@@ -207,6 +207,26 @@ The agent is configured on a settings page (bottom of the project sidebar) inste
 the project's data sources, to add, edit and refresh. One backend and one frontend agent;
 the contract is folded into `docs/contracts.md`.
 
+## Wave 4: a better MCP for analysis (three agents at once)
+
+Learned from building the goal 3 analysis through the MCP tools (30 calls, 9 dashboard
+versions, exploration outside ADA). Contract: `docs/contracts/wave4.md`.
+
+| Agent | Builds |
+| --- | --- |
+| MCP | `query_operator` (ad-hoc SELECT/WHERE/GROUP BY/HAVING over any operator or snapshot, for the agent only, never shown); `build_pipeline` (one batch with references between steps, all or nothing); `edit_dashboard` that copies widgets in, `pin_widget` with a layout; `refresh_source(wait)`; guidance in the server instructions |
+| Documents | `document` sources: PDFs fetched and extracted locally with pdfplumber, as pages or as table rows |
+| Widgets | `chart` widgets in Vega-Lite (target lines, layers, formats); table labels and formats; value `compare_to`; years without thousands separators |
+
+Then integration 4, and the goal 3 analysis rebuilt with the new tools as the acceptance check.
+
+## Functions (later)
+
+A project defines functions: a parameterised pipeline with typed inputs. A `call` operator
+applies one to operators, and lineage shows the call and the function's version. This
+replaces copying SQL between similar pipelines (the county map built three times for three
+indicators) and is the right shape for reuse, not templates.
+
 ## Test consolidation (last)
 
 Merge test files that test the same thing (`test_http` with `test_api_http`, `test_mcp`
@@ -243,5 +263,6 @@ statistic operators; document and browser sources; alert pipelines; data-quality
 ```
 Foundation ──▶ A  B  C  D  E  F ──▶ Integration 1 ──▶ G  H  I  J ──▶ Integration 2 (all done)
 ──▶ Pipeline view ──▶ Wave 3 (backend, frontend) ──▶ Integration 3 (all done)
-──▶ Bottom-up invalidation (proposed) ──▶ Test consolidation
+──▶ Bottom-up invalidation (proposed) ──▶ Test consolidation (done) ──▶ Settings page (done)
+──▶ Wave 4 (MCP, documents, widgets) ──▶ Integration 4 ──▶ Functions (later)
 ```
