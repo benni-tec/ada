@@ -42,6 +42,16 @@
       "Alert": {
         "description": "One instance per rule and key. A region that stays below target alerts once.",
         "properties": {
+          "condition_operator_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatorId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "$ref": "#/components/schemas/Id"
           },
@@ -50,6 +60,16 @@
           },
           "last_run_id": {
             "$ref": "#/components/schemas/Id"
+          },
+          "pipeline_run_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "project_id": {
             "$ref": "#/components/schemas/Id"
@@ -202,8 +222,18 @@
       },
       "AlertRuleChange": {
         "additionalProperties": false,
-        "description": "Fields left out stay as they are.",
+        "description": "Fields left out stay as they are. The interval, maximum age and alert pipeline may\nbe empty: null clears them (an interval of null checks whenever the data changes).",
         "properties": {
+          "alert_pipeline_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatorId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "check_interval_seconds": {
             "anyOf": [
               {
@@ -239,6 +269,31 @@
                 "type": "null"
               }
             ]
+          },
+          "key_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Columns"
+          },
+          "max_data_age_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Data Age Seconds"
           },
           "name": {
             "anyOf": [

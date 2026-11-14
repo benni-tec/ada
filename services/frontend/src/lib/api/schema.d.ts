@@ -877,9 +877,11 @@ export interface components {
          * @description One instance per rule and key. A region that stays below target alerts once.
          */
         Alert: {
+            condition_operator_id?: components["schemas"]["OperatorId"] | null;
             id: components["schemas"]["Id"];
             key: components["schemas"]["JsonObject"];
             last_run_id: components["schemas"]["Id"];
+            pipeline_run_id?: components["schemas"]["Id"] | null;
             project_id: components["schemas"]["Id"];
             /** Resolved At */
             resolved_at?: string | null;
@@ -933,9 +935,11 @@ export interface components {
         };
         /**
          * AlertRuleChange
-         * @description Fields left out stay as they are.
+         * @description Fields left out stay as they are. The interval, maximum age and alert pipeline may
+         *     be empty: null clears them (an interval of null checks whenever the data changes).
          */
         AlertRuleChange: {
+            alert_pipeline_id?: components["schemas"]["OperatorId"] | null;
             /** Check Interval Seconds */
             check_interval_seconds?: number | null;
             /** Enabled */
@@ -943,6 +947,10 @@ export interface components {
             /** Expected Revision */
             expected_revision: number;
             formula?: components["schemas"]["JsonObject"] | null;
+            /** Key Columns */
+            key_columns?: string[] | null;
+            /** Max Data Age Seconds */
+            max_data_age_seconds?: number | null;
             /** Name */
             name?: string | null;
             severity?: components["schemas"]["Severity"] | null;

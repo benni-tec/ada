@@ -104,6 +104,32 @@ def test_rules_are_created_listed_read_and_updated(client: TestClient, setup: Se
     ]
 
 
+def test_a_patch_clears_with_null_and_keeps_what_it_leaves_out(
+    client: TestClient, setup: Setup
+) -> None:
+    rule = created_rule(client, setup, check_interval_seconds=3600, max_data_age_seconds=600)
+    url = f"/api/alert-rules/{rule['id']}"
+
+    kept = client.patch(url, json={"expected_revision": 1, "key_columns": ["region", "start"]})
+    assert kept.status_code == 200, kept.text
+    assert kept.json()["key_columns"] == ["region", "start"]
+    assert (kept.json()["check_interval_seconds"], kept.json()["max_data_age_seconds"]) == (
+        3600,
+        600,
+    )
+
+    cleared = client.patch(
+        url,
+        json={"expected_revision": 2, "check_interval_seconds": None, "max_data_age_seconds": None},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["check_interval_seconds"] is None
+    assert cleared.json()["max_data_age_seconds"] is None
+
+    set_again = client.patch(url, json={"expected_revision": 3, "max_data_age_seconds": 60})
+    assert set_again.json()["max_data_age_seconds"] == 60
+
+
 def test_invalid_rules_answer_with_the_node_at_fault(client: TestClient, setup: Setup) -> None:
     url = f"/api/dashboards/{setup.dashboard.id}/alert-rules"
     response = client.post(url, json=rule_body(setup, formula=BAD_FORMULA))
@@ -264,9 +290,45 @@ async def test_an_agent_creates_checks_and_reads_alerts(mcp: Client, mcp_world: 
     )
     assert updated["revision"] == 2
     checked = await call(mcp, "check_alert_rule", rule_id=rule["id"])
+    # The alert names the operator whose rows show it.
+    assert alert["condition_operator_id"] is not None
     assert [(a["key"], a["state"]) for a in checked["changed"]] == [
         ({"region": "north"}, "resolved")
     ]
+
+
+@pytest.mark.anyio
+async def test_the_update_tool_clears_named_fields(mcp: Client, mcp_world: World) -> None:
+    setup = await mcp_world.setup(DATA)
+    rule = await call(
+        mcp,
+        "create_alert_rule",
+        dashboard_id=str(setup.dashboard.id),
+        name="Coverage below target",
+        operator_id=setup.measure.id,
+        formula=below(80),
+        key_columns=["region"],
+        check_interval_seconds=3600,
+    )
+    changed = await call(
+        mcp,
+        "update_alert_rule",
+        rule_id=rule["id"],
+        expected_revision=1,
+        max_data_age_seconds=600,
+        clear=["check_interval_seconds"],
+    )
+    assert (changed["check_interval_seconds"], changed["max_data_age_seconds"]) == (None, 600)
+    with pytest.raises(ToolError, match="Either set or clear a field, not both"):
+        await mcp.call_tool(
+            "update_alert_rule",
+            {
+                "rule_id": rule["id"],
+                "expected_revision": 2,
+                "max_data_age_seconds": 60,
+                "clear": ["max_data_age_seconds"],
+            },
+        )
 
 
 @pytest.mark.anyio

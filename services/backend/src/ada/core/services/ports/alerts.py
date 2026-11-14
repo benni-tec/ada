@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
-from ada.core.models.base import Id, JsonObject
+from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.operators import OperatorId
 
 
@@ -33,10 +33,16 @@ class AlertService(Protocol):
         name: str | None = None,
         formula: JsonObject | None = None,
         severity: Severity | None = None,
-        check_interval_seconds: int | None = None,
+        check_interval_seconds: Change[int | None] = UNCHANGED,
         enabled: bool | None = None,
+        key_columns: Sequence[str] | None = None,
+        max_data_age_seconds: Change[int | None] = UNCHANGED,
+        alert_pipeline_id: Change[OperatorId | None] = UNCHANGED,
     ) -> AlertRule:
-        """Change the given fields; None leaves a field as it is."""
+        """Change the given fields and check the result as a new rule. For the fields that
+        may be empty (interval, maximum age, alert pipeline) None clears the field and
+        UNCHANGED, the default, keeps it; for the others None keeps it. New key columns
+        resolve the firing alerts of the old keys at the next check."""
         ...
 
     async def check(self, rule_id: Id) -> Sequence[Alert]:

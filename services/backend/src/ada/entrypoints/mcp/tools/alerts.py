@@ -1,14 +1,19 @@
 from collections.abc import Sequence
+from typing import Literal
 
 from dishka import FromDishka
 from fastmcp import FastMCP
 
 from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
-from ada.core.models.base import DomainModel, Id, JsonObject
+from ada.core.models.base import UNCHANGED, Change, DomainModel, Id, JsonObject
+from ada.core.models.errors import Invalid
 from ada.core.models.operators import OperatorId
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.projects import ProjectService
 from ada.entrypoints.mcp.injection import Inject
+
+# The fields of a rule that may be empty, which update_alert_rule can clear.
+type Clearable = Literal["check_interval_seconds", "max_data_age_seconds", "alert_pipeline_id"]
 
 
 class RuleCheck(DomainModel):
@@ -119,23 +124,48 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         severity: Severity | None = None,
         check_interval_seconds: int | None = None,
         enabled: bool | None = None,
+        key_columns: Sequence[str] | None = None,
+        max_data_age_seconds: int | None = None,
+        alert_pipeline_id: OperatorId | None = None,
+        clear: Sequence[Clearable] = (),
     ) -> AlertRule:
         """Change an alert rule: its name, formula (same format as in create_alert_rule),
-        severity, check interval, or whether it is enabled. Pass the `revision` you last
-        read as `expected_revision`; if someone changed the rule since, this fails and you
-        read it again. Fields left out stay as they are. The measure and key columns
-        cannot change: create a new rule for that.
+        severity, check interval, key columns, maximum data age, alert pipeline, or whether
+        it is enabled. Pass the `revision` you last read as `expected_revision`; if someone
+        changed the rule since, this fails and you read it again. Fields left out stay as
+        they are. To empty a field that may be empty, name it in `clear`: no interval
+        checks whenever the data changes, no maximum age leaves freshness to the sources,
+        no alert pipeline runs nothing when an alert fires. The measure cannot change:
+        create a new rule for that. New key columns resolve the alerts of the old keys at
+        the next check.
 
         Alerts follow the new formula from the next check; call check_alert_rule to check
         now. Returns the rule with its new revision."""
+        given = {
+            "check_interval_seconds": check_interval_seconds,
+            "max_data_age_seconds": max_data_age_seconds,
+            "alert_pipeline_id": alert_pipeline_id,
+        }
+        both = [field for field in clear if given[field] is not None]
+        if both:
+            raise Invalid(f"Either set or clear a field, not both: {', '.join(both)}")
+
+        def change[T](field: Clearable, value: T | None) -> Change[T | None]:
+            if field in clear:
+                return None
+            return value if value is not None else UNCHANGED
+
         return await service.update_rule(
             rule_id,
             expected_revision,
             name=name,
             formula=formula,
             severity=severity,
-            check_interval_seconds=check_interval_seconds,
+            check_interval_seconds=change("check_interval_seconds", check_interval_seconds),
             enabled=enabled,
+            key_columns=key_columns,
+            max_data_age_seconds=change("max_data_age_seconds", max_data_age_seconds),
+            alert_pipeline_id=change("alert_pipeline_id", alert_pipeline_id),
         )
 
     @mcp.tool

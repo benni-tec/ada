@@ -113,6 +113,8 @@ def _alert(row: AlertRow) -> Alert:
         last_run_id=row.last_run_id,
         started_at=row.started_at,
         resolved_at=row.resolved_at,
+        condition_operator_id=row.condition_operator_id,
+        pipeline_run_id=row.pipeline_run_id,
     )
 
 
@@ -124,6 +126,8 @@ def _alert_values(alert: Alert) -> dict[str, Any]:
         "last_run_id": alert.last_run_id,
         "started_at": alert.started_at,
         "resolved_at": alert.resolved_at,
+        "condition_operator_id": alert.condition_operator_id,
+        "pipeline_run_id": alert.pipeline_run_id,
     }
 
 

@@ -6,7 +6,7 @@ from uuid import uuid7
 
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
-from ada.core.models.base import Id, JsonObject
+from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import Event, EventType
 from ada.core.models.operators import (
@@ -127,19 +127,33 @@ class Alerts(AlertService):
         name: str | None = None,
         formula: JsonObject | None = None,
         severity: Severity | None = None,
-        check_interval_seconds: int | None = None,
+        check_interval_seconds: Change[int | None] = UNCHANGED,
         enabled: bool | None = None,
+        key_columns: Sequence[str] | None = None,
+        max_data_age_seconds: Change[int | None] = UNCHANGED,
+        alert_pipeline_id: Change[OperatorId | None] = UNCHANGED,
     ) -> AlertRule:
         rule = await self.rules.get(id)
-        changes = {
+        # None keeps a field that cannot be empty; UNCHANGED keeps one that can.
+        kept = {
             "name": name.strip() if name is not None else None,
             "formula": formula,
             "severity": severity,
-            "check_interval_seconds": check_interval_seconds,
             "enabled": enabled,
+            "key_columns": tuple(key_columns) if key_columns is not None else None,
         }
-        updated = rule.model_copy(update={k: v for k, v in changes.items() if v is not None})
-        await self._check(updated)
+        clearable = {
+            "check_interval_seconds": check_interval_seconds,
+            "max_data_age_seconds": max_data_age_seconds,
+            "alert_pipeline_id": alert_pipeline_id,
+        }
+        changes = {k: v for k, v in kept.items() if v is not None} | {
+            k: v for k, v in clearable.items() if v is not UNCHANGED
+        }
+        updated = rule.model_copy(update=changes)
+        measure = await self._check(updated)
+        if updated.alert_pipeline_id is not None:
+            await self._alert_input(updated, measure)
         return await self.rules.update(updated, expected_revision)
 
     async def _check(self, rule: AlertRule) -> Operator:
@@ -244,14 +258,33 @@ class Alerts(AlertService):
             for alert in await self.instances.list(rule.project_id, AlertState.FIRING)
             if alert.rule_id == rule.id
         }
-        changed: list[Alert] = []
-        for canonical, key in alerting_keys.items():
-            if canonical in firing:
-                # Still alerting: the same instance, now also shown by this run.
+        # The pipeline runs for alerts that start now; it does not fail the check, so it
+        # can run before they are written, and they name its run.
+        starting = [key for canonical, key in alerting_keys.items() if canonical not in firing]
+        pipeline_run_id = (
+            await self._run_alert_pipeline(rule, measure, alerting, run)
+            if rule.alert_pipeline_id is not None and starting
+            else None
+        )
+        started_alerts: list[Alert] = []
+        resolved_alerts: list[Alert] = []
+        for canonical, alert in firing.items():
+            if canonical in alerting_keys:
+                # Still alerting: the same instance, now also shown by this run (and by the
+                # rule's current condition, should the formula have changed).
                 await self.instances.save(
-                    firing[canonical].model_copy(update={"last_run_id": run.id})
+                    alert.model_copy(
+                        update={"last_run_id": run.id, "condition_operator_id": alerting.id}
+                    )
                 )
-                continue
+            else:
+                # last_run_id and the condition stay those of the last run that showed it.
+                resolved = alert.model_copy(
+                    update={"state": AlertState.RESOLVED, "resolved_at": now}
+                )
+                await self.instances.save(resolved)
+                resolved_alerts.append(resolved)
+        for key in starting:
             alert = Alert(
                 id=uuid7(),
                 project_id=rule.project_id,
@@ -261,24 +294,15 @@ class Alerts(AlertService):
                 since_run_id=run.id,
                 last_run_id=run.id,
                 started_at=now,
+                condition_operator_id=alerting.id,
+                pipeline_run_id=pipeline_run_id,
             )
             await self.instances.add(alert)
-            changed.append(alert)
-        for canonical, alert in firing.items():
-            if canonical not in alerting_keys:
-                # last_run_id stays the last run that showed the condition.
-                resolved = alert.model_copy(
-                    update={"state": AlertState.RESOLVED, "resolved_at": now}
-                )
-                await self.instances.save(resolved)
-                changed.append(resolved)
+            started_alerts.append(alert)
 
+        changed = started_alerts + resolved_alerts
         for alert in changed:
             await self._publish(alert)
-        if rule.alert_pipeline_id is not None and any(
-            alert.state is AlertState.FIRING for alert in changed
-        ):
-            await self._run_alert_pipeline(rule, measure, alerting, run)
         await self.rules.record_check(rule.id, started)
         return changed
 
@@ -320,23 +344,27 @@ class Alerts(AlertService):
 
     async def _run_alert_pipeline(
         self, rule: AlertRule, measure: Operator, alerting: Operator, check_run: Run
-    ) -> None:
+    ) -> Id | None:
         """Run the alert pipeline on the alerting rows, in a run of its own that fixes the
         check run's snapshots: the same data, but a binding marks a run as a scenario, and
-        the check run must not be one."""
+        the check run must not be one. Returns the run, also when the pipeline failed in
+        it (it says run.failed); None when no run started."""
+        run_id: Id | None = None
         try:
             slot = await self._alert_input(rule, measure)
             run = await self.run_service.start(
                 rule.project_id, PLATFORM, bindings={slot: alerting.id}
             )
+            run_id = run.id
             fixed = await self.runs.get(check_run.id)
             for operator_id, snapshot_id in fixed.snapshots.items():
                 await self.runs.fix_snapshot(run.id, operator_id, snapshot_id)
             assert rule.alert_pipeline_id is not None
             await self.run_service.execute(run.id, rule.alert_pipeline_id)
         except Exception:
-            # The alerts stand without it; the run, if it started, says run.failed.
+            # The alerts stand without it.
             logger.exception("The alert pipeline of rule %s failed", rule.id)
+        return run_id
 
     async def due(self) -> Sequence[AlertRule]:
         now = self.clock.now()

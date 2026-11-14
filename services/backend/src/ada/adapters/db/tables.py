@@ -362,3 +362,9 @@ class AlertRow(Base):
     last_run_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("runs.id", ondelete="RESTRICT"))
     started_at: Mapped[datetime] = mapped_column(_timestamp)
     resolved_at: Mapped[datetime | None] = mapped_column(_timestamp)
+    condition_operator_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("operators.id", ondelete="RESTRICT")
+    )
+    pipeline_run_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("runs.id", ondelete="RESTRICT")
+    )

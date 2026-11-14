@@ -172,6 +172,22 @@ test('an alert opens the rows of its key in the run that showed it', async () =>
   expect(within(table).queryByText('south')).not.toBeInTheDocument()
 })
 
+test('an alert with a recorded condition opens the rows that raised it', async () => {
+  const raised = alert({ condition_operator_id: 'op_condition' })
+  alertsApi({
+    'GET /api/projects/p1/alerts': [{ alert: raised, rule: rule() }],
+    'GET /api/runs/run-2/operators/op_condition/rows': { ...rows, rows: [['north', '2024-01-01', 70]] },
+  })
+  renderAt('/projects/p1/alerts')
+  const list = await screen.findByRole('list', { name: 'Alerts' })
+
+  fireEvent.click(within(list).getByRole('button', { name: 'Show the data that fires' }))
+  const table = await within(list).findByRole('table')
+  expect(within(table).getByText(/Alerting rows for region: north in run/)).toBeInTheDocument()
+  expect(within(table).getAllByRole('row')).toHaveLength(2)
+  expect(within(table).getByText('70')).toBeInTheDocument()
+})
+
 test('a live alert event refetches the feed', async () => {
   const fetch = alertsApi()
   renderAt('/projects/p1/alerts')
@@ -288,6 +304,10 @@ test('an edit sends the rule revision and the changed fields', async () => {
   const form = await screen.findByRole('form', { name: 'Edit rule Coverage below target' })
   fireEvent.click(within(form).getByRole('checkbox', { name: 'Enabled' }))
   fireEvent.change(within(form).getByLabelText('Operator of low'), { target: { value: '>=' } })
+  // An emptied interval is sent as null, which clears it; key columns can change too.
+  fireEvent.change(within(form).getByLabelText('Check every (minutes)'), { target: { value: '' } })
+  fireEvent.change(within(form).getByLabelText('Maximum data age (minutes)'), { target: { value: '30' } })
+  fireEvent.click(await within(form).findByRole('checkbox', { name: 'start' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
 
   await waitFor(() => expect(patched).not.toBeNull())
@@ -296,7 +316,9 @@ test('an edit sends the rule revision and the changed fields', async () => {
     name: 'Coverage below target',
     formula: { ...formula, op: '>=' },
     severity: 'critical',
-    check_interval_seconds: 3600,
+    check_interval_seconds: null,
+    max_data_age_seconds: 1800,
+    key_columns: ['region', 'start'],
     enabled: false,
   })
 })

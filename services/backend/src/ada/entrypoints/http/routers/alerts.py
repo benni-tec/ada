@@ -5,7 +5,7 @@ from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, status
 
 from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
-from ada.core.models.base import DomainModel, Id, JsonObject
+from ada.core.models.base import UNCHANGED, Change, DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard
 from ada.core.models.operators import OperatorId
 from ada.core.services.ports.alerts import AlertService
@@ -31,7 +31,8 @@ class NewAlertRule(Request):
 
 
 class AlertRuleChange(Request):
-    """Fields left out stay as they are."""
+    """Fields left out stay as they are. The interval, maximum age and alert pipeline may
+    be empty: null clears them (an interval of null checks whenever the data changes)."""
 
     expected_revision: int
     name: str | None = None
@@ -39,6 +40,14 @@ class AlertRuleChange(Request):
     severity: Severity | None = None
     check_interval_seconds: int | None = None
     enabled: bool | None = None
+    key_columns: list[str] | None = None
+    max_data_age_seconds: int | None = None
+    alert_pipeline_id: OperatorId | None = None
+
+    def given[T](self, field: str, value: T) -> Change[T]:
+        """The value of a field that may be empty: null when sent as null, UNCHANGED when
+        left out of the body."""
+        return value if field in self.model_fields_set else UNCHANGED
 
 
 class AlertView(DomainModel):
@@ -103,8 +112,11 @@ async def update_alert_rule(
         name=body.name,
         formula=body.formula,
         severity=body.severity,
-        check_interval_seconds=body.check_interval_seconds,
+        check_interval_seconds=body.given("check_interval_seconds", body.check_interval_seconds),
         enabled=body.enabled,
+        key_columns=body.key_columns,
+        max_data_age_seconds=body.given("max_data_age_seconds", body.max_data_age_seconds),
+        alert_pipeline_id=body.given("alert_pipeline_id", body.alert_pipeline_id),
     )
 
 

@@ -35,9 +35,9 @@ function minutes(value: number | null | undefined): string {
 }
 
 /**
- * Creates a rule on a dashboard, or edits one. The measure and key columns are chosen when
- * the rule is created and stay; the formula is built as a tree over the measure's columns.
- * A validation error from the server is shown, and the node it names is marked.
+ * Creates a rule on a dashboard, or edits one. The measure is chosen when the rule is
+ * created and stays; the formula is built as a tree over the measure's columns. A
+ * validation error from the server is shown, and the node it names is marked.
  */
 export function RuleEditor({
   projectId,
@@ -77,8 +77,10 @@ export function RuleEditor({
           name,
           formula: value,
           severity,
-          // The service keeps an interval it is not given, so clearing one is not possible.
+          // Sent even when empty: null clears an interval or a maximum age.
           check_interval_seconds: seconds(interval),
+          max_data_age_seconds: seconds(maxAge),
+          key_columns: keyColumns,
           enabled,
         })
       }
@@ -128,8 +130,7 @@ export function RuleEditor({
       </Field>
       {rule ? (
         <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          On <span className="font-mono">{rule.operator_id}</span>, one alert per{' '}
-          {rule.key_columns.length > 0 ? rule.key_columns.join(' and ') : 'measure'}.
+          On <span className="font-mono">{rule.operator_id}</span>.
         </p>
       ) : (
         <>
@@ -144,30 +145,30 @@ export function RuleEditor({
             }}
           />
           {measure.error && <ErrorNotice error={measure.error} prefix="The measure cannot be read:" />}
-          {columns.length > 0 && (
-            <fieldset className="flex flex-col gap-1">
-              <legend className="text-sm font-medium">Key columns: one alert per combination</legend>
-              <div className="flex flex-wrap gap-3">
-                {columns.map((column) => (
-                  <label key={column.name} className="flex items-center gap-1.5 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={keyColumns.includes(column.name)}
-                      onChange={(event) =>
-                        setKeyColumns(
-                          event.target.checked
-                            ? [...keyColumns, column.name]
-                            : keyColumns.filter((name) => name !== column.name),
-                        )
-                      }
-                    />
-                    {column.name}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          )}
         </>
+      )}
+      {columns.length > 0 && (
+        <fieldset className="flex flex-col gap-1">
+          <legend className="text-sm font-medium">Key columns: one alert per combination</legend>
+          <div className="flex flex-wrap gap-3">
+            {columns.map((column) => (
+              <label key={column.name} className="flex items-center gap-1.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={keyColumns.includes(column.name)}
+                  onChange={(event) =>
+                    setKeyColumns(
+                      event.target.checked
+                        ? [...keyColumns, column.name]
+                        : keyColumns.filter((name) => name !== column.name),
+                    )
+                  }
+                />
+                {column.name}
+              </label>
+            ))}
+          </div>
+        </fieldset>
       )}
       <div className="flex flex-wrap gap-4">
         <Field label="Severity" htmlFor={`${formId}-severity`}>
@@ -187,7 +188,7 @@ export function RuleEditor({
         <Field
           label="Check every (minutes)"
           htmlFor={`${formId}-interval`}
-          hint={rule ? undefined : 'Empty: whenever the data changes'}
+          hint="Empty: whenever the data changes"
         >
           <input
             id={`${formId}-interval`}
@@ -199,19 +200,17 @@ export function RuleEditor({
             className={`${fieldClass} w-32`}
           />
         </Field>
-        {!rule && (
-          <Field label="Maximum data age (minutes)" htmlFor={`${formId}-age`} hint="Older source data is fetched again">
-            <input
-              id={`${formId}-age`}
-              type="number"
-              min={1}
-              step="any"
-              value={maxAge}
-              onChange={(event) => setMaxAge(event.target.value)}
-              className={`${fieldClass} w-32`}
-            />
-          </Field>
-        )}
+        <Field label="Maximum data age (minutes)" htmlFor={`${formId}-age`} hint="Older source data is fetched again">
+          <input
+            id={`${formId}-age`}
+            type="number"
+            min={1}
+            step="any"
+            value={maxAge}
+            onChange={(event) => setMaxAge(event.target.value)}
+            className={`${fieldClass} w-32`}
+          />
+        </Field>
         {rule && (
           <label className="flex items-center gap-1.5 self-end text-sm">
             <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />

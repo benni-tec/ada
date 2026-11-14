@@ -162,6 +162,49 @@ async def test_rules_are_updated_with_a_revision_check(world: World, setup: Setu
         assert (await service.get_rule(rule.id)).revision == 2
 
 
+async def test_an_update_changes_what_create_set_and_clears_what_may_be_empty(
+    world: World, setup: Setup
+) -> None:
+    pipeline_id = await alert_pipeline(world, setup)
+    rule = await world.rule(setup, check_interval_seconds=600)
+    async with world.alerts() as service:
+        updated = await service.update_rule(
+            rule.id,
+            1,
+            key_columns=["region", "start"],
+            max_data_age_seconds=3600,
+            alert_pipeline_id=pipeline_id,
+        )
+    assert updated.key_columns == ("region", "start")
+    assert updated.max_data_age_seconds == 3600
+    assert updated.alert_pipeline_id == pipeline_id
+    # Left out: kept, None or not.
+    assert updated.check_interval_seconds == 600
+    assert updated.name == rule.name
+
+    async with world.alerts() as service:
+        cleared = await service.update_rule(
+            rule.id,
+            2,
+            check_interval_seconds=None,
+            max_data_age_seconds=None,
+            alert_pipeline_id=None,
+        )
+    assert cleared.check_interval_seconds is None
+    assert cleared.max_data_age_seconds is None
+    assert cleared.alert_pipeline_id is None
+    assert cleared.key_columns == ("region", "start")
+
+    async with world.alerts() as service:
+        with pytest.raises(Invalid, match="'nope'"):
+            await service.update_rule(rule.id, 3, key_columns=["nope"])
+        with pytest.raises(Invalid, match="max_data_age_seconds must be positive"):
+            await service.update_rule(rule.id, 3, max_data_age_seconds=0)
+        with pytest.raises(Invalid, match="does not exist"):
+            await service.update_rule(rule.id, 3, alert_pipeline_id="op_missing")
+        assert (await service.get_rule(rule.id)).revision == 3
+
+
 # Checks
 
 
@@ -177,9 +220,11 @@ async def test_a_check_opens_an_alert_per_alerting_key(world: World, setup: Setu
     assert alert.resolved_at is None
 
     # The alert opens the exact rows that raised it: the alerting operator in its run.
+    assert alert.condition_operator_id == alerting_operator_id(setup, rule)
+    assert alert.pipeline_run_id is None
     async with world.container() as request:
         runs = await request.get(RunService)
-        rows = await runs.read(alert.last_run_id, alerting_operator_id(setup, rule))
+        rows = await runs.read(alert.last_run_id, alert.condition_operator_id)
         run = await runs.get(alert.last_run_id)
     assert [row[:1] + row[3:4] for row in rows.rows] == [("north", 70.0)]
     assert run.started_by.kind == "system"
@@ -472,6 +517,8 @@ async def test_the_alert_pipeline_runs_on_the_alerting_rows_when_an_alert_fires(
         run = await repository.get(run_id)
         check_run = await repository.get(alert.last_run_id)
         rows = await runs.read(run_id, pipeline_id)
+    # The alert names the run of its pipeline.
+    assert alert.pipeline_run_id == run_id
     # Bound to the alerting rows, on the same data as the check.
     assert run.bindings == {"alerting": alerting_operator_id(setup, rule)}
     assert check_run.snapshots.items() <= run.snapshots.items()

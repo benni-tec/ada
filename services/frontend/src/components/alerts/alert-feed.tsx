@@ -112,13 +112,15 @@ function FeedItem({ view }: { view: AlertView }) {
 }
 
 /**
- * The measure's rows for the alert's key, in the run that last showed the condition: the
- * alerting period and the history its time functions read. A run is a consistent cut, so
- * this is exactly the data the check saw.
+ * The rows that raised the alert: the output of the rule's condition (an operator over the
+ * measure) for the alert's key, in the run that last showed it. A run is a consistent cut,
+ * so this is exactly what the check saw. Alerts stored before the condition was recorded
+ * show the measure's rows for the key instead.
  */
 function AlertRows({ view }: { view: AlertView }) {
   const { alert, rule } = view
-  const { data, error, isPending } = useQuery(alertRowsQuery(alert.last_run_id, rule.operator_id))
+  const operatorId = alert.condition_operator_id ?? rule.operator_id
+  const { data, error, isPending } = useQuery(alertRowsQuery(alert.last_run_id, operatorId))
   if (isPending) return <Loading what="the data" />
   if (error) return <ErrorNotice error={error} prefix="The data cannot be loaded:" />
   const names = data.columns.map((column) => column.name)
@@ -129,7 +131,8 @@ function AlertRows({ view }: { view: AlertView }) {
     <div className="overflow-x-auto">
       <table className="w-full text-left text-xs">
         <caption className="pb-1 text-left text-neutral-500">
-          Rows for {keyText(alert.key)} in run <span className="font-mono">{alert.last_run_id.slice(-8)}</span>
+          {alert.condition_operator_id ? 'Alerting rows' : 'Rows'} for {keyText(alert.key)} in run{' '}
+          <span className="font-mono">{alert.last_run_id.slice(-8)}</span>
           {data.truncated && ' (the first 1000 rows of the run were searched)'}
         </caption>
         <thead>
