@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from pathlib import Path
 
 import httpx
@@ -7,7 +8,7 @@ from dishka import Provider, Scope
 
 from ada.adapters.clock import SystemClock
 from ada.adapters.memory.tasks import RecordingTaskDispatcher
-from ada.adapters.sources.examples import EXAMPLES, STATFIN_CANCER_DEATHS
+from ada.adapters.sources.examples import EXAMPLES, NORDCAN_LUNG_SURVIVAL, STATFIN_CANCER_DEATHS
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.composition import create_container
 from ada.config import Settings
@@ -111,5 +112,32 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
         assert isinstance(dispatcher, RecordingTaskDispatcher)
         statfin = next(s for s in sources if s.name == STATFIN_CANCER_DEATHS.name)
         assert dispatcher.refreshes == [(statfin.id, True), (statfin.id, True)]
+    finally:
+        await container.close()
+
+
+async def test_seeding_registers_anew_what_an_older_seed_registered_differently(
+    migrated_database_url: str, tmp_path: Path
+) -> None:
+    settings = Settings(
+        database_url=migrated_database_url, valkey_url="redis://127.0.0.1:1/0", data_dir=tmp_path
+    )
+    container = create_container(settings, MemoryBackground())
+    try:
+        async with container() as request:
+            project = await (await request.get(ProjectService)).create(DEMO_PROJECT)
+            # As wave 1 registered it: the period as text only, no period columns.
+            older = NORDCAN_LUNG_SURVIVAL.model_copy(update={"declared_schema": None})
+            old = await (await request.get(SourceService)).register(
+                project.id, **older.registration()
+            )
+        assert await seed_demo(container) == project.id
+        async with container() as request:
+            sources = await (await request.get(SourceService)).list(project.id)
+        names = {source.name: source for source in sources}
+        assert names[NORDCAN_LUNG_SURVIVAL.name].id != old.id
+        assert [s.name for s in sources if s.id == old.id] == [
+            f"{NORDCAN_LUNG_SURVIVAL.name} (before {date.today()})"
+        ]
     finally:
         await container.close()

@@ -117,7 +117,9 @@ async def seed_demo(container: AsyncContainer, refresh: bool = False) -> Id:
     fetch the demo's data now and queue a refresh of the other sources for the worker."""
     async with container() as request:
         project_id, sources = await _project(
-            await request.get(ProjectService), await request.get(SourceService)
+            await request.get(ProjectService),
+            await request.get(SourceService),
+            await request.get(PipelineService),
         )
     # Its own unit of work: the sources are committed before anything is built on them.
     async with container() as request:
@@ -135,7 +137,7 @@ async def seed_demo(container: AsyncContainer, refresh: bool = False) -> Id:
 
 
 async def _project(
-    projects: ProjectService, sources: SourceService
+    projects: ProjectService, sources: SourceService, pipelines: PipelineService
 ) -> tuple[Id, dict[str, DataSource]]:
     existing = [p for p in await projects.list() if p.name == DEMO_PROJECT]
     if existing:
@@ -147,29 +149,33 @@ async def _project(
     registered = {source.name: source for source in await sources.list(project.id)}
     for example in EXAMPLES:
         source = registered.get(example.name)
+        if source is not None and await _outdated(source, example, pipelines):
+            # Registered by an older seed, e.g. without the period columns. Its source
+            # operator keeps the output it was registered with (operators never change),
+            # so an edit would not reach the pipelines: register it anew, keep the old one.
+            await sources.update(
+                source.id, source.revision, name=f"{example.name} (before {date.today()})"
+            )
+            source = None
         if source is None:
             registered[example.name] = await sources.register(project.id, **example.registration())
-        elif _outdated(source, example):
-            # Registered by an older seed: follow the example (e.g. its period options).
-            registered[example.name] = await sources.update(
-                source.id,
-                source.revision,
-                address=example.address,
-                options=example.options,
-                freshness=example.freshness,
-                declared_schema=example.declared_schema,
-            )
     for source in registered.values():
         print(f"  source {source.id}  {source.name}")
     return project.id, registered
 
 
-def _outdated(source: DataSource, example: ExampleSource) -> bool:
-    return (source.address, source.options, source.freshness, source.declared_schema) != (
-        example.address,
-        example.options,
-        example.freshness,
-        example.declared_schema,
+async def _outdated(source: DataSource, example: ExampleSource, pipelines: PipelineService) -> bool:
+    operator = await pipelines.add_source(source.project_id, source.id, SEED)
+    declared = example.declared_schema
+    return (
+        (source.address, source.options, source.freshness)
+        != (
+            example.address,
+            example.options,
+            example.freshness,
+        )
+        or declared is None
+        or (operator.output.columns, operator.output.roles) != (declared.columns, declared.roles)
     )
 
 
