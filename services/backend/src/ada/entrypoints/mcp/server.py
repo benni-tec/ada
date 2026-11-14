@@ -1,14 +1,18 @@
+from pathlib import Path
+
 from dishka import AsyncContainer
 from fastmcp import FastMCP
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from ada.discovery import modules
 from ada.entrypoints.mcp import tools
+from ada.entrypoints.mcp.apps import register_widget_bundles
 from ada.entrypoints.mcp.injection import make_inject
 
 
-def create_mcp(container: AsyncContainer) -> FastMCP:
-    """MCP server exposing ADA to agents, mounted at /mcp."""
+def create_mcp(container: AsyncContainer, widgets_dir: Path | None = None) -> FastMCP:
+    """MCP server exposing ADA to agents, mounted at /mcp. With `widgets_dir`, the built
+    widgets are served as MCP App resources."""
     mcp = FastMCP(
         "ADA",
         instructions=(
@@ -19,6 +23,8 @@ def create_mcp(container: AsyncContainer) -> FastMCP:
     inject = make_inject(container)
     for module in modules(tools):
         module.register(mcp, inject)
+    if widgets_dir is not None:
+        register_widget_bundles(mcp, widgets_dir)
     return mcp
 
 

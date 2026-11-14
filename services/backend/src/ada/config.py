@@ -3,6 +3,9 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# services/widgets/dist of this checkout, for a backend running from source.
+SOURCE_WIDGETS_DIR = Path(__file__).resolve().parents[3] / "widgets" / "dist"
+
 
 class Settings(BaseSettings):
     """Read from the environment. The URLs are required so a misconfigured container
@@ -19,3 +22,7 @@ class Settings(BaseSettings):
 
     # Analysis data: one Parquet file per snapshot, shared by the API and the workers.
     data_dir: Path = Path("data")
+
+    # The built widgets (services/widgets, `moon run widgets:build`), one <type>.html each,
+    # served to the frontend and as MCP App resources. The image sets its own copy.
+    widgets_dir: Path = SOURCE_WIDGETS_DIR

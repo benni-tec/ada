@@ -20,7 +20,7 @@ def create_app(settings: Settings | None = None, *providers: Provider) -> FastAP
     """
     settings = settings or Settings()
     container = create_container(settings, FastapiProvider(), *providers)
-    mcp_app = create_mcp(container).http_app(path="/")
+    mcp_app = create_mcp(container, settings.widgets_dir).http_app(path="/")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

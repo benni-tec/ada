@@ -1,16 +1,23 @@
 from collections.abc import Sequence
+from typing import Annotated
 
 from dishka import FromDishka
 from fastmcp import FastMCP
+from fastmcp.apps import AppConfig
+from pydantic import Field
 
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.operators import OperatorId
-from ada.core.models.widgets import Widget
+from ada.core.models.widgets import Widget, WidgetData
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.mcp.actor import calling_agent
+from ada.entrypoints.mcp.apps import ANY_WIDGET
 from ada.entrypoints.mcp.injection import Inject
 from ada.entrypoints.mcp.links import widget_url
+
+# The same bound as the REST route: rows travel as JSON.
+MAX_WIDGET_ROWS = 10_000
 
 
 class WidgetView(DomainModel):
@@ -20,7 +27,8 @@ class WidgetView(DomainModel):
 
 
 def register(mcp: FastMCP, inject: Inject) -> None:
-    @mcp.tool
+    # A host that supports MCP Apps renders the widget right after the call.
+    @mcp.tool(app=AppConfig(resource_uri=ANY_WIDGET))
     @inject
     async def create_widget(
         operator_id: OperatorId,
@@ -64,6 +72,20 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             session_id=session_id,
         )
         return WidgetView(widget=widget, url=widget_url(widget))
+
+    # For the widget itself, inside an MCP host: the model never needs the numbers.
+    @mcp.tool(app=AppConfig(visibility=["app"]))
+    @inject
+    async def get_widget_data(
+        widget_id: Id,
+        widgets: FromDishka[WidgetService],
+        run_id: Id | None = None,
+        limit: Annotated[int, Field(ge=1, le=MAX_WIDGET_ROWS)] = 1000,
+    ) -> WidgetData:
+        """The data a widget shows: its operator's output in a run, with what the columns
+        mean and whether the numbers are simulated or stale. Called by the widget, not by
+        the model. Without `run_id` a new run is started."""
+        return await widgets.data(widget_id, run_id, limit)
 
     @mcp.tool
     @inject

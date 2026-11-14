@@ -12,6 +12,8 @@ env:
   VALKEY_URL: "redis://localhost:${VALKEY_PORT:-6380}/0"
   # Snapshots of a backend running from source land in <repo>/data, which git ignores.
   DATA_DIR: "$workspaceRoot/data"
+  # Built by `moon run widgets:build`; served at /api/widget-bundles and over MCP.
+  WIDGETS_DIR: "$workspaceRoot/services/widgets/dist"
 
 fileGroups:
   sources:
