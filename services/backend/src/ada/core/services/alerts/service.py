@@ -7,6 +7,7 @@ from uuid import uuid7
 from ada.core.models.actors import PLATFORM
 from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
 from ada.core.models.analysis import Rows
+from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import Event, EventType
@@ -23,6 +24,7 @@ from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import (
     AlertRepository,
     AlertRuleRepository,
+    AttachmentRepository,
     DashboardRepository,
     OperatorRepository,
     RunRepository,
@@ -33,6 +35,7 @@ from ada.core.services.alerts.formula import compile_rule
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
+from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 
 logger = logging.getLogger(__name__)
@@ -61,6 +64,8 @@ class Alerts(AlertService):
         pipelines: PipelineService,
         run_service: RunService,
         sources: SourceService,
+        attached: AttachmentRepository,
+        session_records: SessionService,
         events: EventPublisher,
         clock: Clock,
     ) -> None:
@@ -73,6 +78,8 @@ class Alerts(AlertService):
         self.pipelines = pipelines
         self.run_service = run_service
         self.sources = sources
+        self.attached = attached
+        self.session_records = session_records
         self.events = events
         self.clock = clock
 
@@ -284,8 +291,22 @@ class Alerts(AlertService):
         changed = started_alerts + resolved_alerts
         for alert in changed:
             await self._publish(alert)
+        await self._record_in_sessions(rule, changed)
         await self.rules.record_check(rule.id, started)
         return changed
+
+    async def _record_in_sessions(self, rule: AlertRule, changed: Sequence[Alert]) -> None:
+        """An entry per alert that started or ended, in every session that has the rule
+        attached, so the people following the session see it happen."""
+        if not changed:
+            return
+        for session_id in await self.attached.sessions_with(
+            AttachmentKind.ALERT_RULE, str(rule.id)
+        ):
+            for alert in changed:
+                what = "started" if alert.state is AlertState.FIRING else "ended"
+                text = f"{rule.name}: {key_text(alert.key)} {what}"
+                await self.session_records.record_alert(session_id, alert.id, text)
 
     async def _demand_fresh_data(self, rule: AlertRule) -> None:
         """Force a refresh of every source upstream whose data is older than the rule's
@@ -401,6 +422,13 @@ class Alerts(AlertService):
                 at=self.clock.now(),
             )
         )
+
+
+def key_text(key: JsonObject) -> str:
+    """What an alert is about, as the frontend writes it: "region: north", or "all rows"
+    for a rule without key columns."""
+    parts = [f"{column}: {value}" for column, value in key.items()]
+    return ", ".join(parts) if parts else "all rows"
 
 
 def _json_value(value: object) -> object:

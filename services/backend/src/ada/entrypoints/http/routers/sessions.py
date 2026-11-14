@@ -3,7 +3,6 @@ from collections.abc import Sequence
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, status
-from pydantic import model_validator
 
 from ada.core.models.agents import PostedMessage
 from ada.core.models.base import Id
@@ -25,18 +24,11 @@ class NewSession(Request):
 
 
 class SessionChange(Request):
-    """Rename, or put a dashboard in the panel, or both. `panel_dashboard_id` set to null
-    clears the panel; leaving it out keeps it."""
+    """Rename. What is shown beside the conversation is the session's attachments
+    (/sessions/{id}/attachments)."""
 
     expected_revision: int
-    title: str | None = None
-    panel_dashboard_id: Id | None = None
-
-    @model_validator(mode="after")
-    def _changes_something(self) -> SessionChange:
-        if self.title is None and "panel_dashboard_id" not in self.model_fields_set:
-            raise ValueError("Give a title or a panel_dashboard_id")
-        return self
+    title: str
 
 
 class NewMessage(Request):
@@ -78,13 +70,7 @@ async def get_session(session_id: Id, service: FromDishka[SessionService]) -> Se
 async def change_session(
     session_id: Id, body: SessionChange, service: FromDishka[SessionService]
 ) -> Session:
-    revision = body.expected_revision
-    if body.title is not None:
-        session = await service.rename(session_id, body.title, revision)
-        revision = session.revision
-    if "panel_dashboard_id" in body.model_fields_set:
-        session = await service.show_dashboard(session_id, body.panel_dashboard_id, revision)
-    return session
+    return await service.rename(session_id, body.title, body.expected_revision)
 
 
 @router.get("/sessions/{session_id}/entries")

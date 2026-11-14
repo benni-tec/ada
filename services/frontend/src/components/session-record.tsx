@@ -1,12 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { CircleAlert, CircleCheck, Code, LoaderCircle, Microscope } from 'lucide-react'
+import { Bell, CircleAlert, CircleCheck, Code, LoaderCircle, Microscope } from 'lucide-react'
 
-import { operatorQuery, sessionTurnsQuery, widgetQuery, type Id, type SessionEntry, type Widget } from '@/lib/api'
+import {
+  alertFeedQuery,
+  operatorQuery,
+  sessionTurnsQuery,
+  widgetQuery,
+  type Id,
+  type SessionEntry,
+  type Widget,
+} from '@/lib/api'
+import { cn } from '@/lib/utils'
 import { delegationState, type DelegationState } from '@/lib/research'
 import { groupRecord } from '@/lib/session-record'
 import type { CardRun } from '@/lib/view-run'
 
+import { severityTextClasses } from './alerts/labels'
+import { SeverityBadge } from './alerts/severity'
 import { AgentTurnEntry } from './chat/agent-turn'
 import { RecordedContext } from './chat/context-chips'
 import { Markdown } from './chat/markdown'
@@ -30,6 +41,7 @@ export function SessionRecord({
   widgets,
   run,
   highlightedWidget,
+  empty = 'Nothing here yet. Write a message below, or let an agent work in this session over MCP.',
 }: {
   projectId: Id
   entries: SessionEntry[]
@@ -37,13 +49,11 @@ export function SessionRecord({
   /** The session's run: every widget card reads it. */
   run: CardRun
   highlightedWidget?: string
+  /** What an empty record says; another session's, read only beside this one, has no composer. */
+  empty?: string
 }) {
   if (entries.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-        Nothing here yet. Write a message below, or let an agent work in this session over MCP.
-      </p>
-    )
+    return <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{empty}</p>
   }
   return (
     <ol aria-label="Session record" className="flex flex-col gap-5">
@@ -92,6 +102,8 @@ function EntryView({
       return <DelegationEntry entry={entry} projectId={projectId} />
     case 'report':
       return <ReportEntry entry={entry} projectId={projectId} />
+    case 'alert':
+      return <AlertEntry entry={entry} projectId={projectId} />
     case 'widget':
       return (
         <WidgetEntry
@@ -231,6 +243,39 @@ function ReportEntry({ entry, projectId }: { entry: SessionEntry; projectId: Id 
         )}
       </MessageContent>
     </Message>
+  )
+}
+
+/**
+ * An alert of a rule attached to the session started or ended: one line, coloured by the
+ * rule's severity as on the alerts page. The entry names the alert; the project's alerts
+ * (one query for every such entry) give its rule.
+ */
+function AlertEntry({ entry, projectId }: { entry: SessionEntry; projectId: Id }) {
+  const { data: alerts } = useQuery(alertFeedQuery(projectId))
+  const view = alerts?.find((candidate) => candidate.alert.id === entry.ref)
+  const severity = view?.rule.severity
+  return (
+    <div className="flex gap-3 py-1" data-severity={severity}>
+      {/* The rule's colour as a bar, like the border of an operator entry. */}
+      <span
+        aria-hidden="true"
+        className={cn('w-0.5 shrink-0 rounded-full', severity ? cn('bg-current', severityTextClasses[severity]) : 'bg-border')}
+      />
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="flex flex-wrap items-center gap-2 text-sm">
+          <Bell aria-hidden="true" className={cn('size-3.5 shrink-0', severity ? severityTextClasses[severity] : 'text-muted-foreground')} />
+          {severity && <SeverityBadge severity={severity} />}
+          <span className="font-medium">{entry.text}</span>
+        </p>
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+          <Time value={entry.created_at} />
+          <Link to="/projects/$projectId/alerts" params={{ projectId }} className="underline-offset-2 hover:underline">
+            See the alerts
+          </Link>
+        </p>
+      </div>
+    </div>
   )
 }
 

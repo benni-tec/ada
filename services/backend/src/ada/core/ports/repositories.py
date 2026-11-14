@@ -26,8 +26,10 @@ from ada.core.models.agents import (
     TurnStatus,
 )
 from ada.core.models.alerts import Alert, AlertRule, AlertState
+from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
+from ada.core.models.judges import JudgeDefaults, JudgeOverride, Verdict
 from ada.core.models.operators import Operator, OperatorId
 from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
@@ -250,13 +252,50 @@ class WidgetRepository(Protocol):
         change wins."""
         ...
 
+    async def set_render_error(self, id: Id, error: str | None) -> None:
+        """Store only what went wrong drawing the widget, so a frame's report never undoes
+        a change made at the same moment."""
+        ...
+
     async def list(self, project_id: Id) -> Sequence[Widget]: ...
     async def list_by_session(self, session_id: Id) -> Sequence[Widget]: ...
+
+    async def set_verdict(self, id: Id, verdict: Verdict | None) -> None:
+        """Store a judge's verdict on the widget, and nothing else: a plain write of that
+        one field, so a review that ends during an edit never puts back an old spec."""
+        ...
+
+
+class JudgeSettingsRepository(Protocol):
+    """The judges' global defaults (one record per kind, which always exists) and the
+    projects' overrides. Model ids name a stored model; a deleted model is cleared, as for
+    the session agent."""
+
+    async def defaults(self) -> Sequence[JudgeDefaults]: ...
+
+    async def update_defaults(
+        self, defaults: JudgeDefaults, expected_revision: int
+    ) -> JudgeDefaults: ...
+
+    async def overrides(self, project_id: Id) -> Sequence[JudgeOverride]:
+        """The project's overrides that exist, at most one per kind."""
+        ...
+
+    async def save_override(self, override: JudgeOverride, expected_revision: int) -> JudgeOverride:
+        """Store the override; `expected_revision` 0 adds it (Conflict when one exists)."""
+        ...
 
 
 class DashboardRepository(Protocol):
     async def get(self, id: Id) -> Dashboard: ...
-    async def list(self, project_id: Id) -> Sequence[Dashboard]: ...
+    async def list(self, project_id: Id) -> Sequence[Dashboard]:
+        """In the order people gave them, then the unplaced ones oldest first."""
+        ...
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        """Place the given dashboards in this order, leaving their revisions as they are."""
+        ...
+
     async def add(self, dashboard: Dashboard) -> None: ...
     async def update(self, dashboard: Dashboard, expected_revision: int) -> Dashboard: ...
     async def add_version(self, version: DashboardVersion) -> None: ...
@@ -273,7 +312,14 @@ class TemplateRepository(Protocol):
 
 class ReportRepository(Protocol):
     async def get(self, id: Id) -> Report: ...
-    async def list(self, project_id: Id) -> Sequence[Report]: ...
+    async def list(self, project_id: Id) -> Sequence[Report]:
+        """In the order people gave them, then the unplaced ones oldest first."""
+        ...
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        """Place the given reports in this order, leaving their revisions as they are."""
+        ...
+
     async def add(self, report: Report) -> None: ...
     async def update(self, report: Report, expected_revision: int) -> Report: ...
     async def add_version(self, version: ReportVersion) -> None: ...
@@ -311,4 +357,26 @@ class AlertRepository(Protocol):
 
     async def list(self, project_id: Id, state: AlertState | None = None) -> Sequence[Alert]:
         """Newest first."""
+        ...
+
+
+class AttachmentRepository(Protocol):
+    """What is attached to sessions. An attachment is only added or removed; a session has
+    each thing (kind and ref) attached at most once."""
+
+    async def get(self, id: Id) -> Attachment: ...
+    async def list(self, session_id: Id) -> Sequence[Attachment]: ...
+
+    async def add(self, attachment: Attachment) -> Attachment:
+        """Store the attachment, or return the stored one when the session already has the
+        same kind and ref attached: attaching twice is not an error. The session must
+        exist."""
+        ...
+
+    async def remove(self, id: Id) -> None:
+        """Remove an attachment; NotFound when there is none."""
+        ...
+
+    async def sessions_with(self, kind: AttachmentKind, ref: str) -> Sequence[Id]:
+        """The sessions that have this thing attached, in the order it was attached."""
         ...

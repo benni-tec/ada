@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { Check, ChevronRight, ChevronsUpDown, LayoutGrid, Plus } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
@@ -35,10 +35,14 @@ import {
   createSession,
   dashboardKeys,
   dashboardsQuery,
+  errorMessage,
   keys,
   projectQuery,
   projectsQuery,
+  reportKeys,
   reportsQuery,
+  reorderDashboards,
+  reorderReports,
   sessionsQuery,
   type Id,
   type Session,
@@ -49,6 +53,7 @@ import { defaultSettingsSection, withSettings } from '@/lib/settings-sections'
 
 import { CreateDialog } from './create-dialog'
 import { Hint } from './icon-action'
+import { SortableList, type SortHandle, type SortItem } from './sortable-list'
 import { Vahti } from './vahti/vahti'
 
 /**
@@ -205,14 +210,46 @@ function Empty({ children }: { children: ReactNode }) {
   return <li className="px-2 py-1 text-xs text-sidebar-foreground/60">{children}</li>
 }
 
-/** One item of a type, as a link. */
-function Item({ active, children }: { active?: boolean; children: ReactNode }) {
+/** One item of a type, as a link; one that can be moved gets its list's `sort` props. */
+function Item({
+  active,
+  sort,
+  children,
+}: {
+  active?: boolean
+  sort?: { item: SortItem; handle: SortHandle }
+  children: ReactNode
+}) {
   return (
-    <SidebarMenuSubItem>
-      <SidebarMenuSubButton asChild isActive={active}>
+    <SidebarMenuSubItem {...sort?.item}>
+      <SidebarMenuSubButton asChild isActive={active} {...sort?.handle}>
         {children}
       </SidebarMenuSubButton>
     </SidebarMenuSubItem>
+  )
+}
+
+/** A list people put in their own order: it changes at once here, and stays if the
+ * server agrees; otherwise the list comes back as it was, with the reason. */
+function useReorder<T extends { id: string }>(queryKey: QueryKey, reorder: (ids: Id[]) => Promise<T[]>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: reorder,
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey })
+      queryClient.setQueryData<T[]>(queryKey, (items) =>
+        items ? ids.map((id) => items.find((item) => item.id === id)).filter((item) => item !== undefined) : items,
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+  })
+}
+
+function ReorderFailed({ error }: { error: unknown }) {
+  return (
+    <li role="alert" className="px-2 py-1 text-xs text-red-700 dark:text-red-400">
+      Could not move it: {errorMessage(error)}
+    </li>
   )
 }
 
@@ -302,6 +339,7 @@ function Dashboards({ projectId }: { projectId: Id }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { data: dashboards } = useQuery(dashboardsQuery(projectId))
+  const reorder = useReorder(dashboardKeys.list(projectId), (ids) => reorderDashboards(projectId, ids))
   return (
     <Group
       type="dashboard"
@@ -331,21 +369,25 @@ function Dashboards({ projectId }: { projectId: Id }) {
       }
     >
       {dashboards?.length === 0 && <Empty>No dashboards yet.</Empty>}
-      {dashboards?.map((dashboard) => (
-        <Item key={dashboard.id} active={dashboard.id === dashboardId}>
+      <SortableList items={dashboards ?? []} label={(dashboard) => dashboard.name} onReorder={(ids) => reorder.mutate(ids)}>
+        {(dashboard, sort) => (
+          <Item active={dashboard.id === dashboardId} sort={sort}>
             <Link to="/projects/$projectId/dashboards/$dashboardId" params={{ projectId, dashboardId: dashboard.id }}>
               <span>{dashboard.name}</span>
             </Link>
-        </Item>
-      ))}
+          </Item>
+        )}
+      </SortableList>
+      {reorder.isError && <ReorderFailed error={reorder.error} />}
     </Group>
   )
 }
 
 function Reports({ projectId }: { projectId: Id }) {
   const { reportId } = useParams({ strict: false })
-  const { data } = useQuery(reportsQuery(projectId))
-  const reports = [...(data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))
+  // In the order people gave them; new ones last.
+  const { data: reports } = useQuery(reportsQuery(projectId))
+  const reorder = useReorder(reportKeys.reports(projectId), (ids) => reorderReports(projectId, ids))
   return (
     <Group
       type="report"
@@ -360,14 +402,17 @@ function Reports({ projectId }: { projectId: Id }) {
         </Hint>
       }
     >
-      {data && reports.length === 0 && <Empty>No reports yet.</Empty>}
-      {reports.map((report) => (
-        <Item key={report.id} active={report.id === reportId}>
+      {reports?.length === 0 && <Empty>No reports yet.</Empty>}
+      <SortableList items={reports ?? []} label={(report) => report.name} onReorder={(ids) => reorder.mutate(ids)}>
+        {(report, sort) => (
+          <Item active={report.id === reportId} sort={sort}>
             <Link to="/projects/$projectId/reports/$reportId" params={{ projectId, reportId: report.id }}>
               <span>{report.name}</span>
             </Link>
-        </Item>
-      ))}
+          </Item>
+        )}
+      </SortableList>
+      {reorder.isError && <ReorderFailed error={reorder.error} />}
     </Group>
   )
 }

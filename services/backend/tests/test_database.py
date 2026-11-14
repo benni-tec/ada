@@ -3,6 +3,8 @@ SQL repositories that are easy to get wrong. The services' own tests run on the 
 repositories; what only the database has to get right is here."""
 
 import asyncio
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -20,6 +22,12 @@ from ada.adapters.db.agent_repositories import SqlTurnProgress
 from ada.adapters.db.base import Base
 from ada.adapters.db.migrate import _config, migrate
 from ada.adapters.db.workspace_repositories import SqlResearchCalls
+from ada.adapters.memory.repositories import (
+    MemoryAttachmentRepository,
+    MemoryProjectRepository,
+    MemorySessionRepository,
+    MemoryStore,
+)
 from ada.composition import create_container
 from ada.core.models.agents import (
     AgentTurn,
@@ -31,13 +39,19 @@ from ada.core.models.agents import (
     TurnStatus,
 )
 from ada.core.models.alerts import AlertState
+from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.errors import Conflict, NotFound
+from ada.core.models.judges import Finding, JudgeKind, Outcome, Verdict
 from ada.core.models.operators import OperatorKind
 from ada.core.models.schema import GeoRole, Roles, Schema
 from ada.core.models.sessions import DashboardContext, PipelineContext, SessionAgent
 from ada.core.models.sources import FoundBy, FreshnessKind, FreshnessPolicy, Provenance
 from ada.core.models.time import Interval, TimeRange
-from ada.core.ports.repositories import ProjectRepository
+from ada.core.ports.repositories import (
+    AttachmentRepository,
+    ProjectRepository,
+    SessionRepository,
+)
 from conftest import settings_in
 from db_helpers import Repos, engine_for, make_world, unit_of_work
 from memory import MemoryBackground
@@ -49,7 +63,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == [f"{n:04}" for n in range(1, 12)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(1, 15)]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -67,6 +81,18 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
                 "SELECT instructions FROM agent_settings"
             ).scalar_one()
         assert instructions == ""
+        # 0010 lets widgets read further inputs and keep a drawing error.
+        columns = {c["name"] for c in inspect(engine).get_columns("widgets")}
+        assert {"inputs", "render_error", "verdict"} <= columns
+        # 0012 seeds the judges' defaults: warn, no model, one row per kind.
+        with engine.connect() as connection:
+            judges = connection.exec_driver_sql(
+                "SELECT kind, strictness, model_id, revision FROM judge_defaults ORDER BY kind"
+            ).all()
+        assert [tuple(row) for row in judges] == [
+            ("text_widget", "warn", None, 1),
+            ("widget_code", "warn", None, 1),
+        ]
 
         command.downgrade(_config(database_url), "0001")
 
@@ -76,16 +102,18 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "agent_settings" not in inspector.get_table_names()
         assert "tool_call" not in {c["name"] for c in inspector.get_columns("session_entries")}
         assert "web_usage" not in inspector.get_table_names()
+        assert "session_attachments" not in inspector.get_table_names()
+        assert "judge_defaults" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == [f"{n:04}" for n in range(2, 12)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(2, 15)]
     assert migrate(database_url) == []
 
 
-def test_migrations_from_0005_keep_existing_rows(database_url: str) -> None:
+def test_migrations_from_0006_keep_existing_rows(database_url: str) -> None:
     config = _config(database_url)
     command.upgrade(config, "0005")
-    project, source, session, entry = uuid7(), uuid7(), uuid7(), uuid7()
+    project, source, session, entry, dashboard = uuid7(), uuid7(), uuid7(), uuid7(), uuid7()
     engine = create_engine(database_url)
     try:
         with engine.begin() as connection:
@@ -106,10 +134,17 @@ def test_migrations_from_0005_keep_existing_rows(database_url: str) -> None:
             )
             connection.execute(
                 text(
-                    "INSERT INTO sessions (id, project_id, title, created_at, revision)"
-                    " VALUES (:s, :p, 'T', now(), 1)"
+                    "INSERT INTO dashboards (id, project_id, name, created_at, revision)"
+                    " VALUES (:d, :p, 'D', now(), 1)"
                 ),
-                {"s": session, "p": project},
+                {"d": dashboard, "p": project},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO sessions (id, project_id, title, panel_dashboard_id,"
+                    " created_at, revision) VALUES (:s, :p, 'T', :d, now(), 1)"
+                ),
+                {"s": session, "p": project, "d": dashboard},
             )
             connection.execute(
                 text(
@@ -146,7 +181,13 @@ def test_migrations_from_0005_keep_existing_rows(database_url: str) -> None:
         assert tuple(source_row) == (None, None, None)
         assert tuple(session_row) == ("session", None, 0)
         assert tuple(settings) == (None,)
-        # An ended turn was announced then, so recovery leaves it alone; a running one counts
+        # 0011: the dashboard beside a session becomes its attachment.
+        with engine.connect() as connection:
+            attachment = connection.execute(
+                text("SELECT session_id, kind, ref, title FROM session_attachments")
+            ).one()
+        assert tuple(attachment) == (session, "dashboard", str(dashboard), "D")
+        # 0013: an ended turn was announced then, so recovery leaves it alone; a running one counts
         # from the upgrade, not from its creation, so it is not failed straight away.
         (done, running) = turns
         assert tuple(done) == ("done", True, None)
@@ -319,6 +360,18 @@ async def test_every_get_of_an_unknown_id_names_its_kind(engine: AsyncEngine) ->
 # Round trips: every field of every record comes back as it went in.
 
 
+VERDICT = Verdict(
+    kind=JudgeKind.TEXT_WIDGET,
+    outcome=Outcome.FAIL,
+    passed=False,
+    blocking=True,
+    findings=(Finding(message="Use a placeholder", excerpt="12 %"),),
+    model="test/judge",
+    content_hash="abc",
+    checked_at=factories.NOW,
+)
+
+
 async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
     async with unit_of_work(engine) as repos:
         world = await make_world(repos)
@@ -363,9 +416,13 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
             world.operator.id,
             copied_from=original.id,
             created_at=factories.NOW + timedelta(seconds=1),
+            verdict=VERDICT,
         )
         await repos.widgets.add(original)
         await repos.widgets.add(copy)
+        # A judge's verdict and a drawing error are stored with the widget.
+        original = original.model_copy(update={"verdict": VERDICT, "render_error": "boom"})
+        await repos.widgets.save(original)
         with pytest.raises(NotFound):
             await repos.sessions.add_entry(db_helpers.entry(uuid7()))
 
@@ -387,10 +444,17 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         assert await repos.sessions.entries(session.id) == [first, later]
         assert await repos.widgets.list(world.project.id) == [original, copy]
         assert await repos.widgets.list_by_session(session.id) == [original]
-        updated = await repos.sessions.update(
-            session.model_copy(update={"panel_dashboard_id": dashboard.id}), 1
+        # A verdict is written on its own, leaving the rest of the widget as it was.
+        await repos.widgets.set_verdict(original.id, VERDICT)
+        assert await repos.widgets.get(original.id) == original.model_copy(
+            update={"verdict": VERDICT}
         )
-    assert (updated.panel_dashboard_id, updated.revision) == (dashboard.id, 2)
+        await repos.widgets.set_verdict(copy.id, None)
+        assert (await repos.widgets.get(copy.id)).verdict is None
+        with pytest.raises(NotFound):
+            await repos.widgets.set_verdict(uuid7(), None)
+        updated = await repos.sessions.update(session.model_copy(update={"title": "New"}), 1)
+    assert (updated.title, updated.revision) == ("New", 2)
     # A research session's web calls, each committed at once; other sessions are not counted.
     calls = SqlResearchCalls(engine)
     assert [await calls.use(child.id, 2) for _ in range(3)] == [True, True, False]
@@ -402,6 +466,74 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         await scalar(engine, counted, id=child.id),
         await scalar(engine, counted, id=session.id),
     ) == (2, 0)
+
+
+@dataclass
+class Attaching:
+    projects: ProjectRepository
+    sessions: SessionRepository
+    attachments: AttachmentRepository
+
+
+@pytest.fixture(params=["memory", "database"])
+async def attaching(request: pytest.FixtureRequest) -> AsyncIterator[Attaching]:
+    """The repositories attachments need, in memory and on PostgreSQL: both behave alike."""
+    if request.param == "memory":
+        store = MemoryStore()
+        yield Attaching(
+            MemoryProjectRepository(store),
+            MemorySessionRepository(store),
+            MemoryAttachmentRepository(store),
+        )
+        return
+    url: str = request.getfixturevalue("migrated_database_url")
+    async with engine_for(url) as engine, unit_of_work(engine) as repos:
+        yield Attaching(repos.projects, repos.sessions, repos.attachments)
+
+
+async def test_a_session_has_each_thing_attached_once_in_the_order_attached(
+    attaching: Attaching,
+) -> None:
+    project = factories.project()
+    await attaching.projects.add(project)
+    session, other = factories.session(project.id), factories.session(project.id)
+    await attaching.sessions.add(session)
+    await attaching.sessions.add(other)
+
+    def attachment(session_id: Any, kind: AttachmentKind, ref: str, later: int = 0) -> Attachment:
+        return Attachment(
+            id=uuid7(),
+            session_id=session_id,
+            kind=kind,
+            ref=ref,
+            title=ref,
+            actor=factories.AGENT,
+            created_at=factories.NOW + timedelta(seconds=later),
+        )
+
+    dashboard = attachment(session.id, AttachmentKind.DASHBOARD, "d1")
+    page = attachment(session.id, AttachmentKind.WEB_PAGE, "https://stat.fi/", later=1)
+    elsewhere = attachment(other.id, AttachmentKind.DASHBOARD, "d1", later=2)
+    stored = [await attaching.attachments.add(a) for a in (dashboard, page, elsewhere)]
+    twice = await attaching.attachments.add(attachment(session.id, AttachmentKind.DASHBOARD, "d1"))
+
+    assert stored == [dashboard, page, elsewhere]
+    assert twice == dashboard
+    assert await attaching.attachments.list(session.id) == [dashboard, page]
+    assert await attaching.attachments.get(page.id) == page
+    assert await attaching.attachments.sessions_with(AttachmentKind.DASHBOARD, "d1") == [
+        session.id,
+        other.id,
+    ]
+    assert await attaching.attachments.sessions_with(AttachmentKind.REPORT, "d1") == []
+    await attaching.attachments.remove(page.id)
+    assert await attaching.attachments.list(session.id) == [dashboard]
+    with pytest.raises(NotFound) as error:
+        await attaching.attachments.remove(page.id)
+    assert error.value.kind == "attachment"
+    with pytest.raises(NotFound) as error:
+        await attaching.attachments.add(attachment(uuid7(), AttachmentKind.DASHBOARD, "d2"))
+    assert error.value.kind == "session"
 
 
 async def test_reporting_records_round_trip(engine: AsyncEngine) -> None:
@@ -448,6 +580,35 @@ async def test_reporting_records_round_trip(engine: AsyncEngine) -> None:
     async with unit_of_work(engine) as repos:
         assert await repos.dashboards.get(dashboard.id) == moved
         assert await repos.reports.list(world.project.id) == [latest]
+
+
+async def test_dashboards_and_reports_keep_the_order_people_gave_them(
+    engine: AsyncEngine,
+) -> None:
+    async with unit_of_work(engine) as repos:
+        world = await make_world(repos)
+        project = world.project.id
+        dashboards = [db_helpers.dashboard(project) for _ in range(3)]
+        reports = [db_helpers.report(project, dashboard_id=dashboards[0].id) for _ in range(2)]
+        for dashboard in dashboards:
+            await repos.dashboards.add(dashboard)
+        for report in reports:
+            await repos.reports.add(report)
+    async with unit_of_work(engine) as repos:
+        await repos.dashboards.reorder(project, [dashboards[2].id, dashboards[0].id])
+        await repos.reports.reorder(project, [reports[1].id, reports[0].id])
+        # Another project's id is left alone.
+        await repos.dashboards.reorder(uuid7(), [dashboards[1].id])
+    async with unit_of_work(engine) as repos:
+        listed = await repos.dashboards.list(project)
+        # Placed ones first, the unplaced one after them; no revision moved.
+        assert [d.id for d in listed] == [dashboards[2].id, dashboards[0].id, dashboards[1].id]
+        assert [(d.position, d.revision) for d in listed] == [(0, 1), (1, 1), (None, 1)]
+        assert [r.id for r in await repos.reports.list(project)] == [reports[1].id, reports[0].id]
+        # An edit after the reorder keeps the position.
+        await repos.dashboards.update(listed[0].model_copy(update={"name": "Renamed"}), 1)
+    async with unit_of_work(engine) as repos:
+        assert (await repos.dashboards.get(dashboards[2].id)).position == 0
 
 
 async def test_alert_rules_and_alerts_round_trip(engine: AsyncEngine) -> None:

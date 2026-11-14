@@ -1,9 +1,10 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
-import type { AgentTurn, Part, ToolCall } from '@/lib/api'
+import type { AgentTurn, Attachment, Part, ToolCall } from '@/lib/api'
 
 import {
+  attachment,
   claude,
   dashboard,
   emit,
@@ -59,6 +60,7 @@ function serveSession(overrides: Record<string, unknown> = {}) {
     'GET /api/sessions/s1': session(),
     'GET /api/sessions/s1/entries': record,
     'GET /api/sessions/s1/widgets': [widget(), external],
+    'GET /api/sessions/s1/attachments': [],
     'GET /api/operators/op_1': {
       id: 'op_1',
       project_id: 'p1',
@@ -109,9 +111,9 @@ test('the record reads as a conversation, its widget cards all at the page’s o
   expect(within(own).getByText('Starting the page’s run…')).toBeInTheDocument()
   act(() => startRun())
   const frame = await within(own).findByTitle('Widget: Coverage by region')
-  expect(frame).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r1')
+  expect(frame).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r1&fit=content')
   expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin')
-  expect(await within(made).findByTitle('Widget: Latest coverage')).toHaveAttribute('src', 'http://localhost:5174/value.html#widget=w2&run=r1')
+  expect(await within(made).findByTitle('Widget: Latest coverage')).toHaveAttribute('src', 'http://localhost:5174/value.html#widget=w2&run=r1&fit=content')
   expect(started).toEqual(['r1'])
 
   // A widget made by an external agent names its client and note; `?widget=` marks one.
@@ -120,8 +122,8 @@ test('the record reads as a conversation, its widget cards all at the page’s o
   expect(within(card).getByRole('banner')).toHaveTextContent('The headline number for 2024')
   expect(card).toHaveAttribute('data-highlighted', 'true')
   expect(screen.getByRole('article', { name: 'Coverage by region' })).not.toHaveAttribute('data-highlighted')
-  // No dashboard beside it.
-  expect(screen.queryByRole('complementary', { name: 'Dashboard' })).not.toBeInTheDocument()
+  // Nothing attached beside it.
+  expect(within(screen.getByRole('complementary', { name: 'Attachments' })).queryByRole('tablist')).not.toBeInTheDocument()
 
   // The live stream: a new entry is read, new data starts one new run for every card.
   const stream = FakeEventSource.latest()
@@ -545,4 +547,108 @@ test('a research model that cannot run gives way to the session agent’s, which
   fireEvent.click(within(composer()).getByRole('button', { name: 'Send' }))
   await waitFor(() => expect(sent).toHaveLength(1))
   expect(sent[0]).toMatchObject({ model: 'gemini/flash' })
+})
+
+test('attachments are tabs beside the conversation: attached from the chooser or by an agent, remembered, detached', async () => {
+  const other = session({ id: 's2', title: 'Mortality', created_at: '2026-11-02T09:00:00Z' })
+  const page = attachment({ id: 'att2', kind: 'web_page', ref: 'https://thl.fi/screening', title: 'thl.fi' })
+  const mortality = attachment({ id: 'att3', kind: 'session', ref: 's2', title: 'Mortality' })
+  const map = attachment({ id: 'att4', kind: 'widget', ref: 'w9', title: 'Mortality by county', actor: claude })
+  let attachments: Attachment[] = []
+  const calls: unknown[] = []
+  serveSession({
+    'GET /api/sessions/s1/attachments': () => attachments,
+    'POST /api/sessions/s1/attachments': (body: { kind: string }) => {
+      calls.push(body)
+      const made = body.kind === 'web_page' ? page : mortality
+      attachments = [...attachments, made]
+      return json(made, 201)
+    },
+    'DELETE /api/sessions/s1/attachments/att2': () => {
+      calls.push('detach att2')
+      attachments = attachments.filter((item) => item.id !== 'att2')
+      return new Response(null, { status: 204 })
+    },
+    // What the chooser lists.
+    'GET /api/projects/p1/dashboards': [dashboard()],
+    'GET /api/projects/p1/reports': [],
+    'GET /api/projects/p1/alert-rules': [],
+    'GET /api/projects/p1/sessions': [session(), other],
+    'GET /api/projects/p1/widgets': [widget()],
+    // What the tabs show.
+    'GET /api/sessions/s2': other,
+    'GET /api/sessions/s2/entries': [entry({ id: 'e20', session_id: 's2', text: 'Which counties lag behind?' })],
+    'GET /api/sessions/s2/widgets': [],
+    'GET /api/widgets/w9': widget({ id: 'w9', title: 'Mortality by county', session_id: 's2', created_by: claude }),
+  })
+  renderAt('/projects/p1/sessions/s1')
+
+  // Nothing attached: a short note and the way to attach.
+  const panel = await screen.findByRole('complementary', { name: 'Attachments' })
+  expect(await within(panel).findByText(/Nothing is attached/)).toBeInTheDocument()
+  fireEvent.click(within(panel).getByRole('button', { name: 'Attach' }))
+
+  // A web page by its address, which must be one.
+  const address = await screen.findByLabelText('Web page address')
+  fireEvent.change(address, { target: { value: 'thl.fi' } })
+  fireEvent.submit(screen.getByRole('form', { name: 'Attach a web page' }))
+  expect(await screen.findByText('Give an address that starts with http:// or https://.')).toBeInTheDocument()
+  fireEvent.change(address, { target: { value: 'https://thl.fi/screening' } })
+  fireEvent.submit(screen.getByRole('form', { name: 'Attach a web page' }))
+  const bar = panel.querySelector('header')!
+  expect(bar).toHaveClass('bg-black', 'text-white')
+  expect(await within(bar).findByRole('tab', { name: 'thl.fi' })).toHaveAttribute('aria-selected', 'true')
+  const open = within(screen.getByRole('tabpanel')).getByRole('link', { name: 'Open in a new tab' })
+  expect(open).toHaveAttribute('href', 'https://thl.fi/screening')
+  expect(open).toHaveAttribute('target', '_blank')
+
+  // The chooser lists the project's things, not this session itself; choosing one opens it.
+  fireEvent.click(within(bar).getByRole('button', { name: 'Attach' }))
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Search what to attach' }), { target: { value: 'mort' } })
+  expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([expect.stringContaining('Mortality')])
+  fireEvent.click(screen.getByRole('option', { name: /Mortality/ }))
+  expect(await within(bar).findByRole('tab', { name: 'Mortality' })).toHaveAttribute('aria-selected', 'true')
+  expect(await within(screen.getByRole('tabpanel')).findByText('Which counties lag behind?')).toBeInTheDocument()
+  expect(calls).toEqual([
+    { kind: 'web_page', ref: 'https://thl.fi/screening' },
+    { kind: 'session', ref: 's2' },
+  ])
+
+  // An agent attaches a widget: its tab opens, and is remembered for the session.
+  act(() => FakeEventSource.latest().open())
+  attachments = [...attachments, map]
+  act(() => emit('session.attachment_added', { session_id: 's1', attachment: map }))
+  expect(await within(bar).findByRole('tab', { name: 'Mortality by county' })).toHaveAttribute('aria-selected', 'true')
+  expect(await within(screen.getByRole('tabpanel')).findByRole('article', { name: 'Mortality by county' })).toBeInTheDocument()
+  expect(localStorage.getItem('ada-session-tab:s1')).toBe('att4')
+  fireEvent.click(within(bar).getByRole('tab', { name: 'thl.fi' }))
+  await waitFor(() => expect(localStorage.getItem('ada-session-tab:s1')).toBe('att2'))
+
+  // The × detaches the open tab; the one beside it opens.
+  fireEvent.click(within(bar).getByRole('button', { name: 'Detach thl.fi' }))
+  await waitFor(() => expect(within(bar).queryByRole('tab', { name: 'thl.fi' })).not.toBeInTheDocument())
+  expect(within(bar).getByRole('tab', { name: 'Mortality' })).toHaveAttribute('aria-selected', 'true')
+  expect(calls.at(-1)).toBe('detach att2')
+})
+
+test('an alert of an attached rule shows in the record, coloured by the rule’s severity', async () => {
+  serveSession({
+    'GET /api/sessions/s1/entries': [
+      question,
+      entry({ id: 'e8', kind: 'alert', ref: 'a1', text: 'Coverage below target: region: north started', actor: { kind: 'system', name: 'ada' } }),
+    ],
+    'GET /api/projects/p1/alerts': [
+      {
+        alert: { id: 'a1', rule_id: 'r1', key: { region: 'north' }, state: 'firing', started_at: '2026-11-02T09:00:00Z', resolved_at: null },
+        rule: { id: 'r1', name: 'Coverage below target', severity: 'critical' },
+      },
+    ],
+  })
+  renderAt('/projects/p1/sessions/s1')
+
+  const [, alert] = await items()
+  expect(alert).toHaveTextContent('Coverage below target: region: north started')
+  expect(await within(alert).findByText('Critical')).toBeInTheDocument()
+  expect(alert.querySelector('[data-severity]')).toHaveAttribute('data-severity', 'critical')
+  expect(within(alert).getByRole('link', { name: 'See the alerts' })).toHaveAttribute('href', '/projects/p1/alerts')
 })

@@ -265,7 +265,14 @@ extracted rows (now web sources), the "never ttl" rule, Exa's page contents call
 used it), and its separate `CONTEXT_API_KEY` setting (main's `CONTEXT_DEV_API_KEY` accepts
 both names). Not built from its design: `watch_page` and Gemini Deep Research (stretch).
 
-## Wave 6: custom widgets and session attachments (planned)
+## Wave 6: custom widgets and session attachments (done)
+
+Built as planned, in four workstreams merged together (see `docs/contracts.md`, "Widgets"
+and "Session attachments"), with named widget inputs before it and the judges (another
+session's text widget and judges branch) beside it: custom widgets are checked, reviewed
+by the judge for data written into their code, drawn in a sandboxed frame without
+network, and report their errors back to the agent; report versions keep copies of their
+widgets; a session's attachments replace its one panel dashboard.
 
 Decided with the user:
 
@@ -358,5 +365,5 @@ Foundation ──▶ A  B  C  D  E  F ──▶ Integration 1 ──▶ G  H  I 
 ──▶ Pipeline view ──▶ Wave 3 (backend, frontend) ──▶ Integration 3 (all done)
 ──▶ Bottom-up invalidation (proposed) ──▶ Test consolidation (done) ──▶ Settings page (done)
 ──▶ Wave 4 (MCP, documents, widgets) ──▶ Integration 4 (done) ──▶ Wave 5 (web, sessions, settings)
-──▶ Research merge (done) ──▶ Wave 6 (custom widgets, attachments) ──▶ Functions (later)
+──▶ Research merge (done) ──▶ Wave 6 (custom widgets, attachments; done) ──▶ Functions (later)
 ```

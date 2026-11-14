@@ -9,6 +9,7 @@ import { vi } from 'vitest'
 import type {
   Actor,
   AgentTurn,
+  Attachment,
   Dashboard,
   DashboardSlot,
   LlmModels,
@@ -120,10 +121,22 @@ export function session(overrides: Partial<Session> = {}): Session {
     project_id: 'p1',
     title: 'Why did coverage drop?',
     origin_dashboard_id: null,
-    panel_dashboard_id: null,
     agent: 'session',
     created_at: '2026-11-01T09:05:00Z',
     revision: 1,
+    ...overrides,
+  }
+}
+
+export function attachment(overrides: Partial<Attachment> = {}): Attachment {
+  return {
+    id: 'att1',
+    session_id: 's1',
+    kind: 'dashboard',
+    ref: 'd1',
+    title: 'Screening overview',
+    actor: web,
+    created_at: '2026-11-01T09:07:00Z',
     ...overrides,
   }
 }
@@ -152,6 +165,7 @@ export function widget(overrides: Partial<Widget> = {}): Widget {
     title: 'Coverage by region',
     spec: { series: 'region' },
     note: '',
+    inputs: {},
     created_by: web,
     created_at: '2026-11-01T09:10:00Z',
     ...overrides,

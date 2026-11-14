@@ -35,6 +35,7 @@ pytestmark = pytest.mark.anyio
 
 AGENT = factories.AGENT
 WEB = {"kind": "user", "name": "web"}
+AGENT_JSON = {"kind": "external_agent", "name": "claude-code"}
 
 
 def widget_in(memory: MemoryStore, project_id: Any, **changes: Any) -> Widget:
@@ -356,6 +357,28 @@ def test_pinning_answers_with_the_new_state_or_a_conflict_naming_both_revisions(
     assert [e.payload["version_id"] for e in changes] == [None, pinned["version"]["id"]]
 
 
+def test_dashboards_are_listed_in_the_order_people_gave_them(client: TestClient) -> None:
+    project = new_project(client)
+    first, second, third = (create_dashboard(client, project) for _ in range(3))
+    path = f"/projects/{project['id']}/dashboards"
+
+    reordered = send(
+        client, "PUT", f"{path}/order", {"ids": [third["id"], first["id"], second["id"]]}
+    )
+    added = create_dashboard(client, project)
+    partial = client.put(f"/api{path}/order", json={"ids": [first["id"]]})
+    twice = client.put(f"/api{path}/order", json={"ids": [first["id"]] * 4})
+
+    assert [d["id"] for d in reordered] == [third["id"], first["id"], second["id"]]
+    assert [d["revision"] for d in reordered] == [1, 1, 1]
+    # A new one comes last until it is moved.
+    listed = send(client, "GET", path)
+    assert [d["id"] for d in listed] == [third["id"], first["id"], second["id"], added["id"]]
+    assert (partial.status_code, twice.status_code) == (422, 422)
+    changed = [e for e in events(client, project["id"]) if e.type is EventType.ORDER_CHANGED]
+    assert [e.payload for e in changed] == [{"list": "dashboards"}]
+
+
 def test_a_run_for_a_dashboard_uses_its_range_unless_one_is_given(client: TestClient) -> None:
     project = new_project(client)
     dashboard = create_dashboard(client, project)
@@ -396,15 +419,17 @@ def test_a_dashboard_has_one_agent_session_the_newest_that_shows_it(client: Test
     created = client.post(path)
     found = client.post(path)
     newer = send(client, "POST", sessions, from_here, 201)
-    shown = {"expected_revision": 1, "panel_dashboard_id": dashboard["id"]}
-    send(client, "PATCH", f"/sessions/{newer['id']}", shown)
+    shown = {"kind": "dashboard", "ref": dashboard["id"]}
+    send(client, "POST", f"/sessions/{newer['id']}/attachments", shown, 201)
     newest = client.post(path)
 
     assert (created.status_code, found.status_code) == (201, 200)
     session = created.json()
     assert found.json() == session != started_here
     assert session["title"] == f"{dashboard['name']} (agent)"
-    assert session["origin_dashboard_id"] == session["panel_dashboard_id"] == dashboard["id"]
+    assert session["origin_dashboard_id"] == dashboard["id"]
+    [attached] = send(client, "GET", f"/sessions/{session['id']}/attachments")
+    assert (attached["kind"], attached["ref"]) == ("dashboard", dashboard["id"])
     assert newest.json()["id"] == newer["id"]
     assert client.post(f"/api/dashboards/{uuid7()}/agent-session").status_code == 404
 
@@ -429,7 +454,8 @@ async def test_the_dashboard_tools_are_served_and_documented(agent: tuple[Client
         "pin_widget",
         "edit_dashboard",
         "set_dashboard_time_range",
-        "show_dashboard_in_session",
+        "attach_to_session",
+        "detach_from_session",
     }
     assert expected <= set(tools)
     for name in expected:
@@ -439,7 +465,7 @@ async def test_the_dashboard_tools_are_served_and_documented(agent: tuple[Client
         assert "expected_revision" in tools[name].input_schema["required"], name
 
 
-async def test_an_agent_pins_a_widget_and_shows_the_dashboard_in_its_session(
+async def test_an_agent_pins_a_widget_on_a_dashboard_its_session_shows(
     agent: tuple[Client, Seen],
 ) -> None:
     client, seen = agent
@@ -465,12 +491,14 @@ async def test_an_agent_pins_a_widget_and_shows_the_dashboard_in_its_session(
     pinned = await call(client, "pin_widget", **pin, expected_revision=1)
     with pytest.raises(ToolError, match="revision 2.*expected revision 1"):
         await call(client, "pin_widget", **pin, expected_revision=1)
-    shown = await call(
+    attach = {"session_id": session["id"], "kind": "dashboard", "ref": dashboard_id}
+    # The new dashboard is attached already, so attaching it changes nothing.
+    shown = await call(client, "attach_to_session", **attach)
+    left = await call(
         client,
-        "show_dashboard_in_session",
+        "detach_from_session",
         session_id=session["id"],
-        dashboard_id=dashboard_id,
-        expected_revision=session["revision"],
+        attachment_id=shown["attachment"]["id"],
     )
 
     assert pinned["version"]["created_by"] == {"kind": "external_agent", "name": "claude-code"}
@@ -478,18 +506,13 @@ async def test_an_agent_pins_a_widget_and_shows_the_dashboard_in_its_session(
         await call(client, "get_dashboard", session_id=session["id"], dashboard_id=dashboard_id)
         == pinned
     )
-    assert shown["session"]["panel_dashboard_id"] == dashboard_id
+    assert (shown["attachment"]["title"], shown["attachment"]["actor"]) == ("Overview", AGENT_JSON)
     assert shown["url"] == f"/projects/{project['id']}/sessions/{session['id']}"
+    assert left == []
     elsewhere = await call(client, "create_project", name="Elsewhere")
     foreign = await call(client, "create_session", project_id=elsewhere["id"], title="Look")
     with pytest.raises(ToolError, match="another project"):
-        await call(
-            client,
-            "show_dashboard_in_session",
-            session_id=foreign["id"],
-            dashboard_id=dashboard_id,
-            expected_revision=1,
-        )
+        await call(client, "attach_to_session", **(attach | {"session_id": foreign["id"]}))
 
 
 # PostgreSQL

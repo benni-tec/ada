@@ -36,6 +36,7 @@ from ada.adapters.valkey.events import ValkeyEventPublisher, ValkeyEventStream, 
 from ada.adapters.valkey.tasks import (
     CHECK_ALERT_RULE,
     EXECUTE,
+    JUDGE_WIDGET,
     REFRESH_SOURCE,
     RUN_TURN,
     ValkeyTaskDispatcher,
@@ -53,6 +54,7 @@ from ada.core.ports.events import EventBroadcaster, EventPublisher, EventStream
 from ada.core.ports.repositories import ProjectRepository
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.services.ports.alerts import AlertService
+from ada.core.services.ports.judges import WidgetReviewService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
@@ -92,6 +94,7 @@ class Services:
     refreshes: list[tuple[Id, bool]] = field(default_factory=list)
     executions: list[tuple[Id, str]] = field(default_factory=list)
     checks: list[Id] = field(default_factory=list)
+    reviews: list[Id] = field(default_factory=list)
     due_sources: Sequence[DataSource] = ()
     due_rules: Sequence[AlertRule] = ()
     rules: dict[Id, AlertRule] = field(default_factory=dict)
@@ -109,6 +112,10 @@ class Services:
 
     async def execute(self, run_id: Id, operator_id: str) -> None:
         self.executions.append((run_id, operator_id))
+        self._fail()
+
+    async def review(self, widget_id: Id, run_id: Id | None = None) -> None:
+        self.reviews.append(widget_id)
         self._fail()
 
     async def get_rule(self, id: Id) -> AlertRule:
@@ -183,6 +190,10 @@ class Fakes(Provider):
         return self.services  # type: ignore[return-value]
 
     @provide
+    def reviews(self) -> WidgetReviewService:
+        return self.services  # type: ignore[return-value]
+
+    @provide
     def alert_service(self) -> AlertService:
         return self.alerts  # type: ignore[return-value]
 
@@ -215,7 +226,7 @@ def test_the_tasks_are_registered_and_the_ticks_scheduled(unreachable_settings: 
         task = broker.find_task(name)
         assert task is not None and task.labels["schedule"] == [{"cron": "* * * * *"}], name
     # The names the dispatcher kicks are tasks the worker runs, queued on demand only.
-    for name in (REFRESH_SOURCE, EXECUTE, CHECK_ALERT_RULE, RUN_TURN):
+    for name in (REFRESH_SOURCE, EXECUTE, CHECK_ALERT_RULE, RUN_TURN, JUDGE_WIDGET):
         task = broker.find_task(name)
         assert task is not None and not task.labels.get("schedule"), name
     assert create_scheduler(broker).sources
@@ -245,12 +256,15 @@ async def test_dispatched_tasks_run_through_the_services_with_the_arguments_give
     await dispatcher.check_alert_rule(enabled.id)
     # Disabled after it was queued: not checked.
     await dispatcher.check_alert_rule(disabled.id)
+    widget_id = uuid7()
+    await dispatcher.judge_widget(widget_id)
     await broker.wait_all()  # type: ignore[attr-defined]
 
     assert fakes.services.refreshes == [(source_id, True)]
     assert isinstance(fakes.services.refreshes[0][0], UUID)
     assert fakes.services.executions == [(run_id, "op_abc")]
     assert fakes.alerts.checks == [enabled.id]
+    assert fakes.services.reviews == [widget_id]
 
 
 async def test_a_failing_task_is_logged_and_the_worker_goes_on(
@@ -270,9 +284,11 @@ async def test_a_failing_task_is_logged_and_the_worker_goes_on(
         await kick(broker, CHECK_ALERT_RULE, rule_id=str(checked.id))
         # A rule that no longer exists is logged too.
         await kick(broker, CHECK_ALERT_RULE, rule_id=str(uuid7()))
+        services.failure = RuntimeError("the widget is gone")
+        await kick(broker, JUDGE_WIDGET, widget_id=str(uuid7()))
     await kick(broker, REFRESH_SOURCE, data_source_id=str(uuid7()))
 
-    for message in ("the source is down", "bad SQL", "the measure has no data"):
+    for message in ("the source is down", "bad SQL", "the measure has no data", "widget is gone"):
         assert message in caplog.text
     assert len(services.refreshes) == 2
 
@@ -413,18 +429,35 @@ def test_a_rest_request_answered_with_an_error_rolls_back_and_announces_nothing(
     # The repositories of the composition root: PostgreSQL.
     with TestClient(create_app(settings, MemoryBackground())) as client:
         project = send(client, "POST", "/projects", {"name": "P"}, 201)
-        session = send(client, "POST", f"/projects/{project['id']}/sessions", {"title": "Old"}, 201)
-        # Renames, then fails on the unknown dashboard: the rename must not stay.
-        response = client.patch(
-            f"/api/sessions/{session['id']}",
-            json={"title": "New", "panel_dashboard_id": str(uuid7()), "expected_revision": 1},
+        send(client, "POST", f"/projects/{project['id']}/sessions", {"title": "S"}, 201)
+        source = {
+            "name": "S",
+            "access_kind": "url",
+            "address": "https://example.test/data.csv",
+            "format": "csv",
+            "declared_schema": {"columns": [{"name": "region", "type": "text"}]},
+        }
+        send(client, "POST", f"/projects/{project['id']}/sources", source, 201)
+        pipelines = f"/projects/{project['id']}/pipelines"
+        [reading] = send(client, "GET", pipelines)
+        # Adds the transform, then fails on the unknown session to record it in: the
+        # transform must not stay.
+        response = client.post(
+            f"/api/projects/{project['id']}/operators",
+            json={
+                "kind": "transform",
+                "sql": "SELECT region FROM input_0",
+                "inputs": [reading["operator_id"]],
+                "session_id": str(uuid7()),
+            },
         )
-        title = send(client, "GET", f"/sessions/{session['id']}")["title"]
+        after = send(client, "GET", pipelines)
         container = client.app.state.dishka_container  # type: ignore[attr-defined]
         assert client.portal is not None
         bus = client.portal.call(container.get, MemoryEventBus)
 
-    assert (response.status_code, title) == (404, "Old")
+    assert (response.status_code, after) == (404, [reading])
+    assert response.json()["detail"].startswith("session ")
     # Only the successful requests announced anything.
     assert [e.type for e in bus.published] == [EventType.SESSION_CREATED]
 

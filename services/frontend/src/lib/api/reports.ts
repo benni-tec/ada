@@ -80,6 +80,15 @@ async function unwrap<T>(call: Promise<Answer<T>>): Promise<T> {
 export const listReports = (projectId: Id) =>
   unwrap(api.GET('/api/projects/{project_id}/reports', { params: { path: { project_id: projectId } } }))
 
+/** Every report of the project, once, in the new order; answers the reordered list. */
+export const reorderReports = (projectId: Id, ids: Id[]) =>
+  unwrap(
+    api.PUT('/api/projects/{project_id}/reports/order', {
+      params: { path: { project_id: projectId } },
+      body: { ids },
+    }),
+  )
+
 export const getReport = (id: Id) =>
   unwrap(api.GET('/api/reports/{report_id}', { params: { path: { report_id: id } } }))
 

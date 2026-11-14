@@ -18,3 +18,7 @@ class TaskDispatcher(Protocol):
     async def run_turn(self, turn_id: Id) -> None:
         """Let the in-platform agent answer a message."""
         ...
+
+    async def judge_widget(self, widget_id: Id) -> None:
+        """Let the project's judge review a widget on a fresh run and store the verdict."""
+        ...

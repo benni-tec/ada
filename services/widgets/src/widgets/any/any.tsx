@@ -1,11 +1,13 @@
 import type { Loaded } from '@/lib/runtime'
 import { Chart } from '@/widgets/chart/chart'
+import { Custom } from '@/widgets/custom/custom'
 import { LineChart } from '@/widgets/line-chart/line-chart'
 import { RegionMap } from '@/widgets/map/map'
 import { Table } from '@/widgets/table/table'
+import { Text } from '@/widgets/text/text'
 import { Value } from '@/widgets/value/value'
 
-const TYPES = { value: Value, table: Table, 'line-chart': LineChart, map: RegionMap, chart: Chart }
+const TYPES = { value: Value, table: Table, 'line-chart': LineChart, map: RegionMap, chart: Chart, text: Text, custom: Custom }
 
 /**
  * Every widget type in one bundle, picked by the widget's type once it is loaded.

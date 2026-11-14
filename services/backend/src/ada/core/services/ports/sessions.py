@@ -20,14 +20,8 @@ class SessionService(Protocol):
 
     async def dashboard_agent_session(self, dashboard_id: Id) -> tuple[Session, bool]:
         """The session of a dashboard's agent panel: the newest session that started from
-        the dashboard and shows it beside the conversation, else a new one titled
-        "<dashboard name> (agent)". The flag says whether it was created."""
-        ...
-
-    async def show_dashboard(
-        self, id: Id, dashboard_id: Id | None, expected_revision: int
-    ) -> Session:
-        """Put a dashboard in the panel beside the conversation, or clear the panel."""
+        the dashboard and has it attached, else a new one titled "<dashboard name>
+        (agent)" with the dashboard attached. The flag says whether it was created."""
         ...
 
     # Each of these appends to the session's record and publishes an event.
@@ -67,4 +61,9 @@ class SessionService(Protocol):
 
     async def record_report(self, child_session_id: Id, text: str, actor: Actor) -> SessionEntry:
         """What a research session came back with, as a report entry in its parent."""
+        ...
+
+    async def record_alert(self, session_id: Id, alert_id: Id, text: str) -> SessionEntry:
+        """An alert of a rule attached to the session started or ended, as the platform
+        saw it."""
         ...

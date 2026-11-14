@@ -1,9 +1,9 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
-import type { AgentSettings, DataSource, LlmProvider } from '@/lib/api'
+import type { AgentSettings, DataSource, JudgeDefaults, JudgeKind, JudgeSettings, LlmProvider, Verdict } from '@/lib/api'
 
-import { json, models, project, renderAt, serveApi } from './app'
+import { json, models, project, renderAt, serveApi, widget } from './app'
 
 // The settings modal (docs/contracts.md, "Settings"): what all projects share (models and
 // providers, agent instructions, the web) and this project's (data sources, its
@@ -359,4 +359,173 @@ test('picking the research agent saves it beside the session agent', async () =>
   expect(picker).toHaveValue('')
   fireEvent.change(picker, { target: { value: 'gemini/pro' } })
   await waitFor(() => expect(put).toEqual([{ model_id: 'gemini/pro', expected_revision: 3 }]))
+})
+
+// Judges
+
+function defaults(kind: JudgeKind, overrides: Partial<JudgeDefaults> = {}): JudgeDefaults {
+  return { kind, strictness: 'warn', model_id: null, instructions: '', revision: 1, ...overrides }
+}
+
+function effective(kind: JudgeKind, overrides: Partial<JudgeSettings> = {}): JudgeSettings {
+  return {
+    project_id: 'p1',
+    kind,
+    strictness: 'warn',
+    model_id: 'gemini/pro',
+    instructions: '',
+    overridden: [],
+    revision: 0,
+    ...overrides,
+  }
+}
+
+function verdict(overrides: Partial<Verdict> = {}): Verdict {
+  return {
+    kind: 'text_widget',
+    outcome: 'fail',
+    passed: false,
+    blocking: false,
+    findings: [
+      { message: 'No input backs 13.2', excerpt: 'gap of 13.2', severity: 'error' },
+      { message: 'Cannot tell', excerpt: 'more than before', severity: 'warning' },
+    ],
+    model: 'gemini/pro',
+    reason: null,
+    content_hash: 'sha256:1',
+    checked_at: '2026-11-14T10:00:00Z',
+    ...overrides,
+  }
+}
+
+const card = async (name: string) => screen.findByRole('region', { name })
+
+test('the global judges: one card per kind, saved with its revision; a conflict keeps what was typed', async () => {
+  const put: unknown[] = []
+  let text = defaults('text_widget', { model_id: 'gemini/pro' })
+  let conflictOnce = true
+  serveSettings({
+    'GET /api/llm/models': models(),
+    'GET /api/settings/judges': () => [text, defaults('widget_code')],
+    'PUT /api/settings/judges/text_widget': (body: { expected_revision: number }) => {
+      put.push(body)
+      if (conflictOnce) {
+        conflictOnce = false
+        text = { ...text, revision: 2 }
+        return json({ detail: 'Changed meanwhile', expected_revision: 1, revision: 2 }, 409)
+      }
+      text = { ...text, ...(body as Partial<JudgeDefaults>), revision: 3 }
+      return text
+    },
+  })
+  renderAt('/projects/p1?settings=judges')
+
+  const section = await screen.findByRole('region', { name: 'Judges' })
+  expect(within(await navGroup('Global')).getByRole('link', { name: 'Judges' })).toHaveAttribute('aria-current', 'page')
+  const texts = await card('Text widgets')
+  expect(await card('Custom widget code')).toBeInTheDocument()
+  expect(within(texts).getByRole('radio', { name: /^Warn/ })).toBeChecked()
+  expect(within(texts).getByRole('radio', { name: /^Block/ })).toHaveAccessibleName(/stops a report version/)
+  await waitFor(() => expect(within(texts).getByLabelText('Model')).toHaveValue('gemini/pro'))
+  // No project words in the global section.
+  expect(within(section).queryByText('Global default')).not.toBeInTheDocument()
+
+  fireEvent.click(within(texts).getByRole('radio', { name: /^Block/ }))
+  fireEvent.change(within(texts).getByLabelText('Model'), { target: { value: 'gemini/flash' } })
+  fireEvent.change(within(texts).getByLabelText('Instructions'), { target: { value: 'Years are not figures.' } })
+  fireEvent.click(within(texts).getByRole('button', { name: 'Save' }))
+
+  // Someone saved first: read again, the typed values stay; saving again wins.
+  expect(await within(texts).findByRole('alert')).toHaveTextContent('Someone else changed this judge')
+  expect(within(texts).getByLabelText('Instructions')).toHaveValue('Years are not figures.')
+  fireEvent.click(within(texts).getByRole('button', { name: 'Save' }))
+  expect(await within(texts).findByRole('status')).toHaveTextContent('Saved')
+  const change = { strictness: 'block', model_id: 'gemini/flash', instructions: 'Years are not figures.' }
+  expect(put).toEqual([
+    { ...change, expected_revision: 1 },
+    { ...change, expected_revision: 2 },
+  ])
+})
+
+test('without models, the judge’s model picker links to the models', async () => {
+  serveSettings({
+    'GET /api/llm/models': models({ models: [], session_agent: null }),
+    'GET /api/settings/judges': [defaults('text_widget'), defaults('widget_code')],
+  })
+  const { router } = renderAt('/projects/p1?settings=judges')
+
+  const link = await within(await card('Text widgets')).findByRole('link', { name: /Add one in Global › Models/ })
+  fireEvent.click(link)
+  await waitFor(() => expect(router.state.location.search).toEqual({ settings: 'models' }))
+})
+
+test('a project’s judges: each field inherits or is overridden, goes back to the default, and lists the verdicts', async () => {
+  const put: unknown[] = []
+  let text = effective('text_widget', {
+    strictness: 'block',
+    instructions: 'Years are not figures.\n\nThe target is 70 %.',
+    overridden: ['strictness', 'instructions'],
+    revision: 2,
+  })
+  serveSettings({
+    'GET /api/llm/models': models(),
+    'GET /api/settings/judges': [
+      defaults('text_widget', { model_id: 'gemini/pro', instructions: 'Years are not figures.' }),
+      defaults('widget_code'),
+    ],
+    'GET /api/projects/p1/judges': () => [text, effective('widget_code')],
+    'PUT /api/projects/p1/judges/text_widget': (body: Record<string, unknown>) => {
+      put.push(body)
+      const overridden = new Set(text.overridden)
+      for (const [field, value] of Object.entries(body)) {
+        if (field === 'expected_revision') continue
+        if (value === null) overridden.delete(field)
+        else overridden.add(field)
+      }
+      text = {
+        ...text,
+        strictness: body.strictness === null ? 'warn' : ((body.strictness as JudgeSettings['strictness']) ?? text.strictness),
+        model_id: (body.model_id as string | undefined) ?? text.model_id,
+        overridden: [...overridden],
+        revision: text.revision + 1,
+      }
+      return text
+    },
+    'GET /api/projects/p1/verdicts': (_: unknown, request: Request) =>
+      new URL(request.url).searchParams.get('kind') === 'text_widget'
+        ? [widget({ id: 'w7', type: 'text', title: 'Why the gap', verdict: verdict() })]
+        : [],
+  })
+  renderAt('/projects/p1?settings=project-judges')
+
+  const texts = await card('Text widgets')
+  // The model follows the global default; strictness and instructions are set here.
+  const model = within(texts).getByLabelText('Model')
+  await waitFor(() => expect(model).toHaveValue('gemini/pro'))
+  expect(model.parentElement!.parentElement).toHaveTextContent('Global default')
+  expect(within(texts).getByRole('radio', { name: /^Block/ })).toBeChecked()
+  expect(within(texts).getByText('Years are not figures.', { selector: 'p' })).toBeInTheDocument()
+  expect(within(texts).getByLabelText('Instructions for this project')).toHaveValue('The target is 70 %.')
+  expect(within(texts).getByText(/after the global instructions/)).toBeInTheDocument()
+
+  // Its verdicts: the widget, the outcome with its count, when.
+  const verdicts = within(texts).getByRole('list', { name: 'Recent verdicts' })
+  const item = within(await within(texts).findByRole('link', { name: 'Why the gap' })).getByText('Why the gap').closest('li')!
+  expect(within(verdicts).getByRole('link', { name: 'Why the gap' })).toHaveAttribute('href', '/projects/p1/widgets/w7')
+  expect(item).toHaveTextContent('Failed: 2 findings')
+  expect(within(item).getByRole('time')).toHaveAttribute('dateTime', '2026-11-14T10:00:00Z')
+  expect(within(await card('Custom widget code')).getByText('No widget has been reviewed yet.')).toBeInTheDocument()
+
+  // Overriding the model sends that field only.
+  fireEvent.change(model, { target: { value: 'gemini/flash' } })
+  fireEvent.click(within(texts).getByRole('button', { name: 'Save' }))
+  await waitFor(() => expect(put).toEqual([{ model_id: 'gemini/flash', expected_revision: 2 }]))
+  expect(await within(texts).findByRole('button', { name: 'Use global default for the model' })).toBeInTheDocument()
+
+  // Back to the default: null.
+  fireEvent.click(within(texts).getByRole('button', { name: 'Use global default for the strictness' }))
+  await waitFor(() => expect(put).toHaveLength(2))
+  expect(put[1]).toEqual({ strictness: null, expected_revision: 3 })
+  await waitFor(() => expect(within(texts).getByRole('radio', { name: /^Warn/ })).toBeChecked())
+  expect(within(texts).queryByRole('button', { name: 'Use global default for the strictness' })).not.toBeInTheDocument()
 })

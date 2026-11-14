@@ -88,14 +88,7 @@ export const renameSession = (session: Session, title: string) =>
     }),
   )
 
-/** Puts a dashboard beside the session, or with null takes it away. */
-export const setPanelDashboard = (session: Session, dashboardId: Id | null) =>
-  unwrap(
-    api.PATCH('/api/sessions/{session_id}', {
-      params: { path: { session_id: session.id } },
-      body: { panel_dashboard_id: dashboardId, expected_revision: session.revision },
-    }),
-  )
+// What is shown beside the session is in attachments.ts.
 
 export const listEntries = (sessionId: Id) =>
   unwrap(api.GET('/api/sessions/{session_id}/entries', { params: { path: { session_id: sessionId } } }))

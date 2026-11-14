@@ -22,10 +22,9 @@ class Session(DomainModel):
     id: Id
     project_id: Id
     title: str
-    # The dashboard it was started from, if any.
+    # The dashboard it was started from, if any. What is shown beside the conversation
+    # is its attachments (attachments.py).
     origin_dashboard_id: Id | None = None
-    # The dashboard shown beside the conversation, if any.
-    panel_dashboard_id: Id | None = None
     created_at: datetime
     # Which agent works in it.
     agent: SessionAgent = SessionAgent.SESSION
@@ -51,6 +50,9 @@ class EntryKind(StrEnum):
     DELEGATION = "delegation"
     # What a child session came back with; `ref` is its id and `text` the report.
     REPORT = "report"
+    # An alert of a rule attached to the session started or ended; `ref` is the alert's id
+    # and `text` says which, e.g. "Coverage below target: region: north started".
+    ALERT = "alert"
 
 
 class ToolCallStatus(StrEnum):

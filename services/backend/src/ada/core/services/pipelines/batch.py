@@ -173,7 +173,8 @@ class Batches(BatchService):
 
     async def _widget(self, run: _Run, part: WidgetPart, note: str) -> _Made:
         operator_id = self._operator(run, part.operator)
-        wanted = (operator_id, part.type.strip(), part.title.strip(), part.spec or {})
+        inputs = {name: self._operator(run, value) for name, value in (part.inputs or {}).items()}
+        wanted = (operator_id, part.type.strip(), part.title.strip(), part.spec or {}, inputs)
         if run.session_id is not None:
             candidates = await self.widgets.list_by_session(run.session_id)
         else:
@@ -183,7 +184,13 @@ class Batches(BatchService):
                 if widget.session_id is None and widget.copied_from is None
             ]
         for widget in candidates:
-            if (widget.operator_id, widget.type, widget.title, widget.spec) == wanted:
+            if (
+                widget.operator_id,
+                widget.type,
+                widget.title,
+                widget.spec,
+                widget.inputs,
+            ) == wanted:
                 break
         else:
             # With a session, the widget service records it there.
@@ -196,6 +203,7 @@ class Batches(BatchService):
                 spec=part.spec,
                 note=note,
                 session_id=run.session_id,
+                inputs=inputs,
             )
         run.widgets.append(widget)
         return _Made("widget", str(widget.id))

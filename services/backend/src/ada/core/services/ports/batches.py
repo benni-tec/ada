@@ -68,6 +68,8 @@ class WidgetPart(_Part):
     type: str
     title: str
     spec: JsonObject | None = None
+    # Further inputs by name, each an operator id or "$ref" (see create_widget).
+    inputs: dict[str, str] | None = None
 
 
 class Step(_Part):

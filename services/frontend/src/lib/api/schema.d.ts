@@ -483,6 +483,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/dashboards/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder Dashboards
+         * @description Put the project's dashboards in a new order, as the sidebar lists them.
+         */
+        put: operations["reorder_dashboards_api_projects__project_id__dashboards_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/events": {
         parameters: {
             query?: never;
@@ -524,6 +544,43 @@ export interface paths {
          *     same content gives the same address; files are kept under the data directory.
          */
         post: operations["upload_file_api_projects__project_id__files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/judges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Project Judges
+         * @description What the judges use in the project, one per kind, with the fields it overrides.
+         */
+        get: operations["get_project_judges_api_projects__project_id__judges_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/judges/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Override Project Judge */
+        put: operations["override_project_judge_api_projects__project_id__judges__kind__put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -577,13 +634,33 @@ export interface paths {
         };
         /**
          * List Reports
-         * @description The project's reports, oldest first; with `session_id` or `dashboard_id` only the
-         *     ones that session or dashboard produced.
+         * @description The project's reports in the order people gave them, new ones last; with
+         *     `session_id` or `dashboard_id` only the ones that session or dashboard produced.
          */
         get: operations["list_reports_api_projects__project_id__reports_get"];
         put?: never;
         /** Create Report */
         post: operations["create_report_api_projects__project_id__reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/reports/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder Reports
+         * @description Put the project's reports in a new order, as the sidebar lists them.
+         */
+        put: operations["reorder_reports_api_projects__project_id__reports_order_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -655,6 +732,26 @@ export interface paths {
         put?: never;
         /** Create Template */
         post: operations["create_template_api_projects__project_id__templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/verdicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Verdicts
+         * @description The project's widgets with a verdict (`Widget.verdict`), newest verdict first.
+         */
+        get: operations["list_verdicts_api_projects__project_id__verdicts_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -810,6 +907,48 @@ export interface paths {
         patch: operations["change_session_api_sessions__session_id__patch"];
         trace?: never;
     };
+    "/api/sessions/{session_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Attachments
+         * @description What the session shows beside its conversation, oldest first.
+         */
+        get: operations["list_attachments_api_sessions__session_id__attachments_get"];
+        put?: never;
+        /**
+         * Attach
+         * @description Attach a thing of the session's project, or a web page. Attaching what is attached
+         *     already answers with the attachment as it is.
+         */
+        post: operations["attach_api_sessions__session_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sessions/{session_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Detach */
+        delete: operations["detach_api_sessions__session_id__attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions/{session_id}/entries": {
         parameters: {
             query?: never;
@@ -943,6 +1082,43 @@ export interface paths {
          *     settings' revision, shared with the session agent).
          */
         put: operations["set_agent_instructions_api_settings_agent_instructions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/judges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Judge Defaults
+         * @description The global settings of every kind of judge, beside the LLM registry.
+         */
+        get: operations["get_judge_defaults_api_settings_judges_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/judges/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Judge Defaults */
+        put: operations["set_judge_defaults_api_settings_judges__kind__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1275,12 +1451,54 @@ export interface paths {
         };
         /**
          * Get Widget Data
-         * @description What the widget shows. Without `run_id` a new run is started, with no bindings and
-         *     an open time range.
+         * @description What the widget shows: one input ("main", its own operator, by default). Without
+         *     `run_id` a new run is started, with no bindings and an open time range.
          */
         get: operations["get_widget_data_api_widgets__widget_id__data_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/widgets/{widget_id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Render
+         * @description Called by the widget's frame only. Kept as `render_error`, so the agent that wrote the
+         *     widget sees it; announced with `widget.updated` when it changed.
+         */
+        post: operations["report_render_api_widgets__widget_id__render_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/widgets/{widget_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Widget
+         * @description Review a text or custom widget again, in the request: on `run_id`, else on a new run.
+         *     The widget comes back with its verdict.
+         */
+        post: operations["review_widget_api_widgets__widget_id__review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1472,6 +1690,32 @@ export interface components {
             alert: components["schemas"]["Alert"];
             rule: components["schemas"]["AlertRule"];
         };
+        /**
+         * Attachment
+         * @description Something shown beside a session, as a tab, and listed to its agent. A session has
+         *     each thing attached at most once. An attachment is added or removed, never changed.
+         */
+        Attachment: {
+            actor: components["schemas"]["Actor"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            id: components["schemas"]["Id"];
+            kind: components["schemas"]["AttachmentKind"];
+            /** Ref */
+            ref: string;
+            session_id: components["schemas"]["Id"];
+            /** Title */
+            title: string;
+        };
+        /**
+         * AttachmentKind
+         * @description What can be attached to a session. `ref` is the thing's id, unless said otherwise.
+         * @enum {string}
+         */
+        AttachmentKind: "dashboard" | "report" | "alert_rule" | "source" | "operator" | "session" | "widget" | "web_page";
         /** CheckResult */
         CheckResult: {
             /** Changed */
@@ -1514,6 +1758,8 @@ export interface components {
             id: components["schemas"]["Id"];
             /** Name */
             name: string;
+            /** Position */
+            position?: number | null;
             project_id: components["schemas"]["Id"];
             /**
              * Revision
@@ -1629,7 +1875,20 @@ export interface components {
          * EntryKind
          * @enum {string}
          */
-        EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report";
+        EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report" | "alert";
+        /** Finding */
+        Finding: {
+            /** Excerpt */
+            excerpt: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default error
+             * @enum {string}
+             */
+            severity: "error" | "warning";
+        };
         /**
          * FoundBy
          * @description How an agent came upon a source: the web search and its scope.
@@ -1776,6 +2035,82 @@ export interface components {
         JsonObject: {
             [key: string]: unknown;
         };
+        /**
+         * JudgeDefaults
+         * @description The global settings of one kind, beside the global LLM registry.
+         */
+        JudgeDefaults: {
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            kind: components["schemas"]["JudgeKind"];
+            /** Model Id */
+            model_id?: string | null;
+            /**
+             * Revision
+             * @default 0
+             */
+            revision: number;
+            /** @default warn */
+            strictness: components["schemas"]["Strictness"];
+        };
+        /**
+         * JudgeDefaultsChange
+         * @description Fields left out stay as they are. `model_id` null clears the model (reviews are then
+         *     unchecked); `instructions` "" clears them.
+         */
+        JudgeDefaultsChange: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Instructions */
+            instructions?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            strictness?: components["schemas"]["Strictness"] | null;
+        };
+        /**
+         * JudgeKind
+         * @enum {string}
+         */
+        JudgeKind: "text_widget" | "widget_code";
+        /**
+         * JudgeOverrideChange
+         * @description Fields left out stay as they are; null inherits the global default again.
+         */
+        JudgeOverrideChange: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Instructions */
+            instructions?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            strictness?: components["schemas"]["Strictness"] | null;
+        };
+        /**
+         * JudgeSettings
+         * @description What review uses in a project: the defaults with the project's overrides applied.
+         */
+        JudgeSettings: {
+            /** Instructions */
+            instructions: string;
+            kind: components["schemas"]["JudgeKind"];
+            /** Model Id */
+            model_id: string | null;
+            /**
+             * Overridden
+             * @default []
+             */
+            overridden: string[];
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 0
+             */
+            revision: number;
+            strictness: components["schemas"]["Strictness"];
+        };
         /** Liveness */
         Liveness: {
             /**
@@ -1876,6 +2211,14 @@ export interface components {
             operator_id: components["schemas"]["OperatorId"];
             /** @default warning */
             severity: components["schemas"]["Severity"];
+        };
+        /** NewAttachment */
+        NewAttachment: {
+            kind: components["schemas"]["AttachmentKind"];
+            /** Ref */
+            ref: string;
+            /** Title */
+            title?: string | null;
         };
         /** NewDashboard */
         NewDashboard: {
@@ -2052,6 +2395,10 @@ export interface components {
         };
         /** NewWidget */
         NewWidget: {
+            /** Inputs */
+            inputs?: {
+                [key: string]: components["schemas"]["OperatorId"];
+            } | null;
             /**
              * Note
              * @default
@@ -2096,6 +2443,19 @@ export interface components {
          * @enum {string}
          */
         OperatorKind: "source" | "extract" | "input" | "transform" | "statistic" | "agent";
+        /**
+         * Order
+         * @description A new order of a project's dashboards or reports: every id of them, once.
+         */
+        Order: {
+            /** Ids */
+            ids: components["schemas"]["Id"][];
+        };
+        /**
+         * Outcome
+         * @enum {string}
+         */
+        Outcome: "pass" | "warn" | "fail" | "unchecked";
         /**
          * OutputKind
          * @enum {string}
@@ -2275,6 +2635,14 @@ export interface components {
          */
         RefreshStatus: "fetched" | "unchanged" | "failed";
         /**
+         * RenderReport
+         * @description What the widget's frame found when it drew: the error, or null when it drew.
+         */
+        RenderReport: {
+            /** Error */
+            error: string | null;
+        };
+        /**
          * Report
          * @description A name with versions. Owned by the session or the dashboard that produced it.
          */
@@ -2289,6 +2657,8 @@ export interface components {
             latest_version_id?: components["schemas"]["Id"] | null;
             /** Name */
             name: string;
+            /** Position */
+            position?: number | null;
             project_id: components["schemas"]["Id"];
             /**
              * Revision
@@ -2438,7 +2808,6 @@ export interface components {
             created_at: string;
             id: components["schemas"]["Id"];
             origin_dashboard_id?: components["schemas"]["Id"] | null;
-            panel_dashboard_id?: components["schemas"]["Id"] | null;
             parent_session_id?: components["schemas"]["Id"] | null;
             project_id: components["schemas"]["Id"];
             /**
@@ -2463,15 +2832,14 @@ export interface components {
         };
         /**
          * SessionChange
-         * @description Rename, or put a dashboard in the panel, or both. `panel_dashboard_id` set to null
-         *     clears the panel; leaving it out keeps it.
+         * @description Rename. What is shown beside the conversation is the session's attachments
+         *     (/sessions/{id}/attachments).
          */
         SessionChange: {
             /** Expected Revision */
             expected_revision: number;
-            panel_dashboard_id?: components["schemas"]["Id"] | null;
             /** Title */
-            title?: string | null;
+            title: string;
         };
         /**
          * SessionEntry
@@ -2614,6 +2982,11 @@ export interface components {
             /** Size */
             size: number;
         };
+        /**
+         * Strictness
+         * @enum {string}
+         */
+        Strictness: "off" | "warn" | "block";
         /** Template */
         Template: {
             /** @default {} */
@@ -2739,6 +3112,31 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** Verdict */
+        Verdict: {
+            /** Blocking */
+            blocking: boolean;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Findings
+             * @default []
+             */
+            findings: components["schemas"]["Finding"][];
+            kind: components["schemas"]["JudgeKind"];
+            /** Model */
+            model?: string | null;
+            outcome: components["schemas"]["Outcome"];
+            /** Passed */
+            passed: boolean;
+            /** Reason */
+            reason?: string | null;
+        };
         /**
          * VersionBump
          * @enum {string}
@@ -2779,12 +3177,21 @@ export interface components {
             created_by: components["schemas"]["Actor"];
             id: components["schemas"]["Id"];
             /**
+             * Inputs
+             * @default {}
+             */
+            inputs: {
+                [key: string]: components["schemas"]["OperatorId"];
+            };
+            /**
              * Note
              * @default
              */
             note: string;
             operator_id: components["schemas"]["OperatorId"];
             project_id: components["schemas"]["Id"];
+            /** Render Error */
+            render_error?: string | null;
             session_id?: components["schemas"]["Id"] | null;
             /** @default {} */
             spec: components["schemas"]["JsonObject"];
@@ -2792,12 +3199,17 @@ export interface components {
             title: string;
             /** Type */
             type: string;
+            verdict?: components["schemas"]["Verdict"] | null;
         };
         /**
          * WidgetChange
-         * @description Fields left out stay as they are; a spec replaces the old one whole.
+         * @description Fields left out stay as they are; a spec or inputs replace the old ones whole.
          */
         WidgetChange: {
+            /** Inputs */
+            inputs?: {
+                [key: string]: components["schemas"]["OperatorId"];
+            } | null;
             /** Note */
             note?: string | null;
             spec?: components["schemas"]["JsonObject"] | null;
@@ -2825,6 +3237,11 @@ export interface components {
         WidgetData: {
             /** Columns */
             columns: components["schemas"]["Column"][];
+            /**
+             * Input
+             * @default main
+             */
+            input: string;
             /**
              * Is Scenario
              * @default false
@@ -3796,6 +4213,41 @@ export interface operations {
             };
         };
     };
+    reorder_dashboards_api_projects__project_id__dashboards_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Order"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     project_events_api_projects__project_id__events_get: {
         parameters: {
             query?: never;
@@ -3847,6 +4299,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StoredFile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_project_judges_api_projects__project_id__judges_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeSettings"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    override_project_judge_api_projects__project_id__judges__kind__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                kind: components["schemas"]["JudgeKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JudgeOverrideChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeSettings"];
                 };
             };
             /** @description Validation Error */
@@ -3982,6 +4501,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_reports_api_projects__project_id__reports_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Order"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"][];
                 };
             };
             /** @description Validation Error */
@@ -4215,6 +4769,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Template"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_verdicts_api_projects__project_id__verdicts_get: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["JudgeKind"] | null;
+                outcome?: components["schemas"]["Outcome"] | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Widget"][];
                 };
             };
             /** @description Validation Error */
@@ -4584,6 +5172,102 @@ export interface operations {
             };
         };
     };
+    list_attachments_api_sessions__session_id__attachments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attachment"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_api_sessions__session_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewAttachment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attachment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_api_sessions__session_id__attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_entries_api_sessions__session_id__entries_get: {
         parameters: {
             query?: never;
@@ -4787,6 +5471,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentSettingsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_judge_defaults_api_settings_judges_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeDefaults"][];
+                };
+            };
+        };
+    };
+    set_judge_defaults_api_settings_judges__kind__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: components["schemas"]["JudgeKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JudgeDefaultsChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeDefaults"];
                 };
             };
             /** @description Validation Error */
@@ -5441,6 +6180,7 @@ export interface operations {
             query?: {
                 run_id?: components["schemas"]["Id"] | null;
                 limit?: number;
+                input?: string;
             };
             header?: never;
             path: {
@@ -5457,6 +6197,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WidgetData"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_render_api_widgets__widget_id__render_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenderReport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_widget_api_widgets__widget_id__review_post: {
+        parameters: {
+            query?: {
+                run_id?: components["schemas"]["Id"] | null;
+            };
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Widget"];
                 };
             };
             /** @description Validation Error */

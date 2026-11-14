@@ -1,6 +1,17 @@
 import type { QueryKey } from '@tanstack/react-query'
 
-import { agentKeys, alertKeys, dashboardKeys, keys, reportKeys, type EventType, type LiveEvent, type Part } from '@/lib/api'
+import {
+  agentKeys,
+  alertKeys,
+  attachmentKeys,
+  dashboardKeys,
+  judgeKeys,
+  keys,
+  reportKeys,
+  type EventType,
+  type LiveEvent,
+  type Part,
+} from '@/lib/api'
 
 /** What the page does about one live event. */
 export type Effects = {
@@ -20,6 +31,8 @@ export type Effects = {
 export const EVENT_TYPES: readonly EventType[] = [
   'session.created',
   'session.entry_added',
+  'session.attachment_added',
+  'session.attachment_removed',
   'widget.created',
   'widget.updated',
   'run.started',
@@ -29,6 +42,7 @@ export const EVENT_TYPES: readonly EventType[] = [
   'source.refresh_failed',
   'dashboard.changed',
   'report.version_created',
+  'project.order_changed',
   'alert.firing',
   'alert.resolved',
   'agent.turn_started',
@@ -59,15 +73,27 @@ export function effectsOf(event: LiveEvent): Effects {
       if (session) invalidate.push(keys.entries(session))
       break
     }
+    case 'session.attachment_added':
+    case 'session.attachment_removed': {
+      // The session page's tabs; it opens one an agent added (components/attachments). The
+      // project overview names what each recent session shows.
+      const session = id(payload, 'session_id')
+      if (session) invalidate.push(attachmentKeys.list(session))
+      break
+    }
     case 'widget.updated':
     case 'widget.created': {
-      // A changed spec or type is read by the frames when they load.
-      if (event.type === 'widget.updated') reloadWidgets = true
+      // A changed spec or type is read by the frames when they load. A frame's own report
+      // of how it drew changes only the cards' error line: reloading would draw again,
+      // report again, and never stop when each error reads differently.
+      if (event.type === 'widget.updated' && payload.render_only !== true) reloadWidgets = true
       const session = id(payload, 'session_id')
       if (session) invalidate.push(keys.sessionWidgets(session))
       invalidate.push(keys.projectWidgets(projectId))
       const widget = id(payload, 'widget_id')
       if (widget) invalidate.push(keys.widget(widget))
+      // A review's verdict arrives as an update; the judges' lists show it.
+      invalidate.push(judgeKeys.verdicts(projectId))
       break
     }
     case 'run.started':
@@ -100,6 +126,11 @@ export function effectsOf(event: LiveEvent): Effects {
       if (report) invalidate.push(reportKeys.report(report))
       break
     }
+    case 'project.order_changed':
+      // Someone put the dashboards or the reports in a new order: the sidebar lists them.
+      if (payload.list === 'dashboards') invalidate.push(dashboardKeys.list(projectId))
+      if (payload.list === 'reports') invalidate.push(reportKeys.reports(projectId))
+      break
     // The payload names the alert and rule only, so every alert view refetches (feed,
     // badges); rules show when they were last checked.
     case 'alert.firing':

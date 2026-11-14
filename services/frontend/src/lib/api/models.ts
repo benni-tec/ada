@@ -38,6 +38,8 @@ export type WidgetData = Schemas['WidgetData']
 export type EventType =
   | 'session.created'
   | 'session.entry_added'
+  | 'session.attachment_added'
+  | 'session.attachment_removed'
   | 'widget.created'
   | 'widget.updated'
   | 'run.started'
@@ -47,6 +49,7 @@ export type EventType =
   | 'source.refresh_failed'
   | 'dashboard.changed'
   | 'report.version_created'
+  | 'project.order_changed'
   | 'alert.firing'
   | 'alert.resolved'
   | 'agent.turn_started'

@@ -1,36 +1,12 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Error as LOG_ERROR, loader, type Loader } from 'vega'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Error as LOG_ERROR } from 'vega'
 import embed, { type Result, type VisualizationSpec } from 'vega-embed'
-import { expressionInterpreter } from 'vega-interpreter'
 
 import type { Loaded } from '@/lib/runtime'
+import { useDark } from '@/lib/theme'
 
-import { chartSpec, readPalette, vegaConfig } from './spec'
-
-// A chart's only data is its operator's rows. The backend refuses `url` and `data` in a
-// spec; this loader refuses any file or image a spec could still ask for.
-const refuse = () => Promise.reject(new Error('A chart loads nothing: its data is its operator’s output'))
-const noFiles: Loader = { ...loader(), load: refuse, sanitize: refuse, http: refuse, file: refuse }
-
-const DARK = '(prefers-color-scheme: dark)'
-
-function isDark(): boolean {
-  const theme = document.documentElement.dataset.theme
-  if (theme === 'dark' || theme === 'light') return theme === 'dark'
-  return typeof window.matchMedia === 'function' && window.matchMedia(DARK).matches
-}
-
-/** Follows the theme as followTheme sets it on the root, and the system's. */
-function subscribeTheme(listener: () => void): () => void {
-  const observer = new MutationObserver(listener)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-  const media = typeof window.matchMedia === 'function' ? window.matchMedia(DARK) : null
-  media?.addEventListener('change', listener)
-  return () => {
-    observer.disconnect()
-    media?.removeEventListener('change', listener)
-  }
-}
+import { sandboxed } from './embed'
+import { chartSpec, readPalette, sizesItself, vegaConfig } from './spec'
 
 /**
  * A Vega-Lite chart of the operator's output.
@@ -41,8 +17,11 @@ function subscribeTheme(listener: () => void): () => void {
  */
 export function Chart({ widget, data, roles }: Loaded) {
   const ref = useRef<HTMLDivElement>(null)
-  const dark = useSyncExternalStore(subscribeTheme, isDark)
+  const dark = useDark()
   const [problem, setProblem] = useState<string | null>(null)
+  // The spec drawn last: until the current one is, the chart is busy (and a frame sized to
+  // its content waits for it).
+  const [drawn, setDrawn] = useState<unknown>(null)
   const spec = useMemo(() => chartSpec({ widget, data, roles }), [widget, data, roles])
 
   useEffect(() => {
@@ -56,18 +35,24 @@ export function Chart({ widget, data, roles }: Loaded) {
       renderer: 'svg',
       actions: false,
       defaultStyle: false,
-      ast: true,
-      expr: expressionInterpreter,
-      loader: noFiles,
+      ...sandboxed,
       logLevel: LOG_ERROR,
       config: vegaConfig(readPalette()),
       tooltip: { theme: dark ? 'dark' : 'light' },
     }).then(
       (embedded) => {
-        if (current) result = embedded
-        else embedded.finalize()
+        if (current) {
+          result = embedded
+          setDrawn(spec)
+        } else {
+          embedded.finalize()
+        }
       },
-      (error: unknown) => current && setProblem(error instanceof Error ? error.message : String(error)),
+      (error: unknown) => {
+        if (!current) return
+        setProblem(error instanceof Error ? error.message : String(error))
+        setDrawn(spec)
+      },
     )
     return () => {
       current = false
@@ -83,7 +68,8 @@ export function Chart({ widget, data, roles }: Loaded) {
           This chart’s spec does not render: {problem}
         </p>
       )}
-      <div className="ada-chart" role="figure" aria-label={title}>
+      {/* Sized by its spec, it keeps its own height where the page fits frames to content. */}
+      <div className={sizesItself(widget.spec) ? 'ada-chart ada-chart-intrinsic' : 'ada-chart'} role="figure" aria-label={title} aria-busy={drawn !== spec}>
         <div className="ada-vega" ref={ref} />
       </div>
     </>

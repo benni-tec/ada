@@ -1,7 +1,7 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
-import { dashboard, json, project, renderAt, serveApi, session } from './app'
+import { attachment, dashboard, json, project, renderAt, serveApi, session } from './app'
 
 // The projects page, a project's overview and the frame of every project page: the sidebar,
 // the type above each title, the theme.
@@ -35,6 +35,8 @@ function serveProject(overrides: Record<string, unknown> = {}) {
     'GET /api/projects/p1/alerts': [{ alert: { id: 'a1', state: 'firing' }, rule: { severity: 'critical' } }],
     'GET /api/projects/p1/sources': [source],
     'POST /api/projects/p1/runs': json({ id: 'r1', project_id: 'p1', snapshots: {} }, 201),
+    'GET /api/sessions/s1/attachments': [attachment()],
+    'GET /api/sessions/s2/attachments': [],
     ...overrides,
   })
 }
@@ -79,6 +81,8 @@ test('the overview counts the project’s items, and the sidebar lists them unde
   expect(counts).toHaveTextContent('Data sources1')
   const recent = screen.getByRole('region', { name: 'Recent sessions' })
   expect(await within(recent).findByRole('link', { name: /Why did coverage drop\?/ })).toHaveAttribute('href', '/projects/p1/sessions/s1')
+  // With what it shows beside its conversation.
+  expect(await within(recent).findByText('With Screening overview')).toBeInTheDocument()
   const sources = screen.getByRole('region', { name: 'Data sources' })
   expect(await within(sources).findByText(/Last refresh failed: HTTP 503/)).toBeInTheDocument()
   expect(screen.getByRole('status', { name: 'Live updates: Connecting' })).toBeInTheDocument()
@@ -117,6 +121,7 @@ test('the sidebar collapses to icons and opens again, and creates sessions and d
     'GET /api/sessions/s9': waiting,
     'GET /api/sessions/s9/entries': [],
     'GET /api/sessions/s9/widgets': [],
+    'GET /api/sessions/s9/attachments': [],
     'POST /api/projects/p1/dashboards': (body: unknown) => (created.push(body), json(dashboard({ id: 'd8', name: 'Mortality' }), 201)),
     'GET /api/dashboards/d8': { dashboard: dashboard({ id: 'd8', name: 'Mortality', current_version_id: null }), version: null },
     'GET /api/dashboards/d8/versions': [],
@@ -155,6 +160,44 @@ test('the sidebar collapses to icons and opens again, and creates sessions and d
   await waitFor(() => expect(router.state.location.pathname).toBe('/projects/p1/dashboards/d8'))
   expect(await screen.findByText(/No versions yet/)).toBeInTheDocument()
   expect(created).toEqual([{ title: 'Waiting times' }, { name: 'Mortality' }])
+})
+
+test('dashboards are put in another order with the keyboard, and the new order is saved', async () => {
+  const orders: unknown[] = []
+  const first = dashboard({ id: 'd1', name: 'Screening overview', current_version_id: null })
+  const second = dashboard({ id: 'd2', name: 'Mortality', current_version_id: null })
+  serveProject({
+    'GET /api/projects/p1/dashboards': () => (orders.length ? [second, first] : [first, second]),
+    'PUT /api/projects/p1/dashboards/order': (body: unknown) => (orders.push(body), [second, first]),
+  })
+  // jsdom lays nothing out: give the items rows of their own so arrow keys find a neighbour.
+  const rect = Element.prototype.getBoundingClientRect
+  Element.prototype.getBoundingClientRect = function (this: Element) {
+    const items = [...document.querySelectorAll('[data-sidebar="menu-sub-item"]')]
+    const index = items.indexOf(this)
+    if (index < 0) return rect.call(this)
+    return { x: 0, y: index * 32, top: index * 32, left: 0, bottom: index * 32 + 32, right: 200, width: 200, height: 32, toJSON: () => ({}) }
+  }
+  try {
+    renderAt('/projects/p1')
+    const link = await within(await screen.findByRole('group', { name: 'Dashboards' })).findByRole('link', { name: 'Screening overview' })
+
+    // The sensor listens for the next keys from the next tick on.
+    const tick = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    link.focus()
+    fireEvent.keyDown(link, { code: 'Space', key: ' ' })
+    await tick()
+    fireEvent.keyDown(link, { code: 'ArrowDown', key: 'ArrowDown' })
+    await tick()
+    fireEvent.keyDown(link, { code: 'Space', key: ' ' })
+
+    await waitFor(() => expect(orders).toEqual([{ ids: ['d2', 'd1'] }]))
+    await waitFor(() =>
+      expect(within(group('Dashboards')).getAllByRole('link').map((item) => item.textContent)).toEqual(['Mortality', 'Screening overview']),
+    )
+  } finally {
+    Element.prototype.getBoundingClientRect = rect
+  }
 })
 
 test('the theme can be set apart from the system’s, and the page follows it', async () => {

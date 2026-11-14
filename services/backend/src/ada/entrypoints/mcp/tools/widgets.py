@@ -8,7 +8,7 @@ from pydantic import Field
 
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.operators import OperatorId
-from ada.core.models.widgets import Widget, WidgetData
+from ada.core.models.widgets import MAIN_INPUT, Widget, WidgetData
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.mcp.actor import calling_agent
@@ -25,6 +25,9 @@ class WidgetView(DomainModel):
     widget: Widget
     # Where a person sees it in the frontend, relative to the host serving ADA.
     url: str
+    # What is not wrong but likely unintended, e.g. a text widget's input that no
+    # placeholder reads.
+    warnings: tuple[str, ...] = ()
 
 
 def register(mcp: FastMCP, inject: Inject) -> None:
@@ -40,6 +43,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         widgets: FromDishka[WidgetService],
         spec: JsonObject | None = None,
         note: str = "",
+        inputs: dict[str, OperatorId] | None = None,
     ) -> WidgetView:
         """Show an operator's output to the person you work with. Pass only the operator
         id: the widget fetches its own data from the platform, so no numbers go through
@@ -82,6 +86,78 @@ def register(mcp: FastMCP, inject: Inject) -> None:
            "layer": [{"mark": "bar"},
             {"mark": {"type": "text", "dy": -6},
              "encoding": {"text": {"field": "value", "format": ".1f"}}}]}
+        - "custom", your own drawing code, for what no other type can show: `spec` is
+          {"code": "<ES module>", "css": "<optional>", "libraries": ["d3", "vega-lite"]
+          (optional, either or both)}, no other keys. The module's default export draws,
+          `export default function render(root, data, ada)`, and may return a cleanup
+          function (or a promise of one), called before the next render. It runs again on
+          an emptied `root` after a new run or a theme change; resizing does not, so
+          redraw in `ada.onResize(({width, height}) => ...)`.
+          `data.main` is the widget's own operator and `data.inputs[name]` each input
+          ("main" too): {columns: [{name, type}], rows: [{column: value}] (dates as ISO
+          strings), roles (the output's time, geo and measure roles), truncated (more than
+          5,000 rows)}; and `data.run_id`, `data.is_scenario`, `data.is_stale`.
+          `ada.theme` ("light" or "dark"), `ada.colors` {foreground, muted, background,
+          border, accent, positive, negative, warning, series: 8 colours}, `ada.size`
+          {width, height}, `ada.format.number(value, {format, decimals})` and
+          `ada.format.date(value, {grain: "day" | "month" | "quarter" | "year"})` (the
+          platform's formats), `ada.libraries.d3` (d3 7.9) and `ada.libraries.vegaEmbed`
+          (vega-embed; a plain Vega-Lite chart is the "chart" type), only those listed,
+          and `ada.error(message)` to report a problem without throwing. In `css` the
+          colours are variables, `--ada-<name>` for each named one (`--ada-foreground` ...
+          `--ada-warning`) and `--ada-series-1` to `--ada-series-8`, and the frame's root
+          has `data-theme`.
+          It runs in a sandboxed frame without network. Refused anywhere in `code`,
+          comments included: fetch, XMLHttpRequest, WebSocket, EventSource, sendBeacon,
+          importScripts, document.cookie, localStorage, sessionStorage, indexedDB,
+          `import` (statements and `import(`), eval, Function(, window.parent, window.top,
+          parent., top., opener, and any http(s):// address but the http://www.w3.org/
+          namespaces; in `css`, @import and url() of an http(s) address. `code` and `css`
+          at most 64 KB together. Never write data into the code: an array literal of more
+          than 12 numbers is refused, and a judge reviews the code with a sample of the
+          inputs. A failing review refuses the widget with its findings; warnings are kept
+          as its `verdict`. What goes wrong when it draws is kept as its `render_error`:
+          check with `get_widget`, fix with `update_widget`.
+          Bars of `value` by `region`, with "libraries": ["d3"]:
+          export default function render(root, data, ada) {
+            const d3 = ada.libraries.d3;
+            const rows = data.main.rows;
+            const { width, height } = ada.size;
+            const m = { top: 8, right: 8, bottom: 24, left: 56 };
+            const x = d3.scaleBand(rows.map((r) => r.region), [m.left, width - m.right])
+              .padding(0.2);
+            const y = d3.scaleLinear([0, d3.max(rows, (r) => r.value)],
+              [height - m.bottom, m.top]).nice();
+            const svg = d3.select(root).append("svg")
+              .attr("width", width).attr("height", height);
+            svg.append("g").attr("transform", `translate(0,${height - m.bottom})`)
+              .call(d3.axisBottom(x));
+            svg.append("g").attr("transform", `translate(${m.left},0)`)
+              .call(d3.axisLeft(y).tickFormat((v) => ada.format.number(v)));
+            svg.selectAll("rect").data(rows).join("rect")
+              .attr("x", (r) => x(r.region)).attr("y", (r) => y(r.value))
+              .attr("width", x.bandwidth()).attr("height", (r) => y(0) - y(r.value))
+              .attr("fill", ada.colors.series[0])
+              .append("title").text((r) => `${r.region}: ${ada.format.number(r.value)}`);
+          }
+
+        - "text", headings and explanations in Markdown: `markdown` (at most 20,000
+          characters; CommonMark with GFM tables and links, no raw HTML, no images).
+          Every figure in it comes from an input through a placeholder, never typed:
+          {{main.value}} is the column `value` of the widget's own operator, {{gap.share}}
+          that of the input `gap`; {{gap.share:percent}} formats it ("integer" 12,346,
+          "number1" 12,345.7, "percent" 72.5 %, "plain" 12345.678, "signed1" +1.3);
+          {{gap.share[county=Kainuu]}} takes the row where `county` is Kainuu (filters
+          chain: [a=x][b=y]); {{gap}} shows the whole input as a small table (at most 50
+          rows). A value is the latest period's when the input has a time role, else the
+          input's only row: filter or aggregate in SQL so one row remains. Write \\{{ for
+          literal braces. Every placeholder is checked against its input's columns; an
+          input no placeholder reads comes back in `warnings`. A judge then reviews the
+          text against the data (`widget.verdict`; `review_widget` waits for it): a
+          number typed into the text, or a statement the data contradicts, is a finding.
+          Example, with inputs {"gap": <operator id>}: "## Screening gap\n\nCoverage
+          was {{gap.coverage:percent}} in {{gap.year}}, {{gap.change:signed1}} points
+          against the year before."
 
         Number formats are "integer", "number", "percent" (the value is already in
         percent: 72.5 gives "72.5 %") or "plain" (no thousands separator). Integer
@@ -94,9 +170,16 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
         A widget marks simulated and outdated data by itself.
 
+        `inputs` names further operators of the project the widget reads besides its own,
+        e.g. {"targets": "<operator id>"}: lowercase names (letters, digits, _), at most 8;
+        its own operator is the input "main". All are read in the same run and frozen
+        together in reports. A "text" widget reads the inputs its placeholders name and a
+        custom widget all of them (`data.inputs`); the other built-in types read only
+        "main".
+
         Give a one-line `note` on what the widget shows and why: the session shows the
-        widget with the note on its card. Returns the widget and its `url`: give
-        the url to the person."""
+        widget with the note on its card. Returns the widget, its `url` (give it to the
+        person) and any `warnings`."""
         operator = await pipelines.get(operator_id)
         widget = await widgets.create(
             operator.project_id,
@@ -107,8 +190,11 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             spec=spec,
             note=note,
             session_id=session_id,
+            inputs=inputs,
         )
-        return WidgetView(widget=widget, url=widget_url(widget))
+        return WidgetView(
+            widget=widget, url=widget_url(widget), warnings=tuple(await widgets.warnings(widget.id))
+        )
 
     @mcp.tool(app=AppConfig(resource_uri=ANY_WIDGET))
     @inject
@@ -120,15 +206,37 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         note: str | None = None,
         type: str | None = None,
         spec: JsonObject | None = None,
+        inputs: dict[str, OperatorId] | None = None,
     ) -> WidgetView:
-        """Change a widget in place: its title, note, type or spec; what you leave out stays.
+        """Change a widget in place: its title, note, type, spec or further inputs; what you
+        leave out stays. New `inputs` replace the old ones whole ({} removes them all).
         A new `spec` replaces the old one whole (send all of it) and is checked against the
         operator as in `create_widget`, whose description lists every type's settings. Use
-        it to fix a chart or add labels instead of creating a second widget. The widget's
-        operator cannot change: for other data, create a widget. A copy on a dashboard is a
-        widget of its own (its id is in the dashboard's slots) and does not change with the
-        original. Returns the widget and its `url`."""
-        widget = await widgets.update(widget_id, title=title, note=note, type=type, spec=spec)
+        it to fix a chart or add labels instead of creating a second widget. A new spec,
+        type or inputs clears `render_error`, and the judge reviews a changed text or
+        custom widget again. The widget's operator cannot change: for other data, create a
+        widget. A copy on a dashboard or in a report version is a widget of its own (its id
+        is in the dashboard's slots or the version's blocks) and does not change with the
+        original. Returns the widget, its `url` and any `warnings`."""
+        widget = await widgets.update(
+            widget_id, title=title, note=note, type=type, spec=spec, inputs=inputs
+        )
+        return WidgetView(
+            widget=widget, url=widget_url(widget), warnings=tuple(await widgets.warnings(widget.id))
+        )
+
+    @mcp.tool
+    @inject
+    async def get_widget(
+        session_id: SessionId, widget_id: Id, widgets: FromDishka[WidgetService]
+    ) -> WidgetView:
+        """Read one widget with its url: its type, spec (a custom widget's code), inputs,
+        `render_error` (what went wrong the last time it was drawn in ADA, null when it
+        drew) and `verdict` (the judge's review of a custom widget's code: its outcome and
+        findings). After creating or changing a custom widget, check here that it drew,
+        then fix it with `update_widget`. A widget is drawn when someone has it open, so a
+        new one may show no error yet."""
+        widget = await widgets.get(widget_id)
         return WidgetView(widget=widget, url=widget_url(widget))
 
     # For the widget itself, inside an MCP host: the model never needs the numbers.
@@ -139,11 +247,13 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         widgets: FromDishka[WidgetService],
         run_id: Id | None = None,
         limit: Annotated[int, Field(ge=1, le=MAX_WIDGET_ROWS)] = 1000,
+        input: str = MAIN_INPUT,
     ) -> WidgetData:
-        """The data a widget shows: its operator's output in a run, with what the columns
-        mean and whether the numbers are simulated or stale. Called by the widget, not by
-        the model. Without `run_id` a new run is started."""
-        return await widgets.data(widget_id, run_id, limit)
+        """The data a widget shows: one input's output in a run ("main", its own operator,
+        unless `input` names another), with what the columns mean and whether the numbers
+        are simulated or stale. Called by the widget, not by the model. Without `run_id` a
+        new run is started; read further inputs with the `run_id` of the first answer."""
+        return await widgets.data(widget_id, run_id, limit, input)
 
     @mcp.tool
     @inject

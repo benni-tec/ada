@@ -97,6 +97,8 @@ class DashboardRow(Base):
     default_time_end: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(_timestamp)
     revision: Mapped[int] = mapped_column(Integer)
+    # The order people gave the project's dashboards; outside the revision.
+    position: Mapped[int | None] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
 
@@ -174,6 +176,28 @@ class SessionEntryRow(Base):
     tool_call: Mapped[Json | None] = mapped_column(JSONB)
 
 
+class SessionAttachmentRow(Base):
+    """What is attached to a session, shown beside it as tabs and listed to its agent."""
+
+    __tablename__ = "session_attachments"
+    __table_args__ = (
+        UniqueConstraint("session_id", "kind", "ref", name="uq_session_attachments_ref"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("sessions.id", ondelete="CASCADE"), index=True
+    )
+    # The AttachmentKind; `ref` is the thing's id (an operator id for a pipeline, a URL for
+    # a web page). Not a foreign key: the service checks it, and a deleted thing shows as
+    # gone.
+    kind: Mapped[str] = mapped_column(String(16))
+    ref: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(Text, server_default="")
+    actor: Mapped[Json] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+
+
 class AgentTurnRow(Base):
     """The in-platform agent's turns. Written by the worker as the turn runs, outside any
     revision; `cancel_requested` is the one column someone else writes. `settled` says
@@ -248,6 +272,41 @@ class AgentSettingsRow(Base):
     research_agent_model_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("llm_models.id", ondelete="SET NULL")
     )
+    revision: Mapped[int] = mapped_column(Integer)
+
+    __mapper_args__ = {"version_id_col": revision}
+
+
+class JudgeDefaultsRow(Base):
+    """The judges' global settings, one row per kind (inserted by migration 0012)."""
+
+    __tablename__ = "judge_defaults"
+
+    kind: Mapped[str] = mapped_column(String(32), primary_key=True)
+    strictness: Mapped[str] = mapped_column(String(16))
+    model_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("llm_models.id", ondelete="SET NULL")
+    )
+    instructions: Mapped[str] = mapped_column(Text, default="", server_default="")
+    revision: Mapped[int] = mapped_column(Integer)
+
+    __mapper_args__ = {"version_id_col": revision}
+
+
+class ProjectJudgeRow(Base):
+    """A project's overrides of one kind's settings; NULL inherits the global default."""
+
+    __tablename__ = "project_judges"
+
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(String(32), primary_key=True)
+    strictness: Mapped[str | None] = mapped_column(String(16))
+    model_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("llm_models.id", ondelete="SET NULL")
+    )
+    instructions: Mapped[str | None] = mapped_column(Text)
     revision: Mapped[int] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
@@ -363,6 +422,11 @@ class WidgetRow(Base):
     copied_from: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("widgets.id", ondelete="SET NULL")
     )
+    # Further inputs by name ({name: operator id}); not foreign keys, checked by the service.
+    inputs: Mapped[Json] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    render_error: Mapped[str | None] = mapped_column(Text)
+    # A judge's review of what the agent wrote (a custom widget's code): a Verdict as JSON.
+    verdict: Mapped[Json | None] = mapped_column(JSONB)
 
 
 class ReportRow(Base):
@@ -385,6 +449,8 @@ class ReportRow(Base):
     latest_version_id: Mapped[UUID | None] = mapped_column(Uuid)
     created_at: Mapped[datetime] = mapped_column(_timestamp)
     revision: Mapped[int] = mapped_column(Integer)
+    # The order people gave the project's reports; outside the revision.
+    position: Mapped[int | None] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
 

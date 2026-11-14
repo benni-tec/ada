@@ -25,24 +25,31 @@ from ada.composition.unbuilt import Unbuilt
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.errors import Unavailable
+from ada.core.models.judges import Finding, Outcome
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.repositories import ProjectRepository
 from ada.core.services.dashboards.service import Dashboards
 from ada.core.services.pipelines.runs import Runs
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.runs import RunService
+from ada.core.services.widgets.specs import custom_problems
 from ada.discovery import modules
 from ada.entrypoints.mcp import actor
 from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.mcp.sessions import SESSIONLESS
 from api_support import (
+    COLUMNS,
+    FakeJudging,
+    Judged,
     Overrides,
+    Results,
     Seen,
     call,
     dispatcher,
     events,
     mcp_client,
     new_project,
+    resolve,
     send,
     serve,
     store,
@@ -58,7 +65,7 @@ AGENT = {"kind": "external_agent", "name": "claude-code"}
 
 @pytest.fixture(scope="module")
 def client(unreachable_settings: Settings) -> Iterator[TestClient]:
-    with serve(unreachable_settings, Overrides()) as client:
+    with serve(unreachable_settings, Overrides(), FakeJudging()) as client:
         yield client
 
 
@@ -188,24 +195,62 @@ def test_a_message_is_recorded_as_the_web_user_and_announced(
     assert added[-1].payload == {"session_id": session["id"], "entry_id": posted["entry"]["id"]}
 
 
-def test_a_session_shows_a_dashboard_of_its_own_project_in_its_panel(
-    client: TestClient, project: dict[str, Any], session: dict[str, Any]
+def test_a_session_attaches_things_of_its_project_once_and_detaches_them(
+    client: TestClient,
+    project: dict[str, Any],
+    session: dict[str, Any],
+    source_operator: dict[str, Any],
 ) -> None:
-    path = f"/api/sessions/{session['id']}"
+    path = f"/sessions/{session['id']}/attachments"
     own = send(client, "POST", f"/projects/{project['id']}/dashboards", {"name": "Own"}, 201)
     other = new_project(client, "Other")
     foreign = send(client, "POST", f"/projects/{other['id']}/dashboards", {"name": "X"}, 201)
+    url = "https://stat.fi/til/index.html"
 
-    shown = client.patch(path, json={"panel_dashboard_id": own["id"], "expected_revision": 1})
-    refused = client.patch(path, json={"panel_dashboard_id": foreign["id"], "expected_revision": 2})
-    # Null clears the panel, which is a change like any other.
-    cleared = client.patch(path, json={"panel_dashboard_id": None, "expected_revision": 2})
-    unchanged = client.patch(path, json={"expected_revision": 3})
+    dashboard = send(client, "POST", path, {"kind": "dashboard", "ref": own["id"]}, 201)
+    again = send(client, "POST", path, {"kind": "dashboard", "ref": own["id"]}, 201)
+    pipeline = send(client, "POST", path, {"kind": "operator", "ref": source_operator["id"]}, 201)
+    page = send(client, "POST", path, {"kind": "web_page", "ref": url}, 201)
+    refused = [
+        client.post(f"/api{path}", json=body).status_code
+        for body in (
+            {"kind": "dashboard", "ref": foreign["id"]},
+            {"kind": "dashboard", "ref": str(uuid7())},
+            {"kind": "web_page", "ref": "ftp://stat.fi/file.csv"},
+            {"kind": "session", "ref": session["id"]},
+            {"kind": "chart", "ref": "x"},
+        )
+    ]
+    detached = client.delete(f"/api{path}/{pipeline['id']}")
+    gone = client.delete(f"/api{path}/{pipeline['id']}")
+    # Renaming is what is left of changing a session.
+    changed = f"/api/sessions/{session['id']}"
+    renamed = client.patch(changed, json={"title": "New", "expected_revision": 1})
+    shown = {"title": "New", "expected_revision": 2, "panel_dashboard_id": own["id"]}
+    panel = client.patch(changed, json=shown)
 
-    assert shown.json()["panel_dashboard_id"] == own["id"]
-    assert refused.status_code == 422
-    assert (cleared.json()["panel_dashboard_id"], cleared.json()["revision"]) == (None, 3)
-    assert unchanged.status_code == 422
+    assert (dashboard["kind"], dashboard["title"], dashboard["actor"]) == ("dashboard", "Own", WEB)
+    assert again == dashboard
+    assert (pipeline["ref"], pipeline["title"]) == (source_operator["id"], "Sotkanet")
+    assert (page["ref"], page["title"]) == (url, "stat.fi")
+    assert refused == [422, 404, 422, 422, 422]
+    assert (detached.status_code, gone.status_code) == (204, 404)
+    assert send(client, "GET", path) == [dashboard, page]
+    assert client.get(f"/api/sessions/{uuid7()}/attachments").status_code == 404
+    changes = [e for e in events(client, project["id"]) if e.type.startswith("session.attach")]
+    assert [(e.type, e.payload["attachment_id"]) for e in changes] == [
+        ("session.attachment_added", dashboard["id"]),
+        ("session.attachment_added", pipeline["id"]),
+        ("session.attachment_added", page["id"]),
+        ("session.attachment_removed", pipeline["id"]),
+    ]
+    assert changes[0].payload == {
+        "session_id": session["id"],
+        "attachment_id": dashboard["id"],
+        "attachment": dashboard,
+    }
+    assert renamed.json()["title"] == "New" and "panel_dashboard_id" not in renamed.json()
+    assert panel.status_code == 422
 
 
 def test_operators_are_added_through_the_pipeline_service_and_recorded_in_the_session(
@@ -326,6 +371,167 @@ def test_a_widget_is_changed_in_place_and_its_spec_checked(
     assert [e.type for e in events(client, project["id"])][-1] == "widget.updated"
 
 
+def test_a_widget_reads_further_inputs_by_name_in_the_same_run(
+    client: TestClient, project: dict[str, Any], source_operator: dict[str, Any]
+) -> None:
+    total = send(
+        client,
+        "POST",
+        f"/projects/{project['id']}/operators",
+        {
+            "kind": "transform",
+            "sql": "SELECT sum(value) AS total FROM input_0",
+            "inputs": [source_operator["id"]],
+        },
+        201,
+    )
+    path = f"/projects/{project['id']}/widgets"
+    body = {"operator_id": source_operator["id"], "type": "table", "title": "Regions"}
+    widget = send(client, "POST", path, {**body, "inputs": {"total": total["id"]}}, 201)
+    other = new_project(client, "Other")
+    foreign = send(
+        client,
+        "POST",
+        f"/projects/{other['id']}/operators",
+        {"kind": "transform", "sql": "SELECT 1 AS one", "inputs": []},
+        201,
+    )
+    refused = [
+        client.post(f"/api{path}", json={**body, "inputs": inputs}).status_code
+        for inputs in ({"main": total["id"]}, {"Total": total["id"]}, {"x": foreign["id"]})
+    ]
+
+    main = send(client, "GET", f"/widgets/{widget['id']}/data")
+    extra = send(client, "GET", f"/widgets/{widget['id']}/data?run_id={main['run_id']}&input=total")
+    unknown = client.get(f"/api/widgets/{widget['id']}/data?input=nope")
+    cleared = send(client, "PATCH", f"/widgets/{widget['id']}", {"inputs": {}})
+
+    assert widget["inputs"] == {"total": total["id"]}
+    assert refused == [422, 422, 422]
+    assert (main["input"], extra["input"], extra["run_id"]) == ("main", "total", main["run_id"])
+    assert unknown.status_code == 422 and "main, total" in unknown.json()["detail"]
+    assert cleared["inputs"] == {}
+
+
+CUSTOM_CODE = """export default function render(root, data, ada) {
+  root.textContent = ada.format.number(data.main.rows.length);
+}
+"""
+
+
+def test_a_custom_widget_is_checked_then_judged_with_a_sample_of_each_input(
+    client: TestClient,
+    project: dict[str, Any],
+    session: dict[str, Any],
+    source_operator: dict[str, Any],
+) -> None:
+    total = send(
+        client,
+        "POST",
+        f"/projects/{project['id']}/operators",
+        {"kind": "transform", "sql": "SELECT 1 AS total", "inputs": [source_operator["id"]]},
+        201,
+    )
+    path = f"/projects/{project['id']}/widgets"
+    body = {"operator_id": source_operator["id"], "type": "custom", "title": "Count"}
+    judged, results = resolve(client, Judged), resolve(client, Results)
+    asked = len(judged.calls)
+    data_in_code = "// fetch them\nconst v = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];"
+
+    refused = client.post(f"/api{path}", json={**body, "spec": {"code": data_in_code, "x": 1}})
+    finding = Finding(message="The numbers are written into the code", excerpt=" [74.3] ")
+    judged.then(Outcome.FAIL, finding, blocking=True)
+    blocked = client.post(f"/api{path}", json={**body, "spec": {"code": CUSTOM_CODE}})
+    judged.then(Outcome.WARN, Finding(message="No axis", excerpt="root", severity="warning"))
+    spec = {"code": CUSTOM_CODE, "css": "p { margin: 0 }", "libraries": ["d3"]}
+    widget = send(
+        client, "POST", path, {**body, "spec": spec, "inputs": {"total": total["id"]}}, 201
+    )
+    kind, content, context = judged.calls[-1]
+    table = send(client, "POST", path, {**body, "type": "table", "session_id": session["id"]}, 201)
+
+    # Every problem at once, before the judge is asked.
+    assert refused.status_code == 422
+    for problem in ("`x`", "default export", "`fetch` (line 1)", "comments included", "line 2"):
+        assert problem in refused.json()["detail"], problem
+    assert blocked.json() == {
+        "detail": "The judge refused this custom widget's code: "
+        "The numbers are written into the code (in `[74.3]`)"
+    }
+    assert (widget["verdict"]["outcome"], widget["verdict"]["findings"][0]["message"]) == (
+        "warn",
+        "No axis",
+    )
+    assert (kind, content) == ("widget_code", CUSTOM_CODE + "\n/* css */\np { margin: 0 }")
+    assert context.note == "custom widget: Count"
+    assert [(i.name, i.columns, len(i.rows)) for i in context.inputs] == [
+        ("main", COLUMNS, 2),
+        ("total", COLUMNS, 2),
+    ]
+    # Both read in one run, 20 rows at most; the other types are never judged.
+    [(main_run, _, main_limit), (total_run, _, _)] = results.reads[-2:]
+    assert (main_run, main_limit) == (total_run, 20)
+    assert len(judged.calls) == asked + 2
+    assert table["verdict"] is None
+
+
+def test_how_a_widget_drew_is_kept_until_it_changes_and_a_report_keeps_its_code(
+    client: TestClient,
+    project: dict[str, Any],
+    session: dict[str, Any],
+    source_operator: dict[str, Any],
+) -> None:
+    body = {
+        "operator_id": source_operator["id"],
+        "type": "custom",
+        "title": "Count",
+        "spec": {"code": CUSTOM_CODE},
+        "session_id": session["id"],
+    }
+    widget = send(client, "POST", f"/projects/{project['id']}/widgets", body, 201)
+    path = f"/widgets/{widget['id']}"
+    judged = resolve(client, Judged)
+    asked, published = len(judged.calls), len(events(client, project["id"]))
+
+    failed = client.post(f"/api{path}/render", json={"error": "x" * 3000})
+    client.post(f"/api{path}/render", json={"error": "x" * 3000})
+    stored = send(client, "GET", path)
+    announced = [
+        (e.type, e.payload.get("render_only")) for e in events(client, project["id"])[published:]
+    ]
+    content = {"blocks": [{"type": "widget", "widget_id": widget["id"]}]}
+    report = send(
+        client,
+        "POST",
+        f"/projects/{project['id']}/reports",
+        {"name": "Count", "content": content, "session_id": session["id"]},
+        201,
+    )
+    renamed = send(client, "PATCH", path, {"title": "How many"})
+    asked_after_renaming = len(judged.calls)
+    fixed = send(
+        client, "PATCH", path, {"spec": {"code": CUSTOM_CODE.replace("main", "inputs.main")}}
+    )
+    copy = send(client, "GET", f"/widgets/{report['content']['blocks'][0]['widget_id']}")
+    unknown = client.post(f"/api/widgets/{uuid7()}/render", json={"error": None})
+
+    # Kept cut short, and announced once, for the cards only (frames do not reload): the
+    # same error again changes nothing.
+    assert (failed.status_code, stored["render_error"]) == (204, "x" * 2000)
+    assert announced == [("widget.updated", True)]
+    # A new title draws the same; new code clears the error and is judged again.
+    assert (renamed["render_error"], asked_after_renaming) == ("x" * 2000, asked)
+    assert (fixed["render_error"], len(judged.calls)) == (None, asked + 1)
+    # The report shows its own copy, which keeps the code it was made with.
+    assert (copy["spec"], copy["copied_from"], copy["session_id"]) == (
+        {"code": CUSTOM_CODE},
+        widget["id"],
+        None,
+    )
+    assert copy["verdict"] == widget["verdict"]
+    assert unknown.status_code == 404
+
+
 def test_widget_data_is_stale_while_a_source_upstream_failed_its_refresh(
     client: TestClient,
     project: dict[str, Any],
@@ -400,6 +606,7 @@ def test_the_openapi_schema_lists_every_route_of_the_contract(client: TestClient
         ("get", "/api/snapshots/{snapshot_id}"),
         ("post", "/api/projects/{project_id}/widgets"),
         ("get", "/api/widgets/{widget_id}/data"),
+        ("post", "/api/widgets/{widget_id}/render"),
         ("get", "/api/projects/{project_id}/pipelines"),
     }
     served = {(method, path) for path, methods in paths.items() for method in methods}
@@ -452,9 +659,11 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
     tools = {tool.name: tool for tool in await client.list_tools()}
     verbs = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
     verbs |= {"pin", "edit", "set", "show", "generate", "check", "build", "query", "search"}
-    verbs |= {"read", "extract", "map", "watch", "unwatch", "delegate", "report"}
+    verbs |= {"read", "extract", "map", "watch", "unwatch", "delegate", "report", "review"}
+    verbs |= {"attach", "detach"}
     injected = {"service", "projects", "pipelines", "sessions", "widgets", "runs", "dispatcher"}
-    injected |= {"exploration", "batches", "refreshes", "web", "research"}
+    injected |= {"exploration", "batches", "refreshes", "web", "research", "attachments"}
+    injected |= {"reviews"}
 
     for name, tool in tools.items():
         assert name.split("_")[0] in verbs, name
@@ -475,7 +684,15 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
         "spec",
         "session_id",
         "note",
+        "inputs",
     }
+    # The custom widget's example passes the checks the description lists.
+    description = tools["create_widget"].description or ""
+    example = description[description.index("export default function render(root, data, ada) {") :]
+    lines = example.splitlines()
+    example = "\n".join(lines[: [line.strip() for line in lines].index("}") + 1])
+    assert "ada.colors.series[0]" in example and "ada.format.number" in example
+    assert custom_problems({"code": example, "libraries": ["d3"]}) == []
     status = await client.call_tool("system_status")
     assert status.structured_content == UNREACHABLE_HEALTH
 
@@ -559,6 +776,10 @@ async def test_an_agent_builds_a_widget_in_a_session_and_is_recorded_as_itself(
         "widget.created",
         *["session.entry_added"] * 3,
     ]
+    # An agent reads one widget back, e.g. to see whether it drew.
+    assert await call(client, "get_widget", session_id=session["id"], widget_id=widget["id"]) == (
+        created
+    )
 
 
 async def test_tool_errors_say_what_is_wrong_and_change_nothing(

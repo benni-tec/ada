@@ -1,9 +1,10 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 
-import type { DashboardSlot, DashboardVersion, DashboardView, Operator } from '@/lib/api'
+import type { Attachment, DashboardSlot, DashboardVersion, DashboardView, Operator } from '@/lib/api'
 
 import {
+  attachment,
   claude,
   dashboard,
   emit,
@@ -23,7 +24,7 @@ import {
 } from './app'
 
 // A dashboard: its slots on the grid at one run, the time range, versions, arranging the
-// layout, the agent panel, widgets full size, and the dashboard beside a session.
+// layout, the agent panel, widgets full size, and the dashboard attached to a session.
 
 const v1: DashboardVersion = {
   id: 'v1',
@@ -334,7 +335,7 @@ test('the agent panel opens on the dashboard’s agent session, and “Add widge
   serveDashboard({
     'POST /api/dashboards/d1/agent-session': () => {
       opened.push('d1')
-      return json(session({ id: 's7', title: 'Screening overview (agent)', origin_dashboard_id: 'd1', panel_dashboard_id: 'd1' }), 201)
+      return json(session({ id: 's7', title: 'Screening overview (agent)', origin_dashboard_id: 'd1' }), 201)
     },
     'GET /api/sessions/s7/entries': [entry({ id: 'e1', session_id: 's7', text: 'Earlier question' })],
     'GET /api/sessions/s7/widgets': [],
@@ -423,17 +424,25 @@ test('a widget opens full size over the page at its card’s run; Escape, back a
   expect(router.state.location.search).toEqual({})
 })
 
-test('a session started from the dashboard has it beside the conversation, which follows it and can detach it', async () => {
+test('a session started from the dashboard has it attached beside the conversation, which follows it and can detach it', async () => {
   const calls: unknown[] = []
-  let stored = session({ id: 's9', origin_dashboard_id: 'd1', title: 'Questions about Screening overview' })
+  const stored = session({ id: 's9', origin_dashboard_id: 'd1', title: 'Questions about Screening overview' })
+  const attached = attachment({ session_id: 's9' })
+  let attachments: Attachment[] = []
   let current = view()
   serveDashboard({
     'GET /api/dashboards/d1': () => current,
     'POST /api/projects/p1/sessions': (body: unknown) => (calls.push(['create', body]), json(stored, 201)),
-    'PATCH /api/sessions/s9': (body: { panel_dashboard_id: string | null }) => {
-      calls.push(['panel', body])
-      stored = { ...stored, panel_dashboard_id: body.panel_dashboard_id, revision: stored.revision + 1 }
-      return stored
+    'POST /api/sessions/s9/attachments': (body: unknown) => {
+      calls.push(['attach', body])
+      attachments = [attached]
+      return json(attached, 201)
+    },
+    'GET /api/sessions/s9/attachments': () => attachments,
+    'DELETE /api/sessions/s9/attachments/att1': () => {
+      calls.push(['detach', 'att1'])
+      attachments = []
+      return new Response(null, { status: 204 })
     },
     'GET /api/sessions/s9': () => stored,
     'GET /api/sessions/s9/entries': [],
@@ -444,13 +453,14 @@ test('a session started from the dashboard has it beside the conversation, which
   fireEvent.click(await screen.findByRole('button', { name: 'Start a session from this dashboard' }))
   await waitFor(() => expect(router.state.location.pathname).toBe('/projects/p1/sessions/s9'))
 
-  // Half and half: the conversation, and the dashboard under a black bar with its name.
+  // Half and half: the conversation, and the dashboard as the one tab on a black bar.
   const conversation = await screen.findByRole('region', { name: 'Conversation' })
-  const panel = await screen.findByRole('complementary', { name: 'Dashboard' })
+  const panel = await screen.findByRole('complementary', { name: 'Attachments' })
   expect(conversation.parentElement).toBe(panel.parentElement)
   const bar = panel.querySelector('header')!
   expect(bar).toHaveClass('bg-black', 'text-white')
-  expect(await within(bar).findByRole('link', { name: 'Screening overview' })).toHaveAttribute('href', '/projects/p1/dashboards/d1')
+  expect(await within(bar).findByRole('tab', { name: 'Screening overview' })).toHaveAttribute('aria-selected', 'true')
+  expect(await within(panel).findByRole('link', { name: 'Open the dashboard' })).toHaveAttribute('href', '/projects/p1/dashboards/d1')
   expect(await within(panel).findByText(/2020 to 2024 · version 2/)).toBeInTheDocument()
   expect(within(await within(panel).findByRole('list', { name: 'Dashboard widgets' })).getAllByRole('listitem').map((cell) => cell.getAttribute('aria-label'))).toEqual(['coverage', 'headline', 'notes'])
   expect(await within(panel).findByTitle('Widget: Coverage by region')).toHaveAttribute('src', 'http://localhost:5174/map.html#widget=w1&run=r1')
@@ -467,13 +477,13 @@ test('a session started from the dashboard has it beside the conversation, which
   act(() => emit('dashboard.changed', { dashboard_id: 'd1', version_id: 'v3' }))
   await waitFor(() => expect(within(panel).getAllByRole('listitem')).toHaveLength(4))
 
-  // The × detaches it, and the conversation takes the full width.
-  fireEvent.click(within(bar).getByRole('button', { name: 'Detach the dashboard' }))
-  await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Dashboard' })).not.toBeInTheDocument())
-  expect(screen.getByRole('region', { name: 'Conversation' })).toBeInTheDocument()
+  // The × detaches it, and the half says nothing is attached.
+  fireEvent.click(within(bar).getByRole('button', { name: 'Detach Screening overview' }))
+  expect(await within(panel).findByText(/Nothing is attached/)).toBeInTheDocument()
+  expect(within(panel).queryByRole('list', { name: 'Dashboard widgets' })).not.toBeInTheDocument()
   expect(calls).toEqual([
     ['create', { title: 'Questions about Screening overview', origin_dashboard_id: 'd1' }],
-    ['panel', { panel_dashboard_id: 'd1', expected_revision: 1 }],
-    ['panel', { panel_dashboard_id: null, expected_revision: 2 }],
+    ['attach', { kind: 'dashboard', ref: 'd1' }],
+    ['detach', 'att1'],
   ])
 })

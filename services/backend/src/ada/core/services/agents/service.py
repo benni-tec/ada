@@ -37,10 +37,13 @@ from ada.core.ports.events import EventBroadcaster, EventPublisher
 from ada.core.ports.repositories import (
     AgentSettingsRepository,
     AgentTurnRepository,
+    AlertRepository,
+    AttachmentRepository,
     DashboardRepository,
     DataSourceRepository,
     OperatorRepository,
     ProjectRepository,
+    ReportRepository,
     SessionRepository,
     WidgetRepository,
 )
@@ -96,6 +99,9 @@ class AgentTurns(AgentTurnService):
         dashboards: DashboardRepository,
         widgets: WidgetRepository,
         data_sources: DataSourceRepository,
+        attachments: AttachmentRepository,
+        alerts: AlertRepository,
+        reports: ReportRepository,
         runtime: AgentRuntime,
         language_models: LanguageModels,
         agent_settings: AgentSettingsRepository,
@@ -121,7 +127,9 @@ class AgentTurns(AgentTurnService):
         self.dispatcher = dispatcher
         self.units = units
         self.clock = clock
-        self.briefing = Briefing(operators, dashboards, widgets, data_sources)
+        self.briefing = Briefing(
+            operators, dashboards, widgets, data_sources, attachments, alerts, reports
+        )
 
     async def models(self) -> ModelList:
         return await self.language_models.catalog()

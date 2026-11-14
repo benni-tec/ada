@@ -13,10 +13,13 @@ import factories
 from ada.adapters.duckdb.store import DuckDbAnalysisStore
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import (
+    MemoryAlertRuleRepository,
+    MemoryAttachmentRepository,
     MemoryDashboardRepository,
     MemoryDataSourceRepository,
     MemoryOperatorRepository,
     MemoryProjectRepository,
+    MemoryReportRepository,
     MemoryRunRepository,
     MemorySessionRepository,
     MemorySnapshotRepository,
@@ -25,14 +28,19 @@ from ada.adapters.memory.repositories import (
     MemoryStore,
     MemoryWidgetRepository,
 )
+from ada.adapters.memory.tasks import RecordingTaskDispatcher
 from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.adapters.sources.examples import ExampleSource
 from ada.adapters.sources.http import HttpSourceReaders, create_client
+from ada.adapters.transactions import PendingWork
 from ada.core.models.base import Id
+from ada.core.models.judges import JudgeContext, JudgeKind, Outcome, Verdict
 from ada.core.models.operators import Operator
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sources import DataSource
 from ada.core.models.time import TimeRange
+from ada.core.services.attachments.service import Attachments
+from ada.core.services.judges.service import content_hash
 from ada.core.services.pipelines.runs import Runs
 from ada.core.services.pipelines.service import Pipelines
 from ada.core.services.sessions.service import Sessions
@@ -58,6 +66,26 @@ class Transport(httpx.AsyncBaseTransport):
         if self.down:
             raise httpx.ConnectError("the source is down", request=request)
         return await self.mock.handle_async_request(request)
+
+
+class UncheckedJudges:
+    """Every verdict unchecked: this world tests time, not the judges."""
+
+    def __init__(self, clock: FixedClock) -> None:
+        self.clock = clock
+
+    async def review(
+        self, project_id: Id, kind: JudgeKind, content: str, context: JudgeContext
+    ) -> Verdict:
+        return Verdict(
+            kind=kind,
+            outcome=Outcome.UNCHECKED,
+            passed=False,
+            blocking=False,
+            reason="not judged here",
+            content_hash=content_hash(content, context),
+            checked_at=self.clock.now(),
+        )
 
 
 class World:
@@ -105,6 +133,8 @@ class World:
             self.clock,
         )
         sessions = MemorySessionRepository(memory)
+        dashboards = MemoryDashboardRepository(memory)
+        attachments = MemoryAttachmentRepository(memory)
         self.widgets = Widgets(
             self.widget_repository,
             self.operators,
@@ -113,14 +143,30 @@ class World:
             Sessions(
                 sessions,
                 projects,
-                MemoryDashboardRepository(memory),
+                dashboards,
                 self.operators,
                 self.widget_repository,
+                attachments,
+                Attachments(
+                    attachments,
+                    sessions,
+                    dashboards,
+                    MemoryReportRepository(memory),
+                    MemoryAlertRuleRepository(memory),
+                    self.data_sources,
+                    self.operators,
+                    self.widget_repository,
+                    self.events,
+                    self.clock,
+                ),
                 self.events,
                 self.clock,
             ),
             self.runs,
+            UncheckedJudges(self.clock),
             self.events,
+            RecordingTaskDispatcher(),
+            PendingWork(),
             self.clock,
         )
         memory.projects[self.project.id] = self.project
