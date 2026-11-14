@@ -495,3 +495,32 @@ test('a research session is listed under its parent in the sidebar, labelled res
   expect(parent.closest('li')).toContainElement(child)
   expect(child).toHaveTextContent('research')
 })
+
+test('in a research session the research model answers unless another is picked', async () => {
+  const sent: Record<string, unknown>[] = []
+  serveSession({
+    'GET /api/sessions/s1': session({ agent: 'research' }),
+    'GET /api/llm/models': models({ research_agent: 'gemini/pro' }),
+    'POST /api/sessions/s1/messages': (body: Record<string, unknown>) => {
+      sent.push(body)
+      return json({ entry: question, turn: turn({ id: 't2', status: 'queued' }) }, 201)
+    },
+    'GET /api/turns/t2': turn({ id: 't2', status: 'queued' }),
+  })
+  renderAt('/projects/p1/sessions/s1')
+  await items()
+
+  const send = async (text: string) => {
+    fireEvent.change(within(composer()).getByLabelText('Message'), { target: { value: text } })
+    fireEvent.click(within(composer()).getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(within(composer()).getByLabelText('Message')).toHaveValue(''))
+  }
+  expect(await within(composer()).findByRole('button', { name: 'Model: gemini/pro' })).toBeInTheDocument()
+  await send('Look for registries')
+  expect(sent[0]).not.toHaveProperty('model')
+
+  fireEvent.pointerDown(within(composer()).getByRole('button', { name: 'Model: gemini/pro' }), { button: 0, ctrlKey: false })
+  fireEvent.click(await screen.findByRole('menuitemradio', { name: /gemini\/flash/ }))
+  await send('Now the cancer ones')
+  expect(sent[1]).toMatchObject({ model: 'gemini/flash' })
+})
