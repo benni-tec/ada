@@ -6,6 +6,7 @@ import { DashboardsSection } from '@/components/dashboards/dashboards-section'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { Provenance, Time } from '@/components/provenance'
+import { ReportsSection } from '@/components/reports/reports-section'
 import {
   createSession,
   getProject,
@@ -48,6 +49,7 @@ function ProjectPage() {
         <div className="flex flex-col gap-8">
           <Sessions projectId={projectId} />
           <DashboardsSection projectId={projectId} />
+          <ReportsSection projectId={projectId} />
           <Widgets projectId={projectId} />
         </div>
         <Sources projectId={projectId} />

@@ -63,6 +63,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboards/{dashboard_id}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Report
+         * @description A report of the dashboard's current widgets at one run; a new version when the
+         *     dashboard already has a report of that name.
+         */
+        post: operations["generate_report_api_dashboards__dashboard_id__reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboards/{dashboard_id}/runs": {
         parameters: {
             query?: never;
@@ -294,6 +315,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reports
+         * @description The project's reports, oldest first; with `session_id` or `dashboard_id` only the
+         *     ones that session or dashboard produced.
+         */
+        get: operations["list_reports_api_projects__project_id__reports_get"];
+        put?: never;
+        /** Create Report */
+        post: operations["create_report_api_projects__project_id__reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/runs": {
         parameters: {
             query?: never;
@@ -347,6 +390,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Templates */
+        get: operations["list_templates_api_projects__project_id__templates_get"];
+        put?: never;
+        /** Create Template */
+        post: operations["create_template_api_projects__project_id__templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/widgets": {
         parameters: {
             query?: never;
@@ -362,6 +423,82 @@ export interface paths {
         put?: never;
         /** Create Widget */
         post: operations["create_widget_api_projects__project_id__widgets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/report-versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report Version */
+        get: operations["get_report_version_api_report_versions__version_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/report-versions/{version_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Report Sources
+         * @description The data sources behind the version's widgets, with the address and fetch time of
+         *     the snapshot its run used. Generated when the version was made.
+         */
+        get: operations["list_report_sources_api_report_versions__version_id__sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reports/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report */
+        get: operations["get_report_api_reports__report_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reports/{report_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Report Versions
+         * @description Every version, lowest version number first.
+         */
+        get: operations["list_report_versions_api_reports__report_id__versions_get"];
+        put?: never;
+        /** Add Report Version */
+        post: operations["add_report_version_api_reports__report_id__versions_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -508,6 +645,23 @@ export interface paths {
          *     `source.refreshed` or `source.refresh_failed` event.
          */
         post: operations["refresh_source_api_sources__source_id__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Template */
+        get: operations["get_template_api_templates__template_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -737,6 +891,17 @@ export interface components {
             ttl_seconds?: number | null;
         };
         /**
+         * GeneratedReport
+         * @description Freeze the dashboard's current widgets at a run. Without `run_id` a run is started
+         *     for `time_range`, or else for the dashboard's default range.
+         */
+        GeneratedReport: {
+            /** Name */
+            name: string;
+            run_id?: components["schemas"]["Id"] | null;
+            time_range?: components["schemas"]["TimeRange"] | null;
+        };
+        /**
          * GeoRole
          * @description Which column holds a region code, in which code system and at which level, e.g.
          *     system "sotkanet" and level "wellbeing_services_county".
@@ -859,6 +1024,37 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * NewReport
+         * @description A report and its first version, 1.0.0. `content` is a component tree, or
+         *     `{"slots": {name: widget_id}}` with `template_id` to fill a report template. Without
+         *     `run_id` a run is started for `time_range`; with one, the range is the run's.
+         */
+        NewReport: {
+            content: components["schemas"]["JsonObject"];
+            dashboard_id?: components["schemas"]["Id"] | null;
+            /** Name */
+            name: string;
+            run_id?: components["schemas"]["Id"] | null;
+            session_id?: components["schemas"]["Id"] | null;
+            template_id?: components["schemas"]["Id"] | null;
+            time_range?: components["schemas"]["TimeRange"] | null;
+        };
+        /**
+         * NewReportVersion
+         * @description The next version. Without `bump` the platform picks the level from what changed.
+         *     With `expected_revision`, the version is only added if nobody else added one since the
+         *     report was read at that revision. Without `run_id` a run is started for
+         *     `time_range`, which gives the latest data.
+         */
+        NewReportVersion: {
+            bump?: components["schemas"]["VersionBump"] | null;
+            content: components["schemas"]["JsonObject"];
+            /** Expected Revision */
+            expected_revision?: number | null;
+            run_id?: components["schemas"]["Id"] | null;
+            time_range?: components["schemas"]["TimeRange"] | null;
+        };
         /** NewRun */
         NewRun: {
             /** Bindings */
@@ -899,6 +1095,15 @@ export interface components {
              */
             note: string;
             session_id?: components["schemas"]["Id"] | null;
+        };
+        /** NewTemplate */
+        NewTemplate: {
+            content?: components["schemas"]["JsonObject"] | null;
+            kind: components["schemas"]["TemplateKind"];
+            /** Name */
+            name: string;
+            /** Slots */
+            slots: components["schemas"]["Slot"][];
         };
         /** NewTransform */
         NewTransform: {
@@ -1022,6 +1227,71 @@ export interface components {
              * @default false
              */
             force: boolean;
+        };
+        /**
+         * Report
+         * @description A name with versions. Owned by the session or the dashboard that produced it.
+         */
+        Report: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            dashboard_id?: components["schemas"]["Id"] | null;
+            id: components["schemas"]["Id"];
+            latest_version_id?: components["schemas"]["Id"] | null;
+            /** Name */
+            name: string;
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+            session_id?: components["schemas"]["Id"] | null;
+        };
+        /**
+         * ReportSource
+         * @description One data source behind a report version's widgets, as the version's run read it.
+         */
+        ReportSource: {
+            access_kind: components["schemas"]["AccessKind"];
+            /** Address */
+            address: string;
+            /** Content Hash */
+            content_hash?: string | null;
+            data_source_id: components["schemas"]["Id"];
+            /** Fetched At */
+            fetched_at?: string | null;
+            format: components["schemas"]["DataFormat"];
+            /** Name */
+            name: string;
+            operator_id: components["schemas"]["OperatorId"];
+            snapshot_id?: components["schemas"]["Id"] | null;
+            /** Widget Ids */
+            widget_ids: components["schemas"]["Id"][];
+        };
+        /**
+         * ReportVersion
+         * @description Immutable, and frozen at a run: it always shows the same numbers.
+         */
+        ReportVersion: {
+            content: components["schemas"]["JsonObject"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            dashboard_version_id?: components["schemas"]["Id"] | null;
+            id: components["schemas"]["Id"];
+            report_id: components["schemas"]["Id"];
+            run_id: components["schemas"]["Id"];
+            template_id?: components["schemas"]["Id"] | null;
+            time_range: components["schemas"]["TimeRange"];
+            /** Version */
+            version: string;
         };
         /** Roles */
         Roles: {
@@ -1201,6 +1471,36 @@ export interface components {
             name?: string | null;
             options?: components["schemas"]["JsonObject"] | null;
         };
+        /** Template */
+        Template: {
+            /** @default {} */
+            content: components["schemas"]["JsonObject"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            id: components["schemas"]["Id"];
+            kind: components["schemas"]["TemplateKind"];
+            /** Name */
+            name: string;
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+            /**
+             * Slots
+             * @default []
+             */
+            slots: components["schemas"]["Slot"][];
+        };
+        /**
+         * TemplateKind
+         * @enum {string}
+         */
+        TemplateKind: "report" | "dashboard";
         /**
          * TimeRange
          * @description What a run or a dashboard asks for. An open end means no bound on that side.
@@ -1234,6 +1534,11 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * VersionBump
+         * @enum {string}
+         */
+        VersionBump: "major" | "minor" | "patch";
         /**
          * Widget
          * @description A display of one operator's output. It never holds data: it fetches the output of
@@ -1418,6 +1723,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_report_api_dashboards__dashboard_id__reports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeneratedReport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersion"];
                 };
             };
             /** @description Validation Error */
@@ -1885,6 +2225,75 @@ export interface operations {
             };
         };
     };
+    list_reports_api_projects__project_id__reports_get: {
+        parameters: {
+            query?: {
+                session_id?: components["schemas"]["Id"] | null;
+                dashboard_id?: components["schemas"]["Id"] | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_report_api_projects__project_id__reports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewReport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     start_run_api_projects__project_id__runs_post: {
         parameters: {
             query?: never;
@@ -2052,6 +2461,72 @@ export interface operations {
             };
         };
     };
+    list_templates_api_projects__project_id__templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Template"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_template_api_projects__project_id__templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTemplate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Template"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_widgets_api_projects__project_id__widgets_get: {
         parameters: {
             query?: never;
@@ -2105,6 +2580,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Widget"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_version_api_report_versions__version_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_report_sources_api_report_versions__version_id__sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSource"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_api_reports__report_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_report_versions_api_reports__report_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersion"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_report_version_api_reports__report_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewReportVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersion"];
                 };
             };
             /** @description Validation Error */
@@ -2434,6 +3068,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RefreshQueued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_api_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Template"];
                 };
             };
             /** @description Validation Error */

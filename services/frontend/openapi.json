@@ -373,6 +373,41 @@
         "title": "FreshnessPolicy",
         "type": "object"
       },
+      "GeneratedReport": {
+        "additionalProperties": false,
+        "description": "Freeze the dashboard's current widgets at a run. Without `run_id` a run is started\nfor `time_range`, or else for the dashboard's default range.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "GeneratedReport",
+        "type": "object"
+      },
       "GeoRole": {
         "description": "Which column holds a region code, in which code system and at which level, e.g.\nsystem \"sotkanet\" and level \"wellbeing_services_county\".",
         "properties": {
@@ -657,6 +692,130 @@
         "title": "NewProject",
         "type": "object"
       },
+      "NewReport": {
+        "additionalProperties": false,
+        "description": "A report and its first version, 1.0.0. `content` is a component tree, or\n`{\"slots\": {name: widget_id}}` with `template_id` to fill a report template. Without\n`run_id` a run is started for `time_range`; with one, the range is the run's.",
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "dashboard_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "content"
+        ],
+        "title": "NewReport",
+        "type": "object"
+      },
+      "NewReportVersion": {
+        "additionalProperties": false,
+        "description": "The next version. Without `bump` the platform picks the level from what changed.\nWith `expected_revision`, the version is only added if nobody else added one since the\nreport was read at that revision. Without `run_id` a run is started for\n`time_range`, which gives the latest data.",
+        "properties": {
+          "bump": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionBump"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "content": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "NewReportVersion",
+        "type": "object"
+      },
       "NewRun": {
         "additionalProperties": false,
         "properties": {
@@ -801,6 +960,42 @@
           "data_source_id"
         ],
         "title": "NewSourceOperator",
+        "type": "object"
+      },
+      "NewTemplate": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TemplateKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/Slot"
+            },
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "slots"
+        ],
+        "title": "NewTemplate",
         "type": "object"
       },
       "NewTransform": {
@@ -1083,6 +1278,209 @@
           }
         },
         "title": "RefreshRequest",
+        "type": "object"
+      },
+      "Report": {
+        "description": "A name with versions. Owned by the session or the dashboard that produced it.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dashboard_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "latest_version_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "revision": {
+            "default": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "created_at"
+        ],
+        "title": "Report",
+        "type": "object"
+      },
+      "ReportSource": {
+        "description": "One data source behind a report version's widgets, as the version's run read it.",
+        "properties": {
+          "access_kind": {
+            "$ref": "#/components/schemas/AccessKind"
+          },
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "data_source_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "format": {
+            "$ref": "#/components/schemas/DataFormat"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "operator_id": {
+            "$ref": "#/components/schemas/OperatorId"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "widget_ids": {
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "title": "Widget Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data_source_id",
+          "name",
+          "address",
+          "access_kind",
+          "format",
+          "operator_id",
+          "widget_ids"
+        ],
+        "title": "ReportSource",
+        "type": "object"
+      },
+      "ReportVersion": {
+        "description": "Immutable, and frozen at a run: it always shows the same numbers.",
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "dashboard_version_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "report_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "run_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "time_range": {
+            "$ref": "#/components/schemas/TimeRange"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "report_id",
+          "version",
+          "run_id",
+          "time_range",
+          "content",
+          "created_by",
+          "created_at"
+        ],
+        "title": "ReportVersion",
         "type": "object"
       },
       "Roles": {
@@ -1488,6 +1886,62 @@
         "title": "SourceChange",
         "type": "object"
       },
+      "Template": {
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/JsonObject",
+            "default": {}
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TemplateKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "revision": {
+            "default": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "slots": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Slot"
+            },
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "kind",
+          "created_at"
+        ],
+        "title": "Template",
+        "type": "object"
+      },
+      "TemplateKind": {
+        "enum": [
+          "report",
+          "dashboard"
+        ],
+        "title": "TemplateKind",
+        "type": "string"
+      },
       "TimeRange": {
         "description": "What a run or a dashboard asks for. An open end means no bound on that side.",
         "properties": {
@@ -1577,6 +2031,15 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "VersionBump": {
+        "enum": [
+          "major",
+          "minor",
+          "patch"
+        ],
+        "title": "VersionBump",
+        "type": "string"
       },
       "Widget": {
         "description": "A display of one operator's output. It never holds data: it fetches the output of\nits operator from the server, for the run it is shown in.",
@@ -1888,6 +2351,60 @@
         "summary": "Pin Widget",
         "tags": [
           "dashboards"
+        ]
+      }
+    },
+    "/api/dashboards/{dashboard_id}/reports": {
+      "post": {
+        "description": "A report of the dashboard's current widgets at one run; a new version when the\ndashboard already has a report of that name.",
+        "operationId": "generate_report_api_dashboards__dashboard_id__reports_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeneratedReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Report",
+        "tags": [
+          "reports"
         ]
       }
     },
@@ -2573,6 +3090,137 @@
         ]
       }
     },
+    "/api/projects/{project_id}/reports": {
+      "get": {
+        "description": "The project's reports, oldest first; with `session_id` or `dashboard_id` only the\nones that session or dashboard produced.",
+        "operationId": "list_reports_api_projects__project_id__reports_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dashboard_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dashboard Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Report"
+                  },
+                  "title": "Response List Reports Api Projects  Project Id  Reports Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      "post": {
+        "operationId": "create_report_api_projects__project_id__reports_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/projects/{project_id}/runs": {
       "post": {
         "operationId": "start_run_api_projects__project_id__runs_post",
@@ -2829,6 +3477,104 @@
         ]
       }
     },
+    "/api/projects/{project_id}/templates": {
+      "get": {
+        "operationId": "list_templates_api_projects__project_id__templates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Template"
+                  },
+                  "title": "Response List Templates Api Projects  Project Id  Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Templates",
+        "tags": [
+          "reports"
+        ]
+      },
+      "post": {
+        "operationId": "create_template_api_projects__project_id__templates_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTemplate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Template",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/projects/{project_id}/widgets": {
       "get": {
         "description": "Every widget of the project, in a session or not, oldest first.",
@@ -2925,6 +3671,239 @@
         "summary": "Create Widget",
         "tags": [
           "widgets"
+        ]
+      }
+    },
+    "/api/report-versions/{version_id}": {
+      "get": {
+        "operationId": "get_report_version_api_report_versions__version_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Report Version",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/report-versions/{version_id}/sources": {
+      "get": {
+        "description": "The data sources behind the version's widgets, with the address and fetch time of\nthe snapshot its run used. Generated when the version was made.",
+        "operationId": "list_report_sources_api_report_versions__version_id__sources_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReportSource"
+                  },
+                  "title": "Response List Report Sources Api Report Versions  Version Id  Sources Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Report Sources",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/reports/{report_id}": {
+      "get": {
+        "operationId": "get_report_api_reports__report_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/reports/{report_id}/versions": {
+      "get": {
+        "description": "Every version, lowest version number first.",
+        "operationId": "list_report_versions_api_reports__report_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReportVersion"
+                  },
+                  "title": "Response List Report Versions Api Reports  Report Id  Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Report Versions",
+        "tags": [
+          "reports"
+        ]
+      },
+      "post": {
+        "operationId": "add_report_version_api_reports__report_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewReportVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Report Version",
+        "tags": [
+          "reports"
         ]
       }
     },
@@ -3429,6 +4408,49 @@
         "summary": "Refresh Source",
         "tags": [
           "sources"
+        ]
+      }
+    },
+    "/api/templates/{template_id}": {
+      "get": {
+        "operationId": "get_template_api_templates__template_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template",
+        "tags": [
+          "reports"
         ]
       }
     },

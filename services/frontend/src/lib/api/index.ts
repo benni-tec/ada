@@ -6,6 +6,8 @@ export type * from './models'
 export * from './dashboards'
 export * from './queries'
 export * from './requests'
+// Wave 2: reports (workstream H).
+export * from './reports'
 
 export type Health = Schemas['Health']
 

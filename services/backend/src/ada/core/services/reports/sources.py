@@ -1,0 +1,113 @@
+"""The sources list of a report version (docs/spec.md, "Reports"): generated from the
+pipelines of its widgets, never written by hand.
+
+It is worked out once, when the version is made, and stored with it. A version is frozen
+at its run, so what it rests on cannot change afterwards; storing the list also keeps the
+address the data was fetched from, which a later edit of the source would otherwise
+overwrite.
+"""
+
+from collections.abc import Sequence
+from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
+
+from ada.core.models.base import Id, JsonObject
+from ada.core.models.operators import InputParams, OperatorId, OperatorKind, SourceParams
+from ada.core.models.runs import Run
+from ada.core.models.sources import AccessKind, DataFormat
+from ada.core.models.widgets import Widget
+from ada.core.ports.repositories import (
+    DataSourceRepository,
+    OperatorRepository,
+    SnapshotRepository,
+)
+
+
+class SourceEntry(BaseModel):
+    """One data source behind a report version's widgets."""
+
+    model_config = ConfigDict(frozen=True)
+
+    data_source_id: Id
+    name: str
+    # Where the data was fetched from when the version was made.
+    address: str
+    access_kind: AccessKind
+    format: DataFormat
+    # The source operator that read it; its lineage page shows the rest of the pipeline.
+    operator_id: OperatorId
+    # The snapshot the version's run used, and when it was fetched. None only when the run
+    # had not fixed one, which a version made by the platform never leaves.
+    snapshot_id: Id | None = None
+    fetched_at: datetime | None = None
+    content_hash: str | None = None
+    # The widgets of the version that rest on this source, in reading order.
+    widget_ids: tuple[Id, ...]
+
+
+class SourcesList:
+    def __init__(
+        self,
+        operators: OperatorRepository,
+        snapshots: SnapshotRepository,
+        data_sources: DataSourceRepository,
+    ) -> None:
+        self.operators = operators
+        self.snapshots = snapshots
+        self.data_sources = data_sources
+
+    async def build(self, run: Run, widgets: Sequence[Widget]) -> list[JsonObject]:
+        """The sources behind the widgets as they read through `run`, ordered by name."""
+        uses: dict[OperatorId, list[Id]] = {}
+        for widget in widgets:
+            for operator_id in await self._sources_of(widget.operator_id, run):
+                using = uses.setdefault(operator_id, [])
+                if widget.id not in using:
+                    using.append(widget.id)
+        entries = [await self._entry(operator_id, run, ids) for operator_id, ids in uses.items()]
+        entries.sort(key=lambda entry: (entry.name.lower(), entry.operator_id))
+        return [entry.model_dump(mode="json") for entry in entries]
+
+    async def _sources_of(self, operator_id: OperatorId, run: Run) -> list[OperatorId]:
+        """The source operators upstream of an operator, as the run reads it: an input
+        bound by the run leads to what it is bound to, not to its default."""
+        found: list[OperatorId] = []
+        seen: set[OperatorId] = set()
+        pending = [operator_id]
+        while pending:
+            current = pending.pop()
+            if current in seen:
+                continue
+            seen.add(current)
+            operator = await self.operators.get(current)
+            match operator.kind:
+                case OperatorKind.SOURCE:
+                    found.append(operator.id)
+                case OperatorKind.INPUT:
+                    name = InputParams.model_validate(operator.params).name
+                    bound = run.bindings.get(name)
+                    pending.extend([bound] if bound is not None else operator.inputs)
+                case _:
+                    pending.extend(operator.inputs)
+        return found
+
+    async def _entry(self, operator_id: OperatorId, run: Run, widget_ids: list[Id]) -> SourceEntry:
+        operator = await self.operators.get(operator_id)
+        data_source_id = SourceParams.model_validate(operator.params).data_source_id
+        source = await self.data_sources.get(UUID(str(data_source_id)))
+        snapshot_id = run.snapshots.get(operator_id)
+        snapshot = await self.snapshots.get(snapshot_id) if snapshot_id is not None else None
+        return SourceEntry(
+            data_source_id=source.id,
+            name=source.name,
+            address=source.address,
+            access_kind=source.access_kind,
+            format=source.format,
+            operator_id=operator_id,
+            snapshot_id=snapshot.id if snapshot else None,
+            fetched_at=snapshot.fetched_at if snapshot else None,
+            content_hash=snapshot.content_hash if snapshot else None,
+            widget_ids=tuple(widget_ids),
+        )
