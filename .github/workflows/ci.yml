@@ -28,7 +28,7 @@ jobs:
       - uses: jdx/mise-action@v5
       - run: pnpm install --frozen-lockfile
       - run: moon run frontend:lint frontend:typecheck frontend:test frontend:build
-      - run: moon run widgets:lint widgets:typecheck widgets:build
+      - run: moon run widgets:lint widgets:typecheck widgets:test widgets:build
 
   backend:
     name: Backend checks
@@ -41,8 +41,10 @@ jobs:
         run: git branch --force "$GITHUB_BASE_REF" "origin/$GITHUB_BASE_REF"
       - uses: jdx/mise-action@v5
       - run: uv sync --locked
-      # The migration and repository tests need PostgreSQL, set up as in development.
-      - run: docker compose -f docker-compose.infra.yml up -d --wait postgres
+      # The database tests need PostgreSQL and the event and queue tests Valkey, set up as
+      # in development. Both are required here: with CI set (GitHub sets it), those tests
+      # fail instead of skipping when their service is missing.
+      - run: docker compose -f docker-compose.infra.yml up -d --wait postgres valkey
       - run: moon run backend:lint backend:format backend:test
 
   images:
