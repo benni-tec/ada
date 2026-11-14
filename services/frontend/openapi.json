@@ -741,6 +741,16 @@
             "title": "Days",
             "type": "object"
           },
+          "education_provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Citation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "provenance": {
             "$ref": "#/components/schemas/Citation"
           },
@@ -749,6 +759,14 @@
               "type": "number"
             },
             "title": "Survival",
+            "type": "object"
+          },
+          "survival_by_education": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "default": {},
+            "title": "Survival By Education",
             "type": "object"
           }
         },
@@ -790,6 +808,14 @@
             },
             "title": "Targets",
             "type": "object"
+          },
+          "validation": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ValidationCheck"
+            },
+            "title": "Validation",
+            "type": "array"
           },
           "warnings": {
             "default": [],
@@ -5357,6 +5383,35 @@
         ],
         "title": "TurnStatus",
         "type": "string"
+      },
+      "ValidationCheck": {
+        "description": "One check of the build against a figure the model was not built from.",
+        "properties": {
+          "expected": {
+            "title": "Expected",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "predicted": {
+            "title": "Predicted",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "expected",
+          "predicted",
+          "note"
+        ],
+        "title": "ValidationCheck",
+        "type": "object"
       },
       "ValidationError": {
         "properties": {

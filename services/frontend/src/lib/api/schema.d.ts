@@ -1935,9 +1935,17 @@ export interface components {
                     [key: string]: number;
                 };
             };
+            education_provenance?: components["schemas"]["Citation"] | null;
             provenance: components["schemas"]["Citation"];
             /** Survival */
             survival: {
+                [key: string]: number;
+            };
+            /**
+             * Survival By Education
+             * @default {}
+             */
+            survival_by_education: {
                 [key: string]: number;
             };
         };
@@ -1960,6 +1968,11 @@ export interface components {
                     };
                 };
             };
+            /**
+             * Validation
+             * @default []
+             */
+            validation: components["schemas"]["ValidationCheck"][];
             /**
              * Warnings
              * @default []
@@ -3727,6 +3740,20 @@ export interface components {
          * @enum {string}
          */
         TurnStatus: "queued" | "running" | "done" | "failed" | "cancelled";
+        /**
+         * ValidationCheck
+         * @description One check of the build against a figure the model was not built from.
+         */
+        ValidationCheck: {
+            /** Expected */
+            expected: number;
+            /** Name */
+            name: string;
+            /** Note */
+            note: string;
+            /** Predicted */
+            predicted: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
