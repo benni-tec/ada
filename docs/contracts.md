@@ -860,12 +860,11 @@ receives data from an agent; it asks the server for the output of its operator.
   theme menu is the sun or moon at the top right. Widget frames follow it (see Widgets).
 - **Sidebar** (`components/project-sidebar.tsx`), after shadcn's sidebar that collapses
   to icons (`collapsible="icon"`). Its header is the project switcher: the project's name
-  opens a menu of the projects and "All projects". Then Overview; Sessions (with a new
-  session dialog), Dashboards (a new dashboard dialog) and Reports (a link to
-  `/reports/new`), each a collapsible item listing its items; Alerts, one link with the
-  firing count; and Data sources, folded at first (each links to its entry on the settings
-  page, `settings#source-<id>`, marked when its last refresh failed). Sessions and reports
-  newest first. The footer holds Settings (a gear), active on the settings route.
+  opens a menu of the projects and "All projects". Then Alerts, one link with the firing
+  count, on its own above the rest (what needs attention first); then Overview; Sessions
+  (with a new session dialog), Dashboards (a new dashboard dialog) and Reports (a link to
+  `/reports/new`), each a collapsible item listing its items. Data sources are not in the
+  sidebar: they are on the settings page. Sessions and reports newest first. The footer holds Settings (a gear), active on the settings route.
   The current item is marked (`data-active`, and the router's `aria-current="page"`).
   Collapsed, the icons have tooltips and a type's icon opens the sidebar again. Toggled by
   the top bar's button, the rail or Ctrl/Cmd+B; a sheet on phones.
@@ -1003,7 +1002,7 @@ The agent settings' calls are in `lib/api/settings.ts`, on the typed client.
 | `/projects/{id}/dashboards/{dashboard_id}` | The slots on the grid, all on one run; firing alert badges; the time range control (whole years; "Show" starts a run, "Save as default"); "Edit layout"; "Add widget" and the agent panel; "Generate report"; version history with view (`?version=n`) and restore; start a session from it |
 | `/projects/{id}/reports/{report_id}` | A report version (`?version=1.2.0`, default the latest): its tree with each widget at the version's run (opening full size at that run), the run, range, dashboard version, the sources list; each card's pipeline view previews the version's run |
 | `/projects/{id}/reports/new` | Generate a report from a dashboard (`?dashboard=<id>` preselects it) |
-| `/projects/{id}/alerts` | The alert feed (all, firing, resolved; each alert opens its alerting rows) and the rules by dashboard, with the rule editor and its formula builder |
+| `/projects/{id}/alerts` | The project's alerts are its dashboards' alerts, so the page has one section per dashboard (those with something firing first): its name (a link) and firing count, its alerts (filter all, firing, resolved for the whole page; each alert opens its alerting rows), and its rules, with the rule editor and its formula builder |
 | `/projects/{id}/settings` | The agent shared by all projects (providers and their keys, models, the session agent) and this project's data sources (add, edit, refresh now; `#source-<id>` for one). See "Settings" above |
 | `?open=<widget id>`, on any of the project's pages | The widget full size in a modal over the page (see Widgets) |
 

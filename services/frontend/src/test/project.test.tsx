@@ -101,11 +101,11 @@ test('the overview counts the project’s items, and the sidebar lists them unde
   const alerts = within(nav()).getByRole('link', { name: 'Alerts' })
   expect(alerts).toHaveAttribute('href', '/projects/p1/alerts')
   expect(await within(alerts.closest('li')!).findByText('1')).toBeInTheDocument()
-  // Data sources are folded at first, and have no page: each leads to its card on the overview.
-  const folded = within(group('Data sources')).getByRole('button', { name: 'Data sources' })
-  expect(folded).toHaveAttribute('aria-expanded', 'false')
-  fireEvent.click(folded)
-  expect(await within(group('Data sources')).findByRole('link', { name: /Sotkanet screening/ })).toHaveAttribute('href', '/projects/p1/settings#source-ds1')
+  // Alerts come first, apart from the project's contents; data sources are in Settings.
+  const links = within(nav()).getAllByRole('link').map((link) => link.textContent)
+  expect(links.indexOf('Alerts1 firing')).toBeLessThan(links.indexOf('Overview'))
+  expect(within(nav()).queryByRole('group', { name: 'Data sources' })).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/projects/p1/settings')
 })
 
 test('the sidebar collapses to icons and opens again, and creates sessions and dashboards, marking the current one', async () => {

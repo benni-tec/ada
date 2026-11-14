@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { Check, ChevronRight, ChevronsUpDown, CircleAlert, LayoutGrid, Plus } from 'lucide-react'
+import { Check, ChevronRight, ChevronsUpDown, LayoutGrid, Plus } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -40,7 +40,6 @@ import {
   projectsQuery,
   reportsQuery,
   sessionsQuery,
-  sourcesQuery,
   type Id,
 } from '@/lib/api'
 import { pageTypes, type PageTypeName } from '@/lib/page-types'
@@ -62,7 +61,13 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
       </SidebarHeader>
       <SidebarContent>
         <nav aria-label="Project" className="contents">
-          <SidebarGroup>
+          {/* What needs attention first, apart from the project's contents below. */}
+          <SidebarGroup className="pb-0">
+            <SidebarMenu>
+              <Alerts projectId={projectId} />
+            </SidebarMenu>
+          </SidebarGroup>
+          <SidebarGroup className="pt-4">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Overview">
@@ -75,8 +80,6 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
               <Sessions projectId={projectId} />
               <Dashboards projectId={projectId} />
               <Reports projectId={projectId} />
-              <Alerts projectId={projectId} />
-              <Sources projectId={projectId} />
             </SidebarMenu>
           </SidebarGroup>
         </nav>
@@ -153,18 +156,16 @@ function Group({
   type,
   label,
   action,
-  defaultOpen = true,
   children,
 }: {
   type: PageTypeName
   label: string
   action?: ReactNode
-  defaultOpen?: boolean
   children: ReactNode
 }) {
   const labelId = useId()
   const { state, setOpen: setSidebarOpen } = useSidebar()
-  const [open, setOpen] = useState(defaultOpen)
+  const [open, setOpen] = useState(true)
   const Icon = pageTypes[type].icon
   return (
     <Collapsible asChild open={open} onOpenChange={setOpen} className="group/collapsible">
@@ -371,31 +372,5 @@ function SettingsLink({ projectId }: { projectId: Id }) {
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
-}
-
-/** The sources have no page of their own: each leads to its entry in Settings, where it
- * is edited. Folded at first: there are many, and they are looked up less than the rest. */
-function Sources({ projectId }: { projectId: Id }) {
-  const { data: sources } = useQuery(sourcesQuery(projectId))
-  return (
-    <Group type="source" label="Data sources" defaultOpen={false}>
-      {sources?.length === 0 && <Empty>None yet. Add one in Settings, or have an agent register one over MCP.</Empty>}
-      {sources?.map((source) => (
-        <Item key={source.id}>
-          <Link
-            to="/projects/$projectId/settings"
-            params={{ projectId }}
-            hash={`source-${source.id}`}
-            activeOptions={{ exact: true, includeHash: true }}
-          >
-            {source.last_error && (
-              <CircleAlert aria-label="Last refresh failed" className="text-amber-600! dark:text-amber-400!" />
-            )}
-            <span>{source.name}</span>
-          </Link>
-        </Item>
-      ))}
-    </Group>
   )
 }

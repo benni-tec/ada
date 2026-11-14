@@ -138,11 +138,15 @@ function alertsApi(extra: Record<string, unknown> = {}) {
 
 // The feed
 
-test('the feed: firing first, filtered by state, refetched on a live event; each alert opens its rows', async () => {
+test('the feed, dashboard by dashboard: firing first, filtered by state, refetched on a live event; each alert opens its rows', async () => {
   const fetch = alertsApi()
   renderAt('/projects/p1/alerts')
 
-  const list = await screen.findByRole('list', { name: 'Alerts' })
+  // The project's alerts are its dashboards': one section each, named after it.
+  const section = await screen.findByRole('region', { name: 'Screening' })
+  expect(within(section).getByRole('link', { name: 'Screening' })).toHaveAttribute('href', '/projects/p1/dashboards/d1')
+  expect(section).toHaveTextContent('1 firing')
+  const list = within(section).getByRole('list', { name: 'Alerts on Screening' })
   const [firing, resolved] = within(list).getAllByRole('listitem')
   expect(firing).toHaveTextContent('Critical')
   expect(firing).toHaveTextContent('region: north')
@@ -168,7 +172,7 @@ test('the feed: firing first, filtered by state, refetched on a live event; each
   expect(within(table).getByText(/^\{"type":"Polygon".*…$/)).toHaveAttribute('title', expect.stringContaining('[1,2]]}'))
 
   fireEvent.click(screen.getByRole('button', { name: 'Resolved' }))
-  await waitFor(() => expect(within(screen.getByRole('list', { name: 'Alerts' })).getAllByRole('listitem')).toHaveLength(1))
+  await waitFor(() => expect(within(screen.getByRole('list', { name: 'Alerts on Screening' })).getAllByRole('listitem')).toHaveLength(1))
   expect(screen.getByRole('button', { name: 'Resolved' })).toHaveAttribute('aria-pressed', 'true')
   const urls = () => fetch.mock.calls.map(([input]) => new Request(input as RequestInfo).url)
   expect(urls()).toContainEqual(expect.stringContaining('/api/projects/p1/alerts?state=resolved'))

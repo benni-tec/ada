@@ -1,16 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, RefreshCw } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import { IconButton } from '@/components/icon-action'
 import { Button } from '@/components/ui/button'
 
-import { ErrorNotice, Loading } from '@/components/notices'
+import { ErrorNotice } from '@/components/notices'
 import { Time } from '@/components/provenance'
 import {
   alertKeys,
   checkAlertRule,
-  projectAlertRulesQuery,
   type AlertRule,
   type CheckResult,
   type DashboardRules,
@@ -25,36 +24,15 @@ import { SeverityBadge } from './severity'
 const listClass =
   'divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800'
 
-/** Every dashboard of the project with its alert rules, where rules are added and edited. */
-export function AlertRules({ projectId }: { projectId: Id }) {
-  const { data, error, isPending } = useQuery(projectAlertRulesQuery(projectId))
-  const headingId = useId()
-  return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-4">
-      <h2 id={headingId} className="text-lg font-semibold">
-        Rules by dashboard
-      </h2>
-      {isPending ? (
-        <Loading what="alert rules" />
-      ) : error ? (
-        <ErrorNotice error={error} prefix="The rules cannot be loaded:" />
-      ) : data.length === 0 ? (
-        <p className="text-sm text-neutral-500">No dashboards yet. Alert rules belong to a dashboard.</p>
-      ) : (
-        data.map((group) => <DashboardRuleList key={group.dashboard.id} projectId={projectId} group={group} />)
-      )}
-    </section>
-  )
-}
-
-function DashboardRuleList({ projectId, group }: { projectId: Id; group: DashboardRules }) {
+/** A dashboard's alert rules, where they are added and edited. */
+export function DashboardRuleList({ projectId, group }: { projectId: Id; group: DashboardRules }) {
   const [adding, setAdding] = useState(false)
   const headingId = useId()
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 id={headingId} className="font-medium">
-          {group.dashboard.name}
+        <h3 id={headingId} className="text-sm font-medium text-muted-foreground">
+          Rules
         </h3>
         {!adding && (
           <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
