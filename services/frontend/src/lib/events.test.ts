@@ -84,4 +84,7 @@ test('a changed widget is read again and its frames reload', () => {
   ])
   expect(effects.reloadWidgets).toBe(true)
   expect(event('widget.created', { widget_id: 'w1' }).reloadWidgets).toBe(false)
+  // A frame's report of how it drew: the cards refetch, the frames stay.
+  const reported = event('widget.updated', { widget_id: 'w1', render_only: true })
+  expect([reported.reloadWidgets, reported.invalidate]).toEqual([false, [['projects', 'p1', 'widgets'], ['widgets', 'w1']]])
 })

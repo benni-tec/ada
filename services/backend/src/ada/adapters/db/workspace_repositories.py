@@ -333,6 +333,14 @@ class SqlWidgetRepository(WidgetRepository):
         )
         await add_row(self.session, row)
 
+    async def set_render_error(self, id: Id, error: str | None) -> None:
+        table = WidgetRow.__table__
+        result = await self.session.execute(
+            update(table).where(table.c.id == id).values(render_error=error)
+        )
+        if result.rowcount == 0:  # type: ignore[attr-defined]
+            raise NotFound("widget", id)
+
     async def save(self, widget: Widget) -> None:
         table = WidgetRow.__table__
         result = await self.session.execute(

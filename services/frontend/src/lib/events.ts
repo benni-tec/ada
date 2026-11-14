@@ -82,8 +82,10 @@ export function effectsOf(event: LiveEvent): Effects {
     }
     case 'widget.updated':
     case 'widget.created': {
-      // A changed spec or type is read by the frames when they load.
-      if (event.type === 'widget.updated') reloadWidgets = true
+      // A changed spec or type is read by the frames when they load. A frame's own report
+      // of how it drew changes only the cards' error line: reloading would draw again,
+      // report again, and never stop when each error reads differently.
+      if (event.type === 'widget.updated' && payload.render_only !== true) reloadWidgets = true
       const session = id(payload, 'session_id')
       if (session) invalidate.push(keys.sessionWidgets(session))
       invalidate.push(keys.projectWidgets(projectId))

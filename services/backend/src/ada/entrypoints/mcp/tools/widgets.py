@@ -100,7 +100,10 @@ def register(mcp: FastMCP, inject: Inject) -> None:
           `ada.format.date(value, {grain: "day" | "month" | "quarter" | "year"})` (the
           platform's formats), `ada.libraries.d3` (d3 7.9) and `ada.libraries.vegaEmbed`
           (vega-embed; a plain Vega-Lite chart is the "chart" type), only those listed,
-          and `ada.error(message)` to report a problem without throwing.
+          and `ada.error(message)` to report a problem without throwing. In `css` the
+          colours are variables, `--ada-<name>` for each named one (`--ada-foreground` ...
+          `--ada-warning`) and `--ada-series-1` to `--ada-series-8`, and the frame's root
+          has `data-theme`.
           It runs in a sandboxed frame without network. Refused anywhere in `code`,
           comments included: fetch, XMLHttpRequest, WebSocket, EventSource, sendBeacon,
           importScripts, document.cookie, localStorage, sessionStorage, indexedDB,

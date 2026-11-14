@@ -159,9 +159,9 @@ class Widgets(WidgetService):
             error = error[:MAX_RENDER_ERROR]
         if error == widget.render_error:
             return
-        updated = widget.model_copy(update={"render_error": error})
-        await self.widgets.save(updated)
-        await self._announce(updated)
+        await self.widgets.set_render_error(id, error)
+        # Frames draw what they drew; only the cards' error lines need the news.
+        await self._announce(widget, render_only=True)
 
     async def get(self, id: Id) -> Widget:
         return await self.widgets.get(id)
@@ -242,10 +242,12 @@ class Widgets(WidgetService):
                 samples.append(JudgeInput(name=name, columns=rows.columns, rows=rows.rows))
         return tuple(samples)
 
-    async def _announce(self, widget: Widget) -> None:
-        payload = {"widget_id": str(widget.id)}
+    async def _announce(self, widget: Widget, render_only: bool = False) -> None:
+        payload: dict[str, object] = {"widget_id": str(widget.id)}
         if widget.session_id is not None:
             payload["session_id"] = str(widget.session_id)
+        if render_only:
+            payload["render_only"] = True
         await self.events.publish(
             Event(
                 type=EventType.WIDGET_UPDATED,

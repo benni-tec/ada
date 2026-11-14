@@ -495,7 +495,9 @@ def test_how_a_widget_drew_is_kept_until_it_changes_and_a_report_keeps_its_code(
     failed = client.post(f"/api{path}/render", json={"error": "x" * 3000})
     client.post(f"/api{path}/render", json={"error": "x" * 3000})
     stored = send(client, "GET", path)
-    announced = [e.type for e in events(client, project["id"])[published:]]
+    announced = [
+        (e.type, e.payload.get("render_only")) for e in events(client, project["id"])[published:]
+    ]
     content = {"blocks": [{"type": "widget", "widget_id": widget["id"]}]}
     report = send(
         client,
@@ -512,9 +514,10 @@ def test_how_a_widget_drew_is_kept_until_it_changes_and_a_report_keeps_its_code(
     copy = send(client, "GET", f"/widgets/{report['content']['blocks'][0]['widget_id']}")
     unknown = client.post(f"/api/widgets/{uuid7()}/render", json={"error": None})
 
-    # Kept cut short, and announced once: the same error again changes nothing.
+    # Kept cut short, and announced once, for the cards only (frames do not reload): the
+    # same error again changes nothing.
     assert (failed.status_code, stored["render_error"]) == (204, "x" * 2000)
-    assert announced == ["widget.updated"]
+    assert announced == [("widget.updated", True)]
     # A new title draws the same; new code clears the error and is judged again.
     assert (renamed["render_error"], asked_after_renaming) == ("x" * 2000, asked)
     assert (fixed["render_error"], len(judged.calls)) == (None, asked + 1)

@@ -353,6 +353,10 @@ class MemoryWidgetRepository(WidgetRepository):
         _get(self.store.widgets, "widget", widget.id)
         self.store.widgets[widget.id] = widget
 
+    async def set_render_error(self, id: Id, error: str | None) -> None:
+        widget = _get(self.store.widgets, "widget", id)
+        self.store.widgets[id] = widget.model_copy(update={"render_error": error})
+
     async def list(self, project_id: Id) -> Sequence[Widget]:
         return _in_project(self.store.widgets, project_id)
 
