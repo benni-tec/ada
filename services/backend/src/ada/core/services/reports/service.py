@@ -7,7 +7,14 @@ from ada.core.models.base import Id, JsonObject
 from ada.core.models.dashboards import Slot
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import Event, EventType
-from ada.core.models.reports import Report, ReportVersion, Template, TemplateKind, VersionBump
+from ada.core.models.reports import (
+    Report,
+    ReportSource,
+    ReportVersion,
+    Template,
+    TemplateKind,
+    VersionBump,
+)
 from ada.core.models.runs import Run
 from ada.core.models.time import TimeRange
 from ada.core.models.widgets import Widget
@@ -67,7 +74,7 @@ class Reports(ReportService):
         self.runs = runs
         self.events = events
         self.clock = clock
-        self.sources = SourcesList(operators, snapshots, data_sources)
+        self.sources_list = SourcesList(operators, snapshots, data_sources)
 
     async def get(self, id: Id) -> Report:
         return await self.reports.get(id)
@@ -83,6 +90,10 @@ class Reports(ReportService):
         await self.reports.get(id)
         versions = await self.reports.versions(id)
         return sorted(versions, key=lambda version: parse_version(version.version))
+
+    async def sources(self, version_id: Id) -> Sequence[ReportSource]:
+        # Stored in the version's content when it was made (see reports/sources.py).
+        return SourcesList.read((await self.reports.get_version(version_id)).content)
 
     async def create(
         self,
@@ -299,7 +310,7 @@ class Reports(ReportService):
             time_range=time_range,
             content={
                 tree.BLOCKS_KEY: tree.dump(blocks),
-                tree.SOURCES_KEY: await self.sources.build(run, widgets),
+                tree.SOURCES_KEY: await self.sources_list.build(run, widgets),
             },
             template_id=template_id,
             dashboard_version_id=dashboard_version_id,

@@ -4,7 +4,14 @@ from typing import Protocol
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.dashboards import Slot
-from ada.core.models.reports import Report, ReportVersion, Template, TemplateKind, VersionBump
+from ada.core.models.reports import (
+    Report,
+    ReportSource,
+    ReportVersion,
+    Template,
+    TemplateKind,
+    VersionBump,
+)
 from ada.core.models.time import TimeRange
 
 
@@ -13,6 +20,11 @@ class ReportService(Protocol):
     async def list(self, project_id: Id) -> Sequence[Report]: ...
     async def version(self, version_id: Id) -> ReportVersion: ...
     async def versions(self, id: Id) -> Sequence[ReportVersion]: ...
+
+    async def sources(self, version_id: Id) -> Sequence[ReportSource]:
+        """The data sources behind a version's widgets, ordered by name, with the address
+        and the snapshot its run read. Generated when the version was made."""
+        ...
 
     async def create(
         self,

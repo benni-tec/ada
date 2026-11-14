@@ -1,20 +1,23 @@
 """Reports, their versions and sources lists, and templates (docs/contracts/wave2-reports.md)."""
 
 from collections.abc import Sequence
-from datetime import datetime
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, status
-from pydantic import TypeAdapter
 
-from ada.core.models.base import DomainModel, Id, JsonObject
+from ada.core.models.base import Id, JsonObject
 from ada.core.models.dashboards import Slot
 from ada.core.models.errors import Conflict
-from ada.core.models.operators import OperatorId
-from ada.core.models.reports import Report, ReportVersion, Template, TemplateKind, VersionBump
+from ada.core.models.reports import (
+    Report,
+    ReportSource,
+    ReportVersion,
+    Template,
+    TemplateKind,
+    VersionBump,
+)
 from ada.core.models.runs import Run
-from ada.core.models.sources import AccessKind, DataFormat
 from ada.core.models.time import TimeRange
 from ada.core.services.ports.reports import ReportService, TemplateService
 from ada.core.services.ports.runs import RunService
@@ -65,25 +68,6 @@ class NewTemplate(Request):
     kind: TemplateKind
     slots: tuple[Slot, ...]
     content: JsonObject | None = None
-
-
-class ReportSource(DomainModel):
-    """One data source behind a report version's widgets, as the version's run read it."""
-
-    data_source_id: Id
-    name: str
-    # Where the data was fetched from when the version was made.
-    address: str
-    access_kind: AccessKind
-    format: DataFormat
-    operator_id: OperatorId
-    snapshot_id: Id | None = None
-    fetched_at: datetime | None = None
-    content_hash: str | None = None
-    widget_ids: tuple[Id, ...]
-
-
-_sources = TypeAdapter(tuple[ReportSource, ...])
 
 
 @router.get("/projects/{project_id}/reports")
@@ -168,8 +152,7 @@ async def list_report_sources(
 ) -> Sequence[ReportSource]:
     """The data sources behind the version's widgets, with the address and fetch time of
     the snapshot its run used. Generated when the version was made."""
-    version = await service.version(version_id)
-    return _sources.validate_python(version.content.get("sources", []))
+    return await service.sources(version_id)
 
 
 @router.post("/dashboards/{dashboard_id}/reports", status_code=status.HTTP_201_CREATED)

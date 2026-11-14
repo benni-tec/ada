@@ -1722,7 +1722,7 @@
         "type": "object"
       },
       "ReportSource": {
-        "description": "One data source behind a report version's widgets, as the version's run read it.",
+        "description": "One data source behind a report version's widgets, as the version's run read it.\nGenerated when the version is made and stored with it: the version is frozen at its\nrun, so the list cannot go stale, and it keeps the address the data came from even\nif the source is edited later.",
         "properties": {
           "access_kind": {
             "$ref": "#/components/schemas/AccessKind"

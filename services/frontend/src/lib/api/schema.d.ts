@@ -1503,6 +1503,9 @@ export interface components {
         /**
          * ReportSource
          * @description One data source behind a report version's widgets, as the version's run read it.
+         *     Generated when the version is made and stored with it: the version is frozen at its
+         *     run, so the list cannot go stale, and it keeps the address the data came from even
+         *     if the source is edited later.
          */
         ReportSource: {
             access_kind: components["schemas"]["AccessKind"];

@@ -4,6 +4,8 @@ from enum import StrEnum
 from ada.core.models.actors import Actor
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Slot
+from ada.core.models.operators import OperatorId
+from ada.core.models.sources import AccessKind, DataFormat
 from ada.core.models.time import TimeRange
 
 
@@ -62,3 +64,26 @@ class ReportVersion(DomainModel):
     dashboard_version_id: Id | None = None
     created_by: Actor
     created_at: datetime
+
+
+class ReportSource(DomainModel):
+    """One data source behind a report version's widgets, as the version's run read it.
+    Generated when the version is made and stored with it: the version is frozen at its
+    run, so the list cannot go stale, and it keeps the address the data came from even
+    if the source is edited later."""
+
+    data_source_id: Id
+    name: str
+    # Where the data was fetched from when the version was made.
+    address: str
+    access_kind: AccessKind
+    format: DataFormat
+    # The source operator that read it; its lineage is the rest of the pipeline.
+    operator_id: OperatorId
+    # The snapshot the version's run used, and when it was fetched. None only when the run
+    # had not fixed one, which a version made by the platform never leaves.
+    snapshot_id: Id | None = None
+    fetched_at: datetime | None = None
+    content_hash: str | None = None
+    # The widgets of the version that rest on this source, in reading order.
+    widget_ids: tuple[Id, ...]

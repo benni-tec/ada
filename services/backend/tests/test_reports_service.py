@@ -18,7 +18,7 @@ from ada.core.models.dashboards import Slot
 from ada.core.models.errors import Invalid
 from ada.core.models.events import EventType
 from ada.core.models.operators import Operator, OperatorKind
-from ada.core.models.reports import ReportVersion, TemplateKind, VersionBump
+from ada.core.models.reports import ReportSource, ReportVersion, TemplateKind, VersionBump
 from ada.core.models.runs import Run
 from ada.core.models.time import TimeRange
 from ada.core.ports.repositories import OperatorRepository, SessionRepository, WidgetRepository
@@ -368,6 +368,17 @@ async def test_the_sources_list_names_every_source_behind_the_widgets(
             "widget_ids": [str(scene.chart.id)],
         },
     ]
+
+
+async def test_the_service_serves_the_stored_sources_list_typed(calls: Calls, scene: Scene) -> None:
+    version = await calls.create(scene, blocks(shows(scene.chart)))
+    sources = await calls.reports("sources", version.id)
+    assert all(isinstance(source, ReportSource) for source in sources)
+    assert [source.name for source in sources] == ["Sotkanet", "Statistics Finland"]
+    assert sources[0].fetched_at == FETCHED_A
+    assert sources[0].widget_ids == (scene.chart.id,)
+    # As stored: a later edit of the source does not change what the version rests on.
+    assert [source.model_dump(mode="json") for source in sources] == version.content["sources"]
 
 
 async def test_the_sources_list_follows_the_runs_input_bindings(

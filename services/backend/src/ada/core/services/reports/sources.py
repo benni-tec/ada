@@ -8,43 +8,23 @@ overwrite.
 """
 
 from collections.abc import Sequence
-from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import TypeAdapter
 
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.operators import InputParams, OperatorId, OperatorKind, SourceParams
+from ada.core.models.reports import ReportSource
 from ada.core.models.runs import Run
-from ada.core.models.sources import AccessKind, DataFormat
 from ada.core.models.widgets import Widget
 from ada.core.ports.repositories import (
     DataSourceRepository,
     OperatorRepository,
     SnapshotRepository,
 )
+from ada.core.services.reports.content import SOURCES_KEY
 
-
-class SourceEntry(BaseModel):
-    """One data source behind a report version's widgets."""
-
-    model_config = ConfigDict(frozen=True)
-
-    data_source_id: Id
-    name: str
-    # Where the data was fetched from when the version was made.
-    address: str
-    access_kind: AccessKind
-    format: DataFormat
-    # The source operator that read it; its lineage page shows the rest of the pipeline.
-    operator_id: OperatorId
-    # The snapshot the version's run used, and when it was fetched. None only when the run
-    # had not fixed one, which a version made by the platform never leaves.
-    snapshot_id: Id | None = None
-    fetched_at: datetime | None = None
-    content_hash: str | None = None
-    # The widgets of the version that rest on this source, in reading order.
-    widget_ids: tuple[Id, ...]
+_stored = TypeAdapter(tuple[ReportSource, ...])
 
 
 class SourcesList:
@@ -57,6 +37,11 @@ class SourcesList:
         self.operators = operators
         self.snapshots = snapshots
         self.data_sources = data_sources
+
+    @staticmethod
+    def read(content: JsonObject) -> tuple[ReportSource, ...]:
+        """The list stored in a version's content."""
+        return _stored.validate_python(content.get(SOURCES_KEY, []))
 
     async def build(self, run: Run, widgets: Sequence[Widget]) -> list[JsonObject]:
         """The sources behind the widgets as they read through `run`, ordered by name."""
@@ -93,13 +78,13 @@ class SourcesList:
                     pending.extend(operator.inputs)
         return found
 
-    async def _entry(self, operator_id: OperatorId, run: Run, widget_ids: list[Id]) -> SourceEntry:
+    async def _entry(self, operator_id: OperatorId, run: Run, widget_ids: list[Id]) -> ReportSource:
         operator = await self.operators.get(operator_id)
         data_source_id = SourceParams.model_validate(operator.params).data_source_id
         source = await self.data_sources.get(UUID(str(data_source_id)))
         snapshot_id = run.snapshots.get(operator_id)
         snapshot = await self.snapshots.get(snapshot_id) if snapshot_id is not None else None
-        return SourceEntry(
+        return ReportSource(
             data_source_id=source.id,
             name=source.name,
             address=source.address,
