@@ -484,7 +484,8 @@ def _text(node: Node) -> str:
             periods = "1 period" if node.periods == 1 else f"{node.periods} periods"
             return f"{node.kind}({_text(node.args[0])}, {periods})"
         case "not":
-            return f"not {_operand(node.args[0], _PRECEDENCE['not'], right=False)}"
+            # Anything but a single value is parenthesised: not (a < b) reads unambiguously.
+            return f"not {_operand(node.args[0], _ATOM, right=False)}"
     own = _precedence(node)
     joiner = f" {node.kind} " if node.kind in ("and", "or") else f" {node.op} "
     return joiner.join(_operand(arg, own, right=index > 0) for index, arg in enumerate(node.args))
