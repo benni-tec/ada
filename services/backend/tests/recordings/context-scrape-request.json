@@ -1,0 +1,12 @@
+{
+  "url": "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625",
+  "formats": {
+    "markdown": true
+  },
+  "sharedParams": {
+    "mainContentOnly": true
+  },
+  "markdownParams": {
+    "includeLinks": false
+  }
+}

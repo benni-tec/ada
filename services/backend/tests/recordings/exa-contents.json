@@ -1,0 +1,27 @@
+{
+  "requestId": "0b321d54c2ee28fcb14a44f1262c48ab",
+  "results": [
+    {
+      "id": "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625",
+      "title": "Metadata - Sotkanet.fi, Statistics and Indicator Bank",
+      "url": "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625",
+      "author": null,
+      "text": "Metadata - Sotkanet.fi, Statistics and Indicator Bank\n\n# Five-year relative survival rate of breast cancer patients, % (ind. 3625)\n\n| Data source | Years | Update frequency | Updated |\n| --- | --- | --- | --- |\n| Finnish Cancer Registry | 2015–2024 | Once a year | 12.6.2026 |\n\n## Data content\n\nThe indicator represents the five-year relative age-standardised survival rate of breast cancer patients, (0100 percent). The figure indicates the percentage of cancer patients alive five years after cancer diagnosis, compared to the percentage of the population of a similar age in the region surviving during this time. The relative survival rate can be interpreted as an estimate of the likelihood of survival in a situation where the cancer of the patient is the only possible cause of death. This is based on the monitoring of patients diagnosed during the statistical year visible on Sotkanet, and during the nine preceding years, carried out during the statistical year and the four years preceding the statistical year. The regional survival rates have been age-standardised to correspond to the age structure of the patients diagnosed in the entire country during the monitoring years.\n\n## Classifications\n\nGender total\n\nRegion, the wellbeing services county, hospital district, whole country\n\n## Subjects\n\ncancer\n\nbreast cancer\n\nquality of services\n\n## Data source\n\nCancer statistics (Finnish Cancer Registry)\n\n## Additional information\n\nThe Finnish Cancer Registry, Screening statistics\n\n## Member of\n\nQuality of services\n\nEffectiveness (primary health care) KUVA",
+      "image": "https://sotkanet.fi/sotkanet/images/THL_Sotkanet_Vaaka_Vihrea_RGB.svg"
+    }
+  ],
+  "statuses": [
+    {
+      "id": "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625",
+      "status": "success",
+      "source": "cached"
+    }
+  ],
+  "costDollars": {
+    "total": 0.001,
+    "contents": {
+      "text": 0.001
+    }
+  },
+  "searchTime": 13.196484999964014
+}

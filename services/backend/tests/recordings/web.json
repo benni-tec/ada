@@ -1,0 +1,53 @@
+{
+  "recorded": "2026-11-14",
+  "note": "Answers of Exa and Context.dev, replayed by the web tool tests. Bodies are stored as they came; the monitor webhook secret is replaced by test-secret, headers are reduced to the content type.",
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.exa.ai/search",
+      "status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "body": "exa-search-data.json",
+      "request": "exa-search-data-request.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.exa.ai/contents",
+      "status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "body": "exa-contents.json",
+      "request": "exa-contents-request.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.context.dev/v1/web/scrape",
+      "status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "body": "context-scrape.json",
+      "request": "context-scrape-request.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.context.dev/v1/web/scrape",
+      "status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "body": "context-extract.json",
+      "request": "context-extract-request.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.context.dev/v1/monitors",
+      "status": 201,
+      "content_type": "application/json; charset=utf-8",
+      "body": "context-monitor-create.json",
+      "request": "context-monitor-create-request.json"
+    },
+    {
+      "method": "DELETE",
+      "url": "https://api.context.dev/v1/monitors/mon_ad7ebd7e14d14cbab79f8b3f9f89d23f",
+      "status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "body": "context-monitor-delete.json"
+    }
+  ]
+}
