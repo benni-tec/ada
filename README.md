@@ -135,7 +135,8 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `VALKEY_URL` | Valkey URL, e.g. `redis://…` |
 | `DATA_DIR` | Directory for snapshots (default `data`; `/data` in the image) |
 | `WIDGETS_DIR` | The built widgets (default `services/widgets/dist` of the checkout; `/app/widgets` in the image) |
-| `ADA_LLMS_CONFIG` | The in-platform agent's models file (default `llms.yml`; moon sets `config/llms.yml` of the checkout, compose `/config/llms.yml`) |
+| `ADA_SECRET_KEY` | The master key that encrypts the agent's API keys in the database: a Fernet key, or several separated by commas (the first encrypts, all decrypt). Unset: no API key can be stored |
+| `ADA_SECRET_KEY_FILE` | A file holding the master key instead, e.g. a Docker secret |
 
 There are no users and no authentication yet: whoever can reach the gateway can use the
 API and the MCP endpoint. Do not expose it publicly as it is.
@@ -145,21 +146,30 @@ Secrets never go into the repository. `.env` holds only `VERSION`; put local sec
 
 ### The in-platform agent
 
-ADA answers messages in sessions and dashboard panels with an agent of its own when a
-models file names a session agent. Without the file ADA runs as before: messages are
-recorded and nobody answers them.
+ADA answers messages in sessions and dashboard panels with an agent of its own once a
+session agent is chosen on the Settings page (the gear at the bottom of the sidebar).
+Until then messages are recorded and nobody answers them. Providers, keys and the session
+agent are shared by all projects.
 
-1. Copy `llms.example.yml` to `config/llms.yml` (ignored by git) and keep the providers
-   you have a key for. Most providers speak the OpenAI chat API (`kind:
-   openai-compatible` with their `base_url`); Gemini also works natively (`kind: gemini`).
-   Set `models.session_agent` to `<provider>/<model>`.
-2. Put each provider's key in `.env.local` under the variable its `api_key_env` names,
-   e.g. `GEMINI_API_KEY=...`. Keys never go into the models file.
-3. Full stack: compose mounts `config/` into the backend and the worker and passes
-   `.env.local` to them; recreate both (`docker compose up -d backend worker`) so they
-   read the file and the keys. From source: `moon run :dev` reads `config/llms.yml`;
-   export the keys in the shell that starts it.
+1. **A master key.** API keys are stored encrypted in the database, under the master key
+   `ADA_SECRET_KEY`. From source, `moon run :dev` adds one to `.env.local` when it has
+   none (it never overwrites one). For the full stack, put one in `.env.local` yourself
+   and recreate the backend and the worker (`docker compose up -d backend worker`):
 
-`GET /api/llm/models` lists the configured models and, for each, whether its key is set.
-A models file that cannot be read stops the backend and the worker at start, with every
-problem named.
+   ```sh
+   echo "ADA_SECRET_KEY=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')" >> .env.local
+   ```
+
+   Keep it: keys stored under a lost or changed master key cannot be read, and their
+   models show "The stored key cannot be decrypted; enter it again".
+2. **A provider.** On the Settings page, add a provider: a name (lowercase, e.g.
+   `gemini`), its kind and its API key. Most providers speak the OpenAI chat API (kind
+   `openai-compatible`, with their base URL, e.g.
+   `https://generativelanguage.googleapis.com/v1beta/openai/`); Gemini also works natively
+   (kind `gemini`). An `openai-compatible` endpoint may need no key, e.g. a local vLLM.
+3. **A model.** Add the provider's model by its name, e.g. `gemini-2.5-flash`; its id is
+   `<provider>/<model>`.
+4. **The session agent.** Pick it at the top of the Agents section.
+
+`GET /api/llm/models` lists the configured models and whether each can be used; no
+response ever carries a key.
