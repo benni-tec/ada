@@ -32,7 +32,9 @@ export function RowsPreview({
   const { columns, rows: values, truncated } = rows.data
   const shown = values.length
   const note = truncated
-    ? `First ${shown} of ${typeof total === 'number' ? total.toLocaleString() : 'more'} rows`
+    ? typeof total === 'number'
+      ? `First ${shown} of ${total.toLocaleString()} rows`
+      : `First ${shown} rows; there are more`
     : `${shown} row${shown === 1 ? '' : 's'}`
   return (
     <div className="flex h-full min-h-0 flex-col">

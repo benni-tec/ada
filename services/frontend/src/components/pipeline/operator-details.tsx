@@ -145,8 +145,8 @@ function OutputSchema({ operator }: { operator: Operator }) {
   return (
     <Part title="Output">
       <p className="text-xs text-neutral-500">
-        {output.kind === 'table' ? 'A table' : `A ${output.kind}`}; its columns{' '}
-        {output.derived ? 'derived from the query' : 'declared by whoever made it'}, its roles declared.
+        {output.kind === 'table' ? 'A table' : `A ${output.kind}`}
+        {output.derived ? ', its columns derived from its inputs' : ''}. The roles say what the columns mean.
       </p>
       {output.columns.length === 0 ? (
         <p className="text-neutral-500">The columns are not known until the data is read.</p>

@@ -49,13 +49,15 @@ export function PipelineGraph({
   }
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="min-h-0 flex-1 overflow-auto">
+      {/* Centred in the area by auto margins, which, unlike centring the flex items, keep
+          a graph larger than the area scrollable from its start. */}
+      <div className="flex min-h-0 flex-1 overflow-auto p-2">
         <div
           ref={container}
           role="group"
           aria-label="Operators, from the sources to the widget"
           aria-describedby={`${hintId} ${legendId}`}
-          className="relative"
+          className="relative m-auto shrink-0"
           style={{ width: graph.width, height: graph.height }}
         >
           <svg
@@ -104,7 +106,7 @@ export function PipelineGraph({
                 onClick={() => onSelect(operator.id)}
                 onKeyDown={onKeyDown(node)}
                 style={{ left: x, top: y, width: NODE_WIDTH, height: NODE_HEIGHT }}
-                className={`absolute flex flex-col justify-center rounded-md px-2.5 text-left text-xs shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+                className={`absolute flex flex-col justify-center rounded-md px-2.5 text-left text-xs shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:focus-visible:outline-neutral-100 ${
                   operator.materializing ? looks.materializing : looks.passThrough
                 } ${isSelected ? 'ring-3 ring-blue-500 ring-offset-1 ring-offset-white dark:ring-blue-400 dark:ring-offset-neutral-900' : ''}`}
               >
