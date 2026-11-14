@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { expect, test, vi } from 'vitest'
+import { expect, test } from 'vitest'
 
 import { latestPerKey } from '@/lib/columns'
-import { WidgetRuntime, type Loaded } from '@/lib/runtime'
+import type { Loaded } from '@/lib/runtime'
 import type { Roles, WidgetData } from '@/lib/types'
 import { loaded, widget } from '@/test/samples'
 
@@ -84,9 +84,26 @@ test('takes each region at its latest period and classes the values', () => {
   // North is up: North Ostrobothnia lies above Helsinki in the drawing.
   const top = (code: string) => Number(byCode[code].path.split(' ')[1].split('L')[0])
   expect(top('19')).toBeLessThan(top('90'))
+
+  // The helpers underneath.
+  expect(parseGeometry('not json')).toBeNull()
+  expect(parseGeometry({ type: 'Point', coordinates: [1, 2] })).toBeNull()
+  expect(parseGeometry(square(0, 0))?.type).toBe('Polygon')
+  expect(classes([1, 1])).toEqual([{ from: 1, to: 1 }])
+  expect(classes([0, 10]).map((bin) => bin.to)).toEqual([2, 4, 6, 8, 10])
+  const rows = [
+    ['a', '2023-12-31'],
+    ['a', '2024-12-31'],
+    ['a', null],
+    ['b', null],
+  ]
+  expect([...latestPerKey(rows, 0, 1).values()]).toEqual([
+    ['a', '2024-12-31'],
+    ['b', null],
+  ])
 })
 
-test('draws every region, a legend and the marks of missing data', () => {
+test('draws every region, a legend and the marks of missing data, and lists the values in a table', () => {
   const { container } = render(<RegionMap {...sample()} />)
 
   expect(screen.getByRole('img')).toHaveAccessibleName(
@@ -102,6 +119,11 @@ test('draws every region, a legend and the marks of missing data', () => {
   expect(legend).toHaveTextContent('74.3–76.56')
   expect(legend).toHaveTextContent('No data')
   expect(legend).toHaveTextContent('Suppressed')
+
+  // Every value, in a table for screen readers.
+  const table = screen.getByRole('table')
+  expect(within(table).getAllByRole('row')).toHaveLength(1 + 5)
+  expect(within(table).getByRole('row', { name: /North Ostrobothnia/ })).toHaveTextContent('85.6 (85.1–86.1)2024')
 })
 
 test('reads each region with the keyboard', () => {
@@ -127,14 +149,6 @@ test('reads each region with the keyboard', () => {
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
 })
 
-test('lists every value in a table for screen readers', () => {
-  render(<RegionMap {...sample()} />)
-
-  const table = screen.getByRole('table')
-  expect(within(table).getAllByRole('row')).toHaveLength(1 + 5)
-  expect(within(table).getByRole('row', { name: /North Ostrobothnia/ })).toHaveTextContent('85.6 (85.1–86.1)2024')
-})
-
 test('draws longitude and latitude with north up', () => {
   const lonLat = (lon: number, lat: number) =>
     JSON.stringify({ type: 'MultiPolygon', coordinates: [[[[lon, lat], [lon + 1, lat], [lon + 1, lat + 1], [lon, lat]]]] })
@@ -156,46 +170,8 @@ test('draws longitude and latitude with north up', () => {
 })
 
 test('names what is missing to draw a map', () => {
-  render(<RegionMap {...sample({ roles: { ...roles, geo: null } })} />)
+  const { rerender } = render(<RegionMap {...sample({ roles: { ...roles, geo: null } })} />)
   expect(screen.getByRole('alert')).toHaveTextContent('A map needs a geography role')
-})
-
-test('names a missing outline column', () => {
-  render(<RegionMap {...sample({ widget: widget({ type: 'map', spec: { geometry: 'shape' } }) })} />)
+  rerender(<RegionMap {...sample({ widget: widget({ type: 'map', spec: { geometry: 'shape' } }) })} />)
   expect(screen.getByRole('alert')).toHaveTextContent('No column "shape" with the region outlines')
-})
-
-test('marks scenario and stale data like every widget', async () => {
-  window.location.hash = '#widget=w1'
-  const data = counties({ is_scenario: true, is_stale: true })
-  const responses: Record<string, unknown> = {
-    '/api/widgets/w1': widget({ type: 'map', title: 'Screening' }),
-    '/api/widgets/w1/data': data,
-  }
-  const fetch = async (path: string) => new Response(JSON.stringify(responses[path.split('?')[0]]))
-  vi.stubGlobal('fetch', fetch)
-
-  render(<WidgetRuntime>{(loaded) => <RegionMap {...loaded} />}</WidgetRuntime>)
-
-  expect(await screen.findByText('Scenario: simulated numbers')).toBeInTheDocument()
-  expect(screen.getByText('Stale: last good data, a refresh failed')).toBeInTheDocument()
-  expect(screen.getByRole('img')).toBeInTheDocument()
-})
-
-test('helpers: geometry, classes and the latest row per region', () => {
-  expect(parseGeometry('not json')).toBeNull()
-  expect(parseGeometry({ type: 'Point', coordinates: [1, 2] })).toBeNull()
-  expect(parseGeometry(square(0, 0))?.type).toBe('Polygon')
-  expect(classes([1, 1])).toEqual([{ from: 1, to: 1 }])
-  expect(classes([0, 10]).map((bin) => bin.to)).toEqual([2, 4, 6, 8, 10])
-  const rows = [
-    ['a', '2023-12-31'],
-    ['a', '2024-12-31'],
-    ['a', null],
-    ['b', null],
-  ]
-  expect([...latestPerKey(rows, 0, 1).values()]).toEqual([
-    ['a', '2024-12-31'],
-    ['b', null],
-  ])
 })

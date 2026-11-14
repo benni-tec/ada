@@ -8,7 +8,7 @@ import { buildChart, niceTicks, runs, type ChartModel } from './model'
 
 const bySeries = widget({ type: 'line-chart', spec: { series: 'region' } })
 
-test('builds one series per region from the roles', () => {
+test('builds one series per region from the roles, a band only with bounds, and round ticks', () => {
   const model = buildChart(loaded({ widget: bySeries })) as ChartModel
 
   expect(model.x).toBe('period_start')
@@ -20,13 +20,17 @@ test('builds one series per region from the roles', () => {
   // The suppressed value is a gap, which splits North into two runs.
   expect(runs(model.series[0].points)).toHaveLength(2)
   expect(runs(model.series[1].points)).toHaveLength(1)
-})
 
-test('draws no band when the schema declares no bounds', () => {
-  const model = buildChart(loaded({ widget: bySeries, roles: { measures: [{ value: 'coverage' }] } })) as ChartModel
+  // No band when the schema declares no bounds.
+  const unbounded = buildChart(loaded({ widget: bySeries, roles: { measures: [{ value: 'coverage' }] } })) as ChartModel
 
-  expect(model.hasBand).toBe(false)
-  expect(model.hasSuppressed).toBe(false)
+  expect(unbounded.hasBand).toBe(false)
+  expect(unbounded.hasSuppressed).toBe(false)
+
+  // Round ticks that cover the range.
+  expect(niceTicks(3, 17)).toEqual([0, 5, 10, 15, 20])
+  expect(niceTicks(0.1, 0.3)).toEqual([0.1, 0.15, 0.2, 0.25, 0.3])
+  expect(niceTicks(5, 5).length).toBeGreaterThan(1)
 })
 
 test('renders lines, bands, a dot between gaps and a legend', () => {
@@ -62,7 +66,7 @@ test('shows the values at an x with the keyboard', () => {
   expect(tooltip).toHaveTextContent('South71 (69–73)')
 })
 
-test('uses x and y from the spec and a category axis for text', () => {
+test('uses x and y from the spec and a category axis for text, and names a missing column', () => {
   const data = coverage({
     columns: [
       { name: 'month', type: 'text' },
@@ -75,20 +79,11 @@ test('uses x and y from the spec and a category axis for text', () => {
     ],
   })
   const spec = { x: 'month', y: 'visits' }
-  render(<LineChart {...loaded({ widget: widget({ title: '', spec }), data, roles: {} })} />)
+  const { rerender } = render(<LineChart {...loaded({ widget: widget({ title: '', spec }), data, roles: {} })} />)
 
   expect(screen.getByRole('img')).toHaveAccessibleName('Line chart of visits by month, from Jan to Mar')
   expect(screen.queryByRole('list', { name: 'Legend' })).not.toBeInTheDocument()
-})
 
-test('names a missing column', () => {
-  render(<LineChart {...loaded({ widget: widget({ spec: { y: 'deaths' } }) })} />)
-
+  rerender(<LineChart {...loaded({ widget: widget({ spec: { y: 'deaths' } }) })} />)
   expect(screen.getByRole('alert')).toHaveTextContent('No column "deaths" for the y axis')
-})
-
-test('ticks are round and cover the range', () => {
-  expect(niceTicks(3, 17)).toEqual([0, 5, 10, 15, 20])
-  expect(niceTicks(0.1, 0.3)).toEqual([0.1, 0.15, 0.2, 0.25, 0.3])
-  expect(niceTicks(5, 5).length).toBeGreaterThan(1)
 })
