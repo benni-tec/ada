@@ -23,6 +23,14 @@
   --series-6: #008300;
   --series-7: #6250d6;
   --series-8: #e34948;
+  /* Sequential blue for magnitude (maps): one hue, more is darker. */
+  --seq-1: #b7d3f6;
+  --seq-2: #86b6ef;
+  --seq-3: #5598e7;
+  --seq-4: #2a78d6;
+  --seq-5: #184f95;
+  /* A region without a value: neutral, outside the ramp. */
+  --map-missing: #e5e4e0;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 14px;
   color: var(--text-primary);
@@ -48,6 +56,13 @@
     --series-6: #008300;
     --series-7: #9085e9;
     --series-8: #e66767;
+    /* Flipped: the low end recedes into the dark surface, the high end comes forward. */
+    --seq-1: #184f95;
+    --seq-2: #256abf;
+    --seq-3: #3987e5;
+    --seq-4: #6da7ec;
+    --seq-5: #b7d3f6;
+    --map-missing: #383835;
   }
 }
 
@@ -275,4 +290,58 @@ body,
   margin: 0;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* map */
+
+.ada-map {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.ada-map svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ada-map svg:focus-visible {
+  outline: 2px solid var(--series-1);
+}
+
+/* A thin gap in the surface colour between neighbours, whatever the map's scale. */
+.ada-region {
+  stroke: var(--surface);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.ada-region-outline {
+  fill: none;
+  stroke: var(--text-primary);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.ada-map-tooltip {
+  top: 0;
+  right: 0;
+}
+
+.ada-swatch-area {
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.ada-swatch-missing {
+  background: var(--map-missing);
+}
+
+/* The same hatching as suppressed regions on the map. */
+.ada-swatch-suppressed {
+  background: repeating-linear-gradient(45deg, var(--map-missing) 0 3px, var(--text-muted) 3px 4px);
 }

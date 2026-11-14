@@ -9,7 +9,12 @@ export type Column = {
   nullable?: boolean
 }
 
-export type TimeRole = { start: string; end: string }
+/** The columns of a period's first and last day; both inclusive. */
+export type TimeRole = { start: string; end: string; grain?: 'year' | 'quarter' | 'month' | null }
+
+/** The column of a region code, its code system and its level, e.g. "statfin" and
+ * "wellbeing_services_county". Level "mixed" means several levels in one column. */
+export type GeoRole = { code: string; system: string; level: string }
 
 export type MeasureRole = {
   value: string
@@ -21,6 +26,7 @@ export type MeasureRole = {
 
 export type Roles = {
   time?: TimeRole | null
+  geo?: GeoRole | null
   measures?: MeasureRole[]
 }
 

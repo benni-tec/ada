@@ -68,6 +68,23 @@ export function formatCell(value: unknown, column: Column): string {
   return String(value)
 }
 
+/** One row per key: the row of the latest period, by the time role's end column. ISO
+ * dates compare as strings; a row without a period loses to any row with one. Without a
+ * time role (endIndex < 0) the last row of each key wins. Keys keep their first order. */
+export function latestPerKey(rows: unknown[][], keyIndex: number, endIndex: number): Map<string, unknown[]> {
+  const latest = new Map<string, unknown[]>()
+  for (const row of rows) {
+    const key = String(row[keyIndex] ?? '')
+    const current = latest.get(key)
+    const later =
+      !current ||
+      endIndex < 0 ||
+      (row[endIndex] != null && (current[endIndex] == null || String(row[endIndex]) >= String(current[endIndex])))
+    if (later) latest.set(key, row)
+  }
+  return latest
+}
+
 /** A period as people say it: "2024", "2022–2024", or both dates when it is not whole
  * years. Both ends are inclusive, as in the backend's Interval. */
 export function formatPeriod(start: unknown, end: unknown): string | null {
