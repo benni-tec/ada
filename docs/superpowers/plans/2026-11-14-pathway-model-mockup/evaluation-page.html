@@ -2,28 +2,33 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: one column of cards under a fixed data-rule banner, the exact results first. */
+/* Layout: one column of cards under a fixed data-rule banner, the exact results first.
+   Two screens, routed on the hash: #case (a saved case and its models) and #evaluation (one model's full result). */
 :root { --bg: #fafaf9; --card: #ffffff; --fg: #1c1917; --muted: #6b6560; --line: #e7e2dc; --soft: #f1ede8;
-  --accent: #1d4ed8; --warn: #c2410c; --warn-soft: #fff4ec; --ok: #166534; --ok-soft: #ecfdf3; --banner: #b91c1c;
-  --sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif }
+  --accent: #1d4ed8; --accent-soft: #eef2ff; --warn: #c2410c; --warn-soft: #fff4ec; --ok: #166534; --ok-soft: #ecfdf3; --banner: #b91c1c;
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #141210; --card: #1e1b18; --fg: #f3efe9; --muted: #a39c93; --line: #332e29; --soft: #2a2521;
-  --accent: #7ca3ff; --warn: #fb923c; --warn-soft: #3a2316; --ok: #86efac; --ok-soft: #14301f; --banner: #991b1b; color-scheme: dark } }
+  --accent: #7ca3ff; --accent-soft: #1b2340; --warn: #fb923c; --warn-soft: #3a2316; --ok: #86efac; --ok-soft: #14301f; --banner: #991b1b; color-scheme: dark } }
 :root[data-theme="dark"] { --bg: #141210; --card: #1e1b18; --fg: #f3efe9; --muted: #a39c93; --line: #332e29; --soft: #2a2521;
-  --accent: #7ca3ff; --warn: #fb923c; --warn-soft: #3a2316; --ok: #86efac; --ok-soft: #14301f; --banner: #991b1b; color-scheme: dark }
+  --accent: #7ca3ff; --accent-soft: #1b2340; --warn: #fb923c; --warn-soft: #3a2316; --ok: #86efac; --ok-soft: #14301f; --banner: #991b1b; color-scheme: dark }
 body { background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); margin: 0 }
 .banner { background: var(--banner); color: #fff; font-weight: 600; font-size: 13px; text-align: center; padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)) }
+.screens { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); border-bottom: 1px dashed var(--line); font-size: 12px; color: var(--muted) }
+.screens a { color: var(--muted); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px }
+.screens a.on { color: var(--fg); border-color: var(--fg); font-weight: 600 }
 .wrap { max-width: 920px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 20px }
 h1 { font-size: 26px; margin: 0; letter-spacing: -0.01em; text-wrap: balance }
-h2 { font-size: 16px; margin: 0 }
+h2 { font-size: 16px; margin: 0; text-wrap: balance }
 .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 500 }
-.tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--line) }
-.tabs span { padding: 12px 2px; color: var(--muted); font-weight: 500 }
+.tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--line); overflow-x: auto }
+.tabs span { padding: 12px 2px; color: var(--muted); font-weight: 500; white-space: nowrap }
 .tabs .on { color: var(--fg); font-weight: 600; border-bottom: 2px solid var(--fg); margin-bottom: -1px }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0 }
 .card.lead { border-color: var(--fg) }
 .pill { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; white-space: nowrap }
 .pill.std { background: var(--ok-soft); color: var(--ok) } .pill.warn { background: var(--warn); color: #fff } .pill.soft { background: var(--soft); color: var(--fg) }
 .pill.assume { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn) }
+.pill.auto { background: var(--accent-soft); color: var(--accent) } .pill.line { border: 1px solid var(--line); color: var(--muted) }
 .row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; background: var(--soft); font-size: 13px }
 .row.urgent { background: var(--warn-soft) }
 .row small, .step small { display: block; color: var(--muted); font-size: 12px }
@@ -40,29 +45,143 @@ h2 { font-size: 16px; margin: 0 }
 .dots { display: grid; grid-template-columns: repeat(10, 12px); gap: 4px } .dots i { width: 12px; height: 12px; border-radius: 999px; background: var(--line) } .dots i.a { background: var(--fg); opacity: .75 }
 ul { margin: 0; padding-left: 18px } li + li { margin-top: 4px }
 .muted { color: var(--muted); font-size: 12px }
+a { color: var(--accent) }
+/* Case details */
+.toast { display: flex; gap: 10px; align-items: center; background: var(--ok-soft); color: var(--ok); border-radius: 8px; padding: 10px 12px; font-size: 13px; font-weight: 500 }
+.key { font-family: var(--mono); font-size: 26px; font-weight: 600; letter-spacing: -0.01em }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 13px }
+.cols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start }
+.kv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 6px 12px; font-size: 13px; margin: 0 }
+.kv dt { color: var(--muted) } .kv dd { margin: 0; overflow-wrap: anywhere } .kv .extra { color: var(--accent) }
+.timeline { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0; font-size: 13px }
+.timeline li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; padding: 6px 0; border-left: 2px solid var(--line); margin-left: 6px; padding-left: 12px; position: relative }
+.timeline li::before { content: ""; position: absolute; left: -6px; top: 11px; width: 10px; height: 10px; border-radius: 999px; background: var(--card); border: 2px solid var(--fg) }
+.timeline li.open::before { border-style: dashed; border-color: var(--warn) }
+.timeline .d { font-variant-numeric: tabular-nums; color: var(--muted) }
+.model { border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0 }
+.model header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap }
+.model h3 { font-size: 15px; margin: 0 }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px }
+.summary div { background: var(--soft); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--muted) }
+.summary strong { display: block; color: var(--fg); font-size: 15px }
+.summary .urgent { background: var(--warn-soft) } .summary .urgent strong { color: var(--warn) }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+.btn { font: inherit; font-size: 13px; font-weight: 600; border-radius: 8px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--fg); background: var(--fg); color: var(--bg) }
+.btn.ghost { background: transparent; color: var(--fg); border-color: var(--line) }
+.btn[disabled] { opacity: .6; cursor: progress }
+.empty { border: 1px dashed var(--line); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--muted) }
+details summary { cursor: pointer; font-size: 13px; color: var(--muted) }
+details ol { margin: 8px 0 0; padding-left: 18px; font-size: 13px }
+@media (max-width: 720px) { .cols { grid-template-columns: minmax(0, 1fr) } }
 @media (max-width: 480px) { .step { grid-template-columns: minmax(0, 1fr) 90px; } .step .bar { grid-column: 1 / -1 } .row { grid-template-columns: minmax(0, 1fr) auto } .row .due { display: none } }
 </style>
 <div class="banner">Educational use only. Do not enter patient data.</div>
-<div class="wrap">
+<nav class="screens" aria-label="Mockup screens">Mockup screens: <a href="#case" data-screen="case">Case details</a><a href="#evaluation" data-screen="evaluation">Model result</a></nav>
+
+<!-- Screen 1: the case details page, opened right after saving a case. -->
+<div class="wrap" id="screen-case">
+  <div class="toast" role="status">✓ Case SYN-0042 saved (revision 3). The pathway model ran automatically.</div>
+
   <div>
-    <div class="eyebrow">Model · Nordic cancer care</div>
+    <div class="eyebrow">Cases · Suspected cancer pathway</div>
+    <div class="key">SYN-0042</div>
+    <div class="meta"><span>Key set by your system</span><span>Pirkanmaa</span><span>Revision 3 · saved 15 Nov 2026, 10:42</span><span>Synthetic</span></div>
+    <div class="tabs"><span class="on">Details</span><span>Edit</span><span>Open cases</span></div>
+  </div>
+
+  <div class="cols">
+    <section class="card">
+      <h2>Case</h2>
+      <dl class="kv">
+        <dt>Site</dt><dd>Lung</dd>
+        <dt>Sex · age group</dt><dd>Female · 60–69</dd>
+        <dt>Route</dt><dd>Public health centre</dd>
+        <dt>Presentation</dt><dd>Cough 6+ weeks, smoker over 40 · imaging finding</dd>
+        <dt>Intent · modality</dt><dd>Curative · surgery</dd>
+        <dt>Stage</dt><dd>Not known yet</dd>
+        <dt>Education</dt><dd>Basic</dd>
+        <dt class="extra">County</dt><dd class="extra">Pirkanmaa</dd>
+        <dt class="extra">Referred by</dt><dd class="extra">Health centre, Hervanta</dd>
+      </dl>
+      <p class="muted" style="margin:0">Fields in blue are this case type's own: saved and in the data source, not passed to any model.</p>
+
+      <h2 style="margin-top:8px">Steps</h2>
+      <ul class="timeline">
+        <li><span class="d">day 0</span><span>First contact, health centre<br><span class="muted">51 days of symptoms before</span></span></li>
+        <li><span class="d">day 14</span><span>Seen by a physician; imaging ordered</span></li>
+        <li><span class="d">day 27</span><span>Chest X-ray: lesion. <strong>Pathway clock starts</strong></span></li>
+        <li><span class="d">day 28</span><span>Pathway referral sent</span></li>
+        <li><span class="d">day 36</span><span>First specialist visit</span></li>
+        <li><span class="d">day 62</span><span>Work-up complete</span></li>
+        <li class="open"><span class="d">day 74</span><span>Today: no treatment start yet</span></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
+        <h2>Models on this case type</h2>
+        <span class="muted">Results are saved on the case and kept as history</span>
+      </div>
+
+      <article class="model">
+        <header>
+          <div><h3>Patient pathway model</h3><span class="muted">v1 · result from 15 Nov, 10:42 · read revision 3</span></div>
+          <span class="pill auto">Runs automatically</span>
+        </header>
+        <div class="summary">
+          <div>Fast-track trigger<strong>Met: DK · NO · SE</strong></div>
+          <div class="urgent">Treatment start<strong>Overdue by 3 days</strong></div>
+          <div>Behind target<strong>20 days</strong></div>
+          <div>Alive at 5 years<strong>35 of 100</strong>32–39 across settings</div>
+        </div>
+        <div class="actions">
+          <a class="btn" href="#evaluation" style="text-decoration:none">Open full result</a>
+          <button class="btn ghost" type="button" data-evaluate="pathway">Evaluate again</button>
+        </div>
+        <details>
+          <summary>2 earlier results</summary>
+          <ol>
+            <li>12 Nov, 09:10 · v1 · revision 2 · treatment start due in 2 days</li>
+            <li>4 Nov, 14:55 · v1 · revision 1 · work-up due in 4 days</li>
+          </ol>
+        </details>
+      </article>
+
+      <article class="model" id="manual-model">
+        <header>
+          <div><h3>Clinical trial matcher</h3><span class="muted">example of a model added after this case was saved</span></div>
+          <span class="pill line">On request</span>
+        </header>
+        <div class="empty" data-slot="manual">Not evaluated for this case. Models that do not run automatically are never backfilled: a case gets a result only when someone asks for one.</div>
+        <div class="actions"><button class="btn" type="button" data-evaluate="manual">Evaluate</button></div>
+      </article>
+    </section>
+  </div>
+
+  <p class="muted" style="text-align:center;margin:0">Every saved case and result feeds the "Pathway times by county" dashboard through the cases data source.</p>
+</div>
+
+<!-- Screen 2: one model's full result for the case. -->
+<div class="wrap" id="screen-evaluation" hidden>
+  <div>
+    <div class="eyebrow"><a href="#case">SYN-0042</a> · Patient pathway model</div>
     <h1>Patient pathway model</h1>
-    <p class="muted">v1 · lung, colorectal, pancreas · a synthetic example profile, figures from the built model on 14 November 2026</p>
-    <div class="tabs"><span>Model card</span><span class="on">Evaluation</span><span>Population</span></div>
+    <p class="muted">v1 · lung, colorectal, pancreas · result for a synthetic case, saved 15 November 2026</p>
+    <div class="tabs"><span>Model card</span><span class="on">Result</span><span>Population</span></div>
   </div>
 
   <section class="card lead">
     <h2>Fast-track pathway</h2>
-    <p style="margin:0;font-size:15px">This presentation <strong>would start a lung-cancer pathway in Norway and Sweden</strong>. The clock started with the X-ray on day 27. Finland has no national trigger and no standard times.</p>
+    <p style="margin:0;font-size:15px">This presentation <strong>would start a lung-cancer pathway in Denmark, Norway and Sweden</strong>. The clock started with the X-ray on day 27. Finland has no national trigger and no standard times.</p>
     <div class="two">
-      <div class="box"><div style="display:flex;justify-content:space-between;gap:8px"><strong>Suspicion, at first contact</strong><span class="pill soft">Sweden</span></div><span class="muted">Cough for 8 weeks, smoker, 64. Imaging due within 6 days of the physician's decision; done 13 days after.</span></div>
-      <div class="box"><div style="display:flex;justify-content:space-between;gap:8px"><strong>Well-founded suspicion</strong><span class="pill soft">Norway · Sweden</span></div><span class="muted">Imaging finding suggesting lung cancer. Treatment due within 43 days (Norway 42, Sweden 44).</span></div>
+      <div class="box"><div style="display:flex;justify-content:space-between;gap:8px"><strong>Suspicion, at first contact</strong><span class="pill soft">Denmark · Sweden</span></div><span class="muted">Cough for 8 weeks, smoker, 64. Imaging due within 6 days of the physician's decision; done 13 days after.</span></div>
+      <div class="box"><div style="display:flex;justify-content:space-between;gap:8px"><strong>Well-founded suspicion</strong><span class="pill soft">Denmark · Norway · Sweden</span></div><span class="muted">Imaging finding suggesting lung cancer. Treatment due within 44 days (Norway 42, Sweden 44, Denmark 44).</span></div>
     </div>
     <div class="row"><span>Imaging after suspicion<small>within 6 days of the physician's referral decision · Sweden</small></span><span class="due muted">due day 20</span><span class="pill soft">late by 7 days</span></div>
-    <div class="row"><span>First specialist visit<small>11 days after the trigger · Norway</small></span><span class="due muted">due day 38</span><span class="pill std">met, 2 days early</span></div>
-    <div class="row"><span>Work-up complete<small>32 days after the trigger · Norway</small></span><span class="due muted">due day 59</span><span class="pill soft">late by 3 days</span></div>
-    <div class="row urgent"><span>Treatment start<small>43 days after the trigger · Norway, Sweden</small></span><span class="due muted">due day 70</span><span class="pill warn">overdue by 1 day</span></div>
-    <div class="next"><strong>Next:</strong> treatment start, overdue by 1 day under the Nordic standard. No treatment plan yet.</div>
+    <div class="row"><span>First specialist visit<small>10 days after the trigger · Denmark, Norway</small></span><span class="due muted">due day 37</span><span class="pill std">met, 1 day early</span></div>
+    <div class="row"><span>Work-up complete<small>32 days after the trigger · Denmark, Norway</small></span><span class="due muted">due day 59</span><span class="pill soft">late by 3 days</span></div>
+    <div class="row urgent"><span>Treatment start<small>44 days after the trigger · Denmark, Norway, Sweden</small></span><span class="due muted">due day 71</span><span class="pill warn">overdue by 3 days</span></div>
+    <div class="next"><strong>Next:</strong> treatment start, overdue by 3 days under the Nordic standard. No treatment plan yet.</div>
   </section>
 
   <section class="card">
@@ -72,10 +191,10 @@ ul { margin: 0; padding-left: 18px } li + li { margin-top: 4px }
     <div class="step"><span>First contact → physician<small>done</small></span><div class="bar"><i style="width:11.7%"></i><b style="left:11.7%;width:11.7%"></b><s style="left:11.7%"></s></div><span class="days"><strong class="late">14 d (+7)</strong><small>target 7 d</small></span></div>
     <div class="step"><span>Physician → imaging done<small>done</small></span><div class="bar"><i style="width:10%"></i><b style="left:10%;width:11.7%"></b><s style="left:10%"></s></div><span class="days"><strong class="late">13 d (+7)</strong><small>target 6 d</small></span></div>
     <div class="step"><span>Imaging → pathway referral<small>done</small></span><div class="bar"><i style="width:1.7%"></i><s style="left:6.7%"></s></div><span class="days"><strong>1 d</strong><small>target 4 d</small></span></div>
-    <div class="step"><span>Referral → first specialist visit<small>done</small></span><div class="bar"><i style="width:11.7%"></i><b style="left:11.7%;width:1.7%"></b><s style="left:11.7%"></s></div><span class="days"><strong class="late">8 d (+1)</strong><small>target 7 d</small></span></div>
-    <div class="step"><span>First visit → work-up complete<small>done</small></span><div class="bar"><i style="width:35%"></i><b style="left:35%;width:8.3%"></b><s style="left:35%"></s></div><span class="days"><strong class="late">26 d (+5)</strong><small>target 21 d</small></span></div>
-    <div class="step"><span>Work-up complete → treatment start<small>current step, so far</small></span><div class="bar"><i style="width:15%"></i><s style="left:23.3%"></s></div><span class="days"><strong>9 d</strong><small>target 14 d</small></span></div>
-    <p class="muted">Targets: Sweden's primary-care times to the pathway decision, then the median of the Norwegian and Swedish standard times. The first-contact wait has no national standard; 7 days is the Nordic reference from a clinician survey (Khalife 2025).</p>
+    <div class="step"><span>Referral → first specialist visit<small>done</small></span><div class="bar"><i style="width:10%"></i><b style="left:10%;width:3.3%"></b><s style="left:10%"></s></div><span class="days"><strong class="late">8 d (+2)</strong><small>target 6 d</small></span></div>
+    <div class="step"><span>First visit → work-up complete<small>done</small></span><div class="bar"><i style="width:36.7%"></i><b style="left:36.7%;width:6.7%"></b><s style="left:36.7%"></s></div><span class="days"><strong class="late">26 d (+4)</strong><small>target 22 d</small></span></div>
+    <div class="step"><span>Work-up complete → treatment start<small>current step, so far</small></span><div class="bar"><i style="width:20%"></i><s style="left:23.3%"></s></div><span class="days"><strong>12 d</strong><small>target 14 d</small></span></div>
+    <p class="muted">Targets: Sweden's primary-care times to the pathway decision, then the median of the Danish, Norwegian and Swedish standard times. The first-contact wait has no national standard; 7 days is the Nordic reference from a clinician survey (Khalife 2025).</p>
   </section>
 
   <section class="card">
@@ -83,9 +202,9 @@ ul { margin: 0; padding-left: 18px } li + li { margin-top: 4px }
     <p class="muted" style="font-size:13px">Nordic survival for this profile, adjusted for the days beyond target. The evidence for these figures is weaker than for the deadlines above.</p>
     <div class="toggles"><span class="on">Finland residual</span><span>Days before the trigger count</span></div>
     <div class="figs">
-      <div class="fig"><div><span class="n">34</span> <span class="muted">as it stands</span></div><div class="dots"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
-      <div class="fig"><div><span class="n t">34</span> <span class="muted">if the remaining steps are on target</span></div><p class="muted" style="margin:0;max-width:260px">The remaining wait is under the twelve weeks beyond which the published effect begins (Heiden 2021), so the figure does not move. The deadline does.</p></div>
-      <div class="box" style="flex:1 1 200px;background:var(--soft)"><strong>Range across the four settings</strong><span>As it stands: 31–39 of 100</span><span>On target: 31–39 of 100</span></div>
+      <div class="fig"><div><span class="n">35</span> <span class="muted">as it stands</span></div><div class="dots" data-alive="35"></div></div>
+      <div class="fig"><div><span class="n t">35</span> <span class="muted">if the remaining steps are on target</span></div><p class="muted" style="margin:0;max-width:260px">The remaining wait is under the twelve weeks beyond which the published effect begins (Heiden 2021), so the figure does not move. The deadline does.</p></div>
+      <div class="box" style="flex:1 1 200px;background:var(--soft)"><strong>Range across the four settings</strong><span>As it stands: 32–39 of 100</span><span>On target: 32–39 of 100</span></div>
     </div>
     <div class="box"><div style="display:flex;justify-content:space-between;gap:8px"><strong>The 14 days lost before the trigger</strong><span class="pill assume">assumption</span></div><span class="muted">About 3 of 100 under the second setting. Already spent for this patient; a system lever (appointment access, nurse-ordered imaging). Part of the effect is lead time.</span></div>
     <div class="box"><div style="display:flex;justify-content:space-between;gap:8px"><strong>Work-up complete → treatment start on target</strong><span class="pill soft">one cohort</span></div><span class="muted">No change at 5 years on the default setting; the deadline is the reason to act.</span></div>
@@ -96,3 +215,45 @@ ul { margin: 0; padding-left: 18px } li + li { margin-top: 4px }
     <section class="card"><h2>Read with care</h2><ul><li>Survival is counted from diagnosis, so an earlier diagnosis looks better even if death comes no later.</li><li>Sicker patients are often treated faster, which hides part of the effect of waiting.</li><li>Nordic baseline, Finnish education gradient, American and English delay effects. Not validated on Finnish patients.</li></ul></section>
   </div>
 </div>
+
+<script>
+// The 100-dot icon arrays.
+document.querySelectorAll('.dots[data-alive]').forEach((el) => {
+  const alive = Number(el.dataset.alive)
+  el.innerHTML = Array.from({ length: 100 }, (_, i) => `<i${i < alive ? ' class="a"' : ''}></i>`).join('')
+})
+
+// Hash routing between the two screens; #case is the start.
+function show() {
+  const screen = location.hash === '#evaluation' ? 'evaluation' : 'case'
+  document.getElementById('screen-case').hidden = screen !== 'case'
+  document.getElementById('screen-evaluation').hidden = screen !== 'evaluation'
+  document.querySelectorAll('.screens a').forEach((a) => a.classList.toggle('on', a.dataset.screen === screen))
+  window.scrollTo(0, 0)
+}
+window.addEventListener('hashchange', show)
+show()
+
+// The Evaluate buttons: a short wait, then the stored result appears with its time.
+document.querySelectorAll('[data-evaluate]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const label = button.textContent
+    button.disabled = true
+    button.textContent = 'Evaluating…'
+    setTimeout(() => {
+      button.disabled = false
+      if (button.dataset.evaluate === 'manual') {
+        const slot = document.querySelector('[data-slot="manual"]')
+        slot.className = 'summary'
+        slot.innerHTML = '<div>Matching trials<strong>2 recruiting</strong>Finland 1 · Sweden 1</div><div>Result<strong>Saved just now</strong>read revision 3</div>'
+        button.textContent = 'Evaluate again'
+        button.classList.add('ghost')
+        button.closest('.model').querySelector('.muted').textContent = 'example · result from just now · read revision 3'
+      } else {
+        button.textContent = label
+        button.closest('.model').querySelector('.muted').textContent = 'v1 · result from just now · read revision 3'
+      }
+    }, 700)
+  })
+})
+</script>
