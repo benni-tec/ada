@@ -22,7 +22,8 @@ class SystemProvider(Provider):
     def web_configured(self, settings: Settings) -> WebConfigured:
         reading = settings.context_dev_api_key is not None
         return WebConfigured(
-            search=settings.exa_api_key is not None,
+            # Exa's or, without its key, Context.dev's search (providers/web.py).
+            search=settings.exa_api_key is not None or reading,
             reading=reading,
             watching=reading and settings.ada_public_url is not None,
         )

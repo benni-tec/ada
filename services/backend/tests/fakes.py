@@ -28,7 +28,9 @@ from ada.core.models.web import (
     Crawl,
     Extraction,
     Monitor,
+    PdfOptions,
     SearchHit,
+    SearchResults,
     SearchScope,
     WebLink,
     WebPage,
@@ -213,32 +215,42 @@ def _without_name(body: Any) -> Any:
 
 
 class FakeWebSearch(WebSearch):
-    """Returns the given hits; records every search."""
+    """Returns the given hits, charging `credits` (None: like Exa, nothing stated); records
+    every search and its tags."""
 
-    def __init__(self, hits: Sequence[SearchHit] = (), configured: bool = True) -> None:
+    def __init__(
+        self, hits: Sequence[SearchHit] = (), configured: bool = True, credits: int | None = None
+    ) -> None:
         self.hits = list(hits)
         self._configured = configured
+        self.credits = credits
         self.searches: list[tuple[str, SearchScope, int]] = []
+        self.tags: list[tuple[str, ...]] = []
 
     @property
     def configured(self) -> bool:
         return self._configured
 
-    async def search(self, query: str, scope: SearchScope, limit: int) -> list[SearchHit]:
+    async def search(
+        self, query: str, scope: SearchScope, limit: int, *, tags: Sequence[str]
+    ) -> SearchResults:
         self.searches.append((query, scope, limit))
-        return self.hits[:limit]
+        self.tags.append(tuple(tags))
+        return SearchResults(hits=self.hits[:limit], credits=self.credits)
 
 
-# The page FakeExplorer reads: a heading, a sentence and a table.
-PAGE_MARKDOWN = """# Screening in Finland
-
-Coverage by county:
-
-| County | Coverage |
+# The page FakeExplorer reads: a heading, a sentence and a table; a focused read returns
+# the table alone.
+PAGE_TABLE = """| County | Coverage |
 | --- | --- |
 | Uusimaa | 71 |
 | Lappi | 64 |
 """
+PAGE_MARKDOWN = f"""# Screening in Finland
+
+Coverage by county:
+
+{PAGE_TABLE}"""
 
 
 class FakeExplorer(WebExplorer):
@@ -287,15 +299,40 @@ class FakeExplorer(WebExplorer):
             raise self.failure
 
     async def read(
-        self, url: str, *, tags: Sequence[str], main_content_only: bool = False
+        self,
+        url: str,
+        *,
+        tags: Sequence[str],
+        main_content_only: bool = False,
+        focus: str | None = None,
+        pdf: PdfOptions | None = None,
     ) -> WebPage:
-        self._called("read", url=url, tags=tags)
+        # Focus and PDF options are noted only when given.
+        given = {k: v for k, v in {"focus": focus, "pdf": pdf}.items() if v is not None}
+        self._called("read", url=url, tags=tags, **given)
+        if focus:
+            # The passages of the page relevant to the focus: its table.
+            return self.page.model_copy(update={"markdown": PAGE_TABLE})
         return self.page
 
     async def extract(
-        self, url: str, instruction: str, columns: Sequence[str], *, tags: Sequence[str]
+        self,
+        url: str,
+        instruction: str,
+        columns: Sequence[str],
+        *,
+        tags: Sequence[str],
+        pdf: PdfOptions | None = None,
     ) -> Extraction:
-        self._called("extract", url=url, instruction=instruction, columns=list(columns), tags=tags)
+        given = {"pdf": pdf} if pdf is not None else {}
+        self._called(
+            "extract",
+            url=url,
+            instruction=instruction,
+            columns=list(columns),
+            tags=tags,
+            **given,
+        )
         return self.extraction
 
     async def map(self, domain: str, **arguments: Any) -> list[WebLink]:

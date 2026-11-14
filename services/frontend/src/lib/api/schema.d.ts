@@ -1995,7 +1995,7 @@ export interface components {
             watching: boolean;
             /**
              * Web Search
-             * @description Web search is configured (EXA_API_KEY is set)
+             * @description Web search is configured (EXA_API_KEY or CONTEXT_DEV_API_KEY is set)
              */
             web_search: boolean;
             /**

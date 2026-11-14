@@ -9,6 +9,7 @@ from ada.core.models.web import SearchScope
 from ada.core.services.ports.agents import ResearchService
 from ada.core.services.ports.web import (
     MAX_EXTRACT_COLUMNS,
+    MAX_FOCUS_CHARS,
     MAX_MAP_LINKS,
     MAX_READ_CHARS,
     MAX_SEARCH_RESULTS,
@@ -36,11 +37,14 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
     @mcp.tool(
         description=_described(
-            """Search the web (Exa) for data sources, news or research. `scope` "data" (the
-        default) limits the search to statistics offices, registries and open-data
-        portals, "news" to news, "research" to papers, "any" searches everything. Returns
-        each hit's url, title, publication date and a snippet; use read_page to read one.
-        Five credits a search."""
+            """Search the web (ADA's web search) for data sources, news or research. `scope`
+        "data" (the default) limits the search to statistics offices, registries and
+        open-data portals (THL, Sotkanet, Statistics Finland, the Cancer Registry, the
+        Nordic health data authorities, IARC, Eurostat, OECD, WHO, ...), "research" to
+        papers (PubMed, PubMed Central, preprint servers and journals such as Acta
+        Oncologica, BMJ, The Lancet), "news" to news articles, "any" searches everything.
+        Returns each hit's url, title, publication date when known and a snippet of the
+        passages that match; use read_page to read one. About five credits a search."""
         )
     )
     @inject
@@ -58,9 +62,14 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
     @mcp.tool(
         description=_described(
-            """Read one web page as Markdown (Context.dev), its main content without navigation,
-        cut at `max_chars` (`truncated` says whether it was): to check what a page holds
-        before registering it, or to find the download links of a dataset. One credit."""
+            """Read one web page or PDF as Markdown (Context.dev), its main content without
+        navigation, cut at `max_chars` (`truncated` says whether it was): to check what a
+        page holds before registering it, or to find the download links of a dataset. With
+        `query` (a question or topic) only the passages relevant to it come back instead
+        of the whole page: use it to check a figure on a long page or PDF cheaply. For a
+        PDF, `pdf_pages` ("25" or "25-26") reads only those pages, each starting with a
+        `<!-- page N -->` line, and `ocr` reads them with OCR, for tables that are images
+        (empty or garbled without it). One credit, a page of a PDF with OCR one each."""
         )
     )
     @inject
@@ -71,9 +80,20 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         web: FromDishka[WebExplorationService],
         research: FromDishka[ResearchService],
         max_chars: Annotated[int, Field(ge=1, le=MAX_READ_CHARS)] = 20_000,
+        query: Annotated[str | None, Field(max_length=MAX_FOCUS_CHARS)] = None,
+        pdf_pages: str | None = None,
+        ocr: bool = False,
     ) -> WebReadAnswer:
         await research.use_web_call(session_id)
-        return await web.read(project_id, session_id, url, max_chars=max_chars)
+        return await web.read(
+            project_id,
+            session_id,
+            url,
+            max_chars=max_chars,
+            query=query,
+            pdf_pages=pdf_pages,
+            ocr=ocr,
+        )
 
     @mcp.tool(
         description=_described(

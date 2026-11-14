@@ -1,0 +1,69 @@
+{
+  "data": [
+    {
+      "id": "feb658e13097f01de9296099f483a2182bfe6596a20f5936cf5897146e1d5f56",
+      "story_id": "b947cbf7c1e3b319318c4b452b98b3ceefa2fa98f489f6be60e6f249a40d3182",
+      "url": "https://eu-startups.com/2025/11/as-cancer-cases-surge-toward-35-million-by-2050-finlands-gosta-labs-raises-e7-5-million-to-ease-oncology-workloads",
+      "title": "As cancer cases surge toward 35 million by 2050, Finland’s Gosta Labs raises €7.5 million to ease oncology workloads",
+      "description": "Gosta Labs, a Helsinki-based HealthTech company innovating in the oncology sector, has closed a €7.5 million Seed round to scale its AI operating system for complex medical specialties. The round was led by Voima Ventures, with participation from COR Group, the Aho family, and both existing and new investors, including Reaktor and a group of […]\nSearch Search HomeFinland-StartupsAs cancer cases surge toward 35 million by 2050, Finland's Gosta Labs... Finland-Startups Funding As cancer cases surge toward 35 million by 2050, Finland’s Gosta Labs raises €7.5 million to ease oncology workloads David Cendon Garcia By David Cendon Garcia November 27, 2025 Share - Tags - cancer - COR Group - ESMO 2025 Congress - Gosta Labs - Helsinki - Henri Viertolahti - Kaiku Health - Lauri Sippola - oncology - Reaktor - seed - the Aho family - Voima Ventures Share",
+      "language": "en",
+      "authors": [],
+      "image_url": "https://www.eu-startups.com/wp-content/uploads/2025/11/Gosta-Labs.png",
+      "published_at": "2025-11-27T09:00:54.000Z",
+      "type": "editorial",
+      "source": {
+        "name": "EU-Startups",
+        "domain": "eu-startups.com",
+        "direct": true
+      },
+      "match": null
+    },
+    {
+      "id": "812ad60bfba19541024b33cccfc132bf73b59bef88ccf1e3480aa352ebd8b6b7",
+      "story_id": "e1c2bca774e1a4578a976a68f06ea78811549af725586d588dc5e12cb68cf9a1",
+      "url": "https://prnewswire.com/news-releases/helsinki-university-hospital-selects-mridian-system-for-installation-at-comprehensive-cancer-center-301407208.html",
+      "title": "Helsinki University Hospital Selects MRIdian® System for Installation at Comprehensive Cancer Center",
+      "description": "/PRNewswire/ -- ViewRay, Inc. (NASDAQ: VRAY) today announced that Helsinki University Hospital has purchased a MRIdian® System to offer patients MR-guided...\nCLEVELAND, Oct. 25, 2021 /PRNewswire/ -- ViewRay, Inc. (NASDAQ: VRAY) today announced that Helsinki University Hospital has purchased a MRIdian® System to offer patients MR-guided radiation therapy at the Comprehensive Cancer Center in the new Bridge Hospital. The Comprehensive Cancer Center is Finland's largest and most versatile cancer treatment center. The center provides personalized treatment and features modern state-of-the-art radiation therapy technology. The Comprehensive Cancer Center is the first Nordic cancer center to have undergone accreditation through the Organisation of European Cancer Institutes (OECI) and achieved the highest possible status of a Comprehensive Cancer Center. The center's expertise is internationally recognized and its treatment results are world-class. The MRIdian system will enable the team at the Comprehensive Cancer Center to offer the latest MR-guided radiation therapy technology to patients seeking personalized cancer treatment including lung, prostate, pancreas, liver cancers, and other small tumors in abdominal and pelvic areas. \"MRIdian will bring powerful capabilities to our radiation oncology department, including the ability to deliver ablative dose with tight margins through real-time soft-tissue visualization and on-table adaptive therapy,\" said Professor Mikko Tenhunen. \"With MRIdian, we anticipate being able to treat many tumors that we deemed were previously untreatable with radiation therapy, expanding the options available to cancer patients throughout Finland.\"",
+      "language": "en",
+      "authors": [
+        "ViewRay",
+        "Inc."
+      ],
+      "image_url": "https://mma.prnewswire.com/media/560662/ViewRay_Logo.jpg?p=twitter",
+      "published_at": "2021-10-25T10:31:00.000Z",
+      "type": "press_release",
+      "source": {
+        "name": "prnewswire.com",
+        "domain": "prnewswire.com",
+        "direct": false
+      },
+      "match": null
+    },
+    {
+      "id": "29af2ac7348c091d72098717aedaee6dcf58d26912d3f7207835dba3b9bea0b2",
+      "story_id": "30d66adc23f867291ddcfbd6b494071e851e825b21b1ef48b888f9e6a415e905",
+      "url": "https://timesofindia.indiatimes.com/city/bhubaneswar/10-hc-judges-to-hear-urgent-cases-in-vacation-benches/articleshow/121269465.cms",
+      "title": "10 HC judges to hear urgent cases in vacation benches | Bhubaneswar News - Times of India",
+      "description": "Cuttack: Orissa high court's summer vacation started on Monday. It will continue till June 17. During this period, 10 judges will hold court hearings .\n'Jack MacKenzie left bloodied after shocking fan incident at Aberdeen vs. Dundee match') Jill Biden under attack as Donald Trump Jr says she is a 'doctor' and 'covered up' Biden's cancer Joe Biden's prostate cancer admission fuels MAGA narrative Canada vs. Finland: How to watch 2025 IIHF World Championship match, time and streaming details Bhagya Lakshmi’s Smita Bansal bids adieu to her on-screen character ‘Neelam’; pens down an emotional note [Zarina Wahab reveals she isn’t hurt by husband Aditya Pancholi’s affairs; Says, 'I don't suffer, I love myself']( 'Zarina",
+      "language": "en",
+      "authors": [],
+      "image_url": "https://static.toiimg.com/thumb/msid-121269538,width-1070,height-580,imgsize-57224,resizemode-75,overlay-toi_sw,pt-32,y_pad-40/photo.jpg",
+      "published_at": "2025-05-19T13:02:00.000Z",
+      "type": "editorial",
+      "source": {
+        "name": "The Times of India",
+        "domain": "timesofindia.indiatimes.com",
+        "direct": false
+      },
+      "match": null
+    }
+  ],
+  "has_more": true,
+  "next_cursor": "eyJvIjozLCJhIjoxNzk0NjU5ODIzMzAzfQ",
+  "meta": {
+    "count": 3
+  },
+  "key_metadata": {
+    "credits_consumed": 1
+  }
+}

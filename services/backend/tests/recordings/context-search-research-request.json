@@ -1,0 +1,28 @@
+{
+  "query": "breast cancer survival in Finland by region",
+  "numResults": 3,
+  "includeDomains": [
+    "pubmed.ncbi.nlm.nih.gov",
+    "pmc.ncbi.nlm.nih.gov",
+    "ncbi.nlm.nih.gov",
+    "arxiv.org",
+    "biorxiv.org",
+    "medrxiv.org",
+    "doi.org",
+    "medicaljournalssweden.se",
+    "bmj.com",
+    "nature.com",
+    "science.org",
+    "thelancet.com",
+    "sciencedirect.com",
+    "springer.com",
+    "tandfonline.com",
+    "wiley.com",
+    "academic.oup.com",
+    "semanticscholar.org"
+  ],
+  "highlightsOptions": {
+    "enabled": true,
+    "maxCharacters": 600
+  }
+}

@@ -1207,7 +1207,7 @@
             "type": "boolean"
           },
           "web_search": {
-            "description": "Web search is configured (EXA_API_KEY is set)",
+            "description": "Web search is configured (EXA_API_KEY or CONTEXT_DEV_API_KEY is set)",
             "title": "Web Search",
             "type": "boolean"
           },

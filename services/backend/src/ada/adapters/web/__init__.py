@@ -1,5 +1,6 @@
-"""The web on ADA's own accounts: Exa for search (exa.py), Context.dev for agents' page
-reading and extraction, web sources and page monitors (context_dev.py)."""
+"""The web on ADA's own accounts: search by Exa (exa.py) or Context.dev, on the scopes'
+sites (scopes.py); Context.dev for agents' page reading and extraction, web sources and
+page monitors (context_dev.py)."""
 
 import re
 from typing import Any
