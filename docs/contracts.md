@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent) |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent), `0010` named widget inputs and render errors, `0011` session attachments, widget verdicts and the sidebar's order (`dashboards.position`, `reports.position`), `0012` the judges (`judge_defaults`, seeded, and `project_judges`) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -1767,10 +1767,6 @@ and queues the remaining sources for the worker.
   once widgets render anything less trusted. Options: serve the bundles from a separate
   origin, or drop `allow-same-origin` and hand the widget its data over postMessage, as in
   an MCP host.
-- **An alert pipeline's run counts as a scenario.** `Run.is_scenario` is true for any
-  binding, so the run of an alert pipeline, whose only binding is the alerting rows, is
-  flagged as a scenario and its widgets would say "simulated". Bindings that simulate and
-  bindings that feed an alert pipeline need telling apart.
 - **Union snapshots accumulate.** They are a cache keyed by content, retired only by a
   probe change or a forced refresh, like materialized transforms. Every page view starts a
   run, and another one whenever data changes (widget data without a run, as an MCP host
