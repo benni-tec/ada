@@ -38,8 +38,7 @@ from ada.core.services.sessions.service import Sessions
 from ada.core.services.sources.service import DataSources, source_operator_id
 from ada.core.services.widgets.service import Widgets
 from factories import AGENT
-from fakes import FixedClock
-from test_sources_examples import Replay
+from fakes import FixedClock, Replay
 
 # The day the recordings were made.
 TODAY = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)

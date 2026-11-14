@@ -1,0 +1,981 @@
+"""Pipelines: building and running them over real DuckDB in tmp_path and the memory
+repositories, the DuckDB store itself, the pipelines list, and the roles checked before
+anything runs (geography, periods, bounds, what a widget needs)."""
+
+import re
+from collections.abc import Sequence
+from datetime import date, timedelta
+from pathlib import Path
+from typing import Any
+from uuid import UUID, uuid7
+
+import httpx
+import pytest
+
+import factories
+from ada.adapters.duckdb.store import DuckDbAnalysisStore
+from ada.adapters.memory.events import MemoryEventBus
+from ada.adapters.memory.repositories import (
+    MemoryDataSourceRepository,
+    MemoryOperatorRepository,
+    MemoryRunRepository,
+    MemorySnapshotRepository,
+    MemoryStore,
+)
+from ada.adapters.sources.examples import (
+    SOTKANET_BREAST_SCREENING,
+    SOTKANET_REGIONS,
+    WELLBEING_COUNTY_BOUNDARIES,
+)
+from ada.core.models.actors import Actor, ActorKind
+from ada.core.models.analysis import FetchedData, Query, StoredSnapshot
+from ada.core.models.base import Id, JsonObject
+from ada.core.models.errors import Invalid
+from ada.core.models.events import EventType
+from ada.core.models.operators import Operator, OperatorKind, operator_identity
+from ada.core.models.runs import Snapshot
+from ada.core.models.schema import (
+    Column,
+    ColumnType,
+    GeoRole,
+    MeasureRole,
+    Roles,
+    Schema,
+    TimeRole,
+)
+from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy
+from ada.core.models.sources import RefreshResult as Refreshed
+from ada.core.models.time import Grain
+from ada.core.services.pipelines.listing import sql_name
+from ada.core.services.pipelines.runs import Runs
+from ada.core.services.pipelines.service import Pipelines
+from ada.core.services.ports.sources import SourceService
+from ada.core.services.schema import geo
+from ada.core.services.schema.roles import check_compatible, check_widget
+from factories import AGENT, data_source
+from fakes import FixedClock
+from time_world import World as TimeWorld
+
+pytestmark = pytest.mark.anyio
+
+SYSTEM = Actor(kind=ActorKind.SYSTEM, name="ada")
+REGIONS = b"region,value\nHelsinki,10\nTurku,20\nOulu,30\n"
+DECLARED = Schema(
+    columns=(
+        Column(name="region", type=ColumnType.TEXT),
+        Column(name="value", type=ColumnType.INTEGER),
+    )
+)
+
+
+class RecordingStore(DuckDbAnalysisStore):
+    """The real store, remembering what it was asked to run and materialize."""
+
+    def __init__(self, data_dir: Path) -> None:
+        super().__init__(data_dir)
+        self.queries: list[Query] = []
+        self.materialized: list[Query] = []
+        self.described: list[Query] = []
+
+    async def run(self, query: Query, limit: int):  # type: ignore[no-untyped-def]
+        self.queries.append(query)
+        return await super().run(query, limit)
+
+    async def materialize(self, project_id: Id, query: Query) -> StoredSnapshot:
+        self.materialized.append(query)
+        return await super().materialize(project_id, query)
+
+    async def describe(self, query: Query) -> tuple[Column, ...]:
+        self.described.append(query)
+        return await super().describe(query)
+
+
+class FakeSources(SourceService):
+    """Registers sources and refreshes them as the source service is agreed to: the source
+    operator is added at registration, and a refresh writes a snapshot under it with an
+    empty parameters key only when the content changed, superseding the old one."""
+
+    def __init__(self, world: World) -> None:
+        self.world = world
+        self.content: dict[Id, bytes] = {}
+        self.refreshes: list[Id] = []
+        self.failure: Exception | None = None
+
+    async def add(
+        self, project_id: Id, content: bytes, declared: Schema | None = None
+    ) -> tuple[DataSource, Operator]:
+        source = data_source(project_id, declared_schema=declared)
+        await self.world.data_sources.add(source)
+        self.content[source.id] = content
+        params: JsonObject = {"data_source_id": str(source.id)}
+        operator = Operator(
+            id=operator_identity(project_id, OperatorKind.SOURCE, params, ()),
+            project_id=project_id,
+            kind=OperatorKind.SOURCE,
+            params=params,
+            output=declared or Schema(),
+            materializing=True,
+            created_by=SYSTEM,
+            created_at=self.world.clock.now(),
+        )
+        return source, await self.world.operators.add(operator)
+
+    async def refresh(self, id: Id, force: bool = False) -> Refreshed:
+        self.refreshes.append(id)
+        if self.failure:
+            raise self.failure
+        world = self.world
+        source = await world.data_sources.get(id)
+        data = FetchedData(
+            content=self.content[id],
+            format=DataFormat.CSV,
+            fetched_at=world.clock.now(),
+            origin=source.address,
+        )
+        stored = await world.store.write(source.project_id, data, source.declared_schema)
+        (operator,) = await world.operators.reading(id)
+        current = await world.snapshots.current(operator.id, "")
+        if current and current.content_hash == stored.content_hash:
+            return Refreshed(data_source_id=id, changed=False)
+        snapshot = Snapshot(
+            id=uuid7(),
+            project_id=source.project_id,
+            operator_id=operator.id,
+            parameters_key="",
+            content_hash=stored.content_hash,
+            location=stored.location,
+            row_count=stored.row_count,
+            fetched_at=world.clock.now(),
+        )
+        await world.snapshots.add(snapshot)
+        if current:
+            await world.snapshots.supersede(current.id, world.clock.now())
+        return Refreshed(data_source_id=id, changed=True, snapshot_ids=(snapshot.id,))
+
+    async def register(  # type: ignore[override]
+        self,
+        project_id: Id,
+        name: str,
+        access_kind: AccessKind,
+        address: str,
+        format: DataFormat,
+        options: JsonObject | None = None,
+        freshness: FreshnessPolicy | None = None,
+        declared_schema: Schema | None = None,
+    ) -> DataSource:
+        raise NotImplementedError
+
+    async def get(self, id: Id) -> DataSource:
+        return await self.world.data_sources.get(id)
+
+    async def list(self, project_id: Id) -> Sequence[DataSource]:
+        return await self.world.data_sources.list(project_id)
+
+    async def update(self, id: Id, expected_revision: int, **changes: object) -> DataSource:  # type: ignore[override]
+        raise NotImplementedError
+
+    async def due(self) -> Sequence[DataSource]:
+        return []
+
+
+class World:
+    def __init__(self, tmp_path: Path) -> None:
+        memory = MemoryStore()
+        self.project_id = uuid7()
+        self.clock = FixedClock()
+        self.store = RecordingStore(tmp_path / "data")
+        self.data_sources = MemoryDataSourceRepository(memory)
+        self.operators = MemoryOperatorRepository(memory)
+        self.snapshots = MemorySnapshotRepository(memory)
+        self.runs_repository = MemoryRunRepository(memory)
+        self.events = MemoryEventBus()
+        self.sources = FakeSources(self)
+        self.pipelines = Pipelines(
+            self.operators, self.data_sources, self.snapshots, self.sources, self.store, self.clock
+        )
+        self.runs = Runs(
+            self.runs_repository,
+            self.operators,
+            self.snapshots,
+            self.sources,
+            self.store,
+            self.events,
+            self.clock,
+        )
+
+    async def source(
+        self, content: bytes = REGIONS, declared: Schema | None = DECLARED
+    ) -> Operator:
+        _, operator = await self.sources.add(self.project_id, content, declared)
+        return operator
+
+    async def transform(self, sql: str, *inputs: Operator, **options: object) -> Operator:
+        return await self.pipelines.add_transform(
+            self.project_id, sql, [i.id for i in inputs], AGENT, **options
+        )
+
+    async def read(self, operator: Operator, run_id: Id | None = None) -> list[tuple[object, ...]]:
+        run_id = run_id or (await self.runs.start(self.project_id, AGENT)).id
+        return list((await self.runs.read(run_id, operator.id)).rows)
+
+    def set_content(self, operator: Operator, content: bytes) -> None:
+        self.sources.content[UUID(operator.params["data_source_id"])] = content
+
+
+@pytest.fixture
+def world(tmp_path: Path) -> World:
+    return World(tmp_path)
+
+
+# Building and running pipelines
+
+
+async def test_a_transform_derives_its_columns_from_declared_inputs_without_data(
+    world: World,
+) -> None:
+    source = await world.source()
+
+    total = await world.transform(
+        "SELECT count(*) AS n, sum(value) / 2 AS half, region || '!' AS shout FROM input_0 "
+        "GROUP BY region;",
+        source,
+    )
+
+    assert total.output.columns == (
+        Column(name="n", type=ColumnType.INTEGER),
+        Column(name="half", type=ColumnType.NUMBER),
+        Column(name="shout", type=ColumnType.TEXT),
+    )
+    assert total.output.derived is True
+    assert total.materializing is False
+    # The trailing semicolon is not part of the definition.
+    assert total.params == {"sql": total.params["sql"].rstrip(";")}
+    # The source's declared columns sufficed: nothing was fetched.
+    assert world.sources.refreshes == []
+
+
+async def test_adding_a_transform_twice_returns_the_stored_one(world: World) -> None:
+    source = await world.source()
+    first = await world.transform("SELECT region FROM input_0", source)
+    described = len(world.store.described)
+
+    again = await world.transform("SELECT region FROM input_0", source, materialize=True)
+
+    assert again == first
+    assert len(world.store.described) == described
+
+
+@pytest.mark.parametrize(
+    "sql",
+    ["SELECT nope FROM input_0", "SELECT * FROM input_1", "SELECT 1; SELECT 2"],
+)
+async def test_a_transform_with_bad_sql_is_invalid(world: World, sql: str) -> None:
+    source = await world.source()
+    with pytest.raises(Invalid):
+        await world.transform(sql, source)
+    assert await world.operators.list(world.project_id) == [source]
+
+
+async def test_declared_roles_must_name_fitting_columns(world: World) -> None:
+    source = await world.source()
+    sql = "SELECT region, value, value > 15 AS hidden FROM input_0"
+
+    with pytest.raises(Invalid, match="missing"):
+        await world.transform(sql, source, roles=Roles(measures=(MeasureRole(value="missing"),)))
+    with pytest.raises(Invalid, match="region"):
+        await world.transform(sql, source, roles=Roles(measures=(MeasureRole(value="region"),)))
+    with pytest.raises(Invalid, match="value"):
+        roles = Roles(measures=(MeasureRole(value="value", suppressed="value"),))
+        await world.transform(sql, source, roles=roles)
+
+    roles = Roles(measures=(MeasureRole(value="value", suppressed="hidden"),))
+    operator = await world.transform(sql, source, roles=roles)
+    assert operator.output.roles == roles
+    assert operator.output.derived is False
+
+
+async def test_an_input_checks_its_default_against_its_schema(world: World) -> None:
+    source = await world.source()
+
+    slot = await world.pipelines.add_input(world.project_id, "regions", DECLARED, source.id, AGENT)
+    narrower = Schema(columns=(Column(name="value", type=ColumnType.NUMBER),))
+    assert await world.pipelines.add_input(world.project_id, "values", narrower, source.id, AGENT)
+
+    assert slot.inputs == (source.id,)
+    assert slot.materializing is False
+    wrong = Schema(columns=(Column(name="region", type=ColumnType.INTEGER),))
+    with pytest.raises(Invalid, match="region"):
+        await world.pipelines.add_input(world.project_id, "codes", wrong, source.id, AGENT)
+
+
+async def test_a_chain_of_pass_through_transforms_is_one_query(world: World) -> None:
+    source = await world.source()
+    big = await world.transform("SELECT * FROM input_0 WHERE value > 10", source)
+    named = await world.transform(
+        "WITH x AS (SELECT * FROM input_0) SELECT upper(region) AS r, value FROM x", big
+    )
+    ordered = await world.transform("SELECT * FROM input_0 ORDER BY value DESC", named)
+
+    assert await world.read(ordered) == [("OULU", 30), ("TURKU", 20)]
+
+    # One query over the one source snapshot; nothing was stored but the source.
+    (query,) = world.store.queries
+    assert list(query.relations.values()) == [
+        (await world.snapshots.current(source.id, "")).location  # type: ignore[union-attr]
+    ]
+    assert world.store.materialized == []
+    for operator in (big, named, ordered):
+        assert await world.snapshots.list(operator.id) == []
+
+
+async def test_a_shared_upstream_is_fused_once(world: World) -> None:
+    source = await world.source()
+    left = await world.transform("SELECT region, value FROM input_0", source)
+    right = await world.transform("SELECT region, value * 10 AS big FROM input_0", source)
+    joined = await world.transform(
+        "SELECT a.region, a.value, b.big FROM input_0 a JOIN input_1 b USING (region) "
+        "ORDER BY a.region",
+        left,
+        right,
+    )
+
+    assert await world.read(joined) == [
+        ("Helsinki", 10, 100),
+        ("Oulu", 30, 300),
+        ("Turku", 20, 200),
+    ]
+    assert len(world.store.queries[0].relations) == 1
+
+
+async def test_a_materializing_transform_is_reused_while_its_inputs_are_unchanged(
+    world: World,
+) -> None:
+    source = await world.source()
+    total = await world.transform(
+        "SELECT sum(value) AS total FROM input_0", source, materialize=True
+    )
+    on_top = await world.transform("SELECT total + 1 AS more FROM input_0", total)
+
+    first = await world.runs.execute(
+        (await world.runs.start(world.project_id, AGENT)).id, on_top.id
+    )
+    second = await world.runs.execute(
+        (await world.runs.start(world.project_id, AGENT)).id, on_top.id
+    )
+
+    assert len(world.store.materialized) == 1
+    assert first.snapshots == second.snapshots
+    assert set(first.snapshots) == {source.id, total.id}
+    assert await world.read(on_top) == [(61,)]
+    # The pass-through operator on top stored nothing.
+    assert await world.snapshots.list(on_top.id) == []
+
+
+async def test_a_refetch_with_identical_content_reuses_downstream_snapshots(world: World) -> None:
+    source = await world.source()
+    total = await world.transform(
+        "SELECT sum(value) AS total FROM input_0", source, materialize=True
+    )
+    await world.read(total)
+
+    # The same table in another layout: the same content hash, so nothing reruns.
+    world.set_content(source, b"region,value\nOulu,30\nTurku,20\nHelsinki,10\n")
+    await world.read(total)
+
+    assert len(world.store.materialized) == 1
+    assert len(await world.snapshots.list(source.id)) == 1
+
+
+async def test_new_source_data_makes_a_new_snapshot_and_old_runs_keep_theirs(
+    world: World,
+) -> None:
+    source = await world.source()
+    total = await world.transform(
+        "SELECT sum(value) AS total FROM input_0", source, materialize=True
+    )
+    old_run = await world.runs.start(world.project_id, AGENT)
+    assert await world.read(total, old_run.id) == [(60,)]
+
+    world.set_content(source, b"region,value\nHelsinki,100\n")
+    new_run = await world.runs.start(world.project_id, AGENT)
+    assert await world.read(total, new_run.id) == [(100,)]
+
+    # The old run is a consistent cut: same snapshots, same answer.
+    assert await world.read(total, old_run.id) == [(60,)]
+    assert await world.read(source, old_run.id) == [("Helsinki", 10), ("Turku", 20), ("Oulu", 30)]
+    old = (await world.runs.get(old_run.id)).snapshots
+    new = (await world.runs.get(new_run.id)).snapshots
+    assert old[source.id] != new[source.id]
+    assert old[total.id] != new[total.id]
+    old_total = await world.snapshots.get(old[total.id])
+    new_total = await world.snapshots.get(new[total.id])
+    assert old_total.parameters_key != new_total.parameters_key
+    assert old_total.superseded_at is None
+    assert (await world.snapshots.get(old[source.id])).superseded_at is not None
+
+
+async def test_a_failed_refresh_serves_the_last_good_snapshot(world: World) -> None:
+    source = await world.source()
+    await world.read(source)
+
+    world.sources.failure = RuntimeError("the source is down")
+    assert len(await world.read(source)) == 3
+
+    fresh = await world.source(b"region,value\nVaasa,1\n")
+    with pytest.raises(RuntimeError, match="down"):
+        await world.read(fresh)
+
+
+async def test_a_scenario_binds_an_input_to_another_pipeline(world: World) -> None:
+    actual = await world.source()
+    target = await world.source(b"region,value\nHelsinki,80\nTurku,80\nOulu,80\n")
+    raised = await world.transform(
+        "SELECT region, CASE WHEN region = 'Helsinki' THEN 80 ELSE value END AS value FROM input_0",
+        actual,
+    )
+    slot = await world.pipelines.add_input(
+        world.project_id, "screening", DECLARED, actual.id, AGENT
+    )
+    total = await world.transform("SELECT sum(value) AS total FROM input_0", slot, materialize=True)
+
+    baseline = await world.runs.start(world.project_id, AGENT)
+    goal = await world.runs.start(world.project_id, AGENT, bindings={"screening": target.id})
+    helsinki = await world.runs.start(world.project_id, AGENT, bindings={"screening": raised.id})
+
+    assert not baseline.is_scenario
+    assert goal.is_scenario
+    assert await world.read(total, baseline.id) == [(60,)]
+    assert await world.read(total, goal.id) == [(240,)]
+    assert await world.read(total, helsinki.id) == [(130,)]
+    # The same operator, one snapshot per set of inputs it saw.
+    assert len(await world.snapshots.list(total.id)) == 3
+
+
+async def test_bindings_are_checked_when_the_run_starts(world: World) -> None:
+    source = await world.source()
+    slot = await world.pipelines.add_input(
+        world.project_id, "screening", DECLARED, source.id, AGENT
+    )
+    other = await world.transform("SELECT region FROM input_0", source)
+    reading_itself = await world.transform("SELECT * FROM input_0", slot)
+
+    with pytest.raises(Invalid, match="no input named"):
+        await world.runs.start(world.project_id, AGENT, bindings={"nothing": source.id})
+    with pytest.raises(Invalid, match="'value' is missing"):
+        await world.runs.start(world.project_id, AGENT, bindings={"screening": other.id})
+    with pytest.raises(Invalid, match="does not exist"):
+        await world.runs.start(world.project_id, AGENT, bindings={"screening": "op_nope"})
+    with pytest.raises(Invalid, match="reads the input"):
+        await world.runs.start(world.project_id, AGENT, bindings={"screening": reading_itself.id})
+    assert await world.runs.list(world.project_id) == []
+
+
+async def test_execute_publishes_started_and_finished(world: World) -> None:
+    source = await world.source()
+    run = await world.runs.start(world.project_id, AGENT)
+
+    executed = await world.runs.execute(run.id, source.id)
+
+    assert [(e.type, e.payload) for e in world.events.published] == [
+        (EventType.RUN_STARTED, {"run_id": str(run.id), "operator_id": source.id}),
+        (EventType.RUN_FINISHED, {"run_id": str(run.id), "operator_id": source.id}),
+    ]
+    assert all(e.project_id == world.project_id for e in world.events.published)
+    assert await world.runs.get(run.id) == executed
+    assert await world.runs.list(world.project_id) == [executed]
+
+
+async def test_a_failing_execution_publishes_failed_with_the_error(world: World) -> None:
+    source = await world.source(b"region,value\nHelsinki,x\n", declared=None)
+    broken = await world.transform(
+        "SELECT CAST(value AS INTEGER) AS n FROM input_0", source, materialize=True
+    )
+    run = await world.runs.start(world.project_id, AGENT)
+
+    with pytest.raises(Invalid):
+        await world.runs.execute(run.id, broken.id)
+
+    started, failed = world.events.published
+    assert started.type is EventType.RUN_STARTED
+    assert failed.type is EventType.RUN_FAILED
+    assert failed.payload["operator_id"] == broken.id
+    assert "x" in failed.payload["error"]
+
+
+# The DuckDB store, against real Parquet files
+
+
+PROJECT = uuid7()
+CSV = b"region,value,day\nHelsinki,1.5,2024-01-01\nTurku,2,2024-02-01\n"
+
+
+@pytest.fixture
+def duckdb_store(tmp_path: Path) -> DuckDbAnalysisStore:
+    return DuckDbAnalysisStore(tmp_path / "data")
+
+
+def fetched(content: bytes, format: DataFormat = DataFormat.CSV) -> FetchedData:
+    return FetchedData(content=content, format=format, fetched_at=factories.NOW, origin="test")
+
+
+def snapshot_files(store: DuckDbAnalysisStore) -> list[str]:
+    directory = store.data_dir / str(PROJECT)
+    return sorted(path.name for path in directory.iterdir()) if directory.exists() else []
+
+
+def over(location: str, sql: str = "SELECT * FROM s") -> Query:
+    return Query(sql=sql, relations={"s": location})
+
+
+async def test_a_csv_becomes_one_parquet_file_with_columns_read_from_the_data(
+    duckdb_store: DuckDbAnalysisStore,
+) -> None:
+    stored = await duckdb_store.write(PROJECT, fetched(CSV))
+
+    assert stored.location == f"{PROJECT}/{stored.content_hash}.parquet"
+    assert (duckdb_store.data_dir / stored.location).is_file()
+    assert snapshot_files(duckdb_store) == [f"{stored.content_hash}.parquet"]
+    assert stored.row_count == 2
+    assert stored.output == Schema(
+        columns=(
+            Column(name="region", type=ColumnType.TEXT),
+            Column(name="value", type=ColumnType.NUMBER),
+            Column(name="day", type=ColumnType.DATE),
+        ),
+        derived=True,
+    )
+    rows = await duckdb_store.run(over(stored.location), limit=10)
+    assert rows.rows == (("Helsinki", 1.5, date(2024, 1, 1)), ("Turku", 2.0, date(2024, 2, 1)))
+
+
+async def test_identical_data_gets_the_same_hash_whatever_its_layout(
+    duckdb_store: DuckDbAnalysisStore,
+) -> None:
+    first = await duckdb_store.write(PROJECT, fetched(CSV))
+    again = await duckdb_store.write(PROJECT, fetched(CSV))
+    # Quoted, with CRLF line ends and the rows the other way round: the same table.
+    relaid = await duckdb_store.write(
+        PROJECT,
+        fetched(b'"region","value","day"\r\n"Turku",2,2024-02-01\r\n"Helsinki",1.5,2024-01-01\r\n'),
+    )
+    changed = await duckdb_store.write(PROJECT, fetched(CSV.replace(b"1.5", b"1.6")))
+
+    assert first.content_hash == again.content_hash == relaid.content_hash
+    assert first.location == again.location
+    assert changed.content_hash != first.content_hash
+    # One file per distinct content, and no scratch files left behind.
+    assert snapshot_files(duckdb_store) == sorted(
+        f"{h}.parquet" for h in {first.content_hash, changed.content_hash}
+    )
+
+
+async def test_a_declared_schema_adds_roles_to_the_columns_of_the_data(
+    duckdb_store: DuckDbAnalysisStore,
+) -> None:
+    roles = Roles(
+        geo=GeoRole(code="region", system="names", level="city"),
+        measures=(MeasureRole(value="value"),),
+    )
+    declared = Schema(columns=(Column(name="value", type=ColumnType.NUMBER),), roles=roles)
+
+    stored = await duckdb_store.write(PROJECT, fetched(CSV), declared)
+
+    assert stored.output.roles == roles
+    assert stored.output.derived is False
+    # Columns still come from the data, all of them.
+    assert [column.name for column in stored.output.columns] == ["region", "value", "day"]
+
+
+async def test_describe_names_the_columns_without_running_the_query(
+    duckdb_store: DuckDbAnalysisStore,
+) -> None:
+    stored = await duckdb_store.write(PROJECT, fetched(CSV))
+    # Running this would take a very long time; describing only binds it.
+    query = over(
+        stored.location,
+        "SELECT region, sum(value) AS total, count(*) AS n,"
+        " (SELECT sum(x) FROM range(1000000000000) t(x)) AS huge FROM s GROUP BY region",
+    )
+
+    assert await duckdb_store.describe(query) == (
+        Column(name="region", type=ColumnType.TEXT),
+        Column(name="total", type=ColumnType.NUMBER),
+        Column(name="n", type=ColumnType.INTEGER),
+        Column(name="huge", type=ColumnType.INTEGER),
+    )
+
+
+async def test_run_returns_at_most_limit_rows_and_says_when_there_are_more(
+    duckdb_store: DuckDbAnalysisStore,
+) -> None:
+    query = Query(sql="SELECT x, x * 1.5::DECIMAL(4, 1) AS y FROM range(5) t(x) ORDER BY x DESC")
+
+    some = await duckdb_store.run(query, limit=2)
+    every = await duckdb_store.run(query, limit=5)
+
+    assert some.rows == ((4, 6.0), (3, 4.5))
+    assert some.truncated is True
+    assert len(every.rows) == 5
+    assert every.truncated is False
+    assert some.columns == (
+        Column(name="x", type=ColumnType.INTEGER),
+        Column(name="y", type=ColumnType.NUMBER),
+    )
+
+
+async def test_materialize_stores_the_query_result_as_a_snapshot(
+    duckdb_store: DuckDbAnalysisStore,
+) -> None:
+    source = await duckdb_store.write(PROJECT, fetched(CSV))
+
+    copy = await duckdb_store.materialize(PROJECT, over(source.location))
+    total = await duckdb_store.materialize(
+        PROJECT, over(source.location, "SELECT sum(value) AS t FROM s")
+    )
+
+    # The same table, by whatever route, is the same content.
+    assert copy.content_hash == source.content_hash
+    assert copy.location == source.location
+    assert total.row_count == 1
+    assert total.output.columns == (Column(name="t", type=ColumnType.NUMBER),)
+    assert (await duckdb_store.run(over(total.location), 1)).rows == ((3.5,),)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT * FROM read_csv('{other}')",
+        "COPY (SELECT 1) TO '{other}'",
+        "SET enable_external_access = true",
+    ],
+)
+async def test_queries_cannot_reach_other_files(
+    duckdb_store: DuckDbAnalysisStore, tmp_path: Path, sql: str
+) -> None:
+    other = tmp_path / "secret.csv"
+    other.write_text("secret\n1\n")
+    stored = await duckdb_store.write(PROJECT, fetched(CSV))
+    query = over(stored.location, sql.format(other=other, data=duckdb_store.data_dir))
+
+    with pytest.raises(Invalid):
+        await duckdb_store.run(query, limit=10)
+    with pytest.raises(Invalid):
+        await duckdb_store.materialize(PROJECT, query)
+
+
+@pytest.mark.parametrize("location", ["../outside.parquet", "/etc/passwd"])
+async def test_relations_must_be_snapshots_in_the_data_directory(
+    duckdb_store: DuckDbAnalysisStore, location: str
+) -> None:
+    with pytest.raises(Invalid):
+        await duckdb_store.run(over(location), limit=1)
+
+
+# The pipelines list
+
+
+class Listing:
+    """Operators stored directly, each a second later than the one before."""
+
+    def __init__(self) -> None:
+        self.store = MemoryStore()
+        self.project = factories.project()
+        self.store.projects[self.project.id] = self.project
+        self.ticks = 0
+
+    def source(self, name: str) -> Operator:
+        source = factories.data_source(self.project.id, name=name)
+        self.store.data_sources[source.id] = source
+        return self._add(OperatorKind.SOURCE, {"data_source_id": str(source.id)})
+
+    def transform(self, sql: str, *inputs: Operator) -> Operator:
+        return self._add(OperatorKind.TRANSFORM, {"sql": sql}, *inputs)
+
+    def input(self, name: str, default: Operator) -> Operator:
+        return self._add(OperatorKind.INPUT, {"name": name}, default)
+
+    def _add(self, kind: OperatorKind, params: dict[str, Any], *inputs: Operator) -> Operator:
+        self.ticks += 1
+        operator = factories.operator(
+            self.project.id,
+            kind,
+            params,
+            inputs=tuple(i.id for i in inputs),
+            created_at=factories.NOW + timedelta(seconds=self.ticks),
+        )
+        self.store.operators[operator.id] = operator
+        return operator
+
+    async def pipelines(self) -> Any:
+        service = Pipelines(
+            MemoryOperatorRepository(self.store),
+            MemoryDataSourceRepository(self.store),
+            None,  # type: ignore[arg-type]
+            None,  # type: ignore[arg-type]
+            None,  # type: ignore[arg-type]
+            None,  # type: ignore[arg-type]
+        )
+        return await service.pipelines(self.project.id)
+
+
+async def test_only_operators_nothing_builds_on_are_pipelines_newest_first() -> None:
+    world = Listing()
+    screening = world.source("Sotkanet screening")
+    regions = world.source("Regions")
+    left = world.transform("-- Screening by county\nSELECT * FROM input_0", screening)
+    right = world.transform("SELECT region, value FROM input_0 WHERE value > 1", screening)
+    # A diamond: both sides read the screening source.
+    joined = world.transform(
+        "SELECT l.region, l.value, r.value AS previous FROM input_0 AS l "
+        "JOIN input_1 AS r ON l.region = r.region",
+        left,
+        right,
+    )
+    baseline = world.input("baseline", regions)
+    unused = world.source("Boundaries")
+
+    pipelines = await world.pipelines()
+
+    assert [p.operator_id for p in pipelines] == [unused.id, baseline.id, joined.id]
+    by_id = {p.operator_id: p for p in pipelines}
+    diamond = by_id[joined.id]
+    assert [(str(s.data_source_id), s.name) for s in diamond.sources] == [
+        (screening.params["data_source_id"], "Sotkanet screening")
+    ]
+    assert diamond.kind is OperatorKind.TRANSFORM
+    assert diamond.name == "SELECT l.region, l.value, r.value AS previous FROM input_0…"
+    assert diamond.output == joined.output
+    assert diamond.created_at == joined.created_at
+    assert by_id[baseline.id].name == "baseline"
+    assert [s.name for s in by_id[baseline.id].sources] == ["Regions"]
+    assert by_id[unused.id].name == "Boundaries"
+    assert by_id[unused.id].kind is OperatorKind.SOURCE
+
+
+def test_sql_is_named_by_its_leading_comment_or_its_first_words() -> None:
+    assert sql_name("-- Participation by county\n-- (latest year)\nSELECT 1") == (
+        "Participation by county (latest year)"
+    )
+    assert sql_name("  SELECT   region,\n  value FROM input_0  ") == (
+        "SELECT region, value FROM input_0"
+    )
+    long = "SELECT " + ", ".join(f"column_{i}" for i in range(20)) + " FROM input_0"
+    assert len(sql_name(long)) <= 60
+    assert sql_name(long).endswith("…")
+
+
+# Roles
+
+
+COUNTY = GeoRole(code="region", system="statfin", level="wellbeing_services_county")
+YEARS = TimeRole(start="period_start", end="period_end", grain=Grain.YEAR)
+COLUMNS = (
+    Column(name="region", type=ColumnType.TEXT),
+    Column(name="period", type=ColumnType.TEXT),
+    Column(name="value", type=ColumnType.NUMBER),
+    Column(name="lower", type=ColumnType.NUMBER),
+    Column(name="upper", type=ColumnType.NUMBER),
+    Column(name="period_start", type=ColumnType.DATE),
+    Column(name="period_end", type=ColumnType.DATE),
+)
+BOUNDED = MeasureRole(value="value", lower="lower", upper="upper")
+TABLES = {
+    "/years.csv": b"region,period,value,lower,upper\n01,2023,70,68,72\n01,2024,71,69,73\n"
+    b"90,2023,74,72,76\n90,2024,74.3,72.1,76.5\n",
+    "/quarters.csv": b"region,period,value,lower,upper\n01,2024Q1,70,68,72\n",
+}
+
+
+def schema(roles: Roles) -> Schema:
+    return Schema(columns=COLUMNS, roles=roles)
+
+
+class Tables(TimeWorld):
+    """Small CSV sources answered in memory, each declared with the roles it is given."""
+
+    def __init__(self, tmp_path: Path) -> None:
+        def answer(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=TABLES[request.url.path])
+
+        super().__init__(tmp_path, transport=httpx.MockTransport(answer))
+
+    async def table(self, path: str, roles: Roles) -> Operator:
+        source = await self.sources.register(
+            self.project_id,
+            name=path,
+            access_kind=AccessKind.URL,
+            address=f"https://tables.example{path}",
+            format=DataFormat.CSV,
+            options={"period": {"column": "period"}},
+            declared_schema=schema(roles),
+        )
+        return await self.operator(source)
+
+
+@pytest.fixture
+def tables(tmp_path: Path) -> Tables:
+    return Tables(tmp_path)
+
+
+def test_a_binding_needs_the_slot_s_geography_and_period_shape() -> None:
+    slot = Roles(time=YEARS, geo=COUNTY)
+    check_compatible(slot, Roles(time=YEARS, geo=COUNTY, measures=(BOUNDED,)), "it")
+
+    municipalities = COUNTY.model_copy(update={"level": "municipality"})
+    with pytest.raises(Invalid, match="municipality in statfin codes"):
+        check_compatible(slot, Roles(time=YEARS, geo=municipalities), "it")
+    with pytest.raises(Invalid, match="by quarter"):
+        check_compatible(
+            slot, Roles(time=YEARS.model_copy(update={"grain": "quarter"}), geo=COUNTY), "it"
+        )
+    with pytest.raises(Invalid, match="no time role"):
+        check_compatible(slot, Roles(geo=COUNTY), "it")
+    with pytest.raises(Invalid, match="no geography role"):
+        check_compatible(slot, Roles(time=YEARS), "it")
+    # A slot without roles takes anything with the columns; a slot without a grain any
+    # period shape.
+    check_compatible(Roles(), Roles(), "it")
+    check_compatible(Roles(time=YEARS.model_copy(update={"grain": None})), Roles(time=YEARS), "it")
+
+
+async def test_a_run_refuses_a_binding_at_another_level_or_grain(tables: Tables) -> None:
+    years = await tables.table("/years.csv", Roles(time=YEARS, geo=COUNTY))
+    await tables.pipelines.add_input(
+        tables.project_id, "screening", schema(Roles(time=YEARS, geo=COUNTY)), years.id, AGENT
+    )
+    quarters = await tables.table(
+        "/quarters.csv",
+        Roles(time=YEARS.model_copy(update={"grain": Grain.QUARTER}), geo=COUNTY),
+    )
+    unlabelled = await tables.transform("SELECT * FROM input_0", years)
+    raised = await tables.transform(
+        "SELECT * REPLACE (greatest(value, 80) AS value) FROM input_0",
+        years,
+        roles=Roles(time=YEARS, geo=COUNTY, measures=(MeasureRole(value="value"),)),
+    )
+
+    with pytest.raises(Invalid, match="its periods are by quarter, the slot's by year"):
+        await tables.runs.start(tables.project_id, AGENT, bindings={"screening": quarters.id})
+    with pytest.raises(Invalid, match="declares no time role"):
+        await tables.runs.start(tables.project_id, AGENT, bindings={"screening": unlabelled.id})
+    run = await tables.runs.start(tables.project_id, AGENT, bindings={"screening": raised.id})
+    assert run.is_scenario
+
+
+@pytest.mark.parametrize(
+    ("type", "roles", "spec", "message"),
+    [
+        ("value", Roles(), {"column": "region"}, "needs a number, and 'region' is text"),
+        ("map", Roles(geo=COUNTY.model_copy(update={"level": "mixed"})), {}, "mixed levels"),
+        ("map", Roles(geo=COUNTY), {}, "boundaries in a column 'geometry'"),
+    ],
+)
+def test_a_widget_states_what_it_misses(
+    type: str, roles: Roles, spec: dict[str, object], message: str
+) -> None:
+    with pytest.raises(Invalid, match=message):
+        check_widget(type, schema(roles), spec)
+
+
+async def test_create_widget_returns_invalid_with_the_reason(tables: Tables) -> None:
+    years = await tables.table("/years.csv", Roles(time=YEARS, geo=COUNTY, measures=(BOUNDED,)))
+
+    with pytest.raises(Invalid, match="A map widget cannot show this output: it needs the region"):
+        await tables.widgets.create(tables.project_id, years.id, "map", "Screening", AGENT)
+    widget = await tables.widgets.create(
+        tables.project_id, years.id, "line-chart", "Screening", AGENT, spec={"series": "region"}
+    )
+    assert widget.type == "line-chart"
+    assert tables.widget_repository.store.widgets == {widget.id: widget}
+
+
+@pytest.mark.parametrize(
+    ("sql", "reason"),
+    [
+        (
+            "SELECT region, avg(value) AS value, min(lower) AS lower, max(upper) AS upper "
+            "FROM input_0 GROUP BY region",
+            "GROUP BY",
+        ),
+        (
+            "SELECT * REPLACE (avg(value) OVER (PARTITION BY region) AS value) FROM input_0",
+            "avg() OVER",
+        ),
+        (
+            "SELECT s.* FROM (SELECT region, max(value) AS value, max(lower) AS lower, "
+            "max(upper) AS upper FROM input_0 GROUP BY region) AS s JOIN input_0 USING (region)",
+            "GROUP BY",
+        ),
+    ],
+)
+async def test_an_aggregating_transform_cannot_declare_bounds(
+    tables: Tables, sql: str, reason: str
+) -> None:
+    years = await tables.table("/years.csv", Roles(measures=(BOUNDED,)))
+
+    with pytest.raises(Invalid, match=re.escape(f"aggregates ({reason})")):
+        await tables.transform(sql, years, roles=Roles(measures=(BOUNDED,)))
+    # Without the bounds the same step is fine: the widget then draws no band.
+    plain = await tables.transform(sql, years, roles=Roles(measures=(MeasureRole(value="value"),)))
+    assert plain.output.roles.measures[0].lower is None
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        # A subquery that only picks the rows keeps them as they are: the latest period.
+        "SELECT * FROM input_0 WHERE period_end = (SELECT max(period_end) FROM input_0)",
+    ],
+)
+async def test_steps_that_keep_rows_keep_their_bounds(tables: Tables, sql: str) -> None:
+    years = await tables.table("/years.csv", Roles(measures=(BOUNDED,)))
+
+    step = await tables.transform(sql, years, roles=Roles(measures=(BOUNDED,)))
+
+    assert step.output.roles.measures == (BOUNDED,)
+
+
+# Geography
+
+# The recipe of ada.core.services.schema.geo: an explicit join with the mapping, and the
+# new code system and level declared on the result. A map starts from the boundaries, so
+# a county without a value is still drawn, as missing.
+TO_COUNTIES = """
+SELECT b.county_code, b.name AS county, d.period_start, d.period_end, d.value, b.geometry
+FROM input_2 AS b
+LEFT JOIN input_1 AS r ON r.code = b.county_code AND r.category = 'HYVINVOINTIALUE'
+LEFT JOIN input_0 AS d ON d.region = r.sotkanet_id
+ORDER BY county_code, period_start
+"""
+COUNTY_ROLES = Roles(
+    time=TimeRole(start="period_start", end="period_end", grain=Grain.YEAR),
+    geo=GeoRole(code="county_code", system=geo.STATFIN, level=geo.WELLBEING_SERVICES_COUNTY),
+    measures=(MeasureRole(value="value"),),
+)
+
+
+async def test_a_measure_mapped_to_the_counties_feeds_a_map(tmp_path: Path) -> None:
+    world = TimeWorld(tmp_path)
+    screening = await world.operator(await world.register(SOTKANET_BREAST_SCREENING))
+    regions = await world.operator(await world.register(SOTKANET_REGIONS))
+    boundaries = await world.operator(await world.register(WELLBEING_COUNTY_BOUNDARIES))
+    mapped = await world.transform(TO_COUNTIES, screening, regions, boundaries, roles=COUNTY_ROLES)
+    widget = await world.widgets.create(
+        world.project_id, mapped.id, "map", "Breast cancer screening, 2024", AGENT
+    )
+
+    data = await world.widgets.data(widget.id, (await world.run(2024, 2024)).id)
+
+    names = [column.name for column in data.columns]
+    rows = [dict(zip(names, row, strict=True)) for row in data.rows]
+    assert len(rows) == 23
+    value = {row["county_code"]: row["value"] for row in rows}
+    # The spec's first gap: 74.3% in the City of Helsinki, 85.6% in North Ostrobothnia.
+    assert (value["90"], value["19"]) == (74.3, 85.6)
+    # Åland runs its own screening and Sotkanet has no value for it: drawn as missing.
+    assert value["91"] is None
+    assert data.output.roles.geo == COUNTY_ROLES.geo
+    assert not data.is_stale
+    # Sotkanet's own regions are of mixed levels: no map without the mapping.
+    with pytest.raises(Invalid, match="mixed levels"):
+        await world.widgets.create(world.project_id, screening.id, "map", "Screening", AGENT)

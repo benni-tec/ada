@@ -1,6 +1,5 @@
-"""Shared by the tests of the database repositories: one set of repositories per backend,
-so the same expectations run against the memory repositories (the reference) and the
-SQLAlchemy ones, and builders for the records the shared factories do not cover."""
+"""Shared by the tests on PostgreSQL: the SQL repositories on one session, a unit of work
+as a request has one, and builders for the records the shared factories do not cover."""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -29,22 +28,6 @@ from ada.adapters.db.workspace_repositories import (
     SqlProjectRepository,
     SqlSessionRepository,
     SqlWidgetRepository,
-)
-from ada.adapters.memory.repositories import (
-    MemoryAgentTurnRepository,
-    MemoryAlertRepository,
-    MemoryAlertRuleRepository,
-    MemoryDashboardRepository,
-    MemoryDataSourceRepository,
-    MemoryOperatorRepository,
-    MemoryProjectRepository,
-    MemoryReportRepository,
-    MemoryRunRepository,
-    MemorySessionRepository,
-    MemorySnapshotRepository,
-    MemoryStore,
-    MemoryTemplateRepository,
-    MemoryWidgetRepository,
 )
 from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.base import Id
@@ -86,25 +69,6 @@ class Repos:
     alert_rules: AlertRuleRepository
     alerts: AlertRepository
     agent_turns: AgentTurnRepository
-
-
-def memory_repos() -> Repos:
-    store = MemoryStore()
-    return Repos(
-        MemoryProjectRepository(store),
-        MemoryDataSourceRepository(store),
-        MemorySessionRepository(store),
-        MemoryOperatorRepository(store),
-        MemorySnapshotRepository(store),
-        MemoryRunRepository(store),
-        MemoryWidgetRepository(store),
-        MemoryDashboardRepository(store),
-        MemoryTemplateRepository(store),
-        MemoryReportRepository(store),
-        MemoryAlertRuleRepository(store),
-        MemoryAlertRepository(store),
-        MemoryAgentTurnRepository(store),
-    )
 
 
 def sql_repos(session: AsyncSession) -> Repos:
