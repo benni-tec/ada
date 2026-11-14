@@ -66,6 +66,18 @@ async def test_the_agent_gets_every_tool_but_those_it_cannot_use(seen: Seen) -> 
     assert all(spec.input_schema.get("type") == "object" for spec in tools.specs())
 
 
+async def test_tools_work_from_a_task_s_request_scope(seen: Seen) -> None:
+    # The worker hands the toolbox its task's container; above APP is dishka's RUNTIME
+    # container, where no tool's services exist.
+    async with Client(create_mcp(seen.container)) as client:
+        project, session, _ = await setup(client)
+
+    async with seen.container() as request:
+        async with InProcessToolbox(request).connect(AGENT, session["id"]) as tools:
+            listed = await tools.call("list_sources", {"project_id": project["id"]})
+    assert [source["name"] for source in listed]
+
+
 async def test_tool_calls_act_as_the_agent_in_its_session(seen: Seen) -> None:
     async with Client(create_mcp(seen.container)) as client:
         project, session, source = await setup(client)

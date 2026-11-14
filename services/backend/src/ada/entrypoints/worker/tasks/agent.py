@@ -22,16 +22,8 @@ async def run_turn(
     with the platform's own MCP tools, each call a unit of work of its own, so what it
     builds is stored and announced as it goes, like an external agent's work."""
     try:
-        await service.run(UUID(turn_id), InProcessToolbox(_application(container)))
+        await service.run(UUID(turn_id), InProcessToolbox(container))
     except Exception:
         # The service ends every turn it started, failed or not; this is for what happens
         # before (the turn cannot be read). Ending normally keeps the worker running.
         logger.exception("Running agent turn %s failed", turn_id)
-
-
-def _application(container: AsyncContainer) -> AsyncContainer:
-    """The application's container, which outlives this task: the tool calls open their
-    own request scopes from it, as HTTP requests do."""
-    while container.parent_container is not None:
-        container = container.parent_container
-    return container

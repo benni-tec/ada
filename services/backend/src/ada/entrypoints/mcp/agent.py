@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from typing import Any
 
-from dishka import AsyncContainer
+from dishka import AsyncContainer, Scope
 from fastmcp import Client
 from mcp.types import Implementation, TextContent
 
@@ -28,7 +28,7 @@ CLIENT = Implementation(name="ada-in-platform-agent", version="1")
 class InProcessToolbox(AgentToolbox):
     def __init__(self, container: AsyncContainer) -> None:
         # The application's container: each tool call opens its own request scope from it.
-        self.container = container
+        self.container = application(container)
 
     @asynccontextmanager
     async def connect(self, agent: Actor, session_id: Id) -> AsyncIterator[AgentTools]:
@@ -46,6 +46,17 @@ class InProcessToolbox(AgentToolbox):
                     if tool.name not in LEFT_OUT
                 ]
                 yield _McpTools(client, specs, session_id)
+
+
+def application(container: AsyncContainer) -> AsyncContainer:
+    """The APP-scoped container above `container`, e.g. above a worker task's request
+    scope. Not the topmost one: above APP is dishka's RUNTIME container, from which a tool
+    call would open an APP scope and find none of the request-scoped services."""
+    while container.scope is not Scope.APP:
+        if container.parent_container is None:
+            raise ValueError(f"No application container above {container.scope}")
+        container = container.parent_container
+    return container
 
 
 class _McpTools(AgentTools):
