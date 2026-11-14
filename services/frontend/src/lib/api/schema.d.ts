@@ -376,6 +376,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/widget-bundles/{name}.html": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Widget Bundle
+         * @description A built widget, one self-contained HTML file. The frontend loads it in an iframe as
+         *     `<name>.html#widget=<id>&run=<run>`; the widget then reads its data from this API.
+         */
+        get: operations["widget_bundle_api_widget_bundles__name__html_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/widgets/{widget_id}": {
         parameters: {
             query?: never;
@@ -1876,6 +1897,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RefreshQueued"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    widget_bundle_api_widget_bundles__name__html_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

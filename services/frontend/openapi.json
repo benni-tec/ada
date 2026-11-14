@@ -2731,6 +2731,42 @@
         ]
       }
     },
+    "/api/widget-bundles/{name}.html": {
+      "get": {
+        "description": "A built widget, one self-contained HTML file. The frontend loads it in an iframe as\n`<name>.html#widget=<id>&run=<run>`; the widget then reads its data from this API.",
+        "operationId": "widget_bundle_api_widget_bundles__name__html_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Widget Bundle",
+        "tags": [
+          "widgets"
+        ]
+      }
+    },
     "/api/widgets/{widget_id}": {
       "get": {
         "operationId": "get_widget_api_widgets__widget_id__get",
