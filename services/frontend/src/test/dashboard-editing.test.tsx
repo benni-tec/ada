@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import type { Dashboard, DashboardSlot, DashboardVersion, DashboardView } from '@/lib/api'
 
@@ -77,13 +77,15 @@ async function startEditing() {
   await grid()
 }
 
+const done = () => fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
 function drag(handle: HTMLElement, dx: number, dy: number) {
   fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 500, clientY: 300 })
   fireEvent.pointerMove(handle, { pointerId: 1, clientX: 500 + dx, clientY: 300 + dy })
   fireEvent.pointerUp(handle, { pointerId: 1, clientX: 500 + dx, clientY: 300 + dy })
 }
 
-test('dragging a slot moves it, the others make room, and the drop saves the layout as a new version', async () => {
+test('dragging a slot moves it and the others make room; Done saves the layout as one new version', async () => {
   const saved: unknown[] = []
   serveDashboard({
     'PUT /api/dashboards/d1/slots': (body: unknown) => {
@@ -96,7 +98,11 @@ test('dragging a slot moves it, the others make room, and the drop saves the lay
   await startEditing()
 
   drag(screen.getByRole('button', { name: 'Move headline' }), -6 * COLUMN, 0)
+  // Nothing is saved until Done.
+  expect(await screen.findByText(/unsaved layout changes/)).toBeInTheDocument()
+  expect(saved).toEqual([])
 
+  done()
   await waitFor(() => expect(saved).toHaveLength(1))
   expect((saved[0] as { expected_revision: number }).expected_revision).toBe(3)
   expect(layoutOf(saved[0])).toEqual({
@@ -120,16 +126,17 @@ test('a map keeps its aspect ratio when resized; other widgets resize freely', a
 
   // The map, three columns wider: it grows taller with it.
   drag(screen.getByRole('button', { name: 'Resize coverage' }), 3 * COLUMN, 0)
-  await waitFor(() => expect(saved).toHaveLength(1))
-  expect(layoutOf(saved[0]).coverage).toEqual({ x: 0, y: 0, w: 9, h: 6 })
-
   // The number, narrower and lower, as asked; never below its minimum.
   drag(screen.getByRole('button', { name: 'Resize headline' }), -2 * COLUMN, -5 * ROW)
-  await waitFor(() => expect(saved).toHaveLength(2))
-  expect(layoutOf(saved[1]).headline).toMatchObject({ w: 4, h: 2 })
+  done()
+
+  // Both changes, in one version.
+  await waitFor(() => expect(saved).toHaveLength(1))
+  expect(layoutOf(saved[0]).coverage).toEqual({ x: 0, y: 0, w: 9, h: 6 })
+  expect(layoutOf(saved[0]).headline).toMatchObject({ w: 4, h: 2 })
 })
 
-test('a layout someone else changed meanwhile is not saved: the dashboard is read again and the person told', async () => {
+test('a layout someone else changed meanwhile is not saved: the dashboard is read again, the person told, the changes kept', async () => {
   let reads = 0
   serveDashboard({
     'GET /api/dashboards/d1': () => (reads++, view()),
@@ -140,11 +147,13 @@ test('a layout someone else changed meanwhile is not saved: the dashboard is rea
   const before = reads
 
   drag(screen.getByRole('button', { name: 'Move notes' }), 0, ROW)
+  done()
 
   expect(await screen.findByText(/Someone else changed this dashboard/)).toBeInTheDocument()
   await waitFor(() => expect(reads).toBeGreaterThan(before))
-  // Back where the dashboard says it is.
-  expect((await screen.findByRole('listitem', { name: 'notes' })).style.getPropertyValue('--row')).toBe('5 / span 2')
+  // Still editing, with the move kept, so Done can be pressed again.
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
+  expect(screen.getByRole('listitem', { name: 'notes' }).style.getPropertyValue('--row')).toBe('6 / span 2')
 })
 
 test('the keyboard moves and resizes too: Enter picks up, arrows move, Enter drops, Escape puts back', async () => {
@@ -174,17 +183,19 @@ test('the keyboard moves and resizes too: Enter picks up, arrows move, Enter dro
   fireEvent.keyDown(move, { key: 'Enter' })
   fireEvent.keyDown(move, { key: 'ArrowRight' })
   fireEvent.keyDown(move, { key: 'Enter' })
-  await waitFor(() => expect(saved).toHaveLength(1))
-  expect(layoutOf(saved[0]).coverage).toEqual({ x: 1, y: 0, w: 6, h: 4 })
 
   const resize = screen.getByRole('button', { name: 'Resize notes' })
   fireEvent.keyDown(resize, { key: ' ' })
   fireEvent.keyDown(resize, { key: 'ArrowUp' })
   fireEvent.keyDown(resize, { key: 'ArrowLeft' })
   fireEvent.keyDown(resize, { key: ' ' })
-  await waitFor(() => expect(saved).toHaveLength(2))
+  expect(saved).toEqual([])
+  done()
+
+  await waitFor(() => expect(saved).toHaveLength(1))
+  expect(layoutOf(saved[0]).coverage).toEqual({ x: 1, y: 0, w: 6, h: 4 })
   // An empty slot's minimum is 2 by 2.
-  expect(layoutOf(saved[1]).notes).toMatchObject({ w: 11, h: 2 })
+  expect(layoutOf(saved[0]).notes).toMatchObject({ w: 11, h: 2 })
 })
 
 test('handles appear only while the layout is being edited, and not on an old version', async () => {
@@ -349,4 +360,27 @@ test('a link straight to `?open=` shows the widget at a run of its own; closing 
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(router.state.location.pathname).toBe('/projects/p1/dashboards/d1')
   expect(router.state.location.search).toEqual({})
+})
+
+test('unsaved layout changes are discarded on request, and leaving with them asks first', async () => {
+  const saved: unknown[] = []
+  serveDashboard({ 'PUT /api/dashboards/d1/slots': (body: unknown) => (saved.push(body), view()) })
+  const { router } = renderAt('/projects/p1/dashboards/d1')
+  await startEditing()
+
+  drag(screen.getByRole('button', { name: 'Move notes' }), 0, ROW)
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  // A blocked navigation never settles, so it is not awaited.
+  act(() => void router.navigate({ to: '/projects/$projectId', params: { projectId: 'p1' } }))
+  await waitFor(() => expect(confirm).toHaveBeenCalledOnce())
+  expect(router.state.location.pathname).toBe('/projects/p1/dashboards/d1')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Discard the layout changes' }))
+  expect(screen.getByRole('listitem', { name: 'notes' }).style.getPropertyValue('--row')).toBe('5 / span 2')
+  expect(screen.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument()
+  act(() => void router.navigate({ to: '/projects/$projectId', params: { projectId: 'p1' } }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/projects/p1'))
+  expect(confirm).toHaveBeenCalledOnce()
+  expect(saved).toEqual([])
+  confirm.mockRestore()
 })

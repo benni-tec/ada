@@ -81,16 +81,15 @@ const sameBox = (a: Box, b: Box) => a.x === b.x && a.y === b.y && a.w === b.w &&
  *
  * With `onSave`, the slots can be moved and resized: by dragging a slot's handles, or from
  * the keyboard (Enter on a handle picks the slot up, the arrow keys move or resize it,
- * Enter drops it, Escape puts it back). Others in the way move down. A drop saves the
- * whole layout at once, which adds a dashboard version; until the save is answered the
- * grid shows the new layout.
+ * Enter drops it, Escape puts it back). Others in the way move down. A drop hands the whole
+ * new layout to `onChange`; saving it, as one dashboard version, is the page's business.
  */
 export function DashboardGrid({
   slots,
   widgets,
   run,
   editing = false,
-  onSave,
+  onChange,
   empty,
   label = 'Dashboard widgets',
 }: {
@@ -100,8 +99,8 @@ export function DashboardGrid({
   run: CardRun
   /** Show the handles to move and resize slots. */
   editing?: boolean
-  /** Saves a new layout; resolves to whether it was saved. */
-  onSave?: (slots: DashboardSlot[]) => Promise<boolean>
+  /** Takes the layout after a drop. */
+  onChange?: (slots: DashboardSlot[]) => void
   /** More for an empty slot, e.g. "Add widget". */
   empty?: (slot: DashboardSlot) => ReactNode
   label?: string
@@ -109,9 +108,8 @@ export function DashboardGrid({
   const grid = useRef<HTMLUListElement>(null)
   const helpId = useId()
   const [drag, setDrag] = useState<Drag | null>(null)
-  const [saving, setSaving] = useState<DashboardSlot[] | null>(null)
   const [announcement, setAnnouncement] = useState('')
-  const base = saving ?? slots
+  const base = slots
   const shown = drag ? place(base, drag.name, drag.current) : base
   const boxes = new Map(shown.map((slot) => [slot.name, slotLayout(slot)]))
   // The order in the page, and so of the keyboard, is reading order of the layout as saved:
@@ -153,14 +151,9 @@ export function DashboardGrid({
 
   const finish = (current: Drag) => {
     setDrag(null)
-    if (!onSave || sameBox(current.start, current.current)) return
-    const next = place(base, current.name, current.current)
-    setSaving(next)
-    setAnnouncement(`${current.name}: saving the new layout.`)
-    void onSave(next).then((saved) => {
-      setSaving(null)
-      setAnnouncement(saved ? `${current.name}: layout saved.` : `${current.name}: the layout was not saved.`)
-    })
+    if (!onChange || sameBox(current.start, current.current)) return
+    onChange(place(base, current.name, current.current))
+    setAnnouncement(`${current.name}: moved. Done saves the layout.`)
   }
 
   // Escape puts a dragged slot back, wherever the focus is.
@@ -253,8 +246,8 @@ export function DashboardGrid({
               Too narrow to arrange: widen the window or close the agent panel to see the handles.
             </span>
             <span className="hidden @3xl:inline">
-              Drag a widget by its handle to move it, or by its corner to resize it; maps keep their shape. Each drop
-              saves a new version of the dashboard.
+              Drag a widget by its handle to move it, or by its corner to resize it; maps keep their shape. Done
+              saves all changes as one new version of the dashboard.
             </span>
           </p>
         )}
@@ -292,7 +285,7 @@ export function DashboardGrid({
                 )}
               >
                 <SlotContent slot={slot} widgets={widgets} run={run} empty={empty} />
-                {editing && onSave && (
+                {editing && onChange && (
                   <>
                     <Handle
                       label={`Move ${name}`}

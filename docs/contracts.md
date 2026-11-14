@@ -906,12 +906,15 @@ receives data from an agent; it asks the server for the output of its operator.
   gap 16 px, and a widget fills its cell. Dragging previews the layout; others in the way
   move down (never up or sideways). Maps keep their aspect ratio (the pixel ratio when the
   resize began; the width decides, or the height when only it changed). Minimums: value
-  2×2; table, line chart and map 3×3; empty 2×2. Escape during a drag puts it back. A drop
-  saves the full slot list with `PUT /dashboards/{id}/slots` and `expected_revision` (a
-  new version); the grid shows the new layout until answered; a 409 reads the dashboard
-  again and says so. Keyboard: Enter or Space on a handle picks the slot up, the arrows
-  move or resize by one cell, Enter or Space drops (saves), Escape or leaving the handle
-  puts it back; a live region says what happens.
+  2×2; table, line chart and map 3×3; empty 2×2. Escape during a drag puts it back. Drops
+  change only the page's draft layout ("unsaved layout changes" next to the version);
+  **Done** saves the draft once, as one new version, with `PUT /dashboards/{id}/slots` and
+  `expected_revision`; a 409 reads the dashboard again, says so, and keeps the draft and
+  the editing mode, so Done can be pressed again. An × discards the draft. While a draft
+  exists, leaving the page in the app asks first (`useBlocker`) and so does closing or
+  reloading the tab (`beforeunload`). Keyboard: Enter or Space on a handle picks the slot
+  up, the arrows move or resize by one cell, Enter or Space drops, Escape or leaving the
+  handle puts it back; a live region says what happens.
 - **Handles need the 12-column grid**, a container at least 48rem wide, and never show on
   an old version. The hint above the grid says how to drag; in a narrower grid (one
   column, including a laptop with the agent panel open) it says the grid is too narrow to

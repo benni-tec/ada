@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { Check, FileText, MessagesSquare, Move, Sparkles } from 'lucide-react'
+import { createFileRoute, Link, useBlocker, useNavigate } from '@tanstack/react-router'
+import { Check, FileText, MessagesSquare, Move, Sparkles, X } from 'lucide-react'
 import { useId, useMemo, useState, type ReactNode } from 'react'
 
 import { AlertBadges } from '@/components/alerts/alert-badges'
@@ -91,6 +91,15 @@ function DashboardPage() {
   const draft = useChatDraftState()
   const [panelOpen, setPanelOpen] = usePanelOpen()
   const [editing, setEditing] = useState(false)
+  // The layout being edited: moves and resizes change only this, Done saves it as one
+  // version. Null while nothing has changed.
+  const [layout, setLayout] = useState<DashboardSlot[] | null>(null)
+  // Unsaved changes: leaving in the app asks first, and so does closing or reloading the tab.
+  useBlocker({
+    shouldBlockFn: () => !window.confirm('The layout has unsaved changes. Leave without saving them?'),
+    disabled: layout === null,
+    enableBeforeUnload: layout !== null,
+  })
 
   // The range this viewer picked; until then, the dashboard's own.
   const [picked, setPicked] = useState<DashboardTimeRange | null>(null)
@@ -130,8 +139,17 @@ function DashboardPage() {
       .then(async (saved) => {
         if (saved) await navigate({ to: '.', search: {} })
       })
-  // A layout from a drag or a resize: a new version, on the revision last shown.
-  const saveLayout = (slots: DashboardSlot[]) => writes.write((latest) => editDashboard(latest, slots))
+  // Done: the edited layout becomes one new version, on the revision last shown. A
+  // conflict keeps the changes and stays in editing, so Done can be pressed again.
+  const finishEditing = async () => {
+    if (layout !== null && !(await writes.write((latest) => editDashboard(latest, layout)))) return
+    setLayout(null)
+    setEditing(false)
+  }
+  const discardLayout = () => {
+    setLayout(null)
+    setEditing(false)
+  }
   // "Add widget" puts the pipeline, this dashboard and the slot on the agent's message.
   const addWidget = (slot?: string) => (pipeline: Pipeline) => {
     draft.addChip(pipelineChip(pipeline, { id: dashboardId, name: record.name, slot }))
@@ -151,6 +169,7 @@ function DashboardPage() {
                   <p className="text-sm text-muted-foreground">
                     Showing {describeRange(range)}
                     {sameAsDefault ? ' (the dashboard’s default)' : ''} · version {shown?.number ?? 'none yet'}
+                    {layout !== null && !old && ' · unsaved layout changes'}
                   </p>
                   <AlertBadges dashboardId={dashboardId} />
                 </>
@@ -159,10 +178,21 @@ function DashboardPage() {
                 <>
                   <AddWidget projectId={projectId} variant="default" onPick={addWidget()} />
                   {!old && (shown?.slots.length ?? 0) > 0 && (
-                    <Button variant="outline" size="sm" aria-pressed={editing} onClick={() => setEditing((value) => !value)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-pressed={editing}
+                      disabled={writes.pending}
+                      onClick={() => (editing ? void finishEditing() : setEditing(true))}
+                    >
                       {editing ? <Check data-icon="inline-start" aria-hidden="true" /> : <Move data-icon="inline-start" aria-hidden="true" />}
-                      {editing ? 'Done' : 'Edit layout'}
+                      {!editing ? 'Edit layout' : writes.pending ? 'Saving…' : 'Done'}
                     </Button>
+                  )}
+                  {editing && layout !== null && (
+                    <IconButton label="Discard the layout changes" variant="outline" onClick={discardLayout}>
+                      <X />
+                    </IconButton>
                   )}
                   <Button asChild variant="outline" size="sm">
                     <Link to="/projects/$projectId/reports/new" params={{ projectId }} search={{ dashboard: dashboardId }}>
@@ -224,11 +254,11 @@ function DashboardPage() {
               <Loading what="the widgets" />
             ) : (
               <DashboardGrid
-                slots={shown?.slots ?? []}
+                slots={(!old && layout) || shown?.slots || []}
                 widgets={widgetsById}
                 run={{ id: run.data.id, frozen: false, what: 'The dashboard’s current run' }}
                 editing={editing && !old}
-                onSave={old ? undefined : saveLayout}
+                onChange={old ? undefined : setLayout}
                 empty={old ? undefined : (slot) => <AddWidget projectId={projectId} onPick={addWidget(slot.name)} />}
               />
             )}
