@@ -63,11 +63,26 @@ export function fetchWidget({ widgetId }: WidgetContext): Promise<Widget> {
 }
 
 /** The output of the widget's operator, with what its columns mean (`output`) and the
- * scenario and stale flags. */
-export function fetchData({ widgetId, runId }: WidgetContext, limit = 1000): Promise<WidgetData> {
+ * scenario and stale flags; with `input`, the output of the further operator it reads by
+ * that name. Further inputs are read with the run of the first answer. */
+export function fetchData({ widgetId, runId }: WidgetContext, limit = 1000, input?: string): Promise<WidgetData> {
   const query = new URLSearchParams({ limit: String(limit) })
   if (runId) query.set('run_id', runId)
+  if (input) query.set('input', input)
   return get(`/api/widgets/${encodeURIComponent(widgetId)}/data?${query}`)
+}
+
+/**
+ * Tells ADA how drawing went, so the agent that wrote the widget can see it: the error, or
+ * null when it drew. Only the custom widget reports, and only where there is REST (never
+ * in an MCP host). A failed report changes nothing on the page.
+ */
+export async function reportRender(widgetId: string, error: string | null): Promise<void> {
+  await fetch(`/api/widgets/${encodeURIComponent(widgetId)}/render`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ error }),
+  }).catch(() => undefined)
 }
 
 // MCP Apps
@@ -160,12 +175,25 @@ function connect(): Promise<HostBridge> {
   return bridge
 }
 
-/** In an MCP host: the widget from the create_widget result the host renders us for, and
- * its data through the get_widget_data tool. */
-export async function loadFromMcpHost(limit = 1000): Promise<{ widget: Widget; data: WidgetData }> {
+/** In an MCP host: the widget from the create_widget result the host renders us for, its
+ * address in ADA (`url`), and its data through the get_widget_data tool. */
+export async function loadFromMcpHost(limit = 1000): Promise<{ widget: Widget; data: WidgetData; url?: string }> {
   const connection = await connect()
   const created = structured(await withTimeout(connection.toolResult, 'The MCP host sent no tool result'), 'create_widget')
   const widget = created.widget as Widget
   const data = await connection.callTool('get_widget_data', { widget_id: widget.id, limit })
-  return { widget, data: data as WidgetData }
+  return { widget, data: data as WidgetData, url: typeof created.url === 'string' ? created.url : undefined }
+}
+
+/** In an MCP host: one input of the widget in a run, through the get_widget_data tool. */
+export async function readFromMcpHost(widgetId: string, runId: string, limit: number, input?: string): Promise<WidgetData> {
+  const connection = await connect()
+  const data = await connection.callTool('get_widget_data', { widget_id: widgetId, run_id: runId, limit, ...(input && { input }) })
+  return data as WidgetData
+}
+
+/** In an MCP host: asks the host to open an address, since the frame may open nothing itself. */
+export async function openFromMcpHost(url: string): Promise<void> {
+  const connection = await connect()
+  await connection.request('ui/open-link', { url })
 }

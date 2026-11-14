@@ -1,11 +1,12 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
+import { TooltipProvider } from '@/components/ui/tooltip'
 import type { Widget } from '@/lib/api'
 import { LiveContext } from '@/lib/live'
 import { ThemeContext } from '@/lib/theme-context'
 
-import { WidgetFrame } from './widget-card'
+import { WidgetCard, WidgetFrame } from './widget-card'
 
 const widget = { id: 'w1', type: 'map', title: 'Screening' } as Widget
 
@@ -47,4 +48,50 @@ test('a theme picked apart from the system’s goes to the frame, which cannot s
   // The same frame, its fragment changed: no reload.
   expect(screen.getByTitle('Widget: Screening')).toBe(element)
   expect(element.getAttribute('src')).toBe('http://localhost:5174/map.html#widget=w1&run=r1&theme=light')
+})
+
+test('a custom widget’s card says what went wrong drawing it, and warns with what the code review found', async () => {
+  const custom: Widget = {
+    id: 'w2',
+    project_id: 'p1',
+    operator_id: 'op_1',
+    type: 'custom',
+    title: 'Coverage against targets',
+    spec: { code: 'export default function render() {}' },
+    note: '',
+    inputs: {},
+    created_by: { kind: 'user', name: 'web' },
+    created_at: '2026-11-14T09:00:00Z',
+    render_error: 'data.main.rows[0].cases is undefined (line 4)',
+    verdict: {
+      kind: 'widget_code',
+      outcome: 'warn',
+      passed: true,
+      blocking: false,
+      findings: [{ message: 'A target is written into the code', excerpt: 'const target = 90', severity: 'warning' }],
+      model: 'anthropic/claude',
+      content_hash: 'h1',
+      checked_at: '2026-11-14T10:00:00Z',
+    },
+  }
+  const card = (shown: Widget) => (
+    <TooltipProvider>
+      <WidgetCard widget={shown} run={{ id: 'r1', frozen: true, what: 'report version 1.0.0' }} openable={false} actions={<></>} />
+    </TooltipProvider>
+  )
+  const { rerender } = render(card(custom))
+  const article = screen.getByRole('article', { name: 'Coverage against targets' })
+  expect(within(article).getByText('custom')).toBeInTheDocument()
+  expect(within(article).getByText('Not drawn: data.main.rows[0].cases is undefined (line 4)')).toBeInTheDocument()
+
+  const warning = within(article).getByRole('button', { name: 'The code review warns: 1 finding' })
+  act(() => warning.focus())
+  const tooltip = await screen.findByRole('tooltip')
+  expect(tooltip).toHaveTextContent('A target is written into the code')
+  expect(tooltip).toHaveTextContent('const target = 90')
+
+  // Drawn, and not reviewed: neither shows.
+  rerender(card({ ...custom, render_error: null, verdict: { ...custom.verdict!, outcome: 'unchecked', findings: [] } }))
+  expect(screen.queryByText(/Not drawn/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /code review/ })).not.toBeInTheDocument()
 })

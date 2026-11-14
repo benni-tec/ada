@@ -39,11 +39,20 @@ export type Widget = {
   title: string
   spec: Record<string, unknown>
   note: string
+  /** Further operators it reads by name, besides its own ("main"). */
+  inputs?: Record<string, string>
+  /** What went wrong the last time it was drawn, as its frame reported it; null when it drew. */
+  render_error?: string | null
 }
+
+/** The name of a widget's own operator among its inputs. */
+export const MAIN_INPUT = 'main'
 
 export type WidgetData = {
   widget_id: string
   run_id: string
+  /** Which of the widget's inputs this is ("main": its own operator). */
+  input?: string
   /** The operator's declared output: what the columns mean. */
   output: Schema
   columns: Column[]
