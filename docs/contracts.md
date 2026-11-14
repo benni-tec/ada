@@ -96,7 +96,8 @@ stand-in.
 | `system.py` | `Database`, `TaskQueue`, `SystemStatusService` |
 | `repositories.py` | All sixteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog` and `TurnProgress` (own connection, a short transaction per write) |
 | `analysis.py` | `AnalysisStore` (Parquet and DuckDB), `PipelineService`, `RunService`, `ExplorationService` (`Exploration`), `BatchService` (`Batches`) |
-| `sources.py` | `SourceReaders` (HTTP: URL and request sources), `SourceService`, `RefreshService` (`WaitingRefreshes`) |
+| `sources.py` | `SourceReaders` (HTTP: URL, request, document and web sources), `SourceService`, `RefreshService` (`WaitingRefreshes`) |
+| `web.py` | `WebExplorer` (`ContextDevWeb`, REST, ADA's key), `WebBudget` (`SqlWebBudget`: own connection, a short transaction per write), `WebExplorationService` (`WebExploration`) |
 | `workspace.py` | `ProjectService`, `SessionService`, `WidgetService` |
 | `background.py` | `EventBroadcaster` (Valkey pub/sub), `EventPublisher` (transactional, per request), `EventStream` (Valkey), `TaskDispatcher` (taskiq on Valkey) |
 | `dashboards.py` | `DashboardService` (`Dashboards`) |
@@ -259,6 +260,56 @@ gives the declared (empty) table.
   the data directory (`LocalFileStore`, `files/<project>/<sha256><suffix>`). The answer's
   `address` (`upload://<project>/<sha256>.pdf`) is a document source's address: read from
   the store instead of fetched, and its probe never changes.
+
+### Web sources
+
+A web source (`access_kind: "web"`, `format: "html"`; the format `html` belongs to web
+sources only, and they have no other) reads the web through Context.dev on ADA's key
+(`WebPageReader`, `adapters/sources/web.py`, over `ContextDevWeb`). `options.operation`
+(`WebOperation`) says what it asks for:
+
+| `options.operation` | Context.dev | Credits | Rows |
+| --- | --- | --- | --- |
+| `"scrape"` (default) | `POST /v1/web/scrape`, Markdown only | 1 | The page at the address, with the document columns and converters (`DOCUMENT_COLUMNS`, `markdown_pages`, `markdown_tables`): `extract: "pages"` (default) one row `page 1, text <markdown>`; `"tables"` the rows of its Markdown tables, `page, table, row, cells` |
+| `"crawl"` | `POST /v1/web/crawl`: `max_pages` (1–50, default 10), `max_depth`, `url_regex`, `exclude_url_regex` | 1 per page | `pages`: one row per crawled page in crawl order, `page` its number, `text` its URL on the first line, a blank line, then its Markdown (the document columns stay as they are); `tables`: the Markdown tables of all pages, `page` the crawled page's number |
+| `"answers"` | `POST /v1/web/answers`, mode `fast`: `task` (1–2000 characters) and `json_format`, an example object whose top level has one array of records | 10 | The records of that array, in the **declared** columns (required: an answers source has no fixed columns), each value converted to its column's type (`TRY_CAST`; one that does not convert is null), plus `sources json` (added at registration): the URLs the answer read or cites, on every row |
+
+- **Answers are model-extracted.** Their rows are what a model researched and wrote down,
+  not text read from a document: their provenance is the answer's `sources`, which a
+  widget or report on them should cite. Prefer a scrape or a document source of the
+  same page where one exists.
+- **Minimum freshness**, checked at registration and update: `freshness.kind` is `"ttl"`
+  or `"manual"` (no probe, no push), and a ttl is at least 1 day for scrape, 7 days for
+  crawl and 30 days for answers (`WEB_MINIMUM_TTL`). A forced refresh of a crawl or
+  answers source within that interval since its last successful fetch (the last check,
+  unless it failed, else the snapshot's `fetched_at`) is refused before anything is
+  fetched or recorded: `Invalid("<name> was fetched on … UTC; a web source with operation
+  \"crawl\" is fetched at most every 7 days, so it can be refreshed again from … UTC")`.
+  This holds for the refresh an edit queues too: an edited crawl or answers source shows
+  its new options only once the interval has passed.
+- A refresh whose rows did not change makes no snapshot (the content hash, as always).
+- **Credits.** Each fetch spends the project's daily credits (below) before it is sent:
+  1 for a scrape, `max_pages` for a crawl (what Context.dev did not charge, by its
+  `key_metadata.credits_consumed`, is given back afterwards), 10 for answers (corrected
+  likewise). Over the budget the refresh fails with `Invalid("The web budget of this
+  project (300 credits a day) does not leave the N this refresh of <name> needs today")`.
+- Readable failures, recorded as the source's `last_error` like a document's: no key
+  (`CONTEXT_DEV_API_KEY`), refused key, no credits, a page Context.dev could not read
+  (its message), a crawl that found no pages, an answer without exactly one array of
+  records are `Invalid`; Context.dev busy (408, 429, 5xx) or unreachable is `Unavailable`.
+- Every request is tagged `["ada", "project:<id>"]`, as the web tools' are.
+
+### The daily web budget
+
+Context.dev is used on ADA's account, so each project may spend at most
+`Settings.web_daily_credit_limit` credits a day (UTC; `WEB_DAILY_CREDIT_LIMIT`, default
+300), the web tools and web sources together. `WebBudget` counts them in `web_usage
+(project_id, day, credits)` (migration `0006`): `spend` checks and counts in one upsert,
+in a short transaction of its own (`SqlWebBudget`), so concurrent calls cannot overrun
+it and a call that was sent stays counted when its tool call or refresh fails and rolls
+back; `adjust` corrects a reservation afterwards. Nothing is counted for a call refused
+before it is sent (no key, bad arguments, over the budget). Prices: `web_search` 1 per
+10 results (rounded up), `web_read` 1, `web_map` 1; web sources as above.
 
 ### Periods and pushdown
 
@@ -797,6 +848,7 @@ model id (see The agent).
 | Dashboards | `create_dashboard`, `list_dashboards`, `get_dashboard`, `list_dashboard_versions`, `pin_widget` (its description says the dashboard gets a copy; optional `layout`), `edit_dashboard` (any widget of the project; one new to the dashboard is copied), `set_dashboard_time_range` (ISO dates), `show_dashboard_in_session` (the session's revision). They return `{dashboard, version, url}` |
 | Reports | `create_report`, `add_report_version`, `generate_report_from_dashboard`, `list_reports`, `get_report` (optional `version`), `create_template`, `list_templates`. They return `{report, version, versions, url}` |
 | Alerts | `create_alert_rule` (its description carries the formula format), `list_alert_rules`, `get_alert_rule`, `update_alert_rule` (a `clear` list empties the interval, maximum age or alert pipeline), `check_alert_rule` (`{rule, changed, firing}`), `list_alerts` (`{alert, rule_name, severity, dashboard_id, url}`) |
+| Web | `web_search`, `web_read`, `web_map` (below): exploration only |
 | System | `system_status` |
 
 Tools return ids and small previews, never whole datasets. A tool that produces a widget,
@@ -807,7 +859,8 @@ is temporary and to try again later.
 
 **Server instructions** (`INSTRUCTIONS` in `entrypoints/mcp/server.py`): batch first
 (`build_pipeline`, `edit_dashboard`), explore with `query_operator` and never show its
-rows, present only through widgets and reports.
+rows, search and read the web with the web tools and never show what they return (register
+the URL as a source instead), present only through widgets and reports.
 
 **`query_operator(operator_id, select, where?, group_by?, having?, order_by?, limit=100,
 run_id?, snapshot_id?)`** explores any operator, sources included. The fragments (a leading
@@ -819,6 +872,35 @@ or in a new run with no bindings and an open range. Nothing is stored. It return
 `{columns, rows, truncated, run_id, note}`; `note` always says the rows are for the
 agent's exploration only and must not be shown or quoted to the person, and so does the
 tool's description.
+
+**The web tools** (`entrypoints/mcp/tools/web.py`) proxy three of Context.dev's tools on
+ADA's own key, so neither an external client nor the in-platform agent needs a Context.dev
+account. Each takes a required `project_id` and `session_id` (the session must be in the
+project: `Invalid` otherwise) and goes through `WebExplorationService`
+(`core/services/exploration/web.py`) to the `WebExplorer` port (`core/ports/web.py`;
+`ContextDevWeb` in `adapters/web/context_dev.py`, REST at `https://api.context.dev/v1`,
+`Authorization: Bearer <key>`):
+
+| Tool | Context.dev | Forwarded | Returns |
+| --- | --- | --- | --- |
+| `web_search(query, num_results=10, include_domains?, exclude_domains?, country?, languages?)` | `POST /web/search` | those (`numResults` 1–20) | `{results: [{title, url, snippet}], note}` |
+| `web_read(url, max_chars=20000)` | `POST /web/scrape` | `url`, `formats: {markdown: true}` | `{url, title, markdown (cut to max_chars, at most 60000), truncated, note}` |
+| `web_map(domain, search?, max_links=50)` | `GET /web/urls` | `domain`, `search`, `maxLinks` (1–500) | `{links: [{url, title}], note}` |
+
+- Every request carries `tags: ["ada", "project:<id>"]`. Nothing else is forwarded: no
+  screenshots, browser actions, profiles, webhooks, policies, ZDR, batches, monitors,
+  logs or usage, people or company data (they act on ADA's account or are personal data).
+  The dearer operations (crawl, answers) exist only as web sources, with a long minimum
+  freshness (Sources: Web sources).
+- No key (`CONTEXT_DEV_API_KEY` or `CONTEXT_API_KEY`): a readable refusal, nothing
+  counted. Each call spends the project's daily credits (Sources: The daily web budget);
+  over it: `Invalid("The web budget of this project (300 credits a day) is used up for
+  today")`.
+- Every answer carries `note`, `EXPLORATION_NOTE`: "For your own exploration only. Do not
+  show or quote this to the person: to present web data, register its URL as a source
+  (register_source, access_kind \"web\" or \"document\") and build on it, so it can be
+  traced." The tools' descriptions and the server instructions say the same.
+- Their names start with `web`, the one exception to the verbs (`tests/test_api.py`).
 
 **`build_pipeline(project_id, steps, session_id?)`**: each step is
 `{ref?, note?, <kind>: {...}}` with exactly one kind: `register_source` (the fields of
@@ -1152,7 +1234,9 @@ not describe it.
   `query_operator`'s service, batches over MCP on PostgreSQL, the store, the pipelines
   list, roles and geography), `test_time` (periods and pushdown), `test_dashboards`,
   `test_reports`, `test_alerts` (the formula compiler first), `test_agent` (turns, the
-  in-process toolbox), `test_settings` and `test_settings_db` (the master key, the agent
+  in-process toolbox), `test_web` (the web tools over MCP, web sources, the credit
+  budget and the Context.dev client, all with a fake explorer or httpx's `MockTransport`),
+  `test_settings` and `test_settings_db` (the master key, the agent
   configuration service and routes, its repositories), `test_api` (the REST routes and MCP tools of the
   workspace, health, widget bundles, the composition root), `test_database` (migrations,
   transactions, concurrent writers, the SQL repositories' queries), `test_worker_events`
@@ -1349,6 +1433,8 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `WIDGETS_DIR` | The built widgets (default `services/widgets/dist` of the checkout; `/app/widgets` in the image) |
 | `ADA_SECRET_KEY` | The master key of the agent's API keys: a Fernet key, or several separated by commas (the first encrypts). Unset: no key can be stored. See The agent |
 | `ADA_SECRET_KEY_FILE` | A file holding the master key instead (Docker secrets); `ADA_SECRET_KEY` wins when both are set |
+| `CONTEXT_DEV_API_KEY` (or `CONTEXT_API_KEY`) | ADA's Context.dev key: the `context.dev` document engine, web sources and the web tools. Unset: those refuse readably |
+| `WEB_DAILY_CREDIT_LIMIT` | Context.dev credits each project may spend per day, web tools and web sources together (default 300) |
 
 There are no users and no authentication yet: whoever can reach the gateway can use the
 API and the MCP endpoint. Do not expose it publicly as it is.
