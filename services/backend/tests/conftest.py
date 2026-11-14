@@ -49,6 +49,9 @@ UNREACHABLE_HEALTH = {
     "queue": "unavailable",
     "worker": "unavailable",
     "analysis_store": "ok",
+    "web_search": False,
+    "page_reading": False,
+    "watching": False,
 }
 
 

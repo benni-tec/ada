@@ -1,17 +1,24 @@
 """The web tools against recorded Exa and Context.dev answers (tests/recordings/web.json)."""
 
 import json
+from uuid import uuid7
 
 import httpx
 import pytest
+from dishka import Provider, Scope, provide
 from pydantic import SecretStr
 
 from ada.adapters.sources.http import create_client
 from ada.adapters.web.context import ContextPages
 from ada.adapters.web.exa import DATA_DOMAINS, ExaSearch
+from ada.config import Settings
+from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.errors import Invalid, Unavailable
-from ada.core.models.web import SearchScope
-from fakes import WebReplay
+from ada.core.models.web import SearchHit, SearchScope
+from ada.core.ports.web import PageReader, WebSearch
+from ada.entrypoints.mcp.agent import InProcessToolbox
+from api_support import call, mcp_client
+from fakes import FakePageReader, FakeWebSearch, WebReplay
 
 pytestmark = pytest.mark.anyio
 KEY = SecretStr("test-key")
@@ -105,3 +112,73 @@ async def test_error_answers_never_quote_the_body() -> None:
         with pytest.raises(Unavailable, match="other than JSON"):
             await ContextPages(http, secret).unwatch("mon_1")
     assert "synthetic-secret-key" not in str(search.value) + str(scrape.value)
+
+
+class FakeWeb(Provider):
+    def __init__(self, search: FakeWebSearch, pages: FakePageReader) -> None:
+        super().__init__()
+        self.search, self.pages = search, pages
+
+    @provide(scope=Scope.APP)
+    def search_(self) -> WebSearch:
+        return self.search
+
+    @provide(scope=Scope.APP)
+    def pages_(self) -> PageReader:
+        return self.pages
+
+
+WEB_TOOLS = {"search_web", "read_page", "extract_table"}
+
+
+async def test_web_tools_are_listed_for_the_agent(unreachable_settings: Settings) -> None:
+    agent = Actor(kind=ActorKind.AGENT, name="gemini/flash")
+    async with mcp_client(unreachable_settings) as (_, seen):
+        async with InProcessToolbox(seen.container).connect(agent, uuid7()) as tools:
+            specs = {spec.name: spec for spec in tools.specs()}
+    assert WEB_TOOLS <= set(specs)
+    assert all("session_id" in specs[name].input_schema["properties"] for name in WEB_TOOLS)
+
+
+async def test_web_tools_use_the_ports(unreachable_settings: Settings) -> None:
+    hit = SearchHit(url="https://stat.fi/a", title="A", snippet="s")
+    search = FakeWebSearch(hits=[hit] * 3)
+    pages = FakePageReader(text="x" * 25_000, rows=[{"field": "n", "value": "1"}])
+    async with mcp_client(unreachable_settings, FakeWeb(search, pages)) as (client, _):
+        hits = await call(client, "search_web", query="survival", scope="news", limit=2)
+        page = await call(client, "read_page", url="https://stat.fi/a")
+        rows = await call(
+            client, "extract_table", url="https://stat.fi/a", instruction="t", columns=["field"]
+        )
+    assert [h["url"] for h in hits] == ["https://stat.fi/a"] * 2
+    assert search.searches == [("survival", SearchScope.NEWS, 2)]
+    assert page["text"].startswith("x" * 20_000)
+    assert "truncated" in page["text"][20_000:]
+    assert len(page["text"]) < 20_500
+    assert rows == [{"field": "n", "value": "1"}]
+    assert ("extract", ("https://stat.fi/a", "t", ("field",))) in pages.calls
+
+
+async def test_web_tools_without_keys_fail_with_the_setting_named(
+    unreachable_settings: Settings,
+) -> None:
+    async with mcp_client(unreachable_settings) as (client, _):
+        with pytest.raises(Exception, match="EXA_API_KEY is not set"):
+            await client.call_tool("search_web", {"query": "x"})
+        with pytest.raises(Exception, match="CONTEXT_API_KEY is not set"):
+            await client.call_tool("read_page", {"url": "https://example.com"})
+
+
+async def test_system_status_reports_web_configuration(unreachable_settings: Settings) -> None:
+    async def flags(settings: Settings) -> list[object]:
+        async with mcp_client(settings) as (client, _):
+            status = await call(client, "system_status")
+        return [status[k] for k in ("web_search", "page_reading", "watching")]
+
+    keyed = unreachable_settings.model_copy(
+        update={"exa_api_key": SecretStr("k"), "context_api_key": SecretStr("k")}
+    )
+    assert await flags(unreachable_settings) == [False, False, False]
+    assert await flags(keyed) == [True, True, False]
+    full = keyed.model_copy(update={"ada_public_url": "https://ada.example"})
+    assert await flags(full) == [True, True, True]
