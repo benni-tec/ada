@@ -158,6 +158,14 @@ sources"):
 | `core/services/ports/web.py` | `WebExplorationService.read(..., query=None, pdf_pages=None, ocr=False)`; `MAX_FOCUS_CHARS` (2,000) |
 | `adapters/web/scopes.py` | The scopes' domain lists (`DATA_DOMAINS`, `NEWS_DOMAINS`, `RESEARCH_DOMAINS`, `DOMAINS`), moved out of `exa.py` and shared by both engines |
 
+What cases as a data source added to them (see "Cases sources"; no port, table or
+migration changed):
+
+| Where | Change |
+| --- | --- |
+| `core/models/sources.py` | `AccessKind.CASES` (`"cases"`) |
+| `core/models/cases.py` | `CaseTable` (`cases`, `events`, `results`), `case_table(options)`, `case_type_address(address)`; the column rules shared by the registration and the reader: `CASE_TABLE_COLUMNS`, `CASE_TIME_COLUMN`, `field_columns(fields)`, `field_cells(fields, values)`, `result_column(kind, name)` |
+
 ## Adding a feature without touching shared files
 
 Four packages are scanned at startup. A feature adds a module; no list is edited.
@@ -183,7 +191,7 @@ stand-in.
 | `system.py` | `Database`, `TaskQueue`, `SystemStatusService`, `WebConfigured` (from `Settings`) |
 | `repositories.py` | All sixteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog`, `TurnProgress` and `ResearchCalls` (`SqlResearchCalls`) (own connection, a short transaction per write) |
 | `analysis.py` | `AnalysisStore` (Parquet and DuckDB), `PipelineService`, `RunService`, `ExplorationService` (`Exploration`), `BatchService` (`Batches`) |
-| `sources.py` | `SourceReaders` (HTTP: URL, request, document and web sources), `SourceService` (with the `WebExplorer` for monitors, the `SecretBox` for their secrets and `ADA_PUBLIC_URL`), `RefreshService` (`WaitingRefreshes`) |
+| `sources.py` | `SourceReaders` (HTTP: URL, request, document and web sources), `SourceService` (its readers with the cases reader beside them, on the request's repositories, and the `WebExplorer` for monitors, the `SecretBox` for their secrets and `ADA_PUBLIC_URL`), `RefreshService` (`WaitingRefreshes`) |
 | `web.py` | `WebSearch` (`ExaSearch` on ADA's Exa key when it is set, else `ContextDevSearch` on its Context.dev key, else an unconfigured `ExaSearch`), `WebExplorer` (`ContextDevWeb`, REST, ADA's Context.dev key), all on one HTTP client of their own; `WebBudget` (`SqlWebBudget`: own connection, a short transaction per write), `WebExplorationService` (`WebExploration`) |
 | `workspace.py` | `ProjectService`, `SessionService`, `WidgetService` |
 | `background.py` | `EventBroadcaster` (Valkey pub/sub), `EventPublisher` (transactional, per request), `EventStream` (Valkey), `TaskDispatcher` (taskiq on Valkey) |
@@ -445,6 +453,40 @@ the page changes instead of on a schedule. Freshness is either: a long ttl or a 
   snapshot.
 - Alerts need nothing new: a rule whose source got a newer snapshot is due (`due()`).
 - The secret never appears on `DataSource`, in a response, an event or a log.
+
+### Cases sources
+
+A cases source (`access_kind: "cases"`) makes one table of a case type an ordinary
+source: snapshots, lineage and freshness as for any other, so pipelines, widgets and
+dashboards read it. Its address is the case type's id (stored in one spelling), which must
+belong to the source's project; `options.table` (`CaseTable`) is `"cases"` (default),
+`"events"` or `"results"`, anything else is `Invalid`. It is read inside the platform, with
+no network, by `CaseSourceReader` (`adapters/sources/cases.py`) through `CaseRepository`,
+as Parquet in typed columns; `register` sets the format to `parquet` whatever was passed.
+
+| `options.table` | Rows | Columns | Time role |
+| --- | --- | --- | --- |
+| `cases` | One per case | `key, revision, created_at, updated_at`, then every field of the case type: an `enum_list` as its values joined with commas, a `day_map` one integer column per level named `<field>_<level>` (null where the step has not started) | `updated_at` |
+| `events` | One per step event | `key, field, step, days, recorded_at` | `recorded_at` |
+| `results` | One per result | `key, model_id, model, version, case_revision, trigger, created_at, summary, status` (`model` is its name), then each `Section.columns` entry prefixed by the model kind (`patient_pathway_days_behind`), the union over the rows, null where a result has none | `created_at` |
+
+- **Declared for you.** `register` derives the declared schema (`case_schema`,
+  `core/services/sources/cases.py`): the table's columns from the case type, and for
+  results from each model on it (`CaseModel.columns(version)`). Roles the caller declares
+  (a geo role on a county field, say) are kept, with the time role above unless they name
+  another; columns the caller declares are ignored. The reader writes the case type's
+  columns as they are now plus every declared column the data lacks (empty), so a field
+  added later appears as a column and the declared schema always fits.
+- **One table of one case type for good.** `update` refuses a new case type or table:
+  register another source.
+- **Push.** Without a freshness policy a cases source gets `push`. `CaseService.put_case`
+  and every stored result (an automatic run or `evaluate`) mark each `push` cases source
+  on the type stale: `refresh_source(id, force=True)` is queued after the commit, once per
+  source and unit of work, as the webhook of a watched page queues it. A `manual` or `ttl`
+  cases source is left to its policy. A cases source cannot be watched (no http address).
+- `DataSources` takes the `CaseRepository` and the `StatisticalModelRepository` (optional;
+  without them a cases source is `Invalid` to register), and the source provider puts the
+  cases reader beside the installed readers (`CaseSourceReaders`) per unit of work.
 
 ### The daily web budget
 
@@ -1052,7 +1094,13 @@ history, never overwritten, and never backfilled: a model added later has no res
 old cases until it is evaluated or the case is saved again. `CaseRepository`;
 `CaseService` (`create_type`, `update_type`, `get_type`, `list_types`, `put_case`,
 `get_case`, `list_cases`, `models`, `evaluate`, `open_cases`, `model_cases`). The open-case
-list orders by deadline status, never by survival. REST: `GET/POST
+list orders by deadline status, never by survival.
+
+A case type's cases, step events and results are also a data source (`register_source`,
+`access_kind: "cases"`, the case type's id as the address, `options.table`; see "Cases
+sources"), kept fresh by push: every save and every stored result queues a forced refresh
+of the type's push cases sources after the commit (`Cases` through `DataSourceRepository`,
+`TaskDispatcher` and `AfterCommit`). REST: `GET/POST
 /projects/{id}/case-types`, `GET/PATCH /case-types/{id}`, `GET /case-types/{id}/cases`,
 `GET /case-types/{id}/open-cases`, `GET/PUT /case-types/{id}/cases/{key}`, `GET
 /case-types/{id}/cases/{key}/models`, `POST /case-types/{id}/cases/{key}/evaluate`, `GET

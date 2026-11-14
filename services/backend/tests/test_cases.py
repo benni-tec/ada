@@ -10,10 +10,13 @@ from fastapi.testclient import TestClient
 
 from ada.adapters.memory.repositories import (
     MemoryCaseRepository,
+    MemoryDataSourceRepository,
     MemoryProjectRepository,
     MemoryStatisticalModelRepository,
     MemoryStore,
 )
+from ada.adapters.memory.tasks import RecordingTaskDispatcher
+from ada.adapters.transactions import PendingWork
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.cases import Field, FieldType, ResultTrigger
@@ -149,7 +152,16 @@ class World:
             None,
             FixedClock(),  # type: ignore[arg-type]
         )
-        self.cases = Cases(repo, models, FixedClock())
+        self.dispatcher = RecordingTaskDispatcher()
+        self.after_commit = PendingWork()
+        self.cases = Cases(
+            repo,
+            models,
+            FixedClock(),
+            MemoryDataSourceRepository(self.store),
+            self.dispatcher,
+            self.after_commit,
+        )
 
     async def pathway(self) -> tuple[Any, Any]:
         version = await self.models.create_pathway_model(self.project.id, ACTOR)
