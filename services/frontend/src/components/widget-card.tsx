@@ -1,6 +1,8 @@
+import { TriangleAlert } from 'lucide-react'
 import { useContext, type ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import type { Widget } from '@/lib/api'
 import { useLive } from '@/lib/live'
 import { useTheme } from '@/lib/theme-context'
@@ -9,13 +11,14 @@ import type { CardRun } from '@/lib/view-run'
 import { widgetSrc } from '@/lib/widgets'
 
 import { PinToDashboard } from './dashboards/pin-to-dashboard'
+import { Hint } from './icon-action'
 import { OpenWidgetLink } from './open-widget-link'
 import { PipelineAccess } from './pipeline/pipeline-access'
 import { Provenance } from './provenance'
 import { WidgetCardActions } from './widget-card-actions'
 
 // Starting heights per type; the frame can be resized by dragging its lower edge.
-const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 320, chart: 320, map: 420 }
+const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 320, chart: 320, map: 420, custom: 320 }
 
 function frameHeight(widget: Widget, tall?: boolean) {
   return (heights[widget.type] ?? 280) * (tall ? 1.75 : 1)
@@ -67,6 +70,38 @@ export function WidgetFrame({
         className="block h-full w-full border-0"
       />
     </div>
+  )
+}
+
+/**
+ * What a judge found in a custom widget's code, as a warning icon whose tooltip lists the
+ * findings. Only a review that warned or failed shows; one that passed, or was not made
+ * (unchecked), shows nothing.
+ */
+function VerdictWarning({ verdict }: { verdict: Widget['verdict'] }) {
+  if (verdict?.outcome !== 'warn' && verdict?.outcome !== 'fail') return null
+  const count = verdict.findings.length
+  const label = `The code review ${verdict.outcome === 'fail' ? 'failed' : 'warns'}: ${count} ${count === 1 ? 'finding' : 'findings'}`
+  return (
+    <Hint
+      label={
+        <div className="flex flex-col gap-1">
+          <span className="font-medium">{label}</span>
+          <ul className="flex list-disc flex-col gap-1 pl-4">
+            {verdict.findings.map((finding, index) => (
+              <li key={index}>
+                {finding.message}
+                {finding.excerpt && <code className="mt-0.5 block font-mono break-all opacity-80">{finding.excerpt}</code>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      }
+    >
+      <Button type="button" variant="ghost" size="icon-sm" aria-label={label} className="text-amber-600 dark:text-amber-400">
+        <TriangleAlert />
+      </Button>
+    </Hint>
   )
 }
 
@@ -151,9 +186,16 @@ export function WidgetCard({
       ) : (
         <WidgetFrame widget={widget} runId={run.id} tall={tall} fill={fill} reloadOnData={false} />
       )}
+      {/* What went wrong the last time it was drawn, as its frame reported it. */}
+      {widget.render_error && (
+        <p className="shrink-0 truncate border-t px-4 py-1 text-xs text-destructive" title={widget.render_error}>
+          Not drawn: {widget.render_error}
+        </p>
+      )}
       {/* One line; an action's own rows (a chooser, an outcome) wrap below it. */}
       <footer className="flex shrink-0 flex-wrap items-center gap-x-1 border-t px-2 py-1">
         <PipelineAccess widget={widget} run={run} />
+        <VerdictWarning verdict={widget.verdict} />
         {openable && <OpenWidgetLink widget={widget} run={run} />}
         {icons}
       </footer>

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Modal } from '@/components/modal'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   keys,
   lineageQuery,
@@ -22,6 +23,7 @@ import { kindLabels, shortName, type SourceInfo } from './labels'
 import { OperatorDetails } from './operator-details'
 import { PipelineGraph } from './pipeline-graph'
 import { PREVIEW_ROWS, RowsPreview } from './rows-preview'
+import { WidgetCode } from './widget-code'
 
 /**
  * Where each source operator's data comes from: as the report version recorded it when
@@ -86,22 +88,39 @@ function RunLine({ run }: { run: CardRun }) {
   )
 }
 
-/** The pipeline dialog. The pipeline is read when it opens. */
+/** The pipeline dialog. The pipeline is read when it opens. A custom widget's dialog has a
+ * second tab with its code. */
 function PipelineDialog({ widget, run, onClose }: { widget: Widget; run: CardRun; onClose: () => void }) {
   const lineage = useQuery(lineageQuery(widget.operator_id))
   const sourceOf = useSourceOf(widget.project_id, run.sources)
+  const pipeline = lineage.isPending ? (
+    <div className="p-4">
+      <Loading what="the pipeline" />
+    </div>
+  ) : lineage.error ? (
+    <div className="p-4">
+      <ErrorNotice error={lineage.error} prefix="The pipeline cannot be loaded:" />
+    </div>
+  ) : (
+    <PipelineView widget={widget} run={run} operators={lineage.data} sourceOf={sourceOf} />
+  )
   return (
     <Modal title={`Pipeline of “${widget.title || 'Untitled widget'}”`} description={<RunLine run={run} />} onClose={onClose}>
-      {lineage.isPending ? (
-        <div className="p-4">
-          <Loading what="the pipeline" />
-        </div>
-      ) : lineage.error ? (
-        <div className="p-4">
-          <ErrorNotice error={lineage.error} prefix="The pipeline cannot be loaded:" />
-        </div>
+      {widget.type === 'custom' ? (
+        <Tabs defaultValue="pipeline" className="h-full min-h-0 gap-0">
+          <TabsList variant="line" className="mx-3 my-1">
+            <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+            <TabsTrigger value="code">Code</TabsTrigger>
+          </TabsList>
+          <TabsContent value="pipeline" className="min-h-0 border-t">
+            {pipeline}
+          </TabsContent>
+          <TabsContent value="code" className="min-h-0 overflow-y-auto border-t">
+            <WidgetCode widget={widget} sourceOf={sourceOf} />
+          </TabsContent>
+        </Tabs>
       ) : (
-        <PipelineView widget={widget} run={run} operators={lineage.data} sourceOf={sourceOf} />
+        pipeline
       )}
     </Modal>
   )

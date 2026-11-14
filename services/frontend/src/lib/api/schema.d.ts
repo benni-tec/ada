@@ -1630,6 +1630,19 @@ export interface components {
          * @enum {string}
          */
         EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report";
+        /** Finding */
+        Finding: {
+            /** Excerpt */
+            excerpt: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default error
+             * @enum {string}
+             */
+            severity: "error" | "warning";
+        };
         /**
          * FoundBy
          * @description How an agent came upon a source: the web search and its scope.
@@ -1776,6 +1789,11 @@ export interface components {
         JsonObject: {
             [key: string]: unknown;
         };
+        /**
+         * JudgeKind
+         * @enum {string}
+         */
+        JudgeKind: "text_widget" | "widget_code";
         /** Liveness */
         Liveness: {
             /**
@@ -2100,6 +2118,11 @@ export interface components {
          * @enum {string}
          */
         OperatorKind: "source" | "extract" | "input" | "transform" | "statistic" | "agent";
+        /**
+         * Outcome
+         * @enum {string}
+         */
+        Outcome: "pass" | "warn" | "fail" | "unchecked";
         /**
          * OutputKind
          * @enum {string}
@@ -2743,6 +2766,31 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** Verdict */
+        Verdict: {
+            /** Blocking */
+            blocking: boolean;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Findings
+             * @default []
+             */
+            findings: components["schemas"]["Finding"][];
+            kind: components["schemas"]["JudgeKind"];
+            /** Model */
+            model?: string | null;
+            outcome: components["schemas"]["Outcome"];
+            /** Passed */
+            passed: boolean;
+            /** Reason */
+            reason?: string | null;
+        };
         /**
          * VersionBump
          * @enum {string}
@@ -2805,6 +2853,7 @@ export interface components {
             title: string;
             /** Type */
             type: string;
+            verdict?: components["schemas"]["Verdict"] | null;
         };
         /**
          * WidgetChange

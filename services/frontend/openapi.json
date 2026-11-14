@@ -914,6 +914,33 @@
         "title": "EntryKind",
         "type": "string"
       },
+      "Finding": {
+        "properties": {
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "default": "error",
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "excerpt"
+        ],
+        "title": "Finding",
+        "type": "object"
+      },
       "FoundBy": {
         "description": "How an agent came upon a source: the web search and its scope.",
         "properties": {
@@ -1179,6 +1206,14 @@
       "JsonObject": {
         "additionalProperties": true,
         "type": "object"
+      },
+      "JudgeKind": {
+        "enum": [
+          "text_widget",
+          "widget_code"
+        ],
+        "title": "JudgeKind",
+        "type": "string"
       },
       "Liveness": {
         "properties": {
@@ -2150,6 +2185,16 @@
           "agent"
         ],
         "title": "OperatorKind",
+        "type": "string"
+      },
+      "Outcome": {
+        "enum": [
+          "pass",
+          "warn",
+          "fail",
+          "unchecked"
+        ],
+        "title": "Outcome",
         "type": "string"
       },
       "OutputKind": {
@@ -3784,6 +3829,73 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "Verdict": {
+        "properties": {
+          "blocking": {
+            "title": "Blocking",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "findings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/JudgeKind"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "kind",
+          "outcome",
+          "passed",
+          "blocking",
+          "content_hash",
+          "checked_at"
+        ],
+        "title": "Verdict",
+        "type": "object"
+      },
       "VersionBump": {
         "enum": [
           "major",
@@ -3897,6 +4009,16 @@
           "type": {
             "title": "Type",
             "type": "string"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

@@ -32,6 +32,11 @@
   --seq-5: #184f95;
   /* A region without a value: neutral, outside the ramp. */
   --map-missing: #e5e4e0;
+  /* Meanings a custom widget's code gets as ada.colors, from the palette of the theme. */
+  --accent: var(--series-1);
+  --positive: var(--series-6);
+  --negative: var(--error);
+  --warning: var(--series-4);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 14px;
   color: var(--text-primary);
@@ -404,4 +409,19 @@ body,
 /* The same hatching as suppressed regions on the map. */
 .ada-swatch-suppressed {
   background: repeating-linear-gradient(45deg, var(--map-missing) 0 3px, var(--text-muted) 3px 4px);
+}
+
+/* custom: the sandboxed frame that runs the code fills the body. */
+
+.ada-custom {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  display: block;
+  background: transparent;
+}
+
+.ada-custom[hidden] {
+  display: none;
 }

@@ -3,10 +3,46 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
 import react from '@vitejs/plugin-react'
-import { defineConfig, type Plugin } from 'vite'
+import { build, defineConfig, type Plugin } from 'vite'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 
 const widgetsDir = fileURLToPath(new URL('./src/widgets', import.meta.url))
+const srcDir = fileURLToPath(new URL('./src', import.meta.url))
+
+/**
+ * `import code from './entry.ts?script'`: the entry and everything it imports bundled into
+ * one classic script, as a string. The custom widget writes these into the document of
+ * the sandboxed frame that runs its code, which may load nothing (frame.ts).
+ *
+ * The string is safe inside <script>: "</script" and "<!--" are written as "\x3C/script"
+ * and "\x3C!--", as vite-plugin-singlefile does. Tests get an empty script; they run the
+ * frame's code directly.
+ */
+function inlineScripts(): Plugin {
+  return {
+    name: 'ada-inline-scripts',
+    async load(id) {
+      const [file, query] = id.split('?')
+      if (query !== 'script') return null
+      if (process.env.VITEST) return 'export default ""'
+      const output = await build({
+        configFile: false,
+        logLevel: 'warn',
+        resolve: { alias: { '@': srcDir } },
+        define: { 'process.env.NODE_ENV': '"production"' },
+        build: {
+          write: false,
+          lib: { entry: file, formats: ['iife'], name: 'adaScript' },
+          minify: true,
+        },
+      })
+      const [result] = Array.isArray(output) ? output : [output]
+      if (!('output' in result)) throw new Error(`${file} did not build`)
+      const code = result.output[0].code.replace(/<(\/script|!--)/gi, '\\x3C$1')
+      return `export default ${JSON.stringify(code)}`
+    },
+  }
+}
 
 /**
  * Development serves every widget at once, at the same address as the built file:
@@ -46,7 +82,7 @@ export default defineConfig(({ command }) => ({
   root: command === 'build' && widget ? `${widgetsDir}/${widget}` : widgetsDir,
   // Scripts and styles are inlined: a widget is one HTML file, served as a ui:// resource
   // and rendered in a sandboxed iframe that may load nothing else.
-  plugins: [react(), viteSingleFile(), everyWidget()],
+  plugins: [react(), viteSingleFile(), everyWidget(), inlineScripts()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

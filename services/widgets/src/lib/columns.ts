@@ -149,3 +149,30 @@ export function formatPeriod(start: unknown, end: unknown): string | null {
   }
   return start === end ? start : `${start} – ${end}`
 }
+
+export type DateGrain = 'day' | 'month' | 'quarter' | 'year'
+
+/** A date as the platform writes it: ISO, to the grain asked for ("2024-03-01",
+ * "2024-03", "2024 Q1", "2024"). Without a grain a timestamp keeps its time of day
+ * ("2024-03-01 14:30"). Text that is not a date stays as it is. */
+export function formatDate(value: unknown, grain?: DateGrain): string {
+  if (value === null || value === undefined || value === '') return '–'
+  const text = String(value)
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(text)
+  if (!match) return text
+  const [, year, month, day, hour, minute] = match
+  switch (grain) {
+    case 'year':
+      return year
+    case 'quarter':
+      return `${year} Q${Math.floor((Number(month) - 1) / 3) + 1}`
+    case 'month':
+      return `${year}-${month}`
+    case 'day':
+      return `${year}-${month}-${day}`
+    default:
+      return hour !== undefined && `${hour}:${minute}` !== '00:00'
+        ? `${year}-${month}-${day} ${hour}:${minute}`
+        : `${year}-${month}-${day}`
+  }
+}
