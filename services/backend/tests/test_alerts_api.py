@@ -209,7 +209,7 @@ async def test_the_alert_tools_are_served_and_documented(mcp: Client) -> None:
         "list_alert_rules",
         "get_alert_rule",
         "update_alert_rule",
-        "refresh_alerts",
+        "check_alert_rule",
         "list_alerts",
     }
     assert names <= set(tools)
@@ -248,7 +248,7 @@ async def test_an_agent_creates_checks_and_reads_alerts(mcp: Client, mcp_world: 
     assert await call(mcp, "list_alert_rules", dashboard_id=str(setup.dashboard.id)) == [rule]
     assert await call(mcp, "get_alert_rule", rule_id=rule["id"]) == rule
 
-    checked = await call(mcp, "refresh_alerts", rule_id=rule["id"])
+    checked = await call(mcp, "check_alert_rule", rule_id=rule["id"])
     (alert,) = checked["changed"]
     assert alert["key"] == {"region": "north"}
     assert checked["firing"] == [alert]
@@ -263,7 +263,7 @@ async def test_an_agent_creates_checks_and_reads_alerts(mcp: Client, mcp_world: 
         mcp, "update_alert_rule", rule_id=rule["id"], expected_revision=1, formula=below(50)
     )
     assert updated["revision"] == 2
-    checked = await call(mcp, "refresh_alerts", rule_id=rule["id"])
+    checked = await call(mcp, "check_alert_rule", rule_id=rule["id"])
     assert [(a["key"], a["state"]) for a in checked["changed"]] == [
         ({"region": "north"}, "resolved")
     ]

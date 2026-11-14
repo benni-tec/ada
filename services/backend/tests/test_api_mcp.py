@@ -107,7 +107,8 @@ async def test_every_wave_1_tool_is_served(client: Client) -> None:
 
 
 async def test_tool_names_are_snake_case_verbs(client: Client) -> None:
-    verbs = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
+    wave_1 = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
+    verbs = wave_1 | {"pin", "edit", "set", "show", "generate", "check"}
     for tool in await client.list_tools():
         assert tool.name == tool.name.lower()
         assert tool.name.split("_")[0] in verbs

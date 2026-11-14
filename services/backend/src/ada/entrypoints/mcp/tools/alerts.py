@@ -126,7 +126,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         read it again. Fields left out stay as they are. The measure and key columns
         cannot change: create a new rule for that.
 
-        Alerts follow the new formula from the next check; call refresh_alerts to check
+        Alerts follow the new formula from the next check; call check_alert_rule to check
         now. Returns the rule with its new revision."""
         return await service.update_rule(
             rule_id,
@@ -140,7 +140,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
     @mcp.tool
     @inject
-    async def refresh_alerts(rule_id: Id, service: FromDishka[AlertService]) -> RuleCheck:
+    async def check_alert_rule(rule_id: Id, service: FromDishka[AlertService]) -> RuleCheck:
         """Check an alert rule now instead of waiting for its interval: start a new run of
         its measure, evaluate the formula, and open, keep or resolve one alert per key.
         Sources older than the rule's maximum data age are fetched again first. Returns
@@ -198,6 +198,6 @@ def _create_description() -> str:
         "older source data before a check. `alert_pipeline_id` names a pipeline with one "
         "input slot that runs on the alerting rows whenever a new alert fires.\n\n"
         "A formula that does not fit the measure's columns fails with a message naming the "
-        "node at fault. Returns the rule; call refresh_alerts to check it at once.\n"
+        "node at fault. Returns the rule; call check_alert_rule to check it at once.\n"
         + FORMULA_FORMAT
     )
