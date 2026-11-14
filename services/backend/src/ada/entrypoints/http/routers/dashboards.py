@@ -2,14 +2,16 @@ from collections.abc import Sequence
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 
 from ada.core.models.base import DomainModel, Id
 from ada.core.models.dashboards import Dashboard, DashboardVersion, Slot
 from ada.core.models.runs import Run
+from ada.core.models.sessions import Session
 from ada.core.models.time import TimeRange
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.runs import RunService
+from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.http.actor import WEB
 from ada.entrypoints.http.requests import Request
 
@@ -97,8 +99,8 @@ async def edit_dashboard(
 async def pin_widget(
     dashboard_id: Id, body: Pin, service: FromDishka[DashboardService]
 ) -> DashboardView:
-    """Put a widget in a slot, adding the slot when there is none of that name. Adds a
-    version."""
+    """Put a copy of a widget in a slot, adding the slot when there is none of that name.
+    The copy's `copied_from` names the original. Adds a version."""
     await service.pin_widget(dashboard_id, body.widget_id, body.slot, body.expected_revision, WEB)
     return await _view(service, dashboard_id)
 
@@ -128,3 +130,17 @@ async def start_dashboard_run(
     dashboard = await dashboards.get(dashboard_id)
     time_range = body.time_range if body and body.time_range else dashboard.default_time_range
     return await runs.start(dashboard.project_id, WEB, time_range)
+
+
+@router.post(
+    "/dashboards/{dashboard_id}/agent-session",
+    responses={status.HTTP_201_CREATED: {"model": Session, "description": "Created"}},
+)
+async def dashboard_agent_session(
+    dashboard_id: Id, response: Response, service: FromDishka[SessionService]
+) -> Session:
+    """The session behind the dashboard's agent panel: the newest one that started from
+    the dashboard and shows it, else a new one (201)."""
+    session, created = await service.dashboard_agent_session(dashboard_id)
+    response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+    return session

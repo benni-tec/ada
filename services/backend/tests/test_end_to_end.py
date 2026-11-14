@@ -370,7 +370,9 @@ async def test_an_agent_maps_a_measure_and_follows_it_with_a_report_and_alerts(
         slot="Participation by county",
         expected_revision=dashboard["revision"],
     )
-    assert [slot["widget_id"] for slot in pinned["version"]["slots"]] == [widget["id"]]
+    # The dashboard shows its own copy of the session's map, on the same pipeline.
+    [pinned_id] = [slot["widget_id"] for slot in pinned["version"]["slots"]]
+    assert pinned_id != widget["id"]
 
     # The dashboard's run, as POST /dashboards/{id}/runs starts it: the range is pushed
     # down to Sotkanet, which is asked for exactly those two years.
@@ -405,7 +407,7 @@ async def test_an_agent_maps_a_measure_and_follows_it_with_a_report_and_alerts(
     sotkanet = listed[SOTKANET_BREAST_SCREENING.name]
     assert sotkanet["fetched_at"] is not None
     assert sotkanet["address"] == SOTKANET_BREAST_SCREENING.address
-    assert sotkanet["widget_ids"] == [widget["id"]]
+    assert sotkanet["widget_ids"] == [pinned_id]
     # The stored periods are fresh: freezing the version fetched nothing more.
     assert years_asked(stack.outside) == [["2023", "2024"]]
 

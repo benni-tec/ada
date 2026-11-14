@@ -8,6 +8,7 @@ from pydantic import Field
 
 from ada.core.models.base import Id
 from ada.core.models.operators import Operator, OperatorId
+from ada.core.models.pipelines import Pipeline
 from ada.core.models.schema import Roles, Schema
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
@@ -87,3 +88,13 @@ async def get_lineage(
 ) -> Sequence[Operator]:
     """The operator and everything upstream of it, inputs first."""
     return await service.lineage(operator_id)
+
+
+@router.get("/projects/{project_id}/pipelines")
+async def list_pipelines(
+    project_id: Id, projects: FromDishka[ProjectService], service: FromDishka[PipelineService]
+) -> Sequence[Pipeline]:
+    """The project's pipelines: operators no other operator uses as an input, newest
+    first, with a readable name and the data sources each reads."""
+    await projects.get(project_id)
+    return await service.pipelines(project_id)

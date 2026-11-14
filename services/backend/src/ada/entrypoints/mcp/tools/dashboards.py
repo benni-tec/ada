@@ -92,9 +92,11 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         expected_revision: int,
         service: FromDishka[DashboardService],
     ) -> DashboardState:
-        """Show a widget, e.g. one you made in a session, on a dashboard. The widget is
-        referenced, not copied: it keeps reading its own pipeline, so make sure that
-        pipeline's sources have freshness policies, or the dashboard will not stay current.
+        """Show a widget, e.g. one you made in a session, on a dashboard. The dashboard gets
+        its own copy of the widget (same operator, type, spec, title and note), so either
+        can be changed later without the other; the copy names the original in
+        `copied_from`. It reads the same pipeline, so make sure that pipeline's sources
+        have freshness policies, or the dashboard will not stay current.
 
         `slot` names the place on the dashboard. A slot that exists changes its widget and
         keeps its position; a new name adds a slot after the others. Both must be in the

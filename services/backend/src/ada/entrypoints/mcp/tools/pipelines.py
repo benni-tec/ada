@@ -8,6 +8,7 @@ from pydantic import Field
 from ada.core.models.analysis import Rows
 from ada.core.models.base import DomainModel, Id
 from ada.core.models.operators import Operator, OperatorId
+from ada.core.models.pipelines import Pipeline
 from ada.core.models.schema import Roles
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
@@ -89,6 +90,20 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         if session_id is not None:
             await sessions.record_operator(session_id, operator.id, note, actor)
         return operator
+
+    @mcp.tool
+    @inject
+    async def list_pipelines(
+        project_id: Id,
+        projects: FromDishka[ProjectService],
+        pipelines: FromDishka[PipelineService],
+    ) -> Sequence[Pipeline]:
+        """List a project's pipelines: the operators nothing else builds on yet, newest
+        first, each with a readable name, its kind, the data sources it reads and its
+        output columns. Look here before building: extend or show an existing pipeline
+        rather than reading the same source again."""
+        await projects.get(project_id)
+        return await pipelines.pipelines(project_id)
 
     @mcp.tool
     @inject

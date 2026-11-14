@@ -12,6 +12,7 @@ from ada.core.models.operators import (
     TransformParams,
     operator_identity,
 )
+from ada.core.models.pipelines import Pipeline
 from ada.core.models.schema import OutputKind, Roles, Schema
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.repositories import (
@@ -20,6 +21,7 @@ from ada.core.ports.repositories import (
     SnapshotRepository,
 )
 from ada.core.ports.system import Clock
+from ada.core.services.pipelines import listing
 from ada.core.services.pipelines.fusion import QueryNode, compose
 from ada.core.services.pipelines.schemas import (
     Columns,
@@ -150,6 +152,11 @@ class Pipelines(PipelineService):
 
     async def lineage(self, id: OperatorId) -> Sequence[Operator]:
         return await self.operators.upstream(id)
+
+    async def pipelines(self, project_id: Id) -> Sequence[Pipeline]:
+        operators = await self.operators.list(project_id)
+        names = {source.id: source.name for source in await self.data_sources.list(project_id)}
+        return listing.pipelines(operators, names)
 
     async def _find(self, id: OperatorId) -> Operator | None:
         try:

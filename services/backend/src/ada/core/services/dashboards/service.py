@@ -4,9 +4,10 @@ from uuid import uuid7
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.dashboards import Dashboard, DashboardVersion, Slot
-from ada.core.models.errors import Invalid
+from ada.core.models.errors import Conflict, Invalid
 from ada.core.models.events import Event, EventType
 from ada.core.models.time import TimeRange
+from ada.core.models.widgets import Widget
 from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import (
     DashboardRepository,
@@ -77,17 +78,52 @@ class Dashboards(DashboardService):
     ) -> DashboardVersion:
         dashboard = await self.dashboards.get(id)
         name = _slot_name(slot)
+        # Checked before anything is written, so a stale caller adds no copy either.
+        if dashboard.revision != expected_revision:
+            raise Conflict("dashboard", id, expected_revision, dashboard.revision)
+        original = await self.widgets.get(widget_id)
+        if original.project_id != dashboard.project_id:
+            raise Invalid("The widget belongs to another project than the dashboard")
+        copy = await self._copy(original, actor)
         current = await self.current(id)
         slots = list(current.slots) if current else []
         for index, existing in enumerate(slots):
             if existing.name == name:
                 # A pinned slot keeps its place; only what it shows changes.
-                slots[index] = existing.model_copy(update={"widget_id": widget_id})
+                slots[index] = existing.model_copy(update={"widget_id": copy.id})
                 break
         else:
-            slots.append(Slot(name=name, widget_id=widget_id))
+            slots.append(Slot(name=name, widget_id=copy.id))
         placed = await self._placed(dashboard, slots)
         return await self._add_version(dashboard, placed, expected_revision, actor)
+
+    async def _copy(self, original: Widget, actor: Actor) -> Widget:
+        """The dashboard's own copy of a widget, so it can be changed without changing the
+        session it came from. It points at the original, the widget made in a session:
+        pinning a copy again copies that original's pointer, so one step always leads back
+        to the session."""
+        copy = Widget(
+            id=uuid7(),
+            project_id=original.project_id,
+            operator_id=original.operator_id,
+            type=original.type,
+            title=original.title,
+            spec=original.spec,
+            note=original.note,
+            created_by=actor,
+            created_at=self.clock.now(),
+            copied_from=original.copied_from or original.id,
+        )
+        await self.widgets.add(copy)
+        await self.events.publish(
+            Event(
+                type=EventType.WIDGET_CREATED,
+                project_id=copy.project_id,
+                payload={"widget_id": str(copy.id)},
+                at=self.clock.now(),
+            )
+        )
+        return copy
 
     async def set_default_time_range(
         self, id: Id, time_range: TimeRange, expected_revision: int

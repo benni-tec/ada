@@ -4,6 +4,7 @@ from typing import Protocol
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.operators import Operator, OperatorId
+from ada.core.models.pipelines import Pipeline
 from ada.core.models.schema import Roles, Schema
 
 
@@ -42,4 +43,9 @@ class PipelineService(Protocol):
 
     async def lineage(self, id: OperatorId) -> Sequence[Operator]:
         """The operator's pipeline: itself and everything upstream, inputs first."""
+        ...
+
+    async def pipelines(self, project_id: Id) -> Sequence[Pipeline]:
+        """The project's pipelines: operators that no other operator uses as an input,
+        newest first, each with a readable name and the data sources it reads."""
         ...
