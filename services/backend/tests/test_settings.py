@@ -158,6 +158,26 @@ async def test_the_session_agent_is_set_and_cleared_with_its_provider() -> None:
 
 
 @pytest.mark.anyio
+async def test_a_deleted_model_is_not_selected_again_when_added_back() -> None:
+    store = MemoryStore()
+    settings = service(store)
+    provider = await settings.add_provider("gemini", ProviderKind.GEMINI, api_key=API_KEY)
+    model = await settings.add_model(provider.id, "flash")
+    repository = MemoryAgentSettingsRepository(store)
+    chosen = await repository.get()
+    await repository.update(
+        chosen.model_copy(update={"session_agent": model.id, "research_agent": model.id}),
+        chosen.revision,
+    )
+
+    await settings.delete_model(model.id)
+    await settings.add_model(provider.id, "flash")
+
+    after = await repository.get()
+    assert (after.session_agent, after.research_agent) == (None, None)
+
+
+@pytest.mark.anyio
 async def test_a_cleared_provider_renames_its_models_and_the_session_agent() -> None:
     settings = service(MemoryStore())
     provider = await settings.add_provider("gemini", ProviderKind.GEMINI, api_key=API_KEY)

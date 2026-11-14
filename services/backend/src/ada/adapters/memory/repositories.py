@@ -85,6 +85,14 @@ class MemoryStore:
         # Source id -> the sealed secret of its monitor.
         self.monitor_secrets: dict[Id, str] = {}
 
+    def forget_model(self, key: tuple[Id, str]) -> None:
+        """Remove a model and clear the selections naming it, as ON DELETE SET NULL does."""
+        del self.llm_models[key]
+        if self.session_agent == key:
+            self.session_agent = None
+        if self.research_agent == key:
+            self.research_agent = None
+
 
 def _get[K, M](records: dict[K, M], kind: str, id: K) -> M:
     try:
@@ -143,6 +151,9 @@ class MemoryDataSourceRepository(DataSourceRepository):
         self.store.data_sources[source.id] = source
 
     async def update(self, source: DataSource, expected_revision: int) -> DataSource:
+        # The monitor is written by set_monitor, outside the revision: an edit keeps it.
+        current = _get(self.store.data_sources, "data source", source.id)
+        source = source.model_copy(update={"monitor_id": current.monitor_id})
         return _update(self.store.data_sources, "data source", source, expected_revision)
 
     async def record_check(
@@ -560,7 +571,7 @@ class MemoryLlmProviderRepository(LlmProviderRepository):
         del self.store.llm_providers[id]
         self.store.llm_api_keys.pop(id, None)
         for key in [key for key in self.store.llm_models if key[0] == id]:
-            del self.store.llm_models[key]
+            self.store.forget_model(key)
 
     async def api_key(self, id: Id) -> str | None:
         _get(self.store.llm_providers, "llm provider", id)
@@ -601,7 +612,7 @@ class MemoryLlmModelRepository(LlmModelRepository):
         return self._current(key)
 
     async def delete(self, id: str) -> None:
-        del self.store.llm_models[_model_key(self.store, id)]
+        self.store.forget_model(_model_key(self.store, id))
 
 
 class MemoryAgentSettingsRepository(AgentSettingsRepository):

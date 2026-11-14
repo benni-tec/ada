@@ -231,6 +231,18 @@ async def test_the_first_refresh_writes_a_snapshot_and_announces_it(world: World
     assert event.payload == {"data_source_id": str(source.id), "changed": True}
 
 
+async def test_an_edit_from_before_watching_keeps_the_monitor(world: World) -> None:
+    source = await world.register()
+    repository = MemoryDataSourceRepository(world.memory)
+
+    await repository.set_monitor(source.id, "mon_1", "sealed")
+    await repository.update(source.model_copy(update={"name": "Renamed"}), source.revision)
+
+    stored = await repository.get(source.id)
+    assert (stored.name, stored.monitor_id) == ("Renamed", "mon_1")
+    assert await repository.monitor_secret_encrypted(source.id) == "sealed"
+
+
 async def test_snapshot_keeps_origin(world: World) -> None:
     world.reader.origin = "https://final/url"
     source = await world.register()
