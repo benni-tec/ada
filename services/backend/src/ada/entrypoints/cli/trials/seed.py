@@ -1,5 +1,6 @@
 """Idempotent registry project and SQL steps, following the waiting-times seed."""
 
+import asyncio
 from dataclasses import dataclass, fields
 
 from dishka import AsyncContainer
@@ -21,6 +22,7 @@ from ada.entrypoints.cli.trials.sources import CTGOV, CTIS, SOURCES
 PROJECT = "Nordic cancer trials"
 SESSION = "Nordic cancer trials"
 SEED = Actor(kind=ActorKind.SYSTEM, name="ada seed-trials")
+REFRESH_DELAY_SECONDS = 1
 
 
 @dataclass
@@ -77,7 +79,9 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
         dashboards = await create_dashboards(request, project_id, session.id, built, SEED)
         # Monitoring can attach here with project_id, session.id and built.
     if refresh:
-        for source in SOURCES:
+        for index, source in enumerate(SOURCES):
+            if index:
+                await asyncio.sleep(REFRESH_DELAY_SECONDS)
             async with container() as request:
                 await (await request.get(SourceService)).refresh(
                     registered[source.name], force=True

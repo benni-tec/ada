@@ -62,10 +62,6 @@ def _ctgov(country: str) -> ExampleSource:
                     f"{base}&pageSize=1&countTotal=true&sort=LastUpdatePostDate:desc"
                     "&fields=NCTId,LastUpdatePostDate"
                 ),
-                "fields": [
-                    "totalCount",
-                    "studies.0.protocolSection.statusModule.lastUpdatePostDateStruct.date",
-                ],
             },
         },
         freshness=DAILY,
@@ -113,11 +109,6 @@ def _ctis(country: str, code: int) -> ExampleSource:
                 "url": CTIS_URL,
                 "method": "POST",
                 "body": body(1),
-                "fields": [
-                    "pagination.totalRecords",
-                    "data.0.ctNumber",
-                    "data.0.lastPublicationUpdate",
-                ],
             },
         },
         freshness=DAILY,

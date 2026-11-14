@@ -21,6 +21,7 @@ from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
+from ada.entrypoints.cli.trials import seed
 from ada.entrypoints.cli.trials.dashboards import DOORS, NEAR_YOU
 from ada.entrypoints.cli.trials.seed import _build, seed_trials
 from ada.entrypoints.cli.trials.sources import COUNTRIES
@@ -101,7 +102,9 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
 
 async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
     container: AsyncContainer,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(seed, "REFRESH_DELAY_SECONDS", 0)
     project_id = await seed_trials(container, refresh=True)
     async with container() as request:
         sources = await (await request.get(SourceService)).list(project_id)
