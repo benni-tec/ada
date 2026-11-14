@@ -35,13 +35,18 @@ writes the requested periods into `params` or `body` before it calls the reader
 """
 
 import asyncio
+import contextlib
+import functools
 import hashlib
 import ipaddress
 import json
 import socket
+import zlib
+from collections.abc import Iterable
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
+import httpcore
 import httpx
 from pydantic import Field, ValidationError
 
@@ -66,6 +71,8 @@ TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 MAX_REDIRECTS = 10
 # Far above any statistics table or boundary file the demo reads.
 MAX_BYTES = 50_000_000
+# The content encodings asked for, which the readers undo within MAX_BYTES (_Inflate).
+ENCODINGS = ("gzip", "deflate")
 
 type Method = Literal["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 type Params = dict[str, str | int | float | list[str | int | float]]
@@ -90,11 +97,16 @@ class SourceUnavailable(Unavailable):
     source records as its last error, so it says which request failed and how."""
 
 
-def create_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
-    """The client every HTTP reader shares, for its connection pool. Tests pass a
+def create_client(
+    transport: httpx.AsyncBaseTransport | None = None, allow_private: bool = False
+) -> httpx.AsyncClient:
+    """The client every HTTP reader shares, for its connection pool. It connects to
+    public addresses only (_PublicNetwork) unless private ones are allowed. Tests pass a
     transport that replays recorded answers."""
+    if transport is None and not allow_private:
+        transport = _public_transport()
     return httpx.AsyncClient(
-        headers={"User-Agent": USER_AGENT},
+        headers={"User-Agent": USER_AGENT, "Accept-Encoding": ", ".join(ENCODINGS)},
         timeout=TIMEOUT,
         follow_redirects=True,
         transport=transport,
@@ -216,10 +228,24 @@ class HttpReader(SourceReader):
             f"{call} answered more than {self.max_bytes:,} bytes, the most a source may have"
         )
         length = response.headers.get("content-length", "")
-        if length.isdigit() and int(length) > self.max_bytes:
+        # A HEAD answer has no body: its length is that of what GET would send.
+        head = response.request.method == "HEAD"
+        if not head and length.isdigit() and int(length) > self.max_bytes:
             raise too_large
+        # Decoded here, since httpx's decoders take no limit and a few kilobytes of gzip
+        # can hold gigabytes. Last applied, first undone.
+        encodings = response.headers.get_list("content-encoding", split_commas=True)
+        decoders = [
+            _Inflate(name, self.max_bytes, too_large)
+            for name in reversed([encoding.strip().lower() for encoding in encodings])
+            if name in ENCODINGS
+        ]
         content = bytearray()
-        async for chunk in response.aiter_bytes():
+        # The bytes as sent. aiter_raw would refuse them for an answer that a test transport
+        # built from bytes, which httpx reads (and decodes) at once.
+        async for chunk in cast(httpx.AsyncByteStream, response.stream):
+            for decoder in decoders:
+                chunk = decoder.decode(chunk)
             content += chunk
             if len(content) > self.max_bytes:
                 raise too_large
@@ -236,6 +262,39 @@ class HttpReader(SourceReader):
             request=response.request,
             extensions=response.extensions,
         )
+
+
+class _Inflate:
+    """Undoes one gzip or deflate encoding, raising `too_large` once it would give more
+    than `limit` bytes, before it holds them."""
+
+    def __init__(self, encoding: str, limit: int, too_large: Exception) -> None:
+        self.encoding = encoding
+        self.wbits = zlib.MAX_WBITS | 16 if encoding == "gzip" else zlib.MAX_WBITS
+        self.inflater = zlib.decompressobj(self.wbits)
+        self.limit = limit
+        self.too_large = too_large
+        self.size = 0
+
+    def decode(self, data: bytes) -> bytes:
+        decoded = bytearray()
+        while data and not self.inflater.eof:
+            try:
+                piece = self.inflater.decompress(data, self.limit - self.size + 1)
+            except zlib.error as error:
+                if self.size == 0 and self.wbits == zlib.MAX_WBITS:
+                    # Deflate is meant to have zlib's header; some servers leave it out.
+                    self.wbits = -zlib.MAX_WBITS
+                    self.inflater = zlib.decompressobj(self.wbits)
+                    continue
+                message = f"the answer is not valid {self.encoding}: {error}"
+                raise httpx.DecodingError(message) from None
+            self.size += len(piece)
+            if self.size > self.limit:
+                raise self.too_large
+            decoded += piece
+            data = self.inflater.unconsumed_tail
+        return bytes(decoded)
 
 
 class HttpSourceReaders(SourceReaders):
@@ -316,18 +375,74 @@ def _url(source: DataSource, options: HttpOptions) -> httpx.URL:
 
 
 async def _check_public(url: httpx.URL) -> None:
-    """Raises Invalid unless every address the host resolves to is public: not loopback,
-    private, link-local (cloud metadata services), multicast or unspecified."""
+    """Refuses a host that is not public before anything is sent to it. The address
+    connected to is checked again by _PublicNetwork."""
     port = url.port or (443 if url.scheme == "https" else 80)
     try:
-        found = await asyncio.get_running_loop().getaddrinfo(
-            url.host, port, type=socket.SOCK_STREAM
-        )
+        await _public_addresses(url.host, port)
     except OSError as error:
         raise SourceUnavailable(f"{url.host} could not be resolved: {error}") from None
+
+
+async def _public_addresses(host: str, port: int) -> list[str]:
+    """The addresses the host resolves to. Raises Invalid unless every one is public: not
+    loopback, private, link-local (cloud metadata services), multicast or unspecified."""
+    found = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    addresses = []
     for *_, address in found:
         ip = ipaddress.ip_address(address[0])
         if ip.is_multicast or not ip.is_global:
             raise Invalid(
-                f"{url.host} is not a public address ({ip}); sources read public addresses only"
+                f"{host} is not a public address ({ip}); sources read public addresses only"
             )
+        addresses.append(str(ip))
+    return list(dict.fromkeys(addresses))
+
+
+class _PublicNetwork(httpcore.AsyncNetworkBackend):
+    """Connects only to public addresses: it resolves the host itself and connects to the
+    addresses it checked, so a name that is public when checked and private a moment
+    later (DNS rebinding) cannot reach the platform's network. TLS still verifies the
+    host's name, which httpcore passes to start_tls, and the Host header is unchanged."""
+
+    def __init__(self) -> None:
+        self.network = httpcore.AnyIOBackend()
+
+    async def connect_tcp(  # noqa: ASYNC109 (httpcore's signature)
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Iterable[Any] | None = None,
+    ) -> httpcore.AsyncNetworkStream:
+        try:
+            async with asyncio.timeout(timeout):
+                addresses = await _public_addresses(host, port)
+        except TimeoutError:
+            raise httpcore.ConnectTimeout(f"{host} was not resolved in time") from None
+        except OSError as error:
+            raise httpcore.ConnectError(f"{host} could not be resolved: {error}") from None
+        connect = functools.partial(
+            self.network.connect_tcp,
+            port=port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+        # Each in turn, as a client given the name would try them.
+        for address in addresses[:-1]:
+            with contextlib.suppress(httpcore.ConnectError, httpcore.ConnectTimeout):
+                return await connect(address)
+        return await connect(addresses[-1])
+
+    async def sleep(self, seconds: float) -> None:
+        await self.network.sleep(seconds)
+
+
+def _public_transport() -> httpx.AsyncHTTPTransport:
+    transport = httpx.AsyncHTTPTransport()
+    # httpx 0.28 takes no network backend, but the httpcore pool it builds does; set
+    # there, the pool keeps httpx's TLS settings and limits.
+    transport._pool._network_backend = _PublicNetwork()
+    return transport

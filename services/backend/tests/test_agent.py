@@ -26,6 +26,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from taskiq import InMemoryBroker
 
+import factories
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import MemoryStore
 from ada.adapters.sources.web import WebPageReader
@@ -43,7 +44,7 @@ from ada.core.ports.sources import SourceReaders
 from ada.core.ports.system import Clock
 from ada.core.ports.web import WebBudget, WebSearch
 from ada.core.services.agents import service as agent_service
-from ada.core.services.agents.research import ResearchReaders
+from ada.core.services.agents.research import ResearchReaders, researching
 from ada.core.services.ports.agents import AgentTurnService, ResearchService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sessions import SessionService
@@ -1103,6 +1104,33 @@ class WebSourceReaders(Provider):
     ) -> SourceReaders:
         web = WebPageReader(self.explorer, budget, FixedClock(), 300)
         return ResearchReaders(FakeSourceReaders({AccessKind.WEB: web}), calls, limits)
+
+
+async def test_a_research_turn_counts_every_document_read_it_queues(
+    unreachable_settings: Settings,
+) -> None:
+    container = create_container(unreachable_settings, *memory_adapters())
+    try:
+        async with container() as request:
+            project = await (await request.get(ProjectService)).create("P")
+            sessions = await request.get(SessionService)
+            parent = await sessions.create(project.id, "S")
+            child = await sessions.create_research(
+                parent.id, "R", Actor(kind=ActorKind.USER, name="web")
+            )
+            research = await request.get(ResearchService)
+            with researching(child.id):
+                # Parsed locally now, but the turn may switch it to Context.dev before the
+                # worker reads it. A URL source is never a paid read.
+                for kind in (AccessKind.DOCUMENT, AccessKind.URL):
+                    await research.use_source_read(
+                        factories.data_source(project.id, access_kind=kind)
+                    )
+        store = await container.get(MemoryStore)
+    finally:
+        await container.close()
+
+    assert store.web_calls == {child.id: 1}
 
 
 async def test_a_research_turn_counts_its_web_calls_whatever_session_it_names(

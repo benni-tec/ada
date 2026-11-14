@@ -186,11 +186,13 @@ class DataSources(SourceService):
         # caller forces one to read it at once. The source operator keeps its declared
         # output, since operators never change.
         source = await self.sources.get(id)
-        if address is not None and address.strip() != source.address:
-            # Held, so a watch that is starting finishes first and is seen below.
+        moved = address is not None and address.strip() != source.address
+        if moved or freshness is not None:
+            # Held, so a watch or unwatch under way finishes first and is seen below; each
+            # sets the policy, and unwatch would put back the earlier one over this.
             await self.locks.hold(id)
             source = await self.sources.get(id)
-            if source.monitor_id is not None:
+            if moved and source.monitor_id is not None:
                 # The monitor watches the old page and would refresh from the new one.
                 raise Invalid(
                     f"Source {source.name} is watched at its address. Stop watching it"

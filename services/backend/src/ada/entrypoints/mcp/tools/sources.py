@@ -170,7 +170,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         "failed", the source's current `snapshot` (id, row count, when fetched) and the
         `error` if it failed. Wait when your next step reads the data. In a research
         session, reading a web source or a document Context.dev parses counts as a web
-        call."""
+        call, and so does queuing a refresh of any document."""
         if not wait:
             # Read by the worker, outside the research turn: counted here.
             await research.use_source_read(await service.get(source_id))

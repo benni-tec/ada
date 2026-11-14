@@ -151,5 +151,7 @@ class Research(ResearchService):
         await count_web_call(self.calls, self.limits.web_calls, session_id)
 
     async def use_source_read(self, source: DataSource) -> None:
-        if paid_read(source):
+        # The worker reads the source as it is then, and the turn can still hand a document
+        # to Context.dev: every queued document read counts.
+        if paid_read(source) or source.access_kind is AccessKind.DOCUMENT:
             await count_web_call(self.calls, self.limits.web_calls, None)

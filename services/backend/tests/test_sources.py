@@ -3,9 +3,13 @@ into a table, and the example registrations against their recorded answers."""
 
 import asyncio
 import csv
+import gzip
 import io
 import json
+import socket
 import time
+import tracemalloc
+import zlib
 from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -710,6 +714,41 @@ async def test_only_public_addresses_are_read_redirects_included() -> None:
     ]
 
 
+async def test_the_address_connected_to_is_the_one_checked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def answer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.readuntil(b"\r\n\r\n")
+        writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\na\n1\n")
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_server(answer, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    resolve = socket.getaddrinfo
+    answers = iter(["93.184.216.34"])
+
+    def rebinding(host: str | bytes, *args: Any, **kwargs: Any) -> Any:
+        # Public when the reader checks the name, this machine when it is connected to.
+        if host not in ("rebind.test", b"rebind.test"):
+            return resolve(host, *args, **kwargs)
+        ip = next(answers, "127.0.0.1")
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", rebinding)
+    rebound = source(address=f"http://rebind.test:{port}/data.csv")
+    async with server:
+        async with create_client() as client:
+            public = HttpSourceReaders(client, FixedClock()).for_kind(AccessKind.URL)
+            with pytest.raises(Invalid, match=r"rebind.test is not a public address \(127"):
+                await public.fetch(rebound, TimeRange())
+        async with create_client(allow_private=True) as client:
+            private = HttpSourceReaders(client, FixedClock(), allow_private=True)
+            fetched = await private.for_kind(AccessKind.URL).fetch(rebound, TimeRange())
+
+    assert fetched.content == b"a\n1\n"
+
+
 async def test_an_answer_over_the_size_limit_is_refused() -> None:
     async def chunks() -> AsyncIterator[bytes]:
         for _ in range(3):
@@ -721,6 +760,36 @@ async def test_an_answer_over_the_size_limit_is_refused() -> None:
     for server in (declared, streamed):
         with pytest.raises(SourceUnavailable, match="more than 100 bytes"):
             await server.reader(max_bytes=100).fetch(source(), TimeRange())
+    # The probe's HEAD request has no body, whatever length GET's would have.
+    tagged = Server(lambda r: httpx.Response(200, headers={"ETag": "v", "Content-Length": "101"}))
+    assert await tagged.reader(max_bytes=100).probe(source()) == "etag:v"
+
+
+async def test_an_encoded_answer_is_decoded_within_the_size_limit() -> None:
+    layered = gzip.compress(zlib.compress(b"a\n1\n"))
+    # About 200 bytes that hold 20 MB of zeros.
+    bomb = gzip.compress(gzip.compress(bytes(20_000_000)))
+
+    def encoded(content: bytes, encoding: str) -> Server:
+        headers = {"Content-Encoding": encoding}
+        # A stream, as from the network: httpx decodes `content` when it is given.
+        stream = httpx.ByteStream(content)
+        return Server(lambda request: httpx.Response(200, headers=headers, stream=stream))
+
+    fetched = await encoded(layered, "deflate, gzip").reader().fetch(source(), TimeRange())
+    tracemalloc.start()
+    try:
+        with pytest.raises(SourceUnavailable, match="more than 100,000 bytes"):
+            await encoded(bomb, "gzip, gzip").reader(max_bytes=100_000).fetch(
+                source(), TimeRange()
+            )
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert fetched.content == b"a\n1\n"
+    # Refused while decoding, not after the 20 MB are in memory.
+    assert peak < 2_000_000
 
 
 async def test_the_probe_reads_a_declared_field_or_hashes_the_answer() -> None:
@@ -1300,10 +1369,7 @@ def test_hook_unknown_source_is_404(watched: tuple[TestClient, str]) -> None:
     assert dispatcher(client).refreshes == []
 
 
-async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str) -> None:
-    explorer = FakeExplorer()
-    secrets = FernetSecretBox(KEY)
-
+def postgres_sources(explorer: FakeExplorer) -> Callable[[Repos], DataSources]:
     def service(repos: Repos) -> DataSources:
         session = repos.data_sources.session  # type: ignore[attr-defined]
         readers = FakeSourceReaders({AccessKind.WEB: FakeSourceReader()})
@@ -1319,9 +1385,17 @@ async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str)
             FixedClock(),
             SqlSourceLocks(session),
             explorer,
-            secrets,
+            FernetSecretBox(KEY),
             PUBLIC_URL,
         )
+
+    return service
+
+
+async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str) -> None:
+    explorer = FakeExplorer()
+    secrets = FernetSecretBox(KEY)
+    service = postgres_sources(explorer)
 
     async with engine_for(migrated_database_url) as engine:
         async with unit_of_work(engine) as repos:
@@ -1345,3 +1419,46 @@ async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str)
     assert verified
     assert (watched.monitor_id, watched.freshness.kind) == ("mon_1", FreshnessKind.PUSH)
     assert "test-secret" not in watched.model_dump_json()
+
+
+async def test_a_policy_edit_waits_for_unwatch_in_postgres(migrated_database_url: str) -> None:
+    explorer = FakeExplorer()
+    service = postgres_sources(explorer)
+    weekly = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=WEEK)
+    deleting, deleted = asyncio.Event(), asyncio.Event()
+
+    async def unwatch(monitor_id: str) -> None:
+        deleting.set()
+        await deleted.wait()
+
+    async with engine_for(migrated_database_url) as engine:
+        async with unit_of_work(engine) as repos:
+            project = factories.project()
+            await repos.projects.add(project)
+            source = await service(repos).register(
+                project.id, "Page", AccessKind.WEB, PAGE, DataFormat.HTML, freshness=weekly
+            )
+            watched = await service(repos).watch(source.id)
+        explorer.unwatch = unwatch  # type: ignore[method-assign]
+
+        async def unwatch_source() -> DataSource:
+            async with unit_of_work(engine) as repos:
+                return await service(repos).unwatch(source.id)
+
+        async def edit() -> DataSource:
+            async with unit_of_work(engine) as repos:
+                daily = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=86_400)
+                return await service(repos).update(source.id, watched.revision, freshness=daily)
+
+        unwatching = asyncio.create_task(unwatch_source())
+        await deleting.wait()
+        editing = asyncio.create_task(edit())
+        done, _ = await asyncio.wait({editing}, timeout=0.3)
+        deleted.set()
+        unwatched = await unwatching
+        # It waited for unwatch, then found the source changed instead of being undone.
+        with pytest.raises(Conflict):
+            await editing
+
+    assert not done
+    assert unwatched.freshness == weekly
