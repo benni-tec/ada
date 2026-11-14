@@ -595,8 +595,10 @@ chooses from and what the agent looks at before building.
 
 - **Which operators.** Those no other operator uses as an input, newest first:
   `{operator_id, name, kind, sources: [{data_source_id, name}], output, created_at}`.
-  Operators a `system` actor made (an alert rule's condition) are left out: they are not
-  listed, and they do not stop the operator they build on from counting as a pipeline.
+  An alert rule's condition is left out: it is not listed, and it does not stop the
+  measure it builds on from counting as a pipeline. It is recognised as an operator made
+  by `PLATFORM` (`Actor(system, "ada")`, `core/models/actors.py`) that is not a source,
+  because the platform makes no other operators; an explicit flag would be cleaner.
 - **Names.** A source operator by its source's name; a transform by its leading `--`
   comment lines (joined), else its whitespace-collapsed SQL, cut at 60 characters with
   "…"; an input by its slot name.
