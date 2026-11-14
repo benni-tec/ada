@@ -119,7 +119,7 @@ export function Composer({
       <div className="relative">
         <span
           aria-hidden="true"
-          data-up={focused && text.trim() !== '' && !activeTurn}
+          data-up={focused && text.trim() !== '' && !isActive(activeTurn)}
           className="vahti-perch pointer-events-none absolute right-6 bottom-full z-0"
         >
           <Vahti pose="peek" size={34} label="" filter={false} look={[-3, 5]} />

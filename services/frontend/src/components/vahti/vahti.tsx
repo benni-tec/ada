@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type RefObject } from 'react'
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 
 import './vahti.css'
 
@@ -53,13 +53,23 @@ function Eyes({ look, shift }: { look: [number, number]; shift?: [number, number
   )
 }
 
-const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+const motionQuery = () =>
+  typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : undefined
+
+function subscribeMotion(onChange: () => void) {
+  const query = motionQuery()
+  query?.addEventListener('change', onChange)
+  return () => query?.removeEventListener('change', onChange)
+}
+
+const useReducedMotion = () => useSyncExternalStore(subscribeMotion, () => motionQuery()?.matches ?? false, () => false)
 
 /** Pupil offset (in drawing units, at most 3.5) toward the pointer, once per frame. */
 function usePointerLook(target: RefObject<SVGSVGElement | null>, on: boolean): [number, number] | undefined {
   const [shift, setShift] = useState<[number, number]>()
+  const reduced = useReducedMotion()
   useEffect(() => {
-    if (!on || reducedMotion()) return
+    if (!on || reduced) return
     let frame = 0
     const move = (event: PointerEvent) => {
       cancelAnimationFrame(frame)
@@ -78,8 +88,8 @@ function usePointerLook(target: RefObject<SVGSVGElement | null>, on: boolean): [
       cancelAnimationFrame(frame)
       window.removeEventListener('pointermove', move)
     }
-  }, [target, on])
-  return shift
+  }, [target, on, reduced])
+  return on && !reduced ? shift : undefined
 }
 
 function Legs() {
