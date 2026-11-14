@@ -225,7 +225,9 @@ class HttpReader(SourceReader):
             f"{call} answered more than {self.max_bytes:,} bytes, the most a source may have"
         )
         length = response.headers.get("content-length", "")
-        if length.isdigit() and int(length) > self.max_bytes:
+        # A HEAD answer has no body: its length is that of what GET would send.
+        head = response.request.method == "HEAD"
+        if not head and length.isdigit() and int(length) > self.max_bytes:
             raise too_large
         content = bytearray()
         async for chunk in response.aiter_bytes():

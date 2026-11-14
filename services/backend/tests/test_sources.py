@@ -757,6 +757,9 @@ async def test_an_answer_over_the_size_limit_is_refused() -> None:
     for server in (declared, streamed):
         with pytest.raises(SourceUnavailable, match="more than 100 bytes"):
             await server.reader(max_bytes=100).fetch(source(), TimeRange())
+    # The probe's HEAD request has no body, whatever length GET's would have.
+    tagged = Server(lambda r: httpx.Response(200, headers={"ETag": "v", "Content-Length": "101"}))
+    assert await tagged.reader(max_bytes=100).probe(source()) == "etag:v"
 
 
 async def test_the_probe_reads_a_declared_field_or_hashes_the_answer() -> None:
