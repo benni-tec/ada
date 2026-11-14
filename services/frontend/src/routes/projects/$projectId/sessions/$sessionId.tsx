@@ -3,12 +3,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo } from 'react'
 
 import { DashboardPanel } from '@/components/dashboards/dashboard-panel'
-import { PinActions } from '@/components/dashboards/pin-to-dashboard'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { MessageForm, SessionRecord } from '@/components/session-record'
 import { entriesQuery, getSession, keys, renameSession, sessionQuery, sessionWidgetsQuery } from '@/lib/api'
 import { useRevisedUpdate } from '@/lib/revisions'
+import { useProjectRun } from '@/lib/view-run'
 import { SessionCrumb } from '@/components/breadcrumbs'
 
 type Search = {
@@ -40,6 +40,10 @@ function SessionPage() {
     alsoInvalidate: [keys.sessions(projectId)],
   })
 
+  // One run for the whole record, as a dashboard has: every card shows the same cut, and
+  // a new run follows changed data.
+  const run = useProjectRun(projectId)
+
   useScrollToWidget(highlighted, entries.isSuccess)
 
   if (session.isPending) return <Loading what="the session" />
@@ -55,9 +59,15 @@ function SessionPage() {
         ) : entries.error ? (
           <ErrorNotice error={entries.error} prefix="The session record cannot be loaded:" />
         ) : (
-          <PinActions>
-            <SessionRecord entries={entries.data} widgets={widgetsById} highlightedWidget={highlighted} />
-          </PinActions>
+          <>
+            {run.error && <ErrorNotice error={run.error} prefix="The data cannot be read:" />}
+            <SessionRecord
+              entries={entries.data}
+              widgets={widgetsById}
+              run={{ id: run.data?.id ?? null, frozen: false, what: 'The session’s current run' }}
+              highlightedWidget={highlighted}
+            />
+          </>
         )}
         <MessageForm sessionId={sessionId} />
       </div>

@@ -55,7 +55,11 @@ export function DashboardPanel({ dashboardId }: { dashboardId: Id }) {
           ) : run.isPending || widgets.isPending ? (
             <Loading what="the widgets" />
           ) : (
-            <CompactGrid slots={view.data.version?.slots ?? []} widgets={widgetsById} runId={run.data.id} />
+            <CompactGrid
+              slots={view.data.version?.slots ?? []}
+              widgets={widgetsById}
+              run={{ id: run.data.id, frozen: false, what: 'The dashboard’s current run' }}
+            />
           )}
         </>
       )}

@@ -159,7 +159,11 @@ function DashboardPage() {
       ) : run.isPending || widgets.isPending ? (
         <Loading what="the widgets" />
       ) : (
-        <DashboardGrid slots={shown?.slots ?? []} widgets={widgetsById} runId={run.data.id} />
+        <DashboardGrid
+          slots={shown?.slots ?? []}
+          widgets={widgetsById}
+          run={{ id: run.data.id, frozen: false, what: 'The dashboard’s current run' }}
+        />
       )}
 
       <Section title="Version history">

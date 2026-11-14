@@ -19,9 +19,23 @@ const record = [
   entry({ id: 'e4', kind: 'widget', ref: 'w2', text: external.note, actor: claude }),
 ]
 
+/** The runs the page started, in order. */
+const started: string[] = []
+
+function run(id: string) {
+  return { id, project_id: 'p1', time_range: { start: null, end: null }, bindings: {}, snapshots: {}, started_by: web, started_at: '2026-11-01T09:30:00Z' }
+}
+
 function serveSession(overrides: Record<string, unknown> = {}) {
+  started.length = 0
   return serveApi({
     'GET /api/projects/p1': project(),
+    'POST /api/projects/p1/runs': () => {
+      started.push(`r${started.length + 1}`)
+      return json(run(started.at(-1)!), 201)
+    },
+    'GET /api/projects/p1/sources': [],
+    'GET /api/operators/op_1/lineage': [],
     'GET /api/sessions/s1': session(),
     'GET /api/sessions/s1/entries': record,
     'GET /api/sessions/s1/widgets': [widget(), external],
@@ -51,7 +65,7 @@ test('shows the record in order, with widgets in frames', async () => {
   expect(items[1]).toHaveTextContent('Load the coverage table')
 
   const frame = await within(items[2]).findByTitle('Widget: Coverage by region')
-  expect(frame).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1')
+  expect(frame).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r1')
   expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin')
   // No dashboard in the panel, so no panel.
   expect(screen.queryByRole('complementary', { name: 'Dashboard' })).not.toBeInTheDocument()
@@ -179,4 +193,48 @@ test('refetches the record when the live stream says an entry was added', async 
   )
 
   expect(await screen.findByText('A new message from elsewhere')).toBeInTheDocument()
+})
+
+test('starts one run for the whole page, which every card reads, and a new one when data changes', async () => {
+  serveSession()
+  renderAt('/projects/p1/sessions/s1')
+
+  expect(await screen.findByTitle('Widget: Coverage by region')).toHaveAttribute(
+    'src',
+    'http://localhost:5174/line-chart.html#widget=w1&run=r1',
+  )
+  expect(await screen.findByTitle('Widget: Latest coverage')).toHaveAttribute(
+    'src',
+    'http://localhost:5174/value.html#widget=w2&run=r1',
+  )
+  expect(started).toEqual(['r1'])
+
+  // New data: one new run, which both frames then read.
+  act(() =>
+    FakeEventSource.latest().emit('source.refreshed', {
+      type: 'source.refreshed',
+      project_id: 'p1',
+      payload: { data_source_id: 'ds1', changed: true },
+      at: '2026-11-01T10:00:00Z',
+    }),
+  )
+  await waitFor(() => expect(screen.getByTitle('Widget: Coverage by region').getAttribute('src')).toContain('run=r2'))
+  expect(screen.getByTitle('Widget: Latest coverage').getAttribute('src')).toContain('run=r2')
+  expect(started).toEqual(['r1', 'r2'])
+})
+
+test('a card waits for the page’s run instead of starting one of its own', async () => {
+  let answer: (response: Response) => void = () => {}
+  serveSession({ 'POST /api/projects/p1/runs': () => new Promise<Response>((resolve) => (answer = resolve)) })
+  renderAt('/projects/p1/sessions/s1')
+
+  const card = await screen.findByRole('article', { name: 'Coverage by region' })
+  expect(within(card).getByText('Starting the page’s run…')).toBeInTheDocument()
+  expect(within(card).queryByTitle('Widget: Coverage by region')).not.toBeInTheDocument()
+
+  act(() => answer(json(run('r7'), 201)))
+  expect(await within(card).findByTitle('Widget: Coverage by region')).toHaveAttribute(
+    'src',
+    'http://localhost:5174/line-chart.html#widget=w1&run=r7',
+  )
 })

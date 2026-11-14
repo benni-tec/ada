@@ -225,7 +225,15 @@ function VersionView({ version }: { version: ReportVersion }) {
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
       <div className="flex min-w-0 flex-col gap-4">
-        <ReportTree blocks={blocks} pinned={{ runId: version.run_id, sources: sources.data ?? [] }} />
+        <ReportTree
+          blocks={blocks}
+          pinned={{
+            id: version.run_id,
+            frozen: true,
+            what: `report version ${version.version}`,
+            sources: sources.data ?? [],
+          }}
+        />
       </div>
       <aside className="flex flex-col gap-6" aria-label="About this version">
         <Facts version={version} />

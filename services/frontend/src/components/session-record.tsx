@@ -10,6 +10,7 @@ import {
   type SessionEntry,
   type Widget,
 } from '@/lib/api'
+import type { CardRun } from '@/lib/view-run'
 
 import { ErrorNotice } from './notices'
 import { Provenance } from './provenance'
@@ -23,10 +24,13 @@ import { WidgetCard } from './widget-card'
 export function SessionRecord({
   entries,
   widgets,
+  run,
   highlightedWidget,
 }: {
   entries: SessionEntry[]
   widgets: Map<Id, Widget>
+  /** The session's run: every widget card reads it. */
+  run: CardRun
   highlightedWidget?: string
 }) {
   if (entries.length === 0) {
@@ -48,6 +52,7 @@ export function SessionRecord({
             <WidgetEntry
               entry={entry}
               known={entry.ref ? widgets.get(entry.ref) : undefined}
+              run={run}
               highlighted={!!entry.ref && entry.ref === highlightedWidget}
             />
           )}
@@ -107,10 +112,12 @@ function OperatorEntry({ entry }: { entry: SessionEntry }) {
 function WidgetEntry({
   entry,
   known,
+  run,
   highlighted,
 }: {
   entry: SessionEntry
   known: Widget | undefined
+  run: CardRun
   highlighted: boolean
 }) {
   // The session's widget list normally has it; read it alone when the entry arrived first.
@@ -118,7 +125,7 @@ function WidgetEntry({
   const widget = known ?? data
   if (error) return <ErrorNotice error={error} prefix="This widget cannot be shown:" />
   if (!widget) return <div className="h-40 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-900" />
-  return <WidgetCard widget={widget} highlighted={highlighted} />
+  return <WidgetCard widget={widget} run={run} highlighted={highlighted} />
 }
 
 /** Adds a message to the session. Ctrl or Cmd with Enter sends. */

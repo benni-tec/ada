@@ -324,6 +324,7 @@ test('pins a widget of the session to a dashboard on the dashboard’s latest re
   let pinned: unknown
   serveApi({
     'GET /api/projects/p1': project(),
+    'POST /api/projects/p1/runs': json(run('r9', { start: null, end: null }), 201),
     'GET /api/sessions/s1': session(),
     'GET /api/sessions/s1/entries': [
       { id: 'e1', session_id: 's1', kind: 'widget', text: '', ref: 'w1', actor: web, created_at: '2026-11-01T09:10:00Z' },
@@ -339,7 +340,7 @@ test('pins a widget of the session to a dashboard on the dashboard’s latest re
   renderAt('/projects/p1/sessions/s1')
 
   const card = await screen.findByRole('article', { name: 'Coverage by region' })
-  fireEvent.click(within(card).getByRole('button', { name: 'Pin to dashboard' }))
+  fireEvent.click(within(card).getByRole('button', { name: 'Add to dashboard' }))
   const form = await within(card).findByRole('form', { name: 'Pin Coverage by region to a dashboard' })
   await waitFor(() => expect(within(form).getByLabelText('Dashboard')).not.toBeDisabled())
   fireEvent.change(within(form).getByLabelText('Slot name'), { target: { value: 'coverage' } })
@@ -358,6 +359,7 @@ test('pins to a new dashboard, created first', async () => {
   const calls: unknown[] = []
   serveApi({
     'GET /api/projects/p1': project(),
+    'POST /api/projects/p1/runs': json(run('r9', { start: null, end: null }), 201),
     'GET /api/sessions/s1': session(),
     'GET /api/sessions/s1/entries': [
       { id: 'e1', session_id: 's1', kind: 'widget', text: '', ref: 'w1', actor: web, created_at: '2026-11-01T09:10:00Z' },
@@ -376,7 +378,7 @@ test('pins to a new dashboard, created first', async () => {
   renderAt('/projects/p1/sessions/s1')
 
   const card = await screen.findByRole('article', { name: 'Coverage by region' })
-  fireEvent.click(within(card).getByRole('button', { name: 'Pin to dashboard' }))
+  fireEvent.click(within(card).getByRole('button', { name: 'Add to dashboard' }))
   const form = await within(card).findByRole('form', { name: /Pin Coverage by region/ })
   fireEvent.change(await within(form).findByLabelText('Name of the new dashboard'), { target: { value: 'Fresh' } })
   fireEvent.click(within(form).getByRole('button', { name: 'Pin' }))
@@ -391,6 +393,7 @@ test('pins to a new dashboard, created first', async () => {
 test('shows why a pin failed', async () => {
   serveApi({
     'GET /api/projects/p1': project(),
+    'POST /api/projects/p1/runs': json(run('r9', { start: null, end: null }), 201),
     'GET /api/sessions/s1': session(),
     'GET /api/sessions/s1/entries': [
       { id: 'e1', session_id: 's1', kind: 'widget', text: '', ref: 'w1', actor: web, created_at: '2026-11-01T09:10:00Z' },
@@ -403,7 +406,7 @@ test('shows why a pin failed', async () => {
   renderAt('/projects/p1/sessions/s1')
 
   const card = await screen.findByRole('article', { name: 'Coverage by region' })
-  fireEvent.click(within(card).getByRole('button', { name: 'Pin to dashboard' }))
+  fireEvent.click(within(card).getByRole('button', { name: 'Add to dashboard' }))
   await waitFor(() => expect(within(card).getByLabelText('Dashboard')).not.toBeDisabled())
   fireEvent.click(within(card).getByRole('button', { name: 'Pin' }))
 

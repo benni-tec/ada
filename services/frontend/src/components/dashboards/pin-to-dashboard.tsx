@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { useId, useState, type FormEvent, type ReactNode } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 
+import { AddToDashboardIcon, iconActionClass, SessionIcon, WithTooltip } from '@/components/icon-action'
 import { ErrorNotice } from '@/components/notices'
-import { WidgetCardActions } from '@/components/widget-card-actions'
 import {
   createDashboard,
   dashboardKeys,
@@ -13,11 +13,6 @@ import {
   type Dashboard,
   type Widget,
 } from '@/lib/api'
-
-/** Puts "Pin to dashboard" under every widget card inside it. */
-export function PinActions({ children }: { children: ReactNode }) {
-  return <WidgetCardActions value={(widget) => <PinToDashboard widget={widget} />}>{children}</WidgetCardActions>
-}
 
 const NEW = 'new'
 
@@ -29,6 +24,9 @@ const fieldClass =
  * showing the widget's pipeline at the latest run. The dashboard can be a new one. The
  * pin is made on the dashboard as it is now, since adding a slot cannot clash with what
  * others did meanwhile.
+ *
+ * An icon in the card's footer line; the chooser and the outcome open as rows of their own
+ * below that line (`basis-full`, last in the footer's wrapping row), so the line stays one.
  */
 export function PinToDashboard({ widget }: { widget: Widget }) {
   const queryClient = useQueryClient()
@@ -55,6 +53,8 @@ export function PinToDashboard({ widget }: { widget: Widget }) {
       return saved.dashboard
     },
     onSuccess: (dashboard) => {
+      // The outcome replaces the chooser, so the footer is back to its line and one more.
+      setOpen(false)
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.list(widget.project_id) })
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.view(dashboard.id) })
     },
@@ -66,32 +66,46 @@ export function PinToDashboard({ widget }: { widget: Widget }) {
   }
   const ready = slot.trim() !== '' && (selected !== NEW || newName.trim() !== '')
 
+  const formId = useId()
+  const row = 'order-last basis-full'
   return (
-    <div className="flex flex-col gap-2 text-sm">
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-          className="text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
-        >
-          Pin to dashboard
-        </button>
-        {pin.isSuccess && (
-          <p role="status" className="text-xs text-green-800 dark:text-green-300">
-            Pinned to{' '}
-            <Link
-              to="/projects/$projectId/dashboards/$dashboardId"
-              params={{ projectId: pin.data.project_id, dashboardId: pin.data.id }}
-              className="underline underline-offset-2"
-            >
-              {pin.data.name}
-            </Link>
-          </p>
+    <>
+      <WithTooltip label="Add to dashboard">
+        {(labelledBy) => (
+          <button
+            type="button"
+            aria-labelledby={labelledBy}
+            aria-expanded={open}
+            aria-controls={open ? formId : undefined}
+            onClick={() => {
+              pin.reset()
+              setOpen((value) => !value)
+            }}
+            className={iconActionClass}
+          >
+            <AddToDashboardIcon />
+          </button>
         )}
-      </div>
+      </WithTooltip>
+      {pin.isSuccess && (
+        <p role="status" className={`${row} pb-1 text-xs text-green-800 dark:text-green-300`}>
+          Pinned to{' '}
+          <Link
+            to="/projects/$projectId/dashboards/$dashboardId"
+            params={{ projectId: pin.data.project_id, dashboardId: pin.data.id }}
+            className="underline underline-offset-2"
+          >
+            {pin.data.name}
+          </Link>
+        </p>
+      )}
       {open && (
-        <form onSubmit={submit} aria-label={`Pin ${widget.title || 'widget'} to a dashboard`} className="flex flex-col gap-2">
+        <form
+          id={formId}
+          onSubmit={submit}
+          aria-label={`Pin ${widget.title || 'widget'} to a dashboard`}
+          className={`${row} flex flex-col gap-2 border-t border-neutral-200 py-2 text-sm dark:border-neutral-800`}
+        >
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
               <label htmlFor={dashboardId} className="text-xs font-medium">
@@ -142,6 +156,41 @@ export function PinToDashboard({ widget }: { widget: Widget }) {
           {pin.error && <ErrorNotice error={pin.error} prefix="Not pinned:" />}
         </form>
       )}
-    </div>
+    </>
+  )
+}
+
+/**
+ * On a dashboard: back to the session the widget was made in, scrolled to it. A widget
+ * made outside a session keeps the icon, disabled, and its tooltip says why: an icon that
+ * comes and goes between cards would leave people wondering what they are missing. It
+ * stays focusable (`aria-disabled`, not `disabled`), so the keyboard reaches the reason.
+ */
+export function GoToSession({ widget }: { widget: Widget }) {
+  if (!widget.session_id) {
+    return (
+      <WithTooltip label="Not made in a session">
+        {(labelledBy) => (
+          <button type="button" aria-labelledby={labelledBy} aria-disabled="true" className={iconActionClass}>
+            <SessionIcon />
+          </button>
+        )}
+      </WithTooltip>
+    )
+  }
+  return (
+    <WithTooltip label="Go to the session it came from">
+      {(labelledBy) => (
+        <Link
+          to="/projects/$projectId/sessions/$sessionId"
+          params={{ projectId: widget.project_id, sessionId: widget.session_id! }}
+          search={{ widget: widget.id }}
+          aria-labelledby={labelledBy}
+          className={iconActionClass}
+        >
+          <SessionIcon />
+        </Link>
+      )}
+    </WithTooltip>
   )
 }
