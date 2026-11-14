@@ -1,0 +1,110 @@
+## [Kiireettömään hoitoon pääsyn toteutuminen terveysasemilla](/kiireettomaan-hoitoon-paasyn-toteutuminen-terveysasemilla)
+Terveydenhuoltolaki määrittelee kiireettömään hoitoon pääsyn aikarajat (ns. hoitotakuun). Lain mukaan
+|  |  |  |
+| --- | --- | --- |
+| **Terveysasema** | **Hoitoon pääsy 10/2026** **(päivitetty 3.11.2026)** | **Takaisinsoiton** **keskimääräinen**    **toteutuminen** |
+| [Hyrynsalmen terveysaseman vastaanotto](https://sote.kainuu.fi/toimipisteet/hyrynsalmen-terveysaseman-vastaanotto) | Hoitotakuu toteutuu | 40 minuuttia |
+| Kajaani, [yleislääketieteen poliklinikka](https://sote.kainuu.fi/toimipisteet/kajaani-yleislaaketieteen-poliklinikka-ylepkl) ja  [Vuolijoen terveysaseman vastaanotto](https://sote.kainuu.fi/toimipisteet/kajaani-vuolijoen-terveysaseman-vastaanotto) | Hoitotakuu ei toteudu, jonoa on, jonotusaika noin 5 kk | 7  tuntia 10 minuuttia |
+| [Kuhmon terveysaseman vastaanotto](https://sote.kainuu.fi/toimipisteet/kuhmon-terveysaseman-vastaanotto) | Hoitotakuu toteutuu | 35 minuuttia |
+| [Paltamon terveysaseman vastaanotto](https://sote.kainuu.fi/toimipisteet/paltamon-terveysaseman-vastaanotto) | Hoitotakuu toteutuu | 1 tuntia 24 minuuttia |
+| [Puolangan terveysaseman vastaanotto](https://hyvinvointialue.kainuu.fi/toimipisteet/puolangan-terveysaseman-vastaanotto) | Hoitotakuu toteutuu | 39 minuuttia |
+| [Ristijärven terveysaseman vastaanotto](https://sote.kainuu.fi/toimipisteet/ristijarven-terveysaseman-vastaanotto) | Hoitotakuu toteutuu | 45 minuuttia |
+| [Sotkamon terveysaseman vastaanotto](https://sote.kainuu.fi/toimipisteet/sotkamon-terveysaseman-vastaanotto) | Hoitotakuu toteutuu | 39 minuuttia |
+| [Suomussalmen terveysaseman vastaanotto](https://sote.kainuu.fi/toimipisteet/suomussalmen-terveysaseman-vastaanotto) | Hoitotakuu toteutuu | 41 minuuttia |
+[hoitoon pääsy](/asiasanat/hoitoon-paasy)
+### THL:n raportit hoitoonpääsyn toteutumisesta
+  [Ensimmäisen hoitotapahtuman toteutuminen - Avohilmo: Perusterveydenhuollon hoitoon pääsyn ensimmäisen hoitotapahtuman toteutuminen - THL kuutio- ja tiivistekäyttöliittymä](https://sampo.thl.fi/pivot/prod/fi/avohpaasy/pthjono01/summary_tiiviste1?aika_0=1236759&lainsaadanto_0=1015904&ikaluokka_0=109987&ikaluokka_1=&ikaluokka_2=&ammatti_0=30664&palvelumuoto_0=33780&yhteystapa_0=226667&kaynninluonne_0=112852&mittari_0=486013&drill-palveluntuottaja=226452#)
+  [**Ensimmäisen hoitotapahtuman toteutuminen ikäryhmittäin - Avohilmo: Perusterveydenhuollon hoitoon pääsyn ensimmäisen hoitotapahtuman toteutuminen - THL kuutio- ja tiivistekäyttöliittymä**](https://sampo.thl.fi/pivot/prod/fi/avohpaasy/pthjono01/summary_tiiviste5?aika_0=1236759&lainsaadanto_0=1015904&ammatti_0=30664&palvelumuoto_0=33780&yhteystapa_0=226667&kaynninluonne_0=112852&mittari_0=486013&drill-palveluntuottaja=226452#)
+  [Ensimmäisen hoitotapahtuman toteutuminen lääkärin vastaanotolla - Avohilmo: Perusterveydenhuollon hoitoon pääsyn ensimmäisen hoitotapahtuman toteutuminen-THL kuutio- ja tiivistekäyttöliittymä](https://sampo.thl.fi/pivot/prod/fi/avohpaasy/pthjono01/summary_tiiviste1?aika_0=1236759&lainsaadanto_0=1015904&ikaluokka_0=109987&ikaluokka_1=&ikaluokka_2=&ammatti_0=1195969&palvelumuoto_0=33780&yhteystapa_0=226667&kaynninluonne_0=112852&mittari_0=486013&drill-palveluntuottaja=226452#)
+### Odotus- ja jonotilanne
+## [Hoidon saatavuus](/hoidon-saatavuus)
+[hoitoon pääsy](/asiasanat/hoitoon-paasy)
+### Odotus- ja jonotilanne
+### Kii­reet­tö­mään hoi­toon pää­sy eli hoi­to­ta­kuu
+### Tar­peel­lis­ta ja vai­kut­ta­vaa hoi­toa
+### Lisätietoa
+## [Hoitoonpääsy](/hoitoonpaasy)
+[hoitoon pääsy](/asiasanat/hoitoon-paasy)
+[odotusajat](/asiasanat/odotusajat)
+### 2026
+**Syyskuu 2026**
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary\_hvaraportti?alueet\_0=103867**](https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary_hvaraportti?alueet_0=103867)
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary\_hvaraporttipsyk?alueet\_0=1038670**](https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary_hvaraporttipsyk?alueet_0=1038670 )
+**Elokuu 2026**
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary\_hvaraportti?alueet\_0=103867**](//sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary_hvaraportti?alueet_0=103867)
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary\_hvaraporttipsyk?alueet\_0=1038670**](https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary_hvaraporttipsyk?alueet_0=1038670 )
+**Heinäkuu 2026**
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary\_hvaraportti?alueet\_0=103867**](//sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary_hvaraportti?alueet_0=103867)
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary\_hvaraporttipsyk?alueet\_0=1038670**](https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary_hvaraporttipsyk?alueet_0=1038670 )
+**Kesäkuu 2026**
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary\_hvaraportti?alueet\_0=103867**](https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary_hvaraportti?alueet_0=103867)
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary\_hvaraporttipsyk?alueet\_0=1038670**](https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary_hvaraporttipsyk?alueet_0=1038670 )
+**Toukokuu 2026**
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary\_hvaraportti?alueet\_0=103867**](https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary_hvaraportti?alueet_0=103867)
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary\_hvaraporttipsyk?alueet\_0=1038670**](https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary_hvaraporttipsyk?alueet_0=1038670 )
+**Huhtikuu 2026**
+[https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary\_hvaraportti?alueet\_0=103867](https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary_hvaraportti?alueet_0=1038670)
+[https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary\_hvaraporttipsyk?alueet\_0=1038670](https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary_hvaraporttipsyk?alueet_0=1038670 )
+**Maaliskuu 2026**
+<https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary_hvaraportti?alueet_0=1038670>
+[https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary\_hvaraporttipsyk?alueet\_0=1038670](https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary_hvaraporttipsyk?alueet_0=1038670 )
+**Helmikuu 2026**
+[**https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary\_hvaraportti?alueet\_0=1038670**](https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary_hvaraportti?alueet_0=1038670)
+[https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary\_hvaraporttipsyk?alueet\_0=1038670](https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary_hvaraporttipsyk?alueet_0=1038670 )
+**Tammikuu 2026**
+<https://sampo.thl.fi/pivot/prod/fi/eshjono/jonotilanne/summary_hvaraportti?alueet_0=1038670>
+[https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary\_hvaraporttipsyk?alueet\_0=1038670](https://sampo.thl.fi/pivot/prod/fi/eshjono/psykiatria/summary_hvaraporttipsyk?alueet_0=1038670 )
+### 2025
+[Hoidon-tarpeen-arviointia-odottavien-lukumaara-ja-odotusajat.pdf](/sites/default/files/documents/library/2025-10/Hoidon-tarpeen-arviointia-odottavien-lukumaara-ja-odotusajat.pdf)
+[Hoitoa-odottavien-lukumaara-ja-odotusajat.pdf](/sites/default/files/documents/library/2025-10/Hoitoa-odottavien-lukumaara-ja-odotusajat.pdf)
+[Yleisimpiin-leikkauksiin-ja-konservatiivisiin-hoitoihin-odottavien-lukumaara-ja-odotusajat.pdf](/sites/default/files/documents/library/2025-10/Yleisimpiin-leikkauksiin-ja-konservatiivisiin-hoitoihin-odottavien-lukumaara-ja-odotusajat.pdf)
+[Yleisimpiin-leikkauksiin-ja-konservatiivisiin-hoitoihin-odottavien-lukumaara-ja-odotusajat-toteutuneiden-hoitojen-osalta.pdf](/sites/default/files/documents/library/2025-10/Yleisimpiin-leikkauksiin-ja-konservatiivisiin-hoitoihin-odottavien-lukumaara-ja-odotusajat-toteutuneiden-hoitojen-osalta.pdf)
+### 2024
+[Hoitoa odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_0.pdf)
+[Hoidon-tarpeen-arviointia-odottavien-lukumaara-ja-odotusajat\_2.pdf](/sites/default/files/documents/library/2026-04/Hoidon-tarpeen-arviointia-odottavien-lukumaara-ja-odotusajat_2.pdf)
+[Yleisimpiin leikkauksiin ja kons.hoitoihin odottavien lukumäärä ja odotusajat toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20kons.hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat%20toteutuneiden%20hoitojen%20osalta_0.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20%20ja%20odotusajat_0.pdf)
+[Hoitoa odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20%20ja%20odotusajat_0.pdf)
+[Hoidon tarpeen arviointia odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_1.pdf)
+[Yleisimpiin leikkauksiin ja kons. hoitoihin odottavat ja odotusajat toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20kons.%20hoitoihin%20odottavat%20ja%20odotusajat%20toteutuneiden%20hoitojen%20osalta_0.pdf)
+[Yleisimpiin leikkauksiin ja kons.hoitoihin odottavat ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20kons.hoitoihin%20odottavat%20ja%20odotusajat_0.pdf)
+### 2023
+[Hoitoa odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_8.pdf)
+[Hoidon tarpeen arviointia odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_7.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä ja odotusajat (2).pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat%20%282%29_0.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä ja odotusajat toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat%20toteutuneiden%20hoitojen%20osalta_0.pdf)
+[Hoitoa odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_7.pdf)
+[Hoidon tarpeen arviointia odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_6.pdf)
+[Yl.leikkauksiin ja kons.hoitoihin odottavien lukumäärä ja odotusajat toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yl.leikkauksiin%20ja%20kons.hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat%20toteutuneiden%20hoitojen%20osalta_1.pdf)
+[Yl.leikkauksiin ja kons.hoitoihin odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Yl.leikkauksiin%20ja%20kons.hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_1.pdf)
+[Hoitoa odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_6.pdf)
+[Hoidon tarpeen arviointia odottavat ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavat%20ja%20odotusajat_0.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärät ja odotusajat toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4t%20ja%20odotusajat%20toteutuneiden%20hoitojen%20osalta_0.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärät ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4t%20ja%20odotusajat_0.pdf)
+### 2022
+[Hoitoa odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_10.pdf)
+[Hoidon tarpeen arviointia odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_10.pdf)
+[Yl.leikkauksiin ja kons.hoitoihin odottavien lukumäärä ja odotusajat toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yl.leikkauksiin%20ja%20kons.hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat%20toteutuneiden%20hoitojen%20osalta_3.pdf)
+[Yl.leikkauksiin ja kons.hoitoihin odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Yl.leikkauksiin%20ja%20kons.hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_3.pdf)
+[Hoitoa odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_9.pdf)
+[Hoidon tarpeen arviointia odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_8.pdf)
+[Yl.leikkauksiin ja kons.hoitoihin odottavien lukumäärä ja odotusajat toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yl.leikkauksiin%20ja%20kons.hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat%20toteutuneiden%20hoitojen%20osalta_2.pdf)
+[Yl.leikkauksiin ja kons.hoitoihin odottavien lukumäärä ja odotusajat.pdf](/sites/default/files/documents/library/2025-05/Yl.leikkauksiin%20ja%20kons.hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A4%20ja%20odotusajat_2.pdf)
+### 2021
+[Hoitoa odottavien lukumäärä1) ja odotusajat2)\_.pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29_.pdf)
+[Hoidon tarpeen arviointia odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29_1.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä1) ja odotusajat2) toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29%20toteutuneiden%20hoitojen%20osalta_0.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29_1.pdf)
+[Hoitoa odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29_0.pdf)
+[Hoidon tarpeen arviointia odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29_0.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä1) ja odotusajat2) toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29%20toteutuneiden%20hoitojen%20osalta.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29_0.pdf)
+[Hoitoa odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29.pdf)
+[Hoidon tarpeen arviointia odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä1) ja odotusajat toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat%20toteutuneiden%20hoitojen%20osalta.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29.pdf)
+### 2020
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä1) ja odotusajat2 toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%20toteutuneiden%20hoitojen%20osalta.pdf)
+[Yleisimpiin leikkauksiin ja konservatiivisiin hoitoihin odottavien lukumäärä1) ja odotusajat2 toteutuneiden hoitojen osalta.pdf](/sites/default/files/documents/library/2025-05/Yleisimpiin%20leikkauksiin%20ja%20konservatiivisiin%20hoitoihin%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%20toteutuneiden%20hoitojen%20osalta_0.pdf)
+[Hoidon tarpeen arviointia odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Hoidon%20tarpeen%20arviointia%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29_2.pdf)
+[Hoitoa odottavien lukumäärä1) ja odotusajat2).pdf](/sites/default/files/documents/library/2025-05/Hoitoa%20odottavien%20lukum%C3%A4%C3%A4r%C3%A41%29%20ja%20odotusajat2%29_1.pdf)

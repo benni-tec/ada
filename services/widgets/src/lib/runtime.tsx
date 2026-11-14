@@ -10,7 +10,7 @@ import {
   readFromMcpHost,
   type WidgetContext,
 } from './host'
-import { MAIN_INPUT, type Roles, type Widget, type WidgetData } from './types'
+import { MAIN_INPUT, type Roles, type Widget, type WidgetData, type WidgetSource } from './types'
 
 import './styles.css'
 
@@ -66,7 +66,18 @@ async function withInputs(loaded: Loaded, ctx: WidgetContext | null): Promise<Lo
     ...Object.fromEntries(names.map((name, i) => [name, others[i]] as const)),
   }
   const stale = Object.values(inputs).some((input) => input.is_stale)
-  return { ...loaded, data: { ...main, is_stale: stale }, roles: main.output.roles ?? {}, inputs }
+  // Each answer names the sources of its own input; the footer lists them all, once each.
+  // An input that did not read a source has not fixed it, so a fetch time wins.
+  const sources = new Map<string, WidgetSource>()
+  for (const source of Object.values(inputs).flatMap((input) => input.sources ?? [])) {
+    if (!sources.get(source.operator_id)?.fetched_at) sources.set(source.operator_id, source)
+  }
+  return {
+    ...loaded,
+    data: { ...main, is_stale: stale, sources: [...sources.values()] },
+    roles: main.output.roles ?? {},
+    inputs,
+  }
 }
 
 /** Loads the widget named in the URL fragment and its data, shows loading and error
@@ -124,8 +135,39 @@ export function WidgetRuntime({ children }: { children: (loaded: Loaded) => Reac
     <div className="ada-widget" data-scenario={data.is_scenario || undefined} data-stale={data.is_stale || undefined}>
       <Flags data={data} />
       <div className="ada-body">{children(result.loaded)}</div>
+      <Sources sources={data.sources ?? []} />
     </div>
   )
+}
+
+/** Where the numbers came from and when they were fetched, under every widget, so no
+ * number is shown without its source. */
+export function Sources({ sources }: { sources: NonNullable<WidgetData['sources']> }) {
+  if (sources.length === 0) return null
+  return (
+    <ul className="ada-sources" aria-label="Sources">
+      {sources.map((source) => (
+        <li key={source.operator_id}>
+          {/^https?:\/\//i.test(source.address) ? (
+            <a href={source.address} target="_blank" rel="noreferrer noopener" title={source.address}>
+              {source.name}
+            </a>
+          ) : (
+            <span title={source.address}>{source.name}</span>
+          )}
+          {' · '}
+          {source.fetched_at ? `fetched ${fetched(source.fetched_at)}` : 'fetch time not recorded'}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function fetched(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 const SCENARIO_TITLE = 'This run binds inputs to other pipelines'

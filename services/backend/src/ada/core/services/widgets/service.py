@@ -15,6 +15,7 @@ from ada.core.ports.repositories import (
     DataSourceRepository,
     OperatorRepository,
     SessionRepository,
+    SnapshotRepository,
     WidgetRepository,
 )
 from ada.core.ports.system import Clock
@@ -24,6 +25,7 @@ from ada.core.services.ports.judges import JudgeService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.widgets import WidgetService
+from ada.core.services.reports.sources import SourcesList
 from ada.core.services.schema.roles import check_widget
 from ada.core.services.widgets.specs import CUSTOM, custom_problems
 from ada.core.services.widgets.text import TEXT_TYPE
@@ -49,6 +51,7 @@ class Widgets(WidgetService):
         operators: OperatorRepository,
         sessions: SessionRepository,
         data_sources: DataSourceRepository,
+        snapshots: SnapshotRepository,
         session_records: SessionService,
         runs: RunService,
         judges: JudgeService,
@@ -61,6 +64,7 @@ class Widgets(WidgetService):
         self.operators = operators
         self.sessions = sessions
         self.data_sources = data_sources
+        self.sources_list = SourcesList(operators, snapshots, data_sources)
         self.session_records = session_records
         self.runs = runs
         self.judges = judges
@@ -244,6 +248,10 @@ class Widgets(WidgetService):
             if run.project_id != widget.project_id:
                 raise Invalid("The run belongs to another project than the widget")
         rows = await self.runs.read(run.id, operator_id, limit)
+        # Reading fixed the run's snapshots, so the sources name what these rows came from.
+        # Only the input read here: another input's snapshot is fixed when it is read.
+        read = widget.model_copy(update={"operator_id": operator_id, "inputs": {}})
+        sources = await self.sources_list.entries(await self.runs.get(run.id), [read])
         operator = await self.operators.get(operator_id)
         return WidgetData(
             widget_id=widget.id,
@@ -255,6 +263,7 @@ class Widgets(WidgetService):
             truncated=rows.truncated,
             is_scenario=run.is_scenario,
             is_stale=await self._is_stale(operator_id),
+            sources=tuple(sources),
         )
 
     async def _reviewed(self, widget: Widget) -> Widget:

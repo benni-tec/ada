@@ -40,6 +40,39 @@ test('loads the widget, its data and its roles from the fragment', async () => {
   expect(await screen.findByText('6 rows, 0 measures')).toBeInTheDocument()
   expect(fetch).toHaveBeenCalledWith('/api/widgets/w1/data?limit=1000&run_id=r9')
   expect(screen.queryByRole('list', { name: 'Data warnings' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('list', { name: 'Sources' })).not.toBeInTheDocument()
+})
+
+test('names the source and its fetch time under the numbers', async () => {
+  serve({
+    data: coverage({
+      sources: [{ operator_id: 'op1', name: 'Kainuu', address: 'https://example.test/k', fetched_at: '2026-11-14T10:00:00Z' }],
+    }),
+  })
+  show()
+
+  const sources = await screen.findByRole('list', { name: 'Sources' })
+  expect(within(sources).getByRole('link', { name: 'Kainuu' })).toHaveAttribute('href', 'https://example.test/k')
+  expect(sources).toHaveTextContent(/fetched .*2026/)
+})
+
+test('a custom widget lists each source once, with the fetch time any input knows', async () => {
+  const fixed = { operator_id: 'op2', name: 'Kainuu', address: 'https://example.test/k', fetched_at: '2026-11-14T10:00:00Z' }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://ada.test')
+      if (url.pathname === '/api/widgets/w1') return json(widget({ type: 'custom', inputs: { gap: 'op_2' } }))
+      // The gap input has not read Kainuu, so its answer has no fetch time for it.
+      const sources = url.searchParams.get('input') === 'gap' ? [{ ...fixed, fetched_at: null }] : [fixed]
+      return json(coverage({ sources }))
+    }),
+  )
+  show()
+
+  const sources = await screen.findByRole('list', { name: 'Sources' })
+  expect(within(sources).getAllByRole('listitem')).toHaveLength(1)
+  expect(sources).toHaveTextContent(/fetched .*2026/)
 })
 
 test('marks simulated and stale data', async () => {
