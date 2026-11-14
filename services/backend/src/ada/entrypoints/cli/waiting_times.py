@@ -47,7 +47,9 @@ from ada.core.services.ports.widgets import WidgetService
 PROJECT = "Equal care: waiting times"
 SESSION = "Waiting times across wellbeing areas"
 DASHBOARD = "Waiting times across wellbeing areas"
-RULE = "Queue grew by a month or more"
+# The rule compares each station with its row in the archived copy: the live page only
+# ever shows its latest month, so that copy is the earlier observation.
+RULE = "Queue a month or more longer than in the archived copy (2026-04-16)"
 RANGE = TimeRange(start=date(2026, 1, 1), end=date(2026, 12, 31))
 
 SEED = Actor(kind=ActorKind.SYSTEM, name="ada seed-waits")
@@ -96,10 +98,11 @@ _MONTHS = (
 _NAMED_MONTH = r"(?i)\b([a-zä]+kuu)\s+(\d{4})(:| ?\.)"
 _NUMBERED_MONTH = r"Hoitoon pääsy\D{0,8}(\d{1,2})/(\d{4})"
 
-# One row per health station on a county page: the Markdown table rows that end in a
-# callback time ("1 tuntia 24 minuuttia"), with the data month and update date the page
-# states. Kainuu: station | care guarantee | callback; Satakunta: station | calls |
-# same-day share | phone queue | callback.
+# One row per health station on a county page: the Markdown table rows (with outer pipes,
+# as Context.dev writes them) with a callback time ("1 tuntia 24 minuuttia") or a care
+# guarantee status, and the data month and update date the page states. Kainuu: station |
+# care guarantee | callback; Satakunta: station | calls | same-day share | phone queue |
+# callback.
 STATION_ROWS = rf"""
 WITH page AS (
     -- Pages write non-breaking spaces into numbers ("7 tuntia"), which \s does not match.
@@ -135,14 +138,18 @@ SELECT
     CASE WHEN len(c) = 3 THEN c[2] END AS care_guarantee,
     TRY_CAST(replace(regexp_extract(c[2], 'noin\s+(\d+(?:,\d+)?)\s*kk', 1), ',', '.') AS DOUBLE)
         AS queue_months,
-    coalesce(TRY_CAST(regexp_extract(c[-1], '(\d+)\s*tunti', 1) AS INTEGER), 0) * 60
+    CASE WHEN regexp_matches(c[-1], '\d+\s*(tunti|minuutti)') THEN
+        coalesce(TRY_CAST(regexp_extract(c[-1], '(\d+)\s*tunti', 1) AS INTEGER), 0) * 60
         + coalesce(TRY_CAST(regexp_extract(c[-1], '(\d+)\s*minuutti', 1) AS INTEGER), 0)
-        AS callback_minutes,
+    END AS callback_minutes,
     m.period_start,
     last_day(m.period_start) AS period_end,
     m.updated
 FROM cells, month AS m
-WHERE len(c) IN (3, 5) AND c[1] <> '' AND regexp_matches(c[-1], '\d+\s*(tunti|minuutti)')
+WHERE len(c) IN (3, 5) AND c[1] <> ''
+    -- A station row: a callback time, or (Kainuu) a care-guarantee status, so a
+    -- callback the page leaves out does not drop the station's queue.
+    AND (regexp_matches(c[-1], '\d+\s*(tunti|minuutti)') OR c[2] ILIKE 'hoitotakuu%')
 """
 
 _FRESHNESS = """CASE
