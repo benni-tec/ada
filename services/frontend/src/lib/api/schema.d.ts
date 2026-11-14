@@ -1484,7 +1484,7 @@ export interface components {
          * EntryKind
          * @enum {string}
          */
-        EntryKind: "message" | "operator" | "widget" | "agent_turn";
+        EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call";
         /**
          * FreshnessKind
          * @enum {string}
@@ -2274,6 +2274,7 @@ export interface components {
              * @default
              */
             text: string;
+            tool_call?: components["schemas"]["ToolCall"] | null;
         };
         /**
          * Severity
@@ -2445,6 +2446,26 @@ export interface components {
             /** Start */
             start: string;
         };
+        /**
+         * ToolCall
+         * @description One tool call as the session shows it: the arguments shortened (see
+         *     ada.core.services.sessions.shortened), the outcome and how long it took.
+         */
+        ToolCall: {
+            arguments: components["schemas"]["JsonObject"];
+            /** Duration Ms */
+            duration_ms: number;
+            /** Error */
+            error?: string | null;
+            status: components["schemas"]["ToolCallStatus"];
+            /** Tool */
+            tool: string;
+        };
+        /**
+         * ToolCallStatus
+         * @enum {string}
+         */
+        ToolCallStatus: "ok" | "error";
         /** ToolPart */
         ToolPart: {
             /** Error Text */

@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
-import type { AgentTurn, Part } from '@/lib/api'
+import type { AgentTurn, Part, ToolCall } from '@/lib/api'
 
 import {
   claude,
@@ -176,6 +176,46 @@ test('an agent turn is drawn with Trace: reasoning, tool calls with input and ou
   expect(text).not.toHaveTextContent('**')
 
   expect(await within(failed).findByRole('alert')).toHaveTextContent('The agent failed: The model is overloaded')
+})
+
+test('an external agent’s tool calls fold into one collapsed group that opens to each call', async () => {
+  const call = (id: string, tool: string, extra: Partial<ToolCall> = {}) =>
+    entry({
+      id,
+      kind: 'tool_call',
+      actor: claude,
+      tool_call: { tool, arguments: { select: 'count(*)' }, status: 'ok', error: null, duration_ms: 42, ...extra },
+    })
+  serveSession({
+    'GET /api/sessions/s1/entries': [
+      call('c1', 'list_sources'),
+      call('c2', 'query_operator'),
+      call('c3', 'add_transform', { status: 'error', error: 'Not a query: nope', duration_ms: 1500 }),
+      // Its effect has an entry of its own, so the call is not drawn twice.
+      entry({ id: 'e3', kind: 'operator', ref: 'op_1', text: 'Load the coverage table', actor: claude }),
+      call('c4', 'add_source_operator'),
+      call('c5', 'create_widget', { status: 'error', error: 'No such operator' }),
+    ],
+  })
+  renderAt('/projects/p1/sessions/s1')
+
+  const [group, operator, after] = await items()
+  const opener = within(group).getByRole('button', { name: /Claude Desktop used 3 tools, 1 failed/ })
+  expect(opener).toHaveAttribute('aria-expanded', 'false')
+  expect(within(group).queryByText('list_sources')).not.toBeInTheDocument()
+  expect(await within(operator).findByText('Loaded a data source')).toBeInTheDocument()
+  expect(after).toHaveTextContent('Claude Desktop used 1 tool, 1 failed')
+
+  fireEvent.click(opener)
+  const lines = [...group.querySelectorAll('[data-slot="trace-collapsible-content"] [data-slot="trace-line"]')]
+  expect(lines.map((line) => line.textContent)).toEqual([
+    'list_sources42 ms',
+    'query_operator42 msexplored, not shown',
+    'Failed: add_transform1.5 s',
+  ])
+  expect(within(group).getByText('Not a query: nope')).toHaveClass('text-destructive')
+  fireEvent.click(within(group).getByRole('button', { name: /query_operator/ }))
+  expect(within(group).getByRole('figure', { name: 'Arguments' })).toHaveTextContent('"select": "count(*)"')
 })
 
 test('a message goes with its context chips and the picked model; Enter sends, Shift+Enter does not', async () => {

@@ -848,7 +848,8 @@
           "message",
           "operator",
           "widget",
-          "agent_turn"
+          "agent_turn",
+          "tool_call"
         ],
         "title": "EntryKind",
         "type": "string"
@@ -2867,6 +2868,16 @@
             "default": "",
             "title": "Text",
             "type": "string"
+          },
+          "tool_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolCall"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3301,6 +3312,52 @@
         ],
         "title": "TimeRole",
         "type": "object"
+      },
+      "ToolCall": {
+        "description": "One tool call as the session shows it: the arguments shortened (see\nada.core.services.sessions.shortened), the outcome and how long it took.",
+        "properties": {
+          "arguments": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ToolCallStatus"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "arguments",
+          "status",
+          "duration_ms"
+        ],
+        "title": "ToolCall",
+        "type": "object"
+      },
+      "ToolCallStatus": {
+        "enum": [
+          "ok",
+          "error"
+        ],
+        "title": "ToolCallStatus",
+        "type": "string"
       },
       "ToolPart": {
         "properties": {

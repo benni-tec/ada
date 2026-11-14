@@ -2,12 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { Code } from 'lucide-react'
 
 import { operatorQuery, widgetQuery, type Id, type SessionEntry, type Widget } from '@/lib/api'
+import { groupRecord } from '@/lib/session-record'
 import type { CardRun } from '@/lib/view-run'
 
 import { AgentTurnEntry } from './chat/agent-turn'
 import { RecordedContext } from './chat/context-chips'
 import { ErrorNotice } from './notices'
 import { Provenance } from './provenance'
+import { ToolCallGroup } from './tool-calls'
 import { Bubble, BubbleContent } from './ui/bubble'
 import { Message, MessageContent } from './ui/message'
 import { WidgetCard } from './widget-card'
@@ -16,7 +18,8 @@ import { WidgetCard } from './widget-card'
  * A session's record in order, as a conversation: the person's messages, the platform
  * agent's answers with the steps it took, and the operators and widgets that were made
  * (by that agent, or by an external one whose own conversation happens in its client and
- * only its tool calls land here).
+ * only its tool calls land here). An external agent's tool calls fold into compact groups
+ * between them (see groupRecord).
  */
 export function SessionRecord({
   projectId,
@@ -41,28 +44,59 @@ export function SessionRecord({
   }
   return (
     <ol aria-label="Session record" className="flex flex-col gap-5">
-      {entries.map((entry) => (
-        <li key={entry.id}>
-          {entry.kind === 'message' ? (
-            <MessageEntry entry={entry} projectId={projectId} />
-          ) : entry.kind === 'agent_turn' ? (
-            entry.ref ? (
-              <AgentTurnEntry turnId={entry.ref} />
-            ) : null
-          ) : entry.kind === 'operator' ? (
-            <OperatorEntry entry={entry} />
-          ) : (
-            <WidgetEntry
-              entry={entry}
-              known={entry.ref ? widgets.get(entry.ref) : undefined}
+      {groupRecord(entries).map((item) =>
+        item.kind === 'tool-calls' ? (
+          <li key={item.key}>
+            <ToolCallGroup actor={item.actor} calls={item.calls} />
+          </li>
+        ) : (
+          <li key={item.entry.id}>
+            <EntryView
+              entry={item.entry}
+              projectId={projectId}
+              widgets={widgets}
               run={run}
-              highlighted={!!entry.ref && entry.ref === highlightedWidget}
+              highlightedWidget={highlightedWidget}
             />
-          )}
-        </li>
-      ))}
+          </li>
+        ),
+      )}
     </ol>
   )
+}
+
+function EntryView({
+  entry,
+  projectId,
+  widgets,
+  run,
+  highlightedWidget,
+}: {
+  entry: SessionEntry
+  projectId: Id
+  widgets: Map<Id, Widget>
+  run: CardRun
+  highlightedWidget?: string
+}) {
+  switch (entry.kind) {
+    case 'message':
+      return <MessageEntry entry={entry} projectId={projectId} />
+    case 'agent_turn':
+      return entry.ref ? <AgentTurnEntry turnId={entry.ref} /> : null
+    case 'operator':
+      return <OperatorEntry entry={entry} />
+    case 'widget':
+      return (
+        <WidgetEntry
+          entry={entry}
+          known={entry.ref ? widgets.get(entry.ref) : undefined}
+          run={run}
+          highlighted={!!entry.ref && entry.ref === highlightedWidget}
+        />
+      )
+    default:
+      return null
+  }
 }
 
 /** A message: the person's on the right, anyone else's (an external agent's) on the left. */
