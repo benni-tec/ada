@@ -50,6 +50,7 @@ To debug a service in an IDE instead, start only the infrastructure with
 | `moon run :build` | Build the frontend and the widgets |
 | `moon run backend:migrate` | Apply pending migrations |
 | `moon run backend:revision -- "<message>"` | Write a migration from the model changes |
+| `moon run frontend:generate` | Regenerate the frontend's API types from the backend's schema |
 
 ## Running the full stack
 
@@ -97,6 +98,14 @@ Two stores, with different jobs:
 
 Background work (runs, source refreshes, alert checks) goes through taskiq with Valkey as
 the broker. There is exactly one scheduler.
+
+## Documents
+
+| File | What it is |
+| --- | --- |
+| `docs/spec.md` | The design: what the system does and why |
+| `docs/contracts.md` | Where things live and how the parts talk to each other |
+| `docs/plan.md` | The order of work and how it is split |
 
 ## Configuration
 

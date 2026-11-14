@@ -41,6 +41,16 @@ tasks:
       - "@group(sources)"
       - "@group(configs)"
 
+  generate:
+    description: "Regenerate the API types from the backend's OpenAPI schema"
+    # openapi-typescript needs the TypeScript 5 compiler API, which TypeScript 7 no longer
+    # has, so it runs with its own copy instead of the project's.
+    script: "(cd ../backend && uv run ada openapi) > openapi.json && pnpm --package=typescript@5 --package=openapi-typescript@7.13.0 dlx openapi-typescript openapi.json -o src/lib/api/schema.d.ts"
+    toolchains: "system"
+    options:
+      cache: false
+      runInCI: false
+
   lint:
     command: "oxlint"
     inputs:

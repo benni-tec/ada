@@ -41,6 +41,8 @@ jobs:
         run: git branch --force "$GITHUB_BASE_REF" "origin/$GITHUB_BASE_REF"
       - uses: jdx/mise-action@v5
       - run: uv sync --locked
+      # The migration and repository tests need PostgreSQL, set up as in development.
+      - run: docker compose -f docker-compose.infra.yml up -d --wait postgres
       - run: moon run backend:lint backend:format backend:test
 
   images:

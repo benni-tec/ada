@@ -13,11 +13,6 @@ pytestmark = pytest.mark.anyio
 
 
 @pytest.fixture
-def anyio_backend() -> str:
-    return "asyncio"
-
-
-@pytest.fixture
 async def client(unreachable_settings: Settings) -> AsyncIterator[Client]:
     container = create_container(unreachable_settings, FastapiProvider())
     try:

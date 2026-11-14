@@ -1,12 +1,15 @@
 """The `ada` command: `serve` starts the API, `migrate` prepares the database before
-anything can use it, `revision` writes a migration from the model changes."""
+anything can use it, `revision` writes a migration from the model changes, `openapi`
+prints the API's schema."""
 
 import argparse
+import json
 
 import uvicorn
 
 from ada.adapters.db.migrate import migrate, write_revision
 from ada.config import Settings
+from ada.entrypoints.http.app import create_app
 
 
 def main() -> None:
@@ -16,6 +19,7 @@ def main() -> None:
     commands.add_parser("migrate", help="bring the database schema up to date")
     revision = commands.add_parser("revision", help="write a migration from the model changes")
     revision.add_argument("message")
+    commands.add_parser("openapi", help="print the OpenAPI schema of the API")
     args = parser.parse_args()
 
     match args.command:
@@ -27,6 +31,12 @@ def main() -> None:
                 print("Database schema is up to date")
         case "revision":
             write_revision(Settings().database_url, args.message)
+        case "openapi":
+            # Building the app connects to nothing, so the schema needs no real settings.
+            settings = Settings(
+                database_url="postgresql+psycopg://unused/", valkey_url="redis://unused"
+            )
+            print(json.dumps(create_app(settings).openapi(), indent=2, sort_keys=True))
         case _:
             uvicorn.run(
                 "ada.entrypoints.http.app:create_app", factory=True, host="0.0.0.0", port=8000

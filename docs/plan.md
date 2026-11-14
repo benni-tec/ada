@@ -33,9 +33,10 @@ everyone:
 `tach.toml` works at package level, so new files inside an existing package need no
 change to it.
 
-## Foundation (one agent, before anything else)
+## Foundation (done)
 
-Runs alone on `main`. Everything after it branches from its result.
+Ran alone on `main`. Everything after it branches from its result. What it fixed is
+written down in `docs/contracts.md`, which every workstream reads first.
 
 - **F0. Spec in the repo.** Export the design document to `docs/spec.md`.
 - **F1. Core models.** Project, DataSource, Session, Operator and its six kinds, Schema
@@ -50,8 +51,10 @@ Runs alone on `main`. Everything after it branches from its result.
   specs and SQLAlchemy's version counter on the mutable tables.
 - **F4. Discovery.** Routers, MCP tool modules, worker task modules and dishka providers
   are found by package scan.
-- **F5. Fakes.** An in-memory fake for every outbound port in `tests/fakes`, plus a
-  conflict error type for revision mismatches. Workstreams test against these.
+- **F5. Fakes.** In-memory repositories, event bus and task dispatcher in
+  `ada/adapters/memory`, bound by default; test-only fakes for the clock, source readers
+  and the analysis store in `tests/fakes.py`. Ports nobody has implemented are bound to
+  stand-ins, so the application starts in every branch.
 - **F6. Typed client.** A task that writes the OpenAPI schema and generates the
   TypeScript client into `services/frontend/src/lib/api`.
 - **F7. Contract notes.** `docs/contracts.md`: the widget protocol (how a widget asks

@@ -1,0 +1,135 @@
+{
+  "components": {
+    "schemas": {
+      "Health": {
+        "properties": {
+          "analysis_store": {
+            "description": "DuckDB over the snapshot directory",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Analysis Store",
+            "type": "string"
+          },
+          "api": {
+            "const": "ok",
+            "description": "Always ok when the API can answer at all",
+            "title": "Api",
+            "type": "string"
+          },
+          "database": {
+            "description": "PostgreSQL, which holds the definitions",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Database",
+            "type": "string"
+          },
+          "queue": {
+            "description": "Valkey, the task queue broker",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Queue",
+            "type": "string"
+          },
+          "status": {
+            "description": "Aggregate: ok only if every part is ok",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "worker": {
+            "description": "Task worker and scheduler, judged by their heartbeat",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "api",
+          "database",
+          "queue",
+          "worker",
+          "analysis_store"
+        ],
+        "title": "Health",
+        "type": "object"
+      },
+      "Liveness": {
+        "properties": {
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Liveness",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "ADA",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "description": "Liveness for container healthchecks: the API answers, whatever its dependencies do.",
+        "operationId": "live_api_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Liveness"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  }
+}
