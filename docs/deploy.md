@@ -12,7 +12,7 @@ ada runs on one Verda VM that it shares with another project, "Tell me when". Pu
   The deploy runs `docker compose -f docker-compose.yml -f docker-compose.deploy.yml` at
   `VERSION=sha-<sha>`.
 - **Caddy**, owned by the other project, holds ports 80 and 443 and proxies
-  `https://ada.65-109-75-63.sslip.io` to `ada-gateway:80` over the external Docker network
+  `https://ada.95-133-254-42.sslip.io` to `ada-gateway:80` over the external Docker network
   `edge`. ada publishes no host ports: the override removes the PostgreSQL, Valkey and gateway
   ones, because Docker bypasses the host firewall.
 
@@ -23,7 +23,7 @@ starts, or `up` fails with "network edge not found".
 
 | Secret | Value |
 | --- | --- |
-| `DEPLOY_HOST` | The VM's address (`65.109.75.63`). A recreated VM changes this and the URL in the workflow's health check. |
+| `DEPLOY_HOST` | The VM's address (`95.133.254.42`). A recreated VM changes this and the URL in the workflow's health check. |
 | `DEPLOY_SSH_KEY` | Private key of a user on the VM that may run Docker (the controller's `~/.ssh/ada_deploy`). |
 | `DEPLOY_KNOWN_HOSTS` | The VM's host key line (the controller's `~/.ssh/ada_known_hosts`); the connection fails on a mismatch. |
 | `DEPLOY_USER` | Optional, default `root`. |
@@ -44,4 +44,4 @@ CI never writes these two in `/opt/ada`:
 Run the CI workflow by hand from main (Actions, CI, Run workflow; other branches never deploy) with `ref` set to an earlier commit
 whose images exist. It deploys that commit's `sha-<short>` images; the compose files come from
 that commit too. Re-running the workflow run of an earlier push does the same. The deploy
-then checks `https://ada.65-109-75-63.sslip.io/api/health/live` for about 90 seconds.
+then checks `https://ada.95-133-254-42.sslip.io/api/health/live` for about 90 seconds.

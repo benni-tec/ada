@@ -177,7 +177,7 @@ jobs:
 
           # The gateway sends /api to the backend, so this reaches its liveness route through
           # Caddy, the gateway and the backend. The host is the VM's sslip.io name.
-          url=https://ada.65-109-75-63.sslip.io/api/health/live
+          url=https://ada.95-133-254-42.sslip.io/api/health/live
           for _ in $(seq 18); do
             curl -fsS --max-time 5 "$url" && exit 0
             sleep 5
