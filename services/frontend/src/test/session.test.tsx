@@ -107,7 +107,7 @@ test('adds a message', async () => {
   serveSession({
     'POST /api/sessions/s1/messages': (body: unknown) => {
       sent.push(body)
-      return entry({ id: 'e5', text: 'And mortality?' })
+      return json({ entry: entry({ id: 'e5', text: 'And mortality?' }), turn: null }, 201)
     },
   })
   renderAt('/projects/p1/sessions/s1')
@@ -115,7 +115,8 @@ test('adds a message', async () => {
   fireEvent.change(await screen.findByLabelText('Message'), { target: { value: 'And mortality?' } })
   fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-  await waitFor(() => expect(sent).toEqual([{ text: 'And mortality?' }]))
+  // No models file is known here: the message goes without a model, and no context.
+  await waitFor(() => expect(sent).toEqual([{ text: 'And mortality?', context: [] }]))
   await waitFor(() => expect(screen.getByLabelText('Message')).toHaveValue(''))
 })
 

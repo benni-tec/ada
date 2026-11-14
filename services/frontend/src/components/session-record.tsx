@@ -1,32 +1,31 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useId, useState, type FormEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Code } from 'lucide-react'
 
-import {
-  addMessage,
-  keys,
-  operatorQuery,
-  widgetQuery,
-  type Id,
-  type SessionEntry,
-  type Widget,
-} from '@/lib/api'
+import { operatorQuery, widgetQuery, type Id, type SessionEntry, type Widget } from '@/lib/api'
 import type { CardRun } from '@/lib/view-run'
 
+import { AgentTurnEntry } from './chat/agent-turn'
+import { RecordedContext } from './chat/context-chips'
 import { ErrorNotice } from './notices'
 import { Provenance } from './provenance'
+import { Bubble, BubbleContent } from './ui/bubble'
+import { Message, MessageContent } from './ui/message'
 import { WidgetCard } from './widget-card'
 
 /**
- * A session's record in order: messages, operators added and widgets shown. It is not a
- * chat transcript; an external agent's conversation happens in its own client, and only
- * its tool calls land here.
+ * A session's record in order, as a conversation: the person's messages, the platform
+ * agent's answers with the steps it took, and the operators and widgets that were made
+ * (by that agent, or by an external one whose own conversation happens in its client and
+ * only its tool calls land here).
  */
 export function SessionRecord({
+  projectId,
   entries,
   widgets,
   run,
   highlightedWidget,
 }: {
+  projectId: Id
   entries: SessionEntry[]
   widgets: Map<Id, Widget>
   /** The session's run: every widget card reads it. */
@@ -35,17 +34,21 @@ export function SessionRecord({
 }) {
   if (entries.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700">
-        Nothing here yet. Write a message, or let an agent work in this session over MCP.
+      <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+        Nothing here yet. Write a message below, or let an agent work in this session over MCP.
       </p>
     )
   }
   return (
-    <ol aria-label="Session record" className="flex flex-col gap-4">
+    <ol aria-label="Session record" className="flex flex-col gap-5">
       {entries.map((entry) => (
         <li key={entry.id}>
           {entry.kind === 'message' ? (
-            <MessageEntry entry={entry} />
+            <MessageEntry entry={entry} projectId={projectId} />
+          ) : entry.kind === 'agent_turn' ? (
+            entry.ref ? (
+              <AgentTurnEntry turnId={entry.ref} />
+            ) : null
           ) : entry.kind === 'operator' ? (
             <OperatorEntry entry={entry} />
           ) : (
@@ -62,12 +65,22 @@ export function SessionRecord({
   )
 }
 
-function MessageEntry({ entry }: { entry: SessionEntry }) {
+/** A message: the person's on the right, anyone else's (an external agent's) on the left. */
+function MessageEntry({ entry, projectId }: { entry: SessionEntry; projectId: Id }) {
+  const own = entry.actor.kind === 'user'
+  const align = own ? 'end' : 'start'
   return (
-    <div className="flex flex-col gap-1 rounded-lg bg-neutral-100 px-4 py-3 dark:bg-neutral-900">
-      <Provenance actor={entry.actor} at={entry.created_at} />
-      <p className="text-sm whitespace-pre-wrap">{entry.text}</p>
-    </div>
+    <Message align={align}>
+      <MessageContent className="gap-1.5">
+        <div className={own ? 'self-end' : undefined}>
+          <Provenance actor={entry.actor} at={entry.created_at} />
+        </div>
+        <Bubble align={align} variant={own ? 'secondary' : 'outline'}>
+          <BubbleContent className="whitespace-pre-wrap">{entry.text}</BubbleContent>
+        </Bubble>
+        {entry.context && entry.context.length > 0 && <RecordedContext context={entry.context} projectId={projectId} />}
+      </MessageContent>
+    </Message>
   )
 }
 
@@ -85,15 +98,11 @@ function OperatorEntry({ entry }: { entry: SessionEntry }) {
   const sql = operator?.kind === 'transform' && typeof operator.params.sql === 'string' ? operator.params.sql : null
   const external = entry.actor.kind === 'external_agent'
   return (
-    <div
-      className={`flex flex-col gap-1 border-l-2 py-1 pl-4 ${
-        external ? 'border-violet-400 dark:border-violet-700' : 'border-neutral-300 dark:border-neutral-700'
-      }`}
-    >
+    <div className={`flex flex-col gap-1 border-l-2 py-1 pl-4 ${external ? 'border-violet-400 dark:border-violet-700' : 'border-border'}`}>
       <p className="text-sm font-medium">
         {operator ? (operatorKinds[operator.kind] ?? `Added a ${operator.kind} operator`) : 'Added an operator'}
         {operator && (
-          <span className="ml-2 font-normal text-neutral-500">
+          <span className="ml-2 font-normal text-muted-foreground">
             {operator.output.columns.length} column{operator.output.columns.length === 1 ? '' : 's'}
           </span>
         )}
@@ -101,8 +110,11 @@ function OperatorEntry({ entry }: { entry: SessionEntry }) {
       <Provenance actor={entry.actor} at={entry.created_at} note={entry.text} />
       {sql && (
         <details className="text-xs">
-          <summary className="cursor-pointer text-neutral-600 dark:text-neutral-400">SQL</summary>
-          <pre className="mt-1 overflow-x-auto rounded bg-neutral-100 p-2 dark:bg-neutral-900">{sql}</pre>
+          <summary className="flex cursor-pointer items-center gap-1 text-muted-foreground">
+            <Code aria-hidden="true" className="size-3.5" />
+            SQL
+          </summary>
+          <pre className="mt-1 overflow-x-auto rounded bg-muted p-2">{sql}</pre>
         </details>
       )}
     </div>
@@ -124,54 +136,6 @@ function WidgetEntry({
   const { data, error } = useQuery({ ...widgetQuery(entry.ref ?? ''), enabled: !!entry.ref && !known })
   const widget = known ?? data
   if (error) return <ErrorNotice error={error} prefix="This widget cannot be shown:" />
-  if (!widget) return <div className="h-40 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-900" />
+  if (!widget) return <div className="h-40 animate-pulse rounded-lg bg-muted" />
   return <WidgetCard widget={widget} run={run} highlighted={highlighted} />
-}
-
-/** Adds a message to the session. Ctrl or Cmd with Enter sends. */
-export function MessageForm({ sessionId }: { sessionId: Id }) {
-  const queryClient = useQueryClient()
-  const inputId = useId()
-  const [text, setText] = useState('')
-  const send = useMutation({
-    mutationFn: (message: string) => addMessage(sessionId, message),
-    onSuccess: () => {
-      setText('')
-      return queryClient.invalidateQueries({ queryKey: keys.entries(sessionId) })
-    },
-  })
-
-  const submit = (event?: FormEvent) => {
-    event?.preventDefault()
-    if (text.trim() !== '' && !send.isPending) send.mutate(text.trim())
-  }
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
-      <label htmlFor={inputId} className="text-sm font-medium">
-        Message
-      </label>
-      <textarea
-        id={inputId}
-        value={text}
-        rows={3}
-        onChange={(event) => setText(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) submit()
-        }}
-        placeholder="Add a note or a question to the session"
-        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-      />
-      <div className="flex items-center justify-between gap-3">
-        {send.error ? <ErrorNotice error={send.error} prefix="Not sent:" /> : <span />}
-        <button
-          type="submit"
-          disabled={send.isPending || text.trim() === ''}
-          className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-        >
-          {send.isPending ? 'Sending…' : 'Send'}
-        </button>
-      </div>
-    </form>
-  )
 }

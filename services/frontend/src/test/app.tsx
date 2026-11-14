@@ -6,7 +6,7 @@ import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/rea
 import { render } from '@testing-library/react'
 import { vi } from 'vitest'
 
-import type { Actor, Project, Session, SessionEntry, Widget } from '@/lib/api'
+import type { Actor, AgentTurn, LlmModels, Pipeline, Project, Session, SessionEntry, Widget } from '@/lib/api'
 import { routeTree } from '@/routeTree.gen'
 
 type Handler = (body: unknown, request: Request) => Response | unknown
@@ -141,4 +141,65 @@ export function widget(overrides: Partial<Widget> = {}): Widget {
     created_at: '2026-11-01T09:10:00Z',
     ...overrides,
   }
+}
+
+// Wave 3: the agent (docs/contracts/wave3.md)
+
+export function turn(overrides: Partial<AgentTurn> = {}): AgentTurn {
+  return {
+    id: 't1',
+    session_id: 's1',
+    prompt_entry_id: 'e1',
+    model: 'gemini/flash',
+    status: 'running',
+    parts: [],
+    error: null,
+    created_at: '2026-11-01T09:06:01Z',
+    finished_at: null,
+    ...overrides,
+  }
+}
+
+export function models(overrides: Partial<LlmModels> = {}): LlmModels {
+  return {
+    models: [
+      { id: 'gemini/flash', provider: 'gemini', model: 'flash', purposes: ['session_agent'], available: true, reason: null },
+      { id: 'gemini/pro', provider: 'gemini', model: 'pro', purposes: [], available: true, reason: null },
+      {
+        id: 'mistral/large',
+        provider: 'mistral',
+        model: 'large',
+        purposes: [],
+        available: false,
+        reason: 'MISTRAL_API_KEY is not set',
+      },
+    ],
+    session_agent: 'gemini/flash',
+    ...overrides,
+  }
+}
+
+export function pipeline(overrides: Partial<Pipeline> = {}): Pipeline {
+  return {
+    operator_id: 'op_p1',
+    name: 'Screening by county',
+    kind: 'transform',
+    sources: [{ data_source_id: 'ds1', name: 'Sotkanet screening' }],
+    output: {
+      kind: 'table',
+      columns: [
+        { name: 'county', type: 'text', nullable: true },
+        { name: 'participation', type: 'number', nullable: true },
+      ],
+      roles: { measures: [] },
+      derived: true,
+    } as Pipeline['output'],
+    created_at: '2026-11-01T09:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Sends one event on the page's live stream. */
+export function emit(type: string, payload: Record<string, unknown>) {
+  FakeEventSource.latest().emit(type, { type, project_id: 'p1', payload, at: '2026-11-01T10:00:00Z' })
 }

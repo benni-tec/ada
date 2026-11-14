@@ -20,6 +20,13 @@ declare module '@tanstack/react-router' {
   }
 }
 
+// Development only (`?mock-agent=1`): answers the wave 3 agent routes from memory, so the
+// chat can be looked at before the backend has them. A production build drops it.
+if (import.meta.env.DEV) {
+  const { installMockAgent, mockAgentWanted } = await import('./dev/mock-agent')
+  if (mockAgentWanted()) installMockAgent()
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

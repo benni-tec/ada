@@ -1,15 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useMemo } from 'react'
 
+import { ChatDraftContext, useChatDraftState } from '@/components/chat/chat-draft'
+import { SessionChat } from '@/components/chat/session-chat'
 import { DashboardPanel } from '@/components/dashboards/dashboard-panel'
 import { EditableTitle } from '@/components/editable-title'
-import { ErrorNotice, Loading } from '@/components/notices'
-import { MessageForm, SessionRecord } from '@/components/session-record'
-import { entriesQuery, getSession, keys, renameSession, sessionQuery, sessionWidgetsQuery } from '@/lib/api'
+import { ConflictNotice, ErrorNotice, Loading } from '@/components/notices'
+import { PageType } from '@/components/page-header'
+import { getSession, keys, renameSession, sessionQuery, setPanelDashboard, type Session } from '@/lib/api'
 import { useRevisedUpdate } from '@/lib/revisions'
-import { useProjectRun } from '@/lib/view-run'
-import { SessionCrumb } from '@/components/breadcrumbs'
 
 type Search = {
   /** A widget to scroll to and highlight; the MCP tools link to it this way. */
@@ -17,19 +16,21 @@ type Search = {
 }
 
 export const Route = createFileRoute('/projects/$projectId/sessions/$sessionId')({
-  staticData: { crumb: SessionCrumb },
   validateSearch: (search: Record<string, unknown>): Search =>
     typeof search.widget === 'string' && search.widget !== '' ? { widget: search.widget } : {},
   component: SessionPage,
 })
 
+/**
+ * A session: its conversation with the agent and the record of what was made, and when
+ * the session has one, its dashboard beside it, half and half.
+ */
 function SessionPage() {
   const { projectId, sessionId } = Route.useParams()
   const { widget: highlighted } = Route.useSearch()
   const session = useQuery(sessionQuery(sessionId))
-  const entries = useQuery(entriesQuery(sessionId))
-  const widgets = useQuery(sessionWidgetsQuery(sessionId))
-  const widgetsById = useMemo(() => new Map((widgets.data ?? []).map((widget) => [widget.id, widget])), [widgets.data])
+  // The page holds the draft, so the dashboard half's "Add widget" can put its chip on it.
+  const draft = useChatDraftState()
   const rename = useRevisedUpdate({
     queryKey: keys.session(sessionId),
     read: () => getSession(sessionId),
@@ -39,48 +40,48 @@ function SessionPage() {
       'Your title was not saved; save again to replace it.',
     alsoInvalidate: [keys.sessions(projectId)],
   })
+  const detach = useRevisedUpdate({
+    queryKey: keys.session(sessionId),
+    read: () => getSession(sessionId),
+    update: (current: Session) => setPanelDashboard(current, null),
+    describeConflict: () =>
+      'Someone else changed this session meanwhile, so the dashboard was not detached. It has been read again; try again.',
+  })
 
-  // One run for the whole record, as a dashboard has: every card shows the same cut, and
-  // a new run follows changed data.
-  const run = useProjectRun(projectId)
-
-  useScrollToWidget(highlighted, entries.isSuccess)
-
-  if (session.isPending) return <Loading what="the session" />
-  if (session.error) return <ErrorNotice error={session.error} prefix="The session cannot be loaded:" />
+  if (session.isPending)
+    return (
+      <div className="p-6">
+        <Loading what="the session" />
+      </div>
+    )
+  if (session.error)
+    return (
+      <div className="p-6">
+        <ErrorNotice error={session.error} prefix="The session cannot be loaded:" />
+      </div>
+    )
 
   const panel = session.data.panel_dashboard_id
   return (
-    <div className={panel ? 'grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]' : 'mx-auto w-full max-w-4xl'}>
-      <div className="flex min-w-0 flex-col gap-6">
-        <EditableTitle value={session.data.title} label="session title" {...rename} />
-        {entries.isPending ? (
-          <Loading what="the session record" />
-        ) : entries.error ? (
-          <ErrorNotice error={entries.error} prefix="The session record cannot be loaded:" />
-        ) : (
-          <>
-            {run.error && <ErrorNotice error={run.error} prefix="The data cannot be read:" />}
-            <SessionRecord
-              entries={entries.data}
-              widgets={widgetsById}
-              run={{ id: run.data?.id ?? null, frozen: false, what: 'The session’s current run' }}
-              highlightedWidget={highlighted}
-            />
-          </>
+    <ChatDraftContext value={draft}>
+      <div className="flex h-full min-h-0 flex-col lg:flex-row">
+        <section aria-label="Conversation" className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <header className="mx-auto flex w-full max-w-4xl shrink-0 flex-col gap-1 px-4 pt-4">
+            <PageType type="session" />
+            <EditableTitle value={session.data.title} label="session title" {...rename} />
+            {detach.conflict && <ConflictNotice message={detach.conflict} onDismiss={detach.reset} />}
+            {detach.error && <ErrorNotice error={new Error(detach.error)} prefix="Not detached:" />}
+          </header>
+          <SessionChat projectId={projectId} sessionId={sessionId} highlightedWidget={highlighted} />
+        </section>
+        {panel && (
+          <DashboardPanel
+            dashboardId={panel}
+            onDetach={() => void detach.save(null).catch(() => {})}
+            detaching={detach.pending}
+          />
         )}
-        <MessageForm sessionId={sessionId} />
       </div>
-      {panel && <DashboardPanel dashboardId={panel} />}
-    </div>
+    </ChatDraftContext>
   )
-}
-
-/** Brings the widget named in the address into view once the record is there. */
-function useScrollToWidget(widgetId: string | undefined, ready: boolean) {
-  useEffect(() => {
-    if (!widgetId || !ready) return
-    // jsdom has no scrollIntoView.
-    document.getElementById(`widget-${widgetId}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
-  }, [widgetId, ready])
 }
