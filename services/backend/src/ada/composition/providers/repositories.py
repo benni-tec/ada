@@ -9,6 +9,7 @@ from ada.adapters.db.llm_repositories import (
     SqlLlmModelRepository,
     SqlLlmProviderRepository,
 )
+from ada.adapters.db.model_repositories import SqlStatisticalModelRepository
 from ada.adapters.db.pipeline_repositories import (
     SqlOperatorRepository,
     SqlRunRepository,
@@ -46,6 +47,7 @@ from ada.core.ports.repositories import (
     RunRepository,
     SessionRepository,
     SnapshotRepository,
+    StatisticalModelRepository,
     TemplateRepository,
     WidgetRepository,
 )
@@ -77,6 +79,7 @@ class RepositoryProvider(Provider):
     llm_models = provide(SqlLlmModelRepository, provides=LlmModelRepository)
     agent_settings = provide(SqlAgentSettingsRepository, provides=AgentSettingsRepository)
     judge_settings = provide(SqlJudgeSettingsRepository, provides=JudgeSettingsRepository)
+    statistical_models = provide(SqlStatisticalModelRepository, provides=StatisticalModelRepository)
 
     source_locks = provide(SqlSourceLocks, provides=SourceLocks)
     # Its own connection per record, from the engine, not the request's session.

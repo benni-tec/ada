@@ -29,6 +29,7 @@ from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionAgent, SessionEntry
 from ada.core.models.sources import DataSource, FreshnessPolicy
+from ada.core.models.statistical_models import ModelVersion, StatisticalModel
 from ada.core.models.widgets import Widget
 from ada.core.ports.agents import ResearchCalls, TurnProgress
 from ada.core.ports.repositories import (
@@ -48,6 +49,7 @@ from ada.core.ports.repositories import (
     RunRepository,
     SessionRepository,
     SnapshotRepository,
+    StatisticalModelRepository,
     TemplateRepository,
     WidgetRepository,
 )
@@ -101,6 +103,8 @@ class MemoryStore:
             kind: JudgeDefaults(kind=kind, revision=1) for kind in JudgeKind
         }
         self.judge_overrides: dict[tuple[Id, JudgeKind], JudgeOverride] = {}
+        self.statistical_models: dict[Id, StatisticalModel] = {}
+        self.model_versions: dict[tuple[Id, int], ModelVersion] = {}
 
     def forget_model(self, key: tuple[Id, str]) -> None:
         """Remove a model and clear the selections naming it, as ON DELETE SET NULL does."""
@@ -859,3 +863,28 @@ class MemoryJudgeSettingsRepository(JudgeSettingsRepository):
         except NotFound:
             return record.model_copy(update={"model_id": None})
         return record
+
+
+class MemoryStatisticalModelRepository(StatisticalModelRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def get(self, id: Id) -> StatisticalModel:
+        return _get(self.store.statistical_models, "statistical model", id)
+
+    async def list(self, project_id: Id) -> Sequence[StatisticalModel]:
+        return [m for m in self.store.statistical_models.values() if m.project_id == project_id]
+
+    async def add(self, model: StatisticalModel) -> None:
+        _get(self.store.projects, "project", model.project_id)
+        self.store.statistical_models[model.id] = model
+
+    async def add_version(self, version: ModelVersion) -> None:
+        model = _get(self.store.statistical_models, "statistical model", version.model_id)
+        self.store.model_versions[(version.model_id, version.version)] = version
+        self.store.statistical_models[model.id] = model.model_copy(
+            update={"latest_version": max(model.latest_version, version.version)}
+        )
+
+    async def version(self, model_id: Id, number: int) -> ModelVersion:
+        return _get(self.store.model_versions, "model version", (model_id, number))

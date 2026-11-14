@@ -660,7 +660,7 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
     verbs = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
     verbs |= {"pin", "edit", "set", "show", "generate", "check", "build", "query", "search"}
     verbs |= {"read", "extract", "map", "watch", "unwatch", "delegate", "report", "review"}
-    verbs |= {"attach", "detach"}
+    verbs |= {"attach", "detach", "evaluate"}
     injected = {"service", "projects", "pipelines", "sessions", "widgets", "runs", "dispatcher"}
     injected |= {"exploration", "batches", "refreshes", "web", "research", "attachments"}
     injected |= {"reviews"}

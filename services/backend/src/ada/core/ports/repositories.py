@@ -36,6 +36,7 @@ from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionEntry
 from ada.core.models.sources import DataSource, FreshnessPolicy
+from ada.core.models.statistical_models import ModelVersion, StatisticalModel
 from ada.core.models.widgets import Widget
 
 
@@ -379,4 +380,20 @@ class AttachmentRepository(Protocol):
 
     async def sessions_with(self, kind: AttachmentKind, ref: str) -> Sequence[Id]:
         """The sessions that have this thing attached, in the order it was attached."""
+        ...
+
+
+class StatisticalModelRepository(Protocol):
+    """Statistical models and their immutable versions."""
+
+    async def get(self, id: Id) -> StatisticalModel: ...
+    async def list(self, project_id: Id) -> Sequence[StatisticalModel]: ...
+    async def add(self, model: StatisticalModel) -> None: ...
+
+    async def add_version(self, version: ModelVersion) -> None:
+        """Store a version and point its model's `latest_version` at it."""
+        ...
+
+    async def version(self, model_id: Id, number: int) -> ModelVersion:
+        """NotFound for an unknown model or version."""
         ...

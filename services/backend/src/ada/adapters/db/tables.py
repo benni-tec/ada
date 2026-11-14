@@ -549,3 +549,35 @@ class WebUsageRow(Base):
     )
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     credits: Mapped[int] = mapped_column(Integer)
+
+
+class StatisticalModelRow(Base):
+    __tablename__ = "statistical_models"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    project_id: Mapped[UUID] = _project()
+    name: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(String(32))
+    # The number of the newest version; the versions point back at the model.
+    latest_version: Mapped[int] = mapped_column(Integer)
+    created_by: Mapped[Json] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+
+
+class StatisticalModelVersionRow(Base):
+    """Immutable: what a version was built from (the spec) and what the build derived."""
+
+    __tablename__ = "statistical_model_versions"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    model_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("statistical_models.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    spec: Mapped[Json] = mapped_column(JSONB)
+    compiled: Mapped[Json] = mapped_column(JSONB)
+    created_by: Mapped[Json] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+
+    __table_args__ = (UniqueConstraint("model_id", "version"),)

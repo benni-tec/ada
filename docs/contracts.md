@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent), `0010` named widget inputs and render errors, `0011` session attachments, widget verdicts and the sidebar's order (`dashboards.position`, `reports.position`), `0012` the judges (`judge_defaults`, seeded, and `project_judges`) |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent), `0010` named widget inputs and render errors, `0011` session attachments, widget verdicts and the sidebar's order (`dashboards.position`, `reports.position`), `0012` the judges (`judge_defaults`, seeded, and `project_judges`), `0013` agent turn recovery, `0014` the freshness policy a source had before it was watched, `0015` statistical models (`statistical_models`, `statistical_model_versions`) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -1088,7 +1088,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 
 Tool names are snake case and start with a verb (`list create register update refresh
 add get preview system pin edit set show generate check build query search read extract
-map watch unwatch delegate report`; `tests/test_api.py`). Tools
+map watch unwatch delegate report review attach detach evaluate`; `tests/test_api.py`). Tools
 that create something take a `note`: one line on why the agent is doing this, shown in
 the session. The acting `Actor` is
 `external_agent` with the client name the MCP host reported when it connected; a client
