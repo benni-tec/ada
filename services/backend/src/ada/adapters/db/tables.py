@@ -355,6 +355,9 @@ class WidgetRow(Base):
     copied_from: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("widgets.id", ondelete="SET NULL")
     )
+    # Further inputs by name ({name: operator id}); not foreign keys, checked by the service.
+    inputs: Mapped[Json] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    render_error: Mapped[str | None] = mapped_column(Text)
 
 
 class ReportRow(Base):

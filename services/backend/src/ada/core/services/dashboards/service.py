@@ -144,6 +144,7 @@ class Dashboards(DashboardService):
             id=uuid7(),
             project_id=original.project_id,
             operator_id=original.operator_id,
+            inputs=original.inputs,
             type=original.type,
             title=original.title,
             spec=original.spec,

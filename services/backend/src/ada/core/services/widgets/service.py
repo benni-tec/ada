@@ -1,12 +1,13 @@
+import re
 from collections.abc import Sequence
 from uuid import UUID, uuid7
 
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.base import Id, JsonObject
-from ada.core.models.errors import Invalid
+from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import Event, EventType
 from ada.core.models.operators import OperatorId, OperatorKind
-from ada.core.models.widgets import Widget, WidgetData
+from ada.core.models.widgets import MAIN_INPUT, Widget, WidgetData
 from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import (
     DataSourceRepository,
@@ -23,6 +24,10 @@ from ada.core.services.schema.roles import check_widget
 # Who starts the run when a widget asks for its data without naming one: nobody asked for
 # it, the widget did, so it is the platform's doing.
 WIDGET_ACTOR = Actor(kind=ActorKind.SYSTEM, name="widget")
+
+# Further inputs a widget may read besides its own operator, and how they are named.
+MAX_INPUTS = 8
+INPUT_NAME = re.compile(r"[a-z][a-z0-9_]{0,31}")
 
 
 class Widgets(WidgetService):
@@ -56,12 +61,14 @@ class Widgets(WidgetService):
         spec: JsonObject | None = None,
         note: str = "",
         session_id: Id | None = None,
+        inputs: dict[str, OperatorId] | None = None,
     ) -> Widget:
         if not type.strip():
             raise Invalid("A widget needs a type")
         operator = await self.operators.get(operator_id)
         if operator.project_id != project_id:
             raise Invalid("The operator belongs to another project")
+        inputs = await self._inputs(project_id, inputs or {})
         # What the widget needs (a measure, an x and a y, a geography role) must be
         # declared on its operator now, not discovered when someone first looks at it.
         check_widget(type.strip(), operator.output, spec or {})
@@ -80,6 +87,7 @@ class Widgets(WidgetService):
             note=note,
             created_by=actor,
             created_at=self.clock.now(),
+            inputs=inputs,
         )
         await self.widgets.add(widget)
         payload = {"widget_id": str(widget.id)}
@@ -104,9 +112,12 @@ class Widgets(WidgetService):
         note: str | None = None,
         type: str | None = None,
         spec: JsonObject | None = None,
+        inputs: dict[str, OperatorId] | None = None,
     ) -> Widget:
         widget = await self.widgets.get(id)
         changes: dict[str, object] = {}
+        if inputs is not None:
+            changes["inputs"] = await self._inputs(widget.project_id, inputs)
         if title is not None:
             if not title.strip():
                 raise Invalid("A widget needs a title")
@@ -147,26 +158,52 @@ class Widgets(WidgetService):
         await self.sessions.get(session_id)
         return await self.widgets.list_by_session(session_id)
 
-    async def data(self, id: Id, run_id: Id | None = None, limit: int = 1000) -> WidgetData:
+    async def data(
+        self, id: Id, run_id: Id | None = None, limit: int = 1000, input: str = MAIN_INPUT
+    ) -> WidgetData:
         widget = await self.widgets.get(id)
+        operator_id = widget.all_inputs().get(input)
+        if operator_id is None:
+            names = ", ".join(widget.all_inputs())
+            raise Invalid(f"Widget {widget.id} has no input {input!r}; it has {names}")
         if run_id is None:
             run = await self.runs.start(widget.project_id, WIDGET_ACTOR)
         else:
             run = await self.runs.get(run_id)
             if run.project_id != widget.project_id:
                 raise Invalid("The run belongs to another project than the widget")
-        rows = await self.runs.read(run.id, widget.operator_id, limit)
-        operator = await self.operators.get(widget.operator_id)
+        rows = await self.runs.read(run.id, operator_id, limit)
+        operator = await self.operators.get(operator_id)
         return WidgetData(
             widget_id=widget.id,
             run_id=run.id,
+            input=input,
             output=operator.output,
             columns=rows.columns,
             rows=rows.rows,
             truncated=rows.truncated,
             is_scenario=run.is_scenario,
-            is_stale=await self._is_stale(widget.operator_id),
+            is_stale=await self._is_stale(operator_id),
         )
+
+    async def _inputs(self, project_id: Id, inputs: dict[str, OperatorId]) -> dict[str, OperatorId]:
+        """Further inputs, checked: a name each (lowercase, digits and _, not "main"), at
+        most MAX_INPUTS, every operator in the widget's project."""
+        if len(inputs) > MAX_INPUTS:
+            raise Invalid(f"A widget reads at most {MAX_INPUTS} further inputs")
+        for name, operator_id in inputs.items():
+            if name == MAIN_INPUT or not INPUT_NAME.fullmatch(name):
+                raise Invalid(
+                    f"Input name {name!r}: lowercase letters, digits and _, starting with a "
+                    f"letter, and not {MAIN_INPUT!r} (the widget's own operator)"
+                )
+            try:
+                operator = await self.operators.get(operator_id)
+            except NotFound:
+                raise Invalid(f"Input {name!r}: operator {operator_id} does not exist") from None
+            if operator.project_id != project_id:
+                raise Invalid(f"Input {name!r}: operator {operator_id} belongs to another project")
+        return dict(inputs)
 
     async def _is_stale(self, operator_id: OperatorId) -> bool:
         """Whether a data source behind the operator failed its last refresh. Its widgets

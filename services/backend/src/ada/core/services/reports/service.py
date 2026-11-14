@@ -298,7 +298,9 @@ class Reports(ReportService):
         dashboard_version_id: Id | None,
     ) -> ReportVersion:
         widgets = [await self.widgets.get(id) for id in tree.widget_ids(blocks)]
-        for operator_id in dict.fromkeys(widget.operator_id for widget in widgets):
+        # Every input of every widget, so a widget with several inputs is frozen whole.
+        operators = (op for widget in widgets for op in widget.all_inputs().values())
+        for operator_id in dict.fromkeys(operators):
             # Fixes the snapshots the widget reads; a run reused by a later version
             # keeps what it fixed first.
             run = await self.runs.execute(run.id, operator_id)
@@ -361,7 +363,8 @@ class Reports(ReportService):
             raise Invalid(f"The content shows widget {widget_id}, which does not exist") from None
 
     async def _operators(self, blocks: Sequence[tree.Block]) -> frozenset[str]:
-        return frozenset([(await self._widget(id)).operator_id for id in tree.widget_ids(blocks)])
+        widgets = [await self._widget(id) for id in tree.widget_ids(blocks)]
+        return frozenset(op for widget in widgets for op in widget.all_inputs().values())
 
     async def _template(self, template_id: Id | None, project_id: Id) -> Template | None:
         if template_id is None:

@@ -18,8 +18,10 @@ class WidgetService(Protocol):
         spec: JsonObject | None = None,
         note: str = "",
         session_id: Id | None = None,
+        inputs: dict[str, OperatorId] | None = None,
     ) -> Widget:
-        """A widget on an operator's output. It is created from an operator id only; no
+        """A widget on an operator's output, and on further named `inputs` if given (each an
+        operator of the project; see Widget.inputs). It is created from an operator id only; no
         data passes through the caller. With a session id it is also recorded there."""
         ...
 
@@ -30,8 +32,10 @@ class WidgetService(Protocol):
         note: str | None = None,
         type: str | None = None,
         spec: JsonObject | None = None,
+        inputs: dict[str, OperatorId] | None = None,
     ) -> Widget:
-        """Change a widget in place; what is left out stays. A new spec replaces the old
+        """Change a widget in place; what is left out stays. New `inputs` replace the old
+        ones whole. A new spec replaces the old
         one whole and is checked against the operator like a new widget's. Copies on
         dashboards are widgets of their own and do not change with it."""
         ...
@@ -40,7 +44,10 @@ class WidgetService(Protocol):
     async def list(self, project_id: Id) -> Sequence[Widget]: ...
     async def list_by_session(self, session_id: Id) -> Sequence[Widget]: ...
 
-    async def data(self, id: Id, run_id: Id | None = None, limit: int = 1000) -> WidgetData:
-        """What the widget shows: its operator's output in the given run. Without a run id
+    async def data(
+        self, id: Id, run_id: Id | None = None, limit: int = 1000, input: str = "main"
+    ) -> WidgetData:
+        """What the widget shows: one input's output ("main": its own operator) in the given
+        run. Without a run id
         a new run with no bindings and an open time range is started."""
         ...

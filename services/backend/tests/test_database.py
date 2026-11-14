@@ -49,7 +49,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == [f"000{n}" for n in range(1, 10)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(1, 11)]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -67,6 +67,9 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
                 "SELECT instructions FROM agent_settings"
             ).scalar_one()
         assert instructions == ""
+        # 0010 lets widgets read further inputs and keep a drawing error.
+        columns = {c["name"] for c in inspect(engine).get_columns("widgets")}
+        assert {"inputs", "render_error"} <= columns
 
         command.downgrade(_config(database_url), "0001")
 
@@ -78,7 +81,7 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "web_usage" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == [f"000{n}" for n in range(2, 10)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(2, 11)]
     assert migrate(database_url) == []
 
 

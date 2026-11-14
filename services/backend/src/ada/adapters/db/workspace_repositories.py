@@ -300,6 +300,8 @@ def _widget(row: WidgetRow) -> Widget:
         created_by=Actor.model_validate(row.created_by),
         created_at=row.created_at,
         copied_from=row.copied_from,
+        inputs=dict(row.inputs or {}),
+        render_error=row.render_error,
     )
 
 
@@ -324,6 +326,8 @@ class SqlWidgetRepository(WidgetRepository):
             created_by=dump(widget.created_by),
             created_at=widget.created_at,
             copied_from=widget.copied_from,
+            inputs=dict(widget.inputs),
+            render_error=widget.render_error,
         )
         await add_row(self.session, row)
 
@@ -337,6 +341,8 @@ class SqlWidgetRepository(WidgetRepository):
                 title=widget.title,
                 spec=json_object(widget.spec),
                 note=widget.note,
+                inputs=dict(widget.inputs),
+                render_error=widget.render_error,
             )
         )
         if result.rowcount == 0:  # type: ignore[attr-defined]

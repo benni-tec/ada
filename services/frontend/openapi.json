@@ -2026,6 +2026,20 @@
       "NewWidget": {
         "additionalProperties": false,
         "properties": {
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/OperatorId"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs"
+          },
           "note": {
             "default": "",
             "title": "Note",
@@ -3832,6 +3846,14 @@
           "id": {
             "$ref": "#/components/schemas/Id"
           },
+          "inputs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/OperatorId"
+            },
+            "default": {},
+            "title": "Inputs",
+            "type": "object"
+          },
           "note": {
             "default": "",
             "title": "Note",
@@ -3842,6 +3864,17 @@
           },
           "project_id": {
             "$ref": "#/components/schemas/Id"
+          },
+          "render_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Render Error"
           },
           "session_id": {
             "anyOf": [
@@ -3880,8 +3913,22 @@
       },
       "WidgetChange": {
         "additionalProperties": false,
-        "description": "Fields left out stay as they are; a spec replaces the old one whole.",
+        "description": "Fields left out stay as they are; a spec or inputs replace the old ones whole.",
         "properties": {
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/OperatorId"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs"
+          },
           "note": {
             "anyOf": [
               {
@@ -3957,6 +4004,11 @@
             },
             "title": "Columns",
             "type": "array"
+          },
+          "input": {
+            "default": "main",
+            "title": "Input",
+            "type": "string"
           },
           "is_scenario": {
             "default": false,
@@ -7852,7 +7904,7 @@
     },
     "/api/widgets/{widget_id}/data": {
       "get": {
-        "description": "What the widget shows. Without `run_id` a new run is started, with no bindings and\nan open time range.",
+        "description": "What the widget shows: one input (\"main\", its own operator, by default). Without\n`run_id` a new run is started, with no bindings and an open time range.",
         "operationId": "get_widget_data_api_widgets__widget_id__data_get",
         "parameters": [
           {
@@ -7891,6 +7943,16 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "input",
+            "required": false,
+            "schema": {
+              "default": "main",
+              "title": "Input",
+              "type": "string"
             }
           }
         ],

@@ -8,7 +8,7 @@ from pydantic import Field
 
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.operators import OperatorId
-from ada.core.models.widgets import Widget, WidgetData
+from ada.core.models.widgets import MAIN_INPUT, Widget, WidgetData
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.mcp.actor import calling_agent
@@ -40,6 +40,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         widgets: FromDishka[WidgetService],
         spec: JsonObject | None = None,
         note: str = "",
+        inputs: dict[str, OperatorId] | None = None,
     ) -> WidgetView:
         """Show an operator's output to the person you work with. Pass only the operator
         id: the widget fetches its own data from the platform, so no numbers go through
@@ -94,6 +95,12 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
         A widget marks simulated and outdated data by itself.
 
+        `inputs` names further operators of the project the widget reads besides its own,
+        e.g. {"targets": "<operator id>"}: lowercase names (letters, digits, _), at most 8;
+        its own operator is the input "main". All are read in the same run and frozen
+        together in reports. Only types that show several datasets read them; the others
+        ignore them.
+
         Give a one-line `note` on what the widget shows and why: the session shows the
         widget with the note on its card. Returns the widget and its `url`: give
         the url to the person."""
@@ -107,6 +114,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             spec=spec,
             note=note,
             session_id=session_id,
+            inputs=inputs,
         )
         return WidgetView(widget=widget, url=widget_url(widget))
 
@@ -120,15 +128,19 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         note: str | None = None,
         type: str | None = None,
         spec: JsonObject | None = None,
+        inputs: dict[str, OperatorId] | None = None,
     ) -> WidgetView:
-        """Change a widget in place: its title, note, type or spec; what you leave out stays.
+        """Change a widget in place: its title, note, type, spec or further inputs; what you
+        leave out stays. New `inputs` replace the old ones whole ({} removes them all).
         A new `spec` replaces the old one whole (send all of it) and is checked against the
         operator as in `create_widget`, whose description lists every type's settings. Use
         it to fix a chart or add labels instead of creating a second widget. The widget's
         operator cannot change: for other data, create a widget. A copy on a dashboard is a
         widget of its own (its id is in the dashboard's slots) and does not change with the
         original. Returns the widget and its `url`."""
-        widget = await widgets.update(widget_id, title=title, note=note, type=type, spec=spec)
+        widget = await widgets.update(
+            widget_id, title=title, note=note, type=type, spec=spec, inputs=inputs
+        )
         return WidgetView(widget=widget, url=widget_url(widget))
 
     # For the widget itself, inside an MCP host: the model never needs the numbers.
@@ -139,11 +151,13 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         widgets: FromDishka[WidgetService],
         run_id: Id | None = None,
         limit: Annotated[int, Field(ge=1, le=MAX_WIDGET_ROWS)] = 1000,
+        input: str = MAIN_INPUT,
     ) -> WidgetData:
-        """The data a widget shows: its operator's output in a run, with what the columns
-        mean and whether the numbers are simulated or stale. Called by the widget, not by
-        the model. Without `run_id` a new run is started."""
-        return await widgets.data(widget_id, run_id, limit)
+        """The data a widget shows: one input's output in a run ("main", its own operator,
+        unless `input` names another), with what the columns mean and whether the numbers
+        are simulated or stale. Called by the widget, not by the model. Without `run_id` a
+        new run is started; read further inputs with the `run_id` of the first answer."""
+        return await widgets.data(widget_id, run_id, limit, input)
 
     @mcp.tool
     @inject

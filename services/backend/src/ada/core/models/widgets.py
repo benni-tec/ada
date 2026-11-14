@@ -5,6 +5,9 @@ from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.operators import OperatorId
 from ada.core.models.schema import Column, Schema
 
+# The name of a widget's own operator among its inputs.
+MAIN_INPUT = "main"
+
 
 class Widget(DomainModel):
     """A display of one operator's output. It never holds data: it fetches the output of
@@ -27,6 +30,17 @@ class Widget(DomainModel):
     # The widget this one was copied from when it was pinned to a dashboard: the original,
     # which knows the session it was made in. A copy can then be changed on its own.
     copied_from: Id | None = None
+    # Further operators the widget reads, by name, besides its own (`operator_id`, the input
+    # named "main"): a text widget's placeholders or a custom widget's datasets. All are read
+    # in the same run.
+    inputs: dict[str, OperatorId] = {}
+    # What went wrong the last time the widget was drawn, as its frame reported it; None
+    # when it drew. Kept so the agent that wrote it can see it and fix it.
+    render_error: str | None = None
+
+    def all_inputs(self) -> dict[str, OperatorId]:
+        """Every input by name, its own operator first, as "main"."""
+        return {MAIN_INPUT: self.operator_id, **self.inputs}
 
 
 class WidgetData(DomainModel):
@@ -34,6 +48,8 @@ class WidgetData(DomainModel):
 
     widget_id: Id
     run_id: Id
+    # Which of the widget's inputs this is ("main": its own operator).
+    input: str = MAIN_INPUT
     # The operator's declared output: what the columns mean (time, measures and their
     # bounds), so a widget needs no second request for it.
     output: Schema

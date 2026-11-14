@@ -326,6 +326,48 @@ def test_a_widget_is_changed_in_place_and_its_spec_checked(
     assert [e.type for e in events(client, project["id"])][-1] == "widget.updated"
 
 
+def test_a_widget_reads_further_inputs_by_name_in_the_same_run(
+    client: TestClient, project: dict[str, Any], source_operator: dict[str, Any]
+) -> None:
+    total = send(
+        client,
+        "POST",
+        f"/projects/{project['id']}/operators",
+        {
+            "kind": "transform",
+            "sql": "SELECT sum(value) AS total FROM input_0",
+            "inputs": [source_operator["id"]],
+        },
+        201,
+    )
+    path = f"/projects/{project['id']}/widgets"
+    body = {"operator_id": source_operator["id"], "type": "table", "title": "Regions"}
+    widget = send(client, "POST", path, {**body, "inputs": {"total": total["id"]}}, 201)
+    other = new_project(client, "Other")
+    foreign = send(
+        client,
+        "POST",
+        f"/projects/{other['id']}/operators",
+        {"kind": "transform", "sql": "SELECT 1 AS one", "inputs": []},
+        201,
+    )
+    refused = [
+        client.post(f"/api{path}", json={**body, "inputs": inputs}).status_code
+        for inputs in ({"main": total["id"]}, {"Total": total["id"]}, {"x": foreign["id"]})
+    ]
+
+    main = send(client, "GET", f"/widgets/{widget['id']}/data")
+    extra = send(client, "GET", f"/widgets/{widget['id']}/data?run_id={main['run_id']}&input=total")
+    unknown = client.get(f"/api/widgets/{widget['id']}/data?input=nope")
+    cleared = send(client, "PATCH", f"/widgets/{widget['id']}", {"inputs": {}})
+
+    assert widget["inputs"] == {"total": total["id"]}
+    assert refused == [422, 422, 422]
+    assert (main["input"], extra["input"], extra["run_id"]) == ("main", "total", main["run_id"])
+    assert unknown.status_code == 422 and "main, total" in unknown.json()["detail"]
+    assert cleared["inputs"] == {}
+
+
 def test_widget_data_is_stale_while_a_source_upstream_failed_its_refresh(
     client: TestClient,
     project: dict[str, Any],
@@ -475,6 +517,7 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
         "spec",
         "session_id",
         "note",
+        "inputs",
     }
     status = await client.call_tool("system_status")
     assert status.structured_content == UNREACHABLE_HEALTH

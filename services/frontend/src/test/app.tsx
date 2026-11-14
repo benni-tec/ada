@@ -152,6 +152,7 @@ export function widget(overrides: Partial<Widget> = {}): Widget {
     title: 'Coverage by region',
     spec: { series: 'region' },
     note: '',
+    inputs: {},
     created_by: web,
     created_at: '2026-11-01T09:10:00Z',
     ...overrides,

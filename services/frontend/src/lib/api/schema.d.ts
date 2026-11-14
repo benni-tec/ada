@@ -1275,8 +1275,8 @@ export interface paths {
         };
         /**
          * Get Widget Data
-         * @description What the widget shows. Without `run_id` a new run is started, with no bindings and
-         *     an open time range.
+         * @description What the widget shows: one input ("main", its own operator, by default). Without
+         *     `run_id` a new run is started, with no bindings and an open time range.
          */
         get: operations["get_widget_data_api_widgets__widget_id__data_get"];
         put?: never;
@@ -2052,6 +2052,10 @@ export interface components {
         };
         /** NewWidget */
         NewWidget: {
+            /** Inputs */
+            inputs?: {
+                [key: string]: components["schemas"]["OperatorId"];
+            } | null;
             /**
              * Note
              * @default
@@ -2779,12 +2783,21 @@ export interface components {
             created_by: components["schemas"]["Actor"];
             id: components["schemas"]["Id"];
             /**
+             * Inputs
+             * @default {}
+             */
+            inputs: {
+                [key: string]: components["schemas"]["OperatorId"];
+            };
+            /**
              * Note
              * @default
              */
             note: string;
             operator_id: components["schemas"]["OperatorId"];
             project_id: components["schemas"]["Id"];
+            /** Render Error */
+            render_error?: string | null;
             session_id?: components["schemas"]["Id"] | null;
             /** @default {} */
             spec: components["schemas"]["JsonObject"];
@@ -2795,9 +2808,13 @@ export interface components {
         };
         /**
          * WidgetChange
-         * @description Fields left out stay as they are; a spec replaces the old one whole.
+         * @description Fields left out stay as they are; a spec or inputs replace the old ones whole.
          */
         WidgetChange: {
+            /** Inputs */
+            inputs?: {
+                [key: string]: components["schemas"]["OperatorId"];
+            } | null;
             /** Note */
             note?: string | null;
             spec?: components["schemas"]["JsonObject"] | null;
@@ -2825,6 +2842,11 @@ export interface components {
         WidgetData: {
             /** Columns */
             columns: components["schemas"]["Column"][];
+            /**
+             * Input
+             * @default main
+             */
+            input: string;
             /**
              * Is Scenario
              * @default false
@@ -5441,6 +5463,7 @@ export interface operations {
             query?: {
                 run_id?: components["schemas"]["Id"] | null;
                 limit?: number;
+                input?: string;
             };
             header?: never;
             path: {

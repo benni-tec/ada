@@ -111,6 +111,15 @@ What the research merge added to them (the research branch on wave 5; see "Web s
 | `config.py` | `exa_api_key` (`EXA_API_KEY`), `ada_public_url` (`ADA_PUBLIC_URL`), `research_web_calls` (40) |
 | Migration `0009` (down revision `0008`) | `data_sources.provenance` (JSONB), `monitor_id`, `monitor_secret_encrypted`; `snapshots.origin`; `sessions.agent` (`'session'`), `parent_session_id` (to sessions, `SET NULL`, indexed), `web_calls` (0); `agent_settings.research_agent_model_id` (to models, `SET NULL`) |
 
+What named widget inputs added to them (before wave 6 and the text widget; see "Widgets"):
+
+| Where | Change |
+| --- | --- |
+| `core/models/widgets.py` | `MAIN_INPUT` (`"main"`); `Widget.inputs: dict[str, OperatorId]` (`{}`), `Widget.render_error: str \| None`, `Widget.all_inputs()` (`main` first); `WidgetData.input` (`"main"`) |
+| `core/services/ports/widgets.py` | `create(..., inputs=None)`, `update(..., inputs=None)` (replaces them whole), `data(id, run_id, limit, input="main")` |
+| `core/services/ports/batches.py` | `WidgetPart.inputs: dict[str, str] \| None`, each an operator id or `$ref` |
+| Migration `0010` (down revision `0009`) | `widgets.inputs` (JSONB, `'{}'`, not null), `widgets.render_error` (text, nullable) |
+
 ## Adding a feature without touching shared files
 
 Four packages are scanned at startup. A feature adds a module; no list is edited.
@@ -961,7 +970,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /runs/{id}/operators/{operator_id}/rows?limit=` | An operator's output in a run |
 | `GET /snapshots/{id}` | A snapshot a run fixed (`Run.snapshots` names them by id): `fetched_at`, `content_hash`, `row_count`, `period` (`RunService.snapshot`) |
 | `GET /projects/{id}/widgets`, `POST /projects/{id}/widgets` | Every widget of the project, oldest first; create |
-| `GET /widgets/{id}`, `GET /widgets/{id}/data?run_id=&limit=` | Read; `WidgetData` (without `run_id` a new run is started) |
+| `GET /widgets/{id}`, `GET /widgets/{id}/data?run_id=&limit=&input=` | Read; `WidgetData` of one input, `main` by default (without `run_id` a new run is started) |
 | `PATCH /widgets/{id}` | `{title?, note?, type?, spec?}`: change in place (a spec replaces the old one whole and is checked); announced with `widget.updated` |
 | `GET /widget-bundles/{type}.html` | A built widget (see Widgets) |
 | `GET /projects/{id}/events` | The live stream |
@@ -1047,7 +1056,7 @@ in `entrypoints/mcp/sessions.py`, described in the schema), except `list_project
 | --- | --- |
 | Projects, sources | `list_projects`, `create_project`, `register_source` and `update_source` (with `provenance`), `list_sources`, `refresh_source` (`wait` and `timeout_seconds` up to 60: fetch in the call and answer `{status, snapshot, error}`; else `status: "queued"`), `watch_source`, `unwatch_source` (see Watched sources) |
 | Sessions, pipelines | `create_session`, `add_source_operator`, `add_transform` (mentions DuckDB's `UNPIVOT` for wide tables), `list_pipelines` (the pipelines list: look there before building), `get_lineage`, `preview_operator`, `query_operator`, `build_pipeline` (below) |
-| Widgets | `create_widget`, `update_widget` (title, note, type or a whole new spec, checked like a new widget's; the operator stays; dashboard copies do not follow), `list_session_widgets`, and `get_widget_data` for the widget itself (MCP Apps visibility `app`) |
+| Widgets | `create_widget` (with optional named `inputs`), `update_widget` (title, note, type, a whole new spec, checked like a new widget's, or new `inputs`; the operator stays; dashboard copies do not follow), `list_session_widgets`, and `get_widget_data(input=)` for the widget itself (MCP Apps visibility `app`) |
 | Dashboards | `create_dashboard`, `list_dashboards`, `get_dashboard`, `list_dashboard_versions`, `pin_widget` (its description says the dashboard gets a copy; optional `layout`), `edit_dashboard` (any widget of the project; one new to the dashboard is copied), `set_dashboard_time_range` (ISO dates), `show_dashboard_in_session` (the session's revision). They return `{dashboard, version, url}` |
 | Reports | `create_report`, `add_report_version`, `generate_report_from_dashboard`, `list_reports`, `get_report` (optional `version`), `create_template`, `list_templates`. They return `{report, version, versions, url}` |
 | Alerts | `create_alert_rule` (its description carries the formula format), `list_alert_rules`, `get_alert_rule`, `update_alert_rule` (a `clear` list empties the interval, maximum age or alert pipeline), `check_alert_rule` (`{rule, changed, firing}`), `list_alerts` (`{alert, rule_name, severity, dashboard_id, url}`) |
@@ -1188,6 +1197,18 @@ A widget type is a folder `services/widgets/src/widgets/<type>/`, built into one
 self-contained file `dist/<type>.html`: `value`, `table`, `line-chart`, `map`, `chart`. `any`
 is the one bundle that renders every type, picked by the widget's `type`. A widget never
 receives data from an agent; it asks the server for the output of its operator.
+
+- **Named inputs.** A widget reads its own operator (`operator_id`, the input `"main"`) and
+  any further operators of its project by name: `inputs: {name: operator_id}`, names
+  `^[a-z][a-z0-9_]{0,31}$`, never `main`, at most 8, each operator in the widget's project
+  (checked on create and update; a new `inputs` replaces the old whole). The built-in types
+  read only `main`; the text widget's placeholders and custom widgets' datasets read the
+  others. `GET /widgets/{id}/data?input=<name>` (MCP `get_widget_data(input=)`) serves one
+  input, `WidgetData.input` naming it; pass the `run_id` of the first answer to read the
+  rest in the same run. An unknown name is 422 listing the widget's names. Reports freeze
+  every input of every widget, a copy on a dashboard keeps them, and `build_pipeline`'s
+  widget step takes them as ids or `$ref`s. `render_error` is what went wrong the last time
+  the widget was drawn, as its frame reported it (wave 6), `null` when it drew.
 
 - **The chart widget** bundles Vega-Lite (`vega` 6.4.0, `vega-lite` 6.5.0, `vega-embed`
   7.3.0, `vega-interpreter` 2.3.2, pinned), about 1.1 MB (360 KB gzipped) per bundle, and
