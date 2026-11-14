@@ -134,11 +134,76 @@ the merge it:
 - folded the four wave 2 contract files into `docs/contracts.md`, with the known issues
   the next wave starts from.
 
+## Pipeline view (in progress)
+
+One agent: a footer on every widget card with the one-line pipeline summary on the left
+and icon actions on the right (add to dashboard; on dashboards, go to the session the
+widget came from, disabled when it has none); a dialog with the operator tree as a graph,
+the selected operator's details, and a preview of its rows in the card's run. Sessions
+and widget pages show one run per view, like dashboards.
+
+## Wave 3: the agent in the platform, and the workspace (two agents at once)
+
+Decided with the user:
+
+- **Models.** Providers and models are configured in `llms.yml`, git-ignored, its path
+  from `ADA_LLMS_CONFIG` (default `./llms.yml`); `llms.example.yml` is committed. Keys
+  are referenced by environment variable name, never written into the file. Most partner
+  providers speak the OpenAI chat API; Gemini may also be used natively.
+- **Agent runtime.** pydantic-ai, run as a worker task when a message is posted. It uses
+  our own MCP tools in-process, so it can do exactly what an external agent can, recorded
+  as the agent with its model's name.
+- **Reasoning steps.** Each agent turn is stored and streamed as parts (reasoning, tool
+  call with arguments and result, sources, text), rendered with the shadcn Trace
+  component. Token deltas are the one documented exception to "events carry ids only".
+- **Chat.** A chat interface instead of the plain text box. Messages can carry context
+  chips: a pipeline, a dashboard, a slot.
+- **Add widget.** Widgets stay agent-made. "Add widget" opens a dropdown of the project's
+  pipelines (operators with no successor) and hands the chosen one to the chat as a
+  chip; the person says what to show. On a dashboard the chip also names the dashboard
+  and slot.
+- **Dashboard agent panel.** A session linked to the dashboard, so every agent step lands
+  in a session.
+- **Layout.** shadcn throughout. A side navigation with the project in the header and its
+  groups (sessions, dashboards, reports, alerts, data sources). No breadcrumbs: each page
+  shows its type (label and icon) above its title. Rename is a pencil icon. Pages use the
+  full width.
+- **Session with a dashboard beside it.** Half and half; the dashboard half has a black
+  header saying "Dashboard" and its name, with an × to detach it.
+- **Full-size widgets** open in a modal over the page (`?open=<widget id>`), so closing
+  returns to where you were; the standalone widget page remains only for direct links.
+- **Dashboard editing.** Drag to move and resize on the 12-column grid; maps keep their
+  aspect ratio, other types resize freely. A save on drop adds a dashboard version.
+- **Slots** are just places: any widget can go in any slot; names are optional labels.
+- **Pinning copies** the widget (`copied_from` points at the original), so a copy can be
+  changed alone; "go to the session it came from" follows `copied_from`.
+
+| Agent | Builds |
+| --- | --- |
+| Backend | `llms.yml` loading; the pydantic-ai agent task; turns as parts, stored and streamed; messages with context; dashboard agent sessions; the pipelines list (route and MCP tool); copy on pin with `copied_from` (migration); layout saves |
+| Frontend | shadcn; side navigation and full-width layout; type labels and rename icons; chat with Trace and context chips; "Add widget"; dashboard agent panel; the half-width dashboard beside a session; widget modal; drag and resize |
+
+## Bottom-up invalidation of definitions (proposed, after wave 3)
+
+A source's definition (address, options, declared schema) becomes part of its operator's
+identity; operators get a `superseded_by` pointer; a definition change rebases everything
+downstream, marking operators broken where they no longer fit; live views follow the
+newest operator, report versions stay on theirs; schema drift found at refresh is
+recorded and flagged, not rebased automatically.
+
+## Test consolidation (last)
+
+Merge test files that test the same thing (`test_http` with `test_api_http`, `test_mcp`
+with `test_api_mcp`, the worker, transaction and composition files); drop
+`test_memory_repositories.py`, which `test_db_repositories.py` covers for both
+implementations; one set of service fakes in `tests/fakes.py`; a shorter long-chain test;
+markers for the PostgreSQL and Valkey tests; parallel runs with `pytest-xdist`. No change
+in behaviour.
+
 ## Later, not planned here
 
 Agent operators and the recommendation widget; Input operators with simulation bindings;
-statistic operators; the in-platform agent; document and browser sources; alert
-pipelines; data-quality alerts.
+statistic operators; document and browser sources; alert pipelines; data-quality alerts.
 
 ## Running the agents
 
@@ -154,4 +219,6 @@ pipelines; data-quality alerts.
 
 ```
 Foundation ──▶ A  B  C  D  E  F ──▶ Integration 1 ──▶ G  H  I  J ──▶ Integration 2 (all done)
+──▶ Pipeline view ──▶ Wave 3 (backend, frontend) ──▶ Integration 3
+──▶ Bottom-up invalidation (proposed) ──▶ Test consolidation
 ```
