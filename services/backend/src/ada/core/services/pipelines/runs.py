@@ -113,15 +113,50 @@ class Runs(RunService):
         return run
 
     async def read(self, run_id: Id, operator_id: OperatorId, limit: int = 1000) -> Rows:
+        return await self.store.run(compose(await self._node(run_id, operator_id)), limit)
+
+    async def query(self, run_id: Id, operator_id: OperatorId, sql: str, limit: int) -> Rows:
+        node = await self._node(run_id, operator_id)
+        return await self.store.run(compose(QueryNode("query", sql, (node,))), limit)
+
+    async def feed(
+        self, run_id: Id, input_id: OperatorId, from_run_id: Id, operator_id: OperatorId, sql: str
+    ) -> Run:
+        run = await self.runs.get(run_id)
+        input_operator = await self._operator(run, input_id)
+        if input_operator.kind is not OperatorKind.INPUT:
+            raise Invalid(f"Operator {input_id} is not an input")
+        node = await self._node(from_run_id, operator_id)
+        stored = await self.store.materialize(
+            run.project_id, compose(QueryNode("fed", sql, (node,)))
+        )
+        check_still_matches(
+            input_operator.output.columns, stored.output.columns, f"Input {input_id}"
+        )
+        snapshot = Snapshot(
+            id=uuid7(),
+            project_id=run.project_id,
+            operator_id=input_id,
+            # Its own key: these rows were fed to this run, and no other run reuses them.
+            parameters_key=f"run:{run_id}",
+            content_hash=stored.content_hash,
+            location=stored.location,
+            row_count=stored.row_count,
+            fetched_at=self.clock.now(),
+        )
+        await self.snapshots.add(snapshot)
+        return await self.runs.fix_snapshot(run_id, input_id, snapshot.id)
+
+    async def _node(self, run_id: Id, operator_id: OperatorId) -> Node:
         run = await self.runs.get(run_id)
         operator = await self._operator(run, operator_id)
         try:
             # Everything below is fixed already: answer without executing, and without
             # announcing a run that did nothing. Widgets read often.
-            node = await _Planner(self, run, fix=False).node(operator.id)
+            return await _Planner(self, run, fix=False).node(operator.id)
         except _NeedsExecution:
-            run, node = await self._execute(run_id, operator_id)
-        return await self.store.run(compose(node), limit)
+            _, node = await self._execute(run_id, operator_id)
+            return node
 
     async def _execute(self, run_id: Id, operator_id: OperatorId) -> tuple[Run, Node]:
         run = await self.runs.get(run_id)

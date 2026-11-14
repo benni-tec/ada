@@ -161,9 +161,10 @@ def test_a_check_answers_with_the_changes_and_the_feed_shows_them(
     assert result["firing"] == [alert]
     assert result["rule"]["last_checked_at"] is not None
 
-    # The run's rows of the alerting operator are what the alert links to.
-    lineage = client.get(f"/api/operators/{setup.measure.id}/lineage")
-    assert lineage.status_code == 200
+    # The alert opens the rows that raised it.
+    rows = client.get(f"/api/alerts/{alert['id']}/rows")
+    assert rows.status_code == 200, rows.text
+    assert [row[0] for row in rows.json()["rows"]] == ["north"]
 
     feed = client.get(f"/api/projects/{setup.project_id}/alerts").json()
     assert [(view["alert"]["id"], view["rule"]["name"]) for view in feed] == [
@@ -290,8 +291,8 @@ async def test_an_agent_creates_checks_and_reads_alerts(mcp: Client, mcp_world: 
     )
     assert updated["revision"] == 2
     checked = await call(mcp, "check_alert_rule", rule_id=rule["id"])
-    # The alert names the operator whose rows show it.
-    assert alert["condition_operator_id"] is not None
+    # The alert keeps the condition that raised it.
+    assert alert["condition_sql"] is not None
     assert [(a["key"], a["state"]) for a in checked["changed"]] == [
         ({"region": "north"}, "resolved")
     ]

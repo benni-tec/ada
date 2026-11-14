@@ -5,7 +5,7 @@ from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.operators import Operator, OperatorId
 from ada.core.models.pipelines import Pipeline
-from ada.core.models.schema import Roles, Schema
+from ada.core.models.schema import Column, Roles, Schema
 
 
 class PipelineService(Protocol):
@@ -30,6 +30,13 @@ class PipelineService(Protocol):
         """SQL over earlier operators, which it names input_0, input_1, ... Its columns are
         derived by describing the query; `roles` declares what they mean and must name
         only columns the query returns. Raises Invalid otherwise."""
+        ...
+
+    async def describe(
+        self, project_id: Id, sql: str, inputs: Sequence[OperatorId]
+    ) -> tuple[Column, ...]:
+        """The columns SQL over these operators (input_0, input_1, ...) would return,
+        without adding an operator. Raises Invalid when it does not bind."""
         ...
 
     async def add_input(

@@ -8,7 +8,7 @@ from ada.adapters.db.migrate import _config, migrate
 def test_migrations_build_every_table_from_an_empty_database(database_url: str) -> None:
     applied = migrate(database_url)
 
-    assert applied == ["0001", "0002", "0003"]
+    assert applied == ["0001", "0002", "0003", "0004"]
     engine = create_engine(database_url)
     try:
         tables = set(inspect(engine).get_table_names())
@@ -35,8 +35,8 @@ def test_every_migration_can_be_undone(database_url: str) -> None:
         columns = {column["name"] for column in inspect(engine).get_columns("alerts")}
     finally:
         engine.dispose()
-    assert "condition_operator_id" not in columns
-    assert migrate(database_url) == ["0002", "0003"]
+    assert "condition_sql" not in columns
+    assert migrate(database_url) == ["0002", "0003", "0004"]
 
 
 def test_0003_adds_turns_context_and_copies_and_takes_them_back(database_url: str) -> None:
@@ -59,4 +59,4 @@ def test_0003_adds_turns_context_and_copies_and_takes_them_back(database_url: st
         assert "copied_from" not in {c["name"] for c in inspector.get_columns("widgets")}
     finally:
         engine.dispose()
-    assert migrate(database_url) == ["0003"]
+    assert migrate(database_url) == ["0003", "0004"]

@@ -36,6 +36,20 @@ class RunService(Protocol):
         pass-through operators are answered by one query over the snapshots below them."""
         ...
 
+    async def query(self, run_id: Id, operator_id: OperatorId, sql: str, limit: int) -> Rows:
+        """`sql` over the operator's output in the run, which it names input_0: a question
+        about that output that is not an operator itself, such as an alert rule's
+        condition. At most `limit` rows."""
+        ...
+
+    async def feed(
+        self, run_id: Id, input_id: OperatorId, from_run_id: Id, operator_id: OperatorId, sql: str
+    ) -> Run:
+        """Fix, as the input operator's data in `run_id`, the rows of `sql` over the
+        operator's output in `from_run_id`: e.g. an alert pipeline run on the rows that
+        raised the alert. The rows are stored as a snapshot of the input for that run."""
+        ...
+
     async def snapshot(self, id: Id) -> Snapshot:
         """A stored snapshot: when it was fetched, its content hash and row count. A run's
         `snapshots` names the ones it fixed, by id only; this is how a client shows them."""

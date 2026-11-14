@@ -9,10 +9,9 @@ import pytest
 
 from ada.composition import create_container
 from ada.config import Settings
-from ada.core.models.alerts import AlertRule, AlertState, Severity
+from ada.core.models.alerts import AlertState, Severity
 from ada.core.models.errors import Conflict, Invalid, NotFound
 from ada.core.models.events import EventType
-from ada.core.models.operators import OperatorKind, operator_identity
 from ada.core.models.schema import Column, ColumnType, Schema
 from ada.core.ports.repositories import OperatorRepository, RunRepository
 from ada.core.services.alerts import service as alert_service
@@ -43,17 +42,10 @@ async def setup(world: World) -> Setup:
     return await world.setup(START)
 
 
-def alerting_operator_id(setup: Setup, rule: AlertRule) -> str:
-    compiled = compile_rule(rule.formula, setup.measure.output, rule.key_columns)
-    return operator_identity(
-        setup.project_id, OperatorKind.TRANSFORM, {"sql": compiled.sql}, (setup.measure.id,)
-    )
-
-
 # Rules
 
 
-async def test_a_rule_is_created_with_its_alerting_operator(world: World, setup: Setup) -> None:
+async def test_a_rule_is_created_and_is_not_an_operator(world: World, setup: Setup) -> None:
     rule = await world.rule(setup, severity=Severity.CRITICAL, check_interval_seconds=3600)
     assert rule.project_id == setup.project_id
     assert rule.dashboard_id == setup.dashboard.id
@@ -64,15 +56,10 @@ async def test_a_rule_is_created_with_its_alerting_operator(world: World, setup:
     async with world.alerts() as service:
         assert await service.get_rule(rule.id) == rule
         assert await service.list_rules(setup.dashboard.id) == [rule]
-    # The condition is a transform over the measure, in the lineage like any other step.
+    # The condition is the rule's, not an operator: the measure stays the only one.
     async with world.container() as request:
-        alerting = await (await request.get(OperatorRepository)).get(
-            alerting_operator_id(setup, rule)
-        )
-    assert alerting.inputs == (setup.measure.id,)
-    assert alerting.created_by.kind == "system"
-    assert [c.name for c in alerting.output.columns] == [c.name for c in MEASURE.columns]
-    assert alerting.output.roles == MEASURE.roles
+        operators = await (await request.get(OperatorRepository)).list(setup.project_id)
+    assert not any(setup.measure.id in operator.inputs for operator in operators)
 
 
 @pytest.mark.parametrize(
@@ -219,13 +206,14 @@ async def test_a_check_opens_an_alert_per_alerting_key(world: World, setup: Setu
     assert alert.started_at == world.clock.now()
     assert alert.resolved_at is None
 
-    # The alert opens the exact rows that raised it: the alerting operator in its run.
-    assert alert.condition_operator_id == alerting_operator_id(setup, rule)
+    # The alert opens the exact rows that raised it: its condition over the measure, in
+    # its run.
+    assert alert.condition_sql == compile_rule(rule.formula, MEASURE, rule.key_columns).sql
     assert alert.pipeline_run_id is None
+    async with world.alerts() as service:
+        rows = await service.rows(alert.id)
     async with world.container() as request:
-        runs = await request.get(RunService)
-        rows = await runs.read(alert.last_run_id, alert.condition_operator_id)
-        run = await runs.get(alert.last_run_id)
+        run = await (await request.get(RunService)).get(alert.last_run_id)
     assert [row[:1] + row[3:4] for row in rows.rows] == [("north", 70.0)]
     assert run.started_by.kind == "system"
     assert not run.is_scenario
@@ -519,9 +507,10 @@ async def test_the_alert_pipeline_runs_on_the_alerting_rows_when_an_alert_fires(
         rows = await runs.read(run_id, pipeline_id)
     # The alert names the run of its pipeline.
     assert alert.pipeline_run_id == run_id
-    # Bound to the alerting rows, on the same data as the check.
-    assert run.bindings == {"alerting": alerting_operator_id(setup, rule)}
+    # Fed the alerting rows as its input, on the same data as the check.
+    assert run.bindings == {}
     assert check_run.snapshots.items() <= run.snapshots.items()
+    assert len(run.snapshots) == len(check_run.snapshots) + 1
     assert rows.rows == ((1,),)
 
     # A check that opens nothing new does not run it again.

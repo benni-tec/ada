@@ -43,6 +43,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/alerts/{alert_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Alert Rows
+         * @description The rows that raised the alert, as its last run showed them.
+         */
+        get: operations["alert_rows_api_alerts__alert_id__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard-versions/{version_id}": {
         parameters: {
             query?: never;
@@ -1054,7 +1074,8 @@ export interface components {
          * @description One instance per rule and key. A region that stays below target alerts once.
          */
         Alert: {
-            condition_operator_id?: components["schemas"]["OperatorId"] | null;
+            /** Condition Sql */
+            condition_sql?: string | null;
             id: components["schemas"]["Id"];
             key: components["schemas"]["JsonObject"];
             last_run_id: components["schemas"]["Id"];
@@ -2357,6 +2378,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    alert_rows_api_alerts__alert_id__rows_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rows"];
                 };
             };
             /** @description Validation Error */

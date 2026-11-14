@@ -6,6 +6,7 @@ from uuid import uuid7
 
 from ada.core.models.actors import PLATFORM
 from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
+from ada.core.models.analysis import Rows
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import Event, EventType
@@ -28,7 +29,7 @@ from ada.core.ports.repositories import (
     SnapshotRepository,
 )
 from ada.core.ports.system import Clock
-from ada.core.services.alerts.formula import Compiled, compile_rule
+from ada.core.services.alerts.formula import compile_rule
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
@@ -44,9 +45,9 @@ MAX_ALERTING_ROWS = 10_000
 class Alerts(AlertService):
     """Alert rules and their checks.
 
-    A check makes the rule's condition part of the lineage: the compiled condition is a
-    transform over the measure operator (`alerting_operator`), so the alerting rows are that
-    operator's output in the check's run, and an alert opens the exact rows that raised it.
+    A rule is not an operator. A check runs its compiled condition over the measure's
+    output in the check's run; each alert keeps that SQL (`condition_sql`), so it opens the
+    exact rows that raised it, and the rule's alert pipeline is fed those rows.
     """
 
     def __init__(
@@ -106,7 +107,7 @@ class Alerts(AlertService):
         )
         measure = await self._check(rule)
         if alert_pipeline_id is not None:
-            await self._alert_input(rule, measure)
+            await self._alert_inputs(rule, measure)
         await self.rules.add(rule)
         return rule
 
@@ -150,7 +151,7 @@ class Alerts(AlertService):
         updated = rule.model_copy(update=changes)
         measure = await self._check(updated)
         if updated.alert_pipeline_id is not None:
-            await self._alert_input(updated, measure)
+            await self._alert_inputs(updated, measure)
         return await self.rules.update(updated, expected_revision)
 
     async def _check(self, rule: AlertRule) -> Operator:
@@ -163,9 +164,9 @@ class Alerts(AlertService):
                 raise Invalid(f"{field} must be positive")
         measure = await self._measure(rule)
         compiled = compile_rule(rule.formula, measure.output, rule.key_columns)
-        # Describing the compiled query is the last word on whether it runs: it adds the
-        # operator the checks will use, so a rule never names SQL that does not bind.
-        await self._alerting_operator(rule, measure, compiled)
+        # Describing the compiled query is the last word on whether it runs, so a rule
+        # never names SQL that does not bind.
+        await self.pipelines.describe(rule.project_id, compiled.sql, [measure.id])
         return measure
 
     async def _measure(self, rule: AlertRule) -> Operator:
@@ -185,24 +186,9 @@ class Alerts(AlertService):
             )
         return measure
 
-    async def _alerting_operator(
-        self, rule: AlertRule, measure: Operator, compiled: Compiled | None = None
-    ) -> Operator:
-        """The transform whose output is the rule's alerting rows. The same rule definition
-        is the same operator, so every check of an unchanged rule reuses it."""
-        compiled = compiled or compile_rule(rule.formula, measure.output, rule.key_columns)
-        return await self.pipelines.add_transform(
-            rule.project_id,
-            compiled.sql,
-            [measure.id],
-            PLATFORM,
-            # The rows are the measure's rows, so its roles still hold.
-            roles=measure.output.roles,
-        )
-
-    async def _alert_input(self, rule: AlertRule, measure: Operator) -> str:
-        """The name of the one input slot of the rule's alert pipeline, which takes the
-        alerting rows; they have the measure's columns."""
+    async def _alert_inputs(self, rule: AlertRule, measure: Operator) -> list[Operator]:
+        """The one input slot of the rule's alert pipeline, which takes the alerting rows;
+        they have the measure's columns. A slot used twice is several operators."""
         assert rule.alert_pipeline_id is not None
         try:
             pipeline = await self.operators.get(rule.alert_pipeline_id)
@@ -220,7 +206,7 @@ class Alerts(AlertService):
             )
         for slot in slots:
             _check_fits(slot.output, measure.output, InputParams.model_validate(slot.params).name)
-        return names.pop()
+        return slots
 
     # Checks
 
@@ -230,13 +216,13 @@ class Alerts(AlertService):
         # than the check, so a rule without an interval is due again for it.
         started = self.clock.now()
         measure = await self._measure(rule)
-        alerting = await self._alerting_operator(rule, measure)
+        condition = compile_rule(rule.formula, measure.output, rule.key_columns).sql
         await self._demand_fresh_data(rule)
 
         # Everything that can fail runs before an alert is written, so a failed check
         # leaves the alerts as they were.
         run = await self.run_service.start(rule.project_id, PLATFORM)
-        rows = await self.run_service.read(run.id, alerting.id, MAX_ALERTING_ROWS)
+        rows = await self.run_service.query(run.id, measure.id, condition, MAX_ALERTING_ROWS)
         if rows.truncated:
             raise Invalid(
                 f"More than {MAX_ALERTING_ROWS} rows alert for rule {rule.id}; narrow the "
@@ -259,7 +245,7 @@ class Alerts(AlertService):
         # can run before they are written, and they name its run.
         starting = [key for canonical, key in alerting_keys.items() if canonical not in firing]
         pipeline_run_id = (
-            await self._run_alert_pipeline(rule, measure, alerting, run)
+            await self._run_alert_pipeline(rule, measure, condition, run)
             if rule.alert_pipeline_id is not None and starting
             else None
         )
@@ -270,9 +256,7 @@ class Alerts(AlertService):
                 # Still alerting: the same instance, now also shown by this run (and by the
                 # rule's current condition, should the formula have changed).
                 await self.instances.save(
-                    alert.model_copy(
-                        update={"last_run_id": run.id, "condition_operator_id": alerting.id}
-                    )
+                    alert.model_copy(update={"last_run_id": run.id, "condition_sql": condition})
                 )
             else:
                 # last_run_id and the condition stay those of the last run that showed it.
@@ -291,7 +275,7 @@ class Alerts(AlertService):
                 since_run_id=run.id,
                 last_run_id=run.id,
                 started_at=now,
-                condition_operator_id=alerting.id,
+                condition_sql=condition,
                 pipeline_run_id=pipeline_run_id,
             )
             await self.instances.add(alert)
@@ -340,22 +324,22 @@ class Alerts(AlertService):
         return max(times, default=None)
 
     async def _run_alert_pipeline(
-        self, rule: AlertRule, measure: Operator, alerting: Operator, check_run: Run
+        self, rule: AlertRule, measure: Operator, condition: str, check_run: Run
     ) -> Id | None:
         """Run the alert pipeline on the alerting rows, in a run of its own that fixes the
-        check run's snapshots: the same data, but a binding marks a run as a scenario, and
-        the check run must not be one. Returns the run, also when the pipeline failed in
-        it (it says run.failed); None when no run started."""
+        check run's snapshots (the same data) and is fed the alerting rows as its input.
+        Returns the run, also when the pipeline failed in it (it says run.failed); None
+        when no run started."""
         run_id: Id | None = None
         try:
-            slot = await self._alert_input(rule, measure)
-            run = await self.run_service.start(
-                rule.project_id, PLATFORM, bindings={slot: alerting.id}
-            )
+            slots = await self._alert_inputs(rule, measure)
+            run = await self.run_service.start(rule.project_id, PLATFORM)
             run_id = run.id
             fixed = await self.runs.get(check_run.id)
             for operator_id, snapshot_id in fixed.snapshots.items():
                 await self.runs.fix_snapshot(run.id, operator_id, snapshot_id)
+            for slot in slots:
+                await self.run_service.feed(run.id, slot.id, check_run.id, measure.id, condition)
             assert rule.alert_pipeline_id is not None
             await self.run_service.execute(run.id, rule.alert_pipeline_id)
         except Exception:
@@ -391,6 +375,16 @@ class Alerts(AlertService):
                 if any(snapshot.fetched_at > at for snapshot in snapshots):
                     return True
         return False
+
+    async def rows(self, alert_id: Id, limit: int = 1000) -> Rows:
+        alert = await self.instances.get(alert_id)
+        rule = await self.rules.get(alert.rule_id)
+        if alert.condition_sql is None:
+            # Stored before the condition was kept: the measure's rows in that run.
+            return await self.run_service.read(alert.last_run_id, rule.operator_id, limit)
+        return await self.run_service.query(
+            alert.last_run_id, rule.operator_id, alert.condition_sql, limit
+        )
 
     async def alerts(self, project_id: Id, state: AlertState | None = None) -> Sequence[Alert]:
         return await self.instances.list(project_id, state)

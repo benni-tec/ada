@@ -186,8 +186,8 @@ Decided with the user:
 ### Integration 3 (done)
 
 Merged both; regenerated the typed client and replaced the frontend's temporary agent
-types with it; left operators the platform made (an alert rule's filter) out of the
-pipelines list; explained in the grid why a narrow dashboard has no handles; folded the
+types with it; made alert rules stop being operators (the condition is kept on the alert
+as SQL, migration `0004`), so the pipelines list is plain again; explained in the grid why a narrow dashboard has no handles; folded the
 wave 3 contracts into `docs/contracts.md`.
 
 ## Bottom-up invalidation of definitions (proposed, after wave 3)

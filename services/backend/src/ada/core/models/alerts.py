@@ -57,8 +57,9 @@ class Alert(DomainModel):
     last_run_id: Id
     started_at: datetime
     resolved_at: datetime | None = None
-    # The operator whose output in last_run_id holds this alert's rows: the rule's
-    # compiled condition over its measure. None only for alerts stored before it was kept.
-    condition_operator_id: OperatorId | None = None
+    # The rule's compiled condition as last checked: SQL over the measure's output
+    # (input_0), whose rows in last_run_id are this alert's rows. A rule is not an
+    # operator, so the condition is kept here. None for alerts stored before it was kept.
+    condition_sql: str | None = None
     # The run of the rule's alert pipeline that this alert started, if the rule has one.
     pipeline_run_id: Id | None = None

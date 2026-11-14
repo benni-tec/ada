@@ -13,7 +13,7 @@ from ada.core.models.operators import (
     operator_identity,
 )
 from ada.core.models.pipelines import Pipeline
-from ada.core.models.schema import OutputKind, Roles, Schema
+from ada.core.models.schema import Column, OutputKind, Roles, Schema
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.repositories import (
     DataSourceRepository,
@@ -74,6 +74,15 @@ class Pipelines(PipelineService):
         )
         return await self.operators.add(operator)
 
+    async def describe(
+        self, project_id: Id, sql: str, inputs: Sequence[OperatorId]
+    ) -> tuple[Column, ...]:
+        upstream = [await self._upstream(project_id, input_id) for input_id in inputs]
+        nodes = tuple([await self.columns.node(operator) for operator in upstream])
+        columns = await self.store.describe(compose(QueryNode("described", sql, nodes)))
+        check_unique(columns)
+        return columns
+
     async def add_transform(
         self,
         project_id: Id,
@@ -92,10 +101,7 @@ class Pipelines(PipelineService):
         id = operator_identity(project_id, OperatorKind.TRANSFORM, params, inputs)
         if existing := await self._find(id):
             return existing
-        upstream = [await self._upstream(project_id, input_id) for input_id in inputs]
-        nodes = tuple([await self.columns.node(operator) for operator in upstream])
-        columns = await self.store.describe(compose(QueryNode(id, sql, nodes)))
-        check_unique(columns)
+        columns = await self.describe(project_id, sql, inputs)
         declared = roles is not None and roles != Roles()
         if roles is not None:
             check_roles(roles, columns)

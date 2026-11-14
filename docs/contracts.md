@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3) |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -27,7 +27,7 @@ What the integration after wave 2 changed in them:
 | `core/models/time.py`, `core/models/schema.py` | `Grain` (`year`, `quarter`, `month`); `TimeRole.grain` (J) |
 | `core/models/base.py` | `Unchanged`, `UNCHANGED` and `Change[T]`: an update argument that was not given, where None means "clear" |
 | `core/models/reports.py` | `ReportSource`: one entry of a report version's sources list |
-| `core/models/alerts.py`, migration `0002` | `Alert.condition_operator_id`, `Alert.pipeline_run_id`, both nullable |
+| `core/models/alerts.py`, migrations `0002`, `0004` | `Alert.condition_sql` (`0004`, in place of `0002`'s `condition_operator_id`), `Alert.pipeline_run_id`, both nullable |
 | `core/services/ports/sources.py` | `SourceService.refresh_range(id, time_range)`, with a default body returning None (J) |
 | `core/services/ports/reports.py` | `ReportService.sources(version_id)` |
 | `core/services/ports/alerts.py` | `AlertService.update_rule` also takes `key_columns`, `max_data_age_seconds`, `alert_pipeline_id`; the three fields that may be empty take `Change[...]` |
@@ -408,16 +408,16 @@ rows), with numbers compared as `DOUBLE`, text as quoted literals and columns as
 identifiers, so nothing in a formula is pasted into SQL as code. Its output has exactly
 the measure's columns.
 
-### The condition is an operator
+### A rule is not an operator
 
-The compiled SQL is added as a pass-through transform over the measure
-(`PipelineService.add_transform(..., Actor(system, "ada"), roles=measure's roles)`). The
-condition becomes part of the lineage like any SQL step: its output in a check's run is
-the set of alerting rows, answered by the same fused query and snapshot reuse as
-everything else. The same rule is the same operator; a changed formula is a new one, and
-the old one stays for the alerts it raised. **Each alert records it**
-(`Alert.condition_operator_id`): the alerting rows are
-`GET /api/runs/{last_run_id}/operators/{condition_operator_id}/rows`.
+A rule's condition is the rule's, not a step of anyone's pipeline: nothing is added to the
+operators for it, so the pipelines list and the lineage show only what people and agents
+built. A check runs the compiled SQL over the measure's output in its run
+(`RunService.query(run, measure, sql, limit)`, answered by the same fused query and
+snapshot reuse as everything else). **Each alert keeps the SQL** (`Alert.condition_sql`,
+migration `0004`), so it opens the exact rows that raised it:
+`GET /api/alerts/{id}/rows` runs that SQL over the measure in the alert's `last_run_id`
+(the measure's rows for alerts stored before `0004` without one).
 
 ### AlertService
 
@@ -430,7 +430,7 @@ the old one stays for the alerts it raised. **Each alert records it**
   maximum data age and alert pipeline, checks the result like a new rule, and is
   revision-checked. Interval, maximum age and alert pipeline take `Change[...]`: `None`
   clears them. New key columns resolve the old keys' alerts at the next check.
-- **`check(rule_id)`**, in one unit of work: finds the condition operator; refreshes
+- **`check(rule_id)`**, in one unit of work: compiles the condition; refreshes
   (forced) every upstream source whose data is older than `max_data_age_seconds` (a
   failure is logged and the check goes on with the last good data); starts a run and reads
   the alerting rows (more than 10 000 fails the check); per distinct key opens a `firing`
@@ -438,14 +438,15 @@ the old one stays for the alerts it raised. **Each alert records it**
   longer alerts; runs the alert pipeline when an alert starts and the rule has one;
   publishes `alert.firing` / `alert.resolved`; records the check with the time it
   **started**. Everything that can fail runs before an alert is written.
-- **Alert pipeline.** Runs in a run of its own, bound `{<its input slot>: <condition
-  operator>}`, with every snapshot of the check run fixed into it first, so it sees exactly
-  the check's data. Its failure is logged and does not undo the alerts. The alerts it was
+- **Alert pipeline.** Runs in a run of its own, with every snapshot of the check run fixed
+  into it first, so it sees exactly the check's data, and its input slot fed the alerting
+  rows: `RunService.feed(run, input, check run, measure, sql)` stores them as a snapshot of
+  the input for that run (`parameters_key` `run:<id>`) and fixes it there. Its failure is logged and does not undo the alerts. The alerts it was
   run for record its run (`Alert.pipeline_run_id`).
 - **`due()`**: enabled rules never checked; with `check_interval_seconds`, those whose
   interval has passed; without one, those whose measure's data changed since the last
   check (any upstream snapshot newer than it; reads no data, fetches nothing).
-- **`alerts(project, state)`**: newest first.
+- **`alerts(project, state)`**: newest first. **`rows(alert_id)`**: the rows that raised it.
 
 ## The agent
 
@@ -595,10 +596,8 @@ chooses from and what the agent looks at before building.
 
 - **Which operators.** Those no other operator uses as an input, newest first:
   `{operator_id, name, kind, sources: [{data_source_id, name}], output, created_at}`.
-  An alert rule's condition is left out: it is not listed, and it does not stop the
-  measure it builds on from counting as a pipeline. It is recognised as an operator made
-  by `PLATFORM` (`Actor(system, "ada")`, `core/models/actors.py`) that is not a source,
-  because the platform makes no other operators; an explicit flag would be cleaner.
+  Alert pipelines are pipelines like any other; alert rules are not operators, so they
+  never appear here.
 - **Names.** A source operator by its source's name; a transform by its leading `--`
   comment lines (joined), else its whitespace-collapsed SQL, cut at 60 characters with
   "…"; an input by its slot name.
@@ -659,6 +658,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /dashboards/{id}/alert-rules`, `POST /dashboards/{id}/alert-rules` | A dashboard's rules, oldest first; create (`name, operator_id, formula, key_columns`, optional `severity, check_interval_seconds, max_data_age_seconds, alert_pipeline_id`) |
 | `GET /alert-rules/{id}`, `PATCH /alert-rules/{id} {expected_revision, ...}` | Read; change. Fields left out stay; `null` clears `check_interval_seconds`, `max_data_age_seconds` and `alert_pipeline_id` |
 | `POST /alert-rules/{id}/check` | Check now, in the request: `{rule, changed, firing}` |
+| `GET /alerts/{id}/rows?limit=` | The rows that raised the alert, in its last run |
 | `GET /projects/{id}/alerts?state=`, `GET /dashboards/{id}/alerts?state=` | `AlertView[] {alert, rule}`, firing first, newest first within a state |
 | `GET /projects/{id}/alert-rules` | `{dashboard, rules}[]` for every dashboard of the project |
 

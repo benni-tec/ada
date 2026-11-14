@@ -443,7 +443,7 @@ async def test_an_agent_maps_a_measure_and_follows_it_with_a_report_and_alerts(
     # East Uusimaa 79.8, West Uusimaa 76.1, Vantaa and Kerava 76.7, Helsinki 74.3 in 2024.
     assert firing == {"01", "03", "04", "90"}
     assert {alert["state"] for alert in checked["changed"]} == {"firing"}
-    assert all(alert["condition_operator_id"] for alert in checked["changed"])
+    assert all(alert["condition_sql"] for alert in checked["changed"])
     assert stack.events.types.count(EventType.ALERT_FIRING) == 4
 
     # Sotkanet publishes recovered numbers; a forced refresh fetches them and the next

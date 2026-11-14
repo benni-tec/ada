@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
+from ada.core.models.analysis import Rows
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.operators import OperatorId
 
@@ -53,6 +54,11 @@ class AlertService(Protocol):
 
     async def due(self) -> Sequence[AlertRule]:
         """The enabled rules whose check interval has passed."""
+        ...
+
+    async def rows(self, alert_id: Id, limit: int = 1000) -> Rows:
+        """The rows that raised the alert, as its last run showed them: the rule's
+        condition over its measure."""
         ...
 
     async def alerts(self, project_id: Id, state: AlertState | None = None) -> Sequence[Alert]: ...

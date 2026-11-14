@@ -5,6 +5,7 @@ from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, status
 
 from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
+from ada.core.models.analysis import Rows
 from ada.core.models.base import UNCHANGED, Change, DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard
 from ada.core.models.operators import OperatorId
@@ -127,6 +128,12 @@ async def check_alert_rule(rule_id: Id, service: FromDishka[AlertService]) -> Ch
     changed = await service.check(rule_id)
     rule = await service.get_rule(rule_id)
     return CheckResult(rule=rule, changed=changed, firing=await _firing(service, rule))
+
+
+@router.get("/alerts/{alert_id}/rows")
+async def alert_rows(alert_id: Id, service: FromDishka[AlertService], limit: int = 1000) -> Rows:
+    """The rows that raised the alert, as its last run showed them."""
+    return await service.rows(alert_id, limit)
 
 
 @router.get("/projects/{project_id}/alert-rules")

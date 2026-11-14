@@ -71,7 +71,7 @@ async def test_alerts_fire_stay_and_resolve_on_postgresql(world: World) -> None:
         (again,) = await service.check(rule.id)
     assert again.id != fired.id
     assert again.key == fired.key
-    assert again.condition_operator_id == fired.condition_operator_id
+    assert again.condition_sql == fired.condition_sql
 
     types = [event.type for event in await world.events()]
     assert types.count(EventType.ALERT_FIRING) == 2

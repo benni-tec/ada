@@ -121,7 +121,7 @@ function alertsApi(extra: Record<string, unknown> = {}) {
     'GET /api/projects/p1/alert-rules': [{ dashboard, rules: [rule()] }],
     'GET /api/projects/p1/widgets': [],
     'GET /api/operators/op_measure': measure,
-    'GET /api/runs/run-2/operators/op_measure/rows': rows,
+    'GET /api/alerts/a1/rows': rows,
     ...extra,
   })
 }
@@ -173,10 +173,10 @@ test('an alert opens the rows of its key in the run that showed it', async () =>
 })
 
 test('an alert with a recorded condition opens the rows that raised it', async () => {
-  const raised = alert({ condition_operator_id: 'op_condition' })
+  const raised = alert({ condition_sql: 'SELECT * FROM input_0 WHERE value < 80' })
   alertsApi({
     'GET /api/projects/p1/alerts': [{ alert: raised, rule: rule() }],
-    'GET /api/runs/run-2/operators/op_condition/rows': {
+    'GET /api/alerts/a1/rows': {
       columns: [...rows.columns, { name: 'geometry', type: 'text', nullable: true }],
       rows: [['north', '2024-01-01', 70, `{"type":"Polygon","coordinates":[${'[1,2],'.repeat(40)}[1,2]]}`]],
       truncated: false,

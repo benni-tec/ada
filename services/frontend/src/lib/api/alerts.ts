@@ -3,7 +3,7 @@
 import { queryOptions } from '@tanstack/react-query'
 
 import { api, ApiFailure, type ApiError, type Schemas } from './client'
-import type { Id, OperatorId } from './models'
+import type { Id } from './models'
 
 export type Severity = Schemas['Severity']
 export type AlertState = Schemas['AlertState']
@@ -74,13 +74,6 @@ export const updateAlertRule = (id: Id, body: AlertRuleChange) =>
 export const checkAlertRule = (id: Id) =>
   unwrap(api.POST('/api/alert-rules/{rule_id}/check', { params: { path: { rule_id: id } } }))
 
-export const readRunRows = (runId: Id, operatorId: OperatorId) =>
-  unwrap(
-    api.GET('/api/runs/{run_id}/operators/{operator_id}/rows', {
-      params: { path: { run_id: runId, operator_id: operatorId }, query: { limit: 1000 } },
-    }),
-  )
-
 export const alertFeedQuery = (projectId: Id, state: AlertState | null = null) =>
   queryOptions({ queryKey: alertKeys.feed(projectId, state), queryFn: () => listAlerts(projectId, state) })
 
@@ -93,11 +86,13 @@ export const dashboardAlertsQuery = (dashboardId: Id) =>
 export const projectAlertRulesQuery = (projectId: Id) =>
   queryOptions({ queryKey: alertKeys.projectRules(projectId), queryFn: () => listProjectAlertRules(projectId) })
 
-export const alertRowsQuery = (runId: Id, operatorId: OperatorId) =>
+/** The rows that raised the alert: its rule's condition over the measure, in the run that
+ * last showed it (the measure's rows for alerts stored before the condition was kept). */
+export const alertRowsQuery = (alertId: Id) =>
   queryOptions({
-    queryKey: ['runs', runId, 'operators', operatorId, 'rows'],
-    queryFn: () => readRunRows(runId, operatorId),
-    // A run is a consistent cut: its rows never change.
+    queryKey: ['alerts', alertId, 'rows'],
+    queryFn: () => unwrap(api.GET('/api/alerts/{alert_id}/rows', { params: { path: { alert_id: alertId } } })),
+    // A run is a consistent cut: its rows never change, and a new run makes a new alert view.
     staleTime: Infinity,
   })
 
