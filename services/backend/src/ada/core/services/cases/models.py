@@ -151,9 +151,11 @@ def adapter(kind: str) -> CaseModel:
 
 def pathway_case_type_fields(version: ModelVersion) -> tuple[Field, ...]:
     """The shipped "Suspected cancer pathway" case type: what the pathway model needs,
-    site and sex required, plus the county and who referred the patient."""
+    site and sex required, plus the county, the date of the first contact (so the
+    pathways can be counted by month) and who referred the patient."""
     needs = PathwayModel().requires(version)
     return needs + (
         Field(name="county", type=FieldType.TEXT, label="Wellbeing services county"),
+        Field(name="first_contact", type=FieldType.DATE, label="First contact"),
         Field(name="referred_by", type=FieldType.TEXT, label="Referred by"),
     )

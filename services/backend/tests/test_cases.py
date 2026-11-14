@@ -1,7 +1,11 @@
 """Case types, cases and the models on them: the field rules, saving under a key, the
 automatic and the requested results, no backfill, and the open-case order."""
 
+import importlib.util
+import random
 from collections.abc import Iterator
+from datetime import date
+from pathlib import Path
 from typing import Any
 from uuid import uuid7
 
@@ -292,3 +296,25 @@ def test_rest_saves_a_case_and_evaluates_on_request(client: TestClient) -> None:
     assert [c["case"]["key"] for c in send(client, "GET", f"{base}/open-cases")] == ["SYN-0042"]
     refused = client.put(f"/api{base}/cases/131052-308T", json={"values": OVERDUE})
     assert refused.status_code == 422
+
+
+async def test_the_synthetic_generator_makes_cases_the_case_type_accepts() -> None:
+    path = Path(__file__).parents[1] / "scripts" / "synthetic_cases.py"
+    spec = importlib.util.spec_from_file_location("synthetic_cases", path)
+    assert spec and spec.loader
+    synthetic = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(synthetic)
+
+    world = World()
+    model, case_type = await world.pathway()
+    version = await world.models.version(model.id)
+    centres = synthetic.typical_days(version.model_dump(mode="json"))
+    rng = random.Random(1)
+    for n in range(1, 41):
+        key, values = synthetic.case(rng, n, centres, date(2026, 11, 15), 18)
+        assert key.startswith("SYN-")
+        await world.cases.put_case(case_type.id, key, values, ACTOR)
+    cases = await world.cases.model_cases(model.id)
+    assert len(cases) == 40 and all(c.latest is not None for c in cases)
+    open_ = await world.cases.open_cases(case_type.id)
+    assert 0 < len(open_) < 40
