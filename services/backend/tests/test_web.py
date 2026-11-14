@@ -491,6 +491,62 @@ async def test_a_web_source_fails_readably_and_stays_counted() -> None:
     assert sum(budget.spent.values()) == 1
 
 
+async def test_web_sources_read_pdf_pages_with_ocr_and_check_the_option() -> None:
+    memory = MemoryStore()
+    clock = FixedClock()
+    explorer = FakeExplorer(rows=[{"county": "Koko maa", "treated": "746"}])
+    explorer.page = explorer.page.model_copy(update={"credits": 2})
+    project = factories.project()
+    memory.projects[project.id] = project
+    budget = MemoryWebBudget()
+    reader = WebPageReader(explorer, budget, clock, 300)
+    service, _ = data_sources(
+        memory, FakeSourceReaders({AccessKind.WEB: reader}), FakeAnalysisStore(), clock
+    )
+    report = {
+        "name": "Lung cancer in Finland",
+        "access_kind": AccessKind.WEB,
+        "address": LUNG_REPORT,
+        "format": DataFormat.HTML,
+    }
+    pdf = {"start": 25, "end": 26, "ocr": True}
+    weekly = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=7 * DAY)
+
+    pages = await service.register(project.id, **report, options={"pdf": pdf})
+    table = await service.register(
+        project.id,
+        **report,
+        options={"operation": "extract", "instruction": "Table 3.7", "pdf": pdf},
+        declared_schema=Schema(
+            columns=(
+                Column(name="county", type=ColumnType.TEXT),
+                Column(name="treated", type=ColumnType.INTEGER),
+            )
+        ),
+        freshness=weekly,
+    )
+    await service.refresh(pages.id)
+    await service.refresh(table.id)
+
+    expected = PdfOptions(start=25, end=26, ocr=True)
+    assert [(name, arguments["pdf"]) for name, arguments in explorer.calls] == [
+        ("read", expected),
+        ("extract", expected),
+    ]
+    # The read charged two credits (one per page read with OCR), the extraction five.
+    assert sum(budget.spent.values()) == 2 + 5
+    for options, message in [
+        ({"pdf": {"start": 0}}, "start page of a PDF is a page number from 1"),
+        ({"pdf": {"start": 26, "end": 25}}, "end page of a PDF is not before its start"),
+        ({"pdf": {"pages": "25-26"}}, "options.pdf is an object"),
+        ({"pdf": "25-26"}, "options.pdf is an object"),
+        ({"pdf": {"ocr": "yes"}}, "ocr is true or false"),
+        ({"operation": "crawl", "pdf": {"ocr": True}}, 'for the operations "scrape" and "extract"'),
+    ]:
+        with pytest.raises(Invalid, match=message):
+            await service.register(project.id, **report, options=options, freshness=weekly)
+
+
 async def test_web_sources_keep_their_minimum_freshness_and_refuse_early_forced_refreshes() -> None:
     memory = MemoryStore()
     clock = FixedClock()

@@ -4,6 +4,7 @@ from enum import StrEnum
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.errors import Invalid
 from ada.core.models.schema import Column, ColumnType, Schema
+from ada.core.models.web import PdfOptions, pdf_options
 
 
 class AccessKind(StrEnum):
@@ -89,7 +90,8 @@ class WebOperation(StrEnum):
     """What a web source asks Context.dev for: `options.operation`. The dearer ones are
     sources, never exploration tools, and are kept fresh rarely (WEB_MINIMUM_TTL)."""
 
-    # One page as Markdown (1 credit), made into pages or tables like a document.
+    # One page as Markdown (1 credit), made into pages or tables like a document. A PDF's
+    # page range and OCR: `pdf` (web_pdf).
     SCRAPE = "scrape"
     # The pages of a site, from the address on (1 credit per page): `max_pages` (at most
     # WEB_CRAWL_MAX_PAGES), `max_depth`, `url_regex`, `exclude_url_regex`.
@@ -99,6 +101,7 @@ class WebOperation(StrEnum):
     ANSWERS = "answers"
     # A table a model reads off the page (about 5 credits): `instruction`, and the declared
     # columns, whose values it fills (null where the page states none). Model-extracted.
+    # `pdf` as for scrape.
     EXTRACT = "extract"
 
 
@@ -115,6 +118,26 @@ def web_operation(options: JsonObject) -> WebOperation:
     except ValueError:
         operations = ", ".join(repr(operation.value) for operation in WebOperation)
         raise Invalid(f"options.operation must be one of {operations}, not {value!r}") from None
+
+
+# The operations that read one page, which may be a PDF: they take `options.pdf`.
+WEB_PDF_OPERATIONS = frozenset({WebOperation.SCRAPE, WebOperation.EXTRACT})
+
+
+def web_pdf(options: JsonObject) -> PdfOptions | None:
+    """`options.pdf` of a web source, `{"start": 25, "end": 26, "ocr": true}` (each
+    optional): which pages of a PDF Context.dev reads, and whether with OCR, for tables
+    that are images. None without it; Invalid when it is malformed."""
+    pdf = options.get("pdf")
+    if pdf is None:
+        return None
+    if not isinstance(pdf, dict) or not set(pdf) <= {"start", "end", "ocr"}:
+        raise Invalid(
+            'options.pdf is an object with "start" and "end" (page numbers from 1) and '
+            '"ocr" (true to read the pages with OCR), each optional, e.g. '
+            '{"start": 25, "end": 26, "ocr": true}'
+        )
+    return pdf_options(pdf.get("start"), pdf.get("end"), pdf.get("ocr", False))
 
 
 _DAY = 24 * 60 * 60

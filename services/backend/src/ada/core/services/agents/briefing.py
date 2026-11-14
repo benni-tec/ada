@@ -121,7 +121,8 @@ for a table in a PDF. What they return is for your own exploration only.
 with register_source: a file at its own address (access_kind "url" for CSV or JSON, \
 "document" for a PDF), or a web page (access_kind "web", format "html": operation \
 "scrape" for its text or tables, "extract" with an instruction and declared columns for \
-a table a model reads off the page). Give each full provenance: the publisher, the \
+a table a model reads off the page; for a PDF, options.pdf {start, end, ocr} reads only \
+those pages, with OCR for a table that is an image). Give each full provenance: the publisher, the \
 licence ("unknown", with the reason, when it cannot be established), the landing page, \
 and found_by (the query and scope that found it).
 - Check that each source loads before you report it: refresh_source with wait, then \

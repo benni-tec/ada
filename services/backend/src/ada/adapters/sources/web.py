@@ -5,7 +5,9 @@
 `"scrape"` (the default)
     The page at the address, as Markdown, made into rows like a document read by
     Context.dev (`options.extract`: `pages`, one row `page 1, text`, or `tables`, the rows
-    of its Markdown tables), with the same columns (DOCUMENT_COLUMNS).
+    of its Markdown tables), with the same columns (DOCUMENT_COLUMNS). For a PDF,
+    `options.pdf` (`start`, `end`, `ocr`) reads a page range, with OCR for tables that are
+    images; each page then starts with a `<!-- page N -->` line in the one row's text.
 `"crawl"`
     The site from the address on (`max_pages` up to 50, `max_depth`, `url_regex`,
     `exclude_url_regex`). `pages`: one row per page in the order crawled, `text` its URL
@@ -18,10 +20,12 @@
     document.
 `"extract"`
     The rows a model reads off the page at the address, following `instruction`, in the
-    declared columns (null where the page states no value). Model-extracted.
+    declared columns (null where the page states no value). Model-extracted. `options.pdf`
+    as for scrape.
 
 Each fetch spends the project's daily web credits first (WebBudget): its price, or for a
-crawl `max_pages`, of which what Context.dev did not charge is given back afterwards. A
+crawl `max_pages`, corrected afterwards to what Context.dev says it charged (a PDF read
+with OCR costs a credit per page). A
 refused budget is Invalid, as are Context.dev's refusals; a fetch that was sent stays
 counted when it fails. There is no probe: web sources are kept fresh by ttl, or by a page
 monitor that refreshes them when the page changed (push).
@@ -53,6 +57,7 @@ from ada.core.models.sources import (
     WebOperation,
     document_extract,
     web_operation,
+    web_pdf,
 )
 from ada.core.models.time import TimeRange
 from ada.core.ports.sources import SourceReader
@@ -91,7 +96,13 @@ class WebPageReader(SourceReader):
         match operation:
             case WebOperation.SCRAPE:
                 await self._spend(source, WEB_SCRAPE_CREDITS)
-                page = await self.explorer.read(source.address, tags=tags)
+                page = await self.explorer.read(
+                    source.address, tags=tags, pdf=web_pdf(source.options)
+                )
+                if page.credits is not None and page.credits != WEB_SCRAPE_CREDITS:
+                    await self.budget.adjust(
+                        source.project_id, self._day(), page.credits - WEB_SCRAPE_CREDITS
+                    )
                 content = await self._document(source, page.markdown)
                 origin = page.url
             case WebOperation.CRAWL:
@@ -133,6 +144,7 @@ class WebPageReader(SourceReader):
                     str(source.options["instruction"]),
                     [column.name for column in source.declared_schema.columns],
                     tags=tags,
+                    pdf=web_pdf(source.options),
                 )
                 if extraction.credits != WEB_EXTRACT_CREDITS:
                     await self.budget.adjust(
