@@ -32,3 +32,11 @@ async def run_turn(
         # The service ends every turn it started, failed or not; this is for what happens
         # before (the turn cannot be read). Ending normally keeps the worker running.
         logger.exception("Running agent turn %s failed", turn_id)
+
+
+@task(schedule=[{"cron": "* * * * *"}])
+async def recover_turns(service: FromDishka[AgentTurnService]) -> None:
+    """Runs every minute: fails a turn whose worker stopped while it ran, and announces a
+    turn whose worker stopped right after it ended, so research whose worker died still
+    reports to its parent though nothing else happens in its session."""
+    await service.recover()

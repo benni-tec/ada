@@ -102,7 +102,9 @@ class World:
         self.operators = MemoryOperatorRepository(memory)
         self.snapshots = MemorySnapshotRepository(memory)
         self.widget_repository = MemoryWidgetRepository(memory)
-        readers = HttpSourceReaders(create_client(transport or self.transport), self.clock)
+        readers = HttpSourceReaders(
+            create_client(transport or self.transport), self.clock, allow_private=True
+        )
         self.sources = DataSources(
             projects=projects,
             sources=self.data_sources,

@@ -159,7 +159,9 @@ async def stack(migrated_database_url: str, tmp_path: Path) -> AsyncIterator[Sta
     events = CommittedBroadcaster(engine)
     replay = Replay()
     world = Outside(replay)
-    readers = HttpSourceReaders(create_client(httpx.MockTransport(world)), SystemClock())
+    readers = HttpSourceReaders(
+        create_client(httpx.MockTransport(world)), SystemClock(), allow_private=True
+    )
 
     outside = Provider(scope=Scope.APP)
     outside.provide(lambda: events, provides=EventBroadcaster)
@@ -544,7 +546,9 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
     outside = Sotkanet2022To2024()
     readers = Provider(scope=Scope.APP)
     readers.provide(
-        lambda: HttpSourceReaders(create_client(httpx.MockTransport(outside)), SystemClock()),
+        lambda: HttpSourceReaders(
+            create_client(httpx.MockTransport(outside)), SystemClock(), allow_private=True
+        ),
         provides=SourceReaders,
     )
     container = create_container(settings, MemoryBackground(), readers)

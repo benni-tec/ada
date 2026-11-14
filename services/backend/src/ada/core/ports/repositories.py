@@ -35,7 +35,7 @@ from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionEntry
-from ada.core.models.sources import DataSource
+from ada.core.models.sources import DataSource, FreshnessPolicy
 from ada.core.models.widgets import Widget
 
 
@@ -64,14 +64,23 @@ class DataSourceRepository(Protocol):
         ...
 
     async def set_monitor(
-        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+        self,
+        id: Id,
+        monitor_id: str | None,
+        secret_encrypted: str | None,
+        freshness_before: FreshnessPolicy | None,
     ) -> None:
-        """Store (or with None clear) the monitor that watches the source and its secret,
-        already sealed. Leaves the revision alone."""
+        """Store (or with None clear) the monitor that watches the source, its secret,
+        already sealed, and the freshness policy the source had before it was watched.
+        Leaves the revision alone."""
         ...
 
     async def monitor_secret_encrypted(self, id: Id) -> str | None:
         """The sealed secret of the source's monitor; it is never part of a DataSource."""
+        ...
+
+    async def freshness_before_watch(self, id: Id) -> FreshnessPolicy | None:
+        """The freshness policy stored with the source's monitor."""
         ...
 
 
@@ -93,12 +102,14 @@ class AgentTurnRepository(Protocol):
     async def add(self, turn: AgentTurn) -> None: ...
     async def list(self, session_id: Id) -> Sequence[AgentTurn]: ...
 
-    async def start(self, id: Id) -> bool:
-        """Move a queued turn to running. False, changing nothing, when it is not queued
-        (it was cancelled before it started, or another worker took it)."""
+    async def start(self, id: Id, at: datetime) -> bool:
+        """Move a queued turn to running, started `at`. False, changing nothing, when it is
+        not queued (it was cancelled before it started, or another worker took it)."""
         ...
 
-    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> None: ...
+    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> bool:
+        """False, changing nothing, when the turn is no longer running."""
+        ...
 
     async def finish(
         self,
@@ -107,7 +118,22 @@ class AgentTurnRepository(Protocol):
         parts: Sequence[TurnPart],
         error: str | None,
         at: datetime,
-    ) -> AgentTurn: ...
+    ) -> AgentTurn | None:
+        """End a running turn. None, changing nothing, when it is no longer running: it was
+        failed elsewhere after its worker seemed to have stopped, and stays failed."""
+        ...
+
+    async def settle(self, id: Id) -> bool:
+        """Note that an ended turn's end was announced. False when it was already, or when
+        the turn has not ended: whoever gets True announces it, once."""
+        ...
+
+    async def unsettled(
+        self, started_before: datetime, finished_before: datetime
+    ) -> Sequence[AgentTurn]:
+        """Turns whose end may never be announced: running since before `started_before`,
+        or ended before `finished_before` without their end announced."""
+        ...
 
     async def request_cancel(self, id: Id, at: datetime) -> AgentTurn:
         """Stop a turn: a queued one is cancelled at once, a running one is flagged and

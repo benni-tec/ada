@@ -186,6 +186,18 @@ class DataSources(SourceService):
         # caller forces one to read it at once. The source operator keeps its declared
         # output, since operators never change.
         source = await self.sources.get(id)
+        moved = address is not None and address.strip() != source.address
+        if moved or freshness is not None:
+            # Held, so a watch or unwatch under way finishes first and is seen below; each
+            # sets the policy, and unwatch would put back the earlier one over this.
+            await self.locks.hold(id)
+            source = await self.sources.get(id)
+            if moved and source.monitor_id is not None:
+                # The monitor watches the old page and would refresh from the new one.
+                raise Invalid(
+                    f"Source {source.name} is watched at its address. Stop watching it"
+                    " before changing the address, then watch it again."
+                )
         changes = {
             "name": name.strip() if name is not None else None,
             "address": address.strip() if address is not None else None,
@@ -354,12 +366,14 @@ class DataSources(SourceService):
         if not source.address.startswith(("http://", "https://")):
             raise Invalid("Only a source at an http(s) address can be watched")
         old = source.monitor_id
+        # Restored by unwatch: the policy from before the first watch, never PUSH itself.
+        before = source.freshness if old is None else await self.sources.freshness_before_watch(id)
         webhook = f"{self.public_url.rstrip('/')}/api/hooks/context/{id}"
         monitor = await self.explorer.watch(source.address, webhook)
         try:
             sealed = self.secrets.encrypt(monitor.secret.get_secret_value())
-            await self.sources.set_monitor(id, monitor.id, sealed)
-            watched = await self._set_freshness(source, FreshnessKind.PUSH)
+            await self.sources.set_monitor(id, monitor.id, sealed, before)
+            watched = await self._set_freshness(source, FreshnessPolicy(kind=FreshnessKind.PUSH))
         except Exception:
             # Without this the monitor would keep firing at a source that does not know it.
             await self.explorer.unwatch(monitor.id)
@@ -376,13 +390,20 @@ class DataSources(SourceService):
         source = await self.sources.get(id)
         if source.monitor_id is None:
             return source
+        before = await self.sources.freshness_before_watch(id)
         await self.explorer.unwatch(source.monitor_id)
-        await self.sources.set_monitor(id, None, None)
-        return await self._set_freshness(source, FreshnessKind.MANUAL)
+        await self.sources.set_monitor(id, None, None, None)
+        if source.freshness.kind is not FreshnessKind.PUSH:
+            # Someone chose another policy while it was watched: theirs stays.
+            return await self.sources.get(id)
+        if before is None or before.kind is FreshnessKind.PUSH:
+            # Watched before the earlier policy was kept, or push with no monitor: by hand.
+            before = FreshnessPolicy()
+        return await self._set_freshness(source, before)
 
-    async def _set_freshness(self, source: DataSource, kind: FreshnessKind) -> DataSource:
+    async def _set_freshness(self, source: DataSource, policy: FreshnessPolicy) -> DataSource:
         fresh = await self.sources.get(source.id)
-        updated = fresh.model_copy(update={"freshness": FreshnessPolicy(kind=kind)})
+        updated = fresh.model_copy(update={"freshness": policy})
         return await self.sources.update(updated, fresh.revision)
 
     async def verify_push(

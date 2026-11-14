@@ -6,19 +6,22 @@ The REST routes run in a TestClient; a turn runs as the worker's task would, on 
 container, in the client's event loop."""
 
 import asyncio
-from collections.abc import AsyncIterator, Iterator
+import json
+from collections.abc import AsyncIterator, Iterator, Sequence
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid7
 
 import pytest
-from dishka import AsyncContainer
+from dishka import AsyncContainer, Provider, Scope, provide
 from fastapi.testclient import TestClient
 from fastmcp import Client
 from mcp.types import Implementation
 from openai import AsyncOpenAI
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.models.function import AgentInfo, DeltaToolCall
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from taskiq import InMemoryBroker
@@ -26,20 +29,31 @@ from taskiq import InMemoryBroker
 import factories
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import MemoryStore
+from ada.adapters.sources.web import WebPageReader
+from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
-from ada.core.models.agents import AgentTurn, ProviderKind, ToolPart
+from ada.core.models.agents import AgentTurn, ProviderKind, ResearchLimits, ToolPart, TurnStatus
+from ada.core.models.agents import TextPart as AnswerText
 from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.base import Id
 from ada.core.models.judges import Finding, Outcome
 from ada.core.models.reports import Report, ReportVersion
+from ada.core.models.sessions import EntryKind
+from ada.core.models.sources import AccessKind
 from ada.core.models.time import TimeRange
-from ada.core.models.web import SearchHit
-from ada.core.ports.agents import ToolCallFailed, TurnProgress
+from ada.core.models.web import SearchHit, SearchScope
+from ada.core.ports.agents import ResearchCalls, ToolCallFailed, TurnProgress
+from ada.core.ports.sources import SourceReaders
+from ada.core.ports.system import Clock
+from ada.core.ports.web import WebBudget, WebSearch
 from ada.core.services.agents import service as agent_service
-from ada.core.services.ports.agents import AgentTurnService
+from ada.core.services.agents.research import ResearchReaders, researching
+from ada.core.services.ports.agents import AgentTurnService, ResearchService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sessions import SessionService
+from ada.core.services.ports.sources import SourceService
+from ada.core.services.sessions.service import Sessions
 from ada.entrypoints.mcp.agent import CLIENT, LEFT_OUT, RESEARCH_TOOLS, InProcessToolbox
 from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.worker import create_broker
@@ -68,8 +82,9 @@ from api_support import (
     send,
     serve,
 )
-from fakes import FakeExplorer, FakeWebSearch
-from memory import memory_adapters
+from conftest import settings_in
+from fakes import FakeExplorer, FakeSourceReaders, FakeWebSearch, FixedClock
+from memory import MemoryBackground, memory_adapters
 
 pytestmark = pytest.mark.anyio
 
@@ -613,7 +628,8 @@ def test_a_turn_is_cancelled_while_queued_or_at_its_next_step(
     # The tool call the model asked for was not made.
     assert (stopped.status, stopped.parts, len(script.calls)) == ("cancelled", (), 1)
     finished = turn_events(client, session, "agent.turn_finished")
-    assert [e.payload["status"] for e in finished] == ["cancelled", "cancelled"]
+    # The running one is announced as it stops and again once settled.
+    assert [e.payload["status"] for e in finished] == ["cancelled"] * 3
 
 
 def test_a_failing_or_unreachable_provider_ends_the_turn_as_failed(
@@ -1170,7 +1186,7 @@ async def test_a_turn_left_running_past_the_time_limit_fails_before_the_next_run
         await configure(app_container, config())
         stuck, turn = await two_turns(app_container)
         # The worker running the first turn died: it is left running.
-        assert await (await app_container.get(TurnProgress)).start(stuck)
+        assert await (await app_container.get(TurnProgress)).start(stuck, overrides.clock.now())
         seen = []
 
         async def look(step: int) -> None:
@@ -1195,3 +1211,311 @@ async def test_a_turn_left_running_past_the_time_limit_fails_before_the_next_run
         assert (seen, done.status) == (["failed"], "done")
     finally:
         await broker.shutdown()
+
+
+PERSON = Actor(kind=ActorKind.USER, name="web")
+
+
+async def research_turn(container: AsyncContainer, parent_id: Id, brief: str) -> AgentTurn:
+    """Research a person delegates from the session, and its turn on the brief."""
+    async with container() as request:
+        child = await (await request.get(ResearchService)).delegate(parent_id, brief, brief, PERSON)
+        [turn] = await (await request.get(AgentTurnService)).turns(child.id)
+    return turn
+
+
+class WebSourceReaders(Provider):
+    """The composition's readers, but web sources read with `explorer`."""
+
+    def __init__(self, explorer: FakeExplorer) -> None:
+        super().__init__()
+        self.explorer = explorer
+
+    @provide(scope=Scope.APP)
+    def readers(
+        self, calls: ResearchCalls, limits: ResearchLimits, budget: WebBudget
+    ) -> SourceReaders:
+        web = WebPageReader(self.explorer, budget, FixedClock(), 300)
+        return ResearchReaders(FakeSourceReaders({AccessKind.WEB: web}), calls, limits)
+
+
+async def test_a_research_turn_counts_every_document_read_it_queues(
+    unreachable_settings: Settings,
+) -> None:
+    container = create_container(unreachable_settings, *memory_adapters())
+    try:
+        async with container() as request:
+            project = await (await request.get(ProjectService)).create("P")
+            sessions = await request.get(SessionService)
+            parent = await sessions.create(project.id, "S")
+            child = await sessions.create_research(
+                parent.id, "R", Actor(kind=ActorKind.USER, name="web")
+            )
+            research = await request.get(ResearchService)
+            with researching(child.id):
+                # Parsed locally now, but the turn may switch it to Context.dev before the
+                # worker reads it. A URL source is never a paid read.
+                for kind in (AccessKind.DOCUMENT, AccessKind.URL):
+                    await research.use_source_read(
+                        factories.data_source(project.id, access_kind=kind)
+                    )
+        store = await container.get(MemoryStore)
+    finally:
+        await container.close()
+
+    assert store.web_calls == {child.id: 1}
+
+
+async def test_a_research_turn_counts_its_web_calls_whatever_session_it_names(
+    unreachable_settings: Settings,
+) -> None:
+    script = Script()
+    search, explorer = FakeWebSearch(), FakeExplorer()
+    settings = unreachable_settings.model_copy(update={"research_web_calls": 3})
+    container = create_container(
+        settings,
+        *memory_adapters(),
+        FakeWeb(search, explorer),
+        WebSourceReaders(explorer),
+        AgentOverrides(script),
+    )
+    try:
+        await configure(container, config())
+        async with container() as request:
+            project = await (await request.get(ProjectService)).create("P")
+            parent = await (await request.get(SessionService)).create(project.id, "S")
+        turn = await research_turn(container, parent.id, "Survival by district")
+        page = {
+            "project_id": str(project.id),
+            "name": "THL page",
+            "address": "https://thl.fi/survival",
+            "access_kind": "web",
+            "format": "html",
+        }
+        on_project = {"project_id": str(project.id)}
+        script.then(
+            # Its parent's session, as if that spent nothing.
+            call("search_web", {**on_project, "query": "survival", "session_id": str(parent.id)}),
+            call("register_source", page),
+            call(
+                "add_source_operator",
+                lambda m: {
+                    "project_id": str(project.id),
+                    "data_source_id": returned(m, "register_source")["id"],
+                    "session_id": str(parent.id),
+                },
+            ),
+            # Reads the page in this call, then queues a read in the worker.
+            call(
+                "preview_operator",
+                lambda m: {"operator_id": returned(m, "add_source_operator")["id"]},
+            ),
+            call("refresh_source", lambda m: {"source_id": returned(m, "register_source")["id"]}),
+            call("read_page", {**on_project, "url": "https://thl.fi/other"}),
+            say("Out of calls."),
+        )
+        ran = await run_turn(container, turn.id)
+        store = await container.get(MemoryStore)
+        async with container() as request:
+            parent_record = await (await request.get(SessionService)).entries(parent.id)
+    finally:
+        await container.close()
+
+    tools = [(p.tool_name, p.state) for p in ran.parts if isinstance(p, ToolPart)]
+    assert tools == [
+        *[
+            (name, "output-available")
+            for name in (
+                "search_web",
+                "register_source",
+                "add_source_operator",
+                "preview_operator",
+                "refresh_source",
+            )
+        ],
+        ("read_page", "output-error"),
+    ]
+    assert store.web_calls == {turn.session_id: 3}
+    assert [(name, arguments["url"]) for name, arguments in explorer.calls] == [
+        ("read", "https://thl.fi/survival")
+    ]
+    # It works in its own session only: the parent has the delegation and the report.
+    assert [entry.kind for entry in parent_record] == [EntryKind.DELEGATION, EntryKind.REPORT]
+
+
+RECOVER_TURNS = "ada.entrypoints.worker.tasks.agent:recover_turns"
+
+
+async def test_research_whose_worker_died_is_ended_and_reported_by_the_recovery(
+    unreachable_settings: Settings,
+) -> None:
+    overrides = Overrides()
+    broker = create_broker(
+        unreachable_settings,
+        *memory_adapters(),
+        overrides,
+        AgentOverrides(Script()),
+        in_memory=True,
+    )
+    assert isinstance(broker, InMemoryBroker)
+    app_container = broker.middlewares[0]._container  # type: ignore[attr-defined]
+    await broker.startup()
+    try:
+        await configure(app_container, config())
+        async with app_container() as request:
+            project = await (await request.get(ProjectService)).create("P")
+            parent = await (await request.get(SessionService)).create(project.id, "S")
+        running = await research_turn(app_container, parent.id, "Survival")
+        ended = await research_turn(app_container, parent.id, "Deaths")
+        reported = await research_turn(app_container, parent.id, "Births")
+        # The workers stopped: one while its turn ran, one right after report_back stored
+        # its report (before the turn stored the call), one right after its turn ended.
+        progress, now = await app_container.get(TurnProgress), overrides.clock.now()
+        for turn in (running, ended, reported):
+            assert await progress.start(turn.id, now)
+        async with app_container() as request:
+            await (await request.get(SessionService)).record_report(
+                reported.session_id, "Births by region.", Actor(kind=ActorKind.AGENT, name=MODEL)
+            )
+        await progress.finish(
+            ended.id, TurnStatus.DONE, (AnswerText(text="No deaths table."),), None, now
+        )
+
+        async def recover() -> list[str]:
+            task = broker.find_task(RECOVER_TURNS)
+            assert task is not None
+            result = await (await task.kiq()).wait_result(timeout=5)
+            assert not result.is_err, result.error
+            async with app_container() as request:
+                entries = await (await request.get(SessionService)).entries(parent.id)
+            return [entry.text for entry in entries if entry.kind is EntryKind.REPORT]
+
+        early = await recover()
+        bound = agent_service.TURN_TIME_LIMIT + agent_service.TURN_MARGIN
+        overrides.clock.advance(seconds=bound.total_seconds() + 1)
+        await recover()
+        reports = await recover()
+        failed = await get_turn(app_container, running.id)
+    finally:
+        await broker.shutdown()
+
+    assert early == ["Births by region."]
+    assert (failed.status, failed.error) == ("failed", agent_service.ABANDONED)
+    assert reports == [
+        "Births by region.",
+        f"Research failed: {agent_service.ABANDONED}",
+        "No deaths table.\n\n(incomplete: ended without a report)",
+    ]
+
+
+async def test_a_research_report_that_failed_is_posted_once_by_the_recovery(
+    migrated_database_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    script, clock = Script(), FixedClock()
+    clocks = Provider(scope=Scope.APP)
+    clocks.provide(lambda: clock, provides=Clock)
+    settings = settings_in(tmp_path, migrated_database_url)
+    container = create_container(settings, MemoryBackground(), clocks, AgentOverrides(script))
+    record, failures = Sessions.record_report, [ConnectionError("The database went away")]
+
+    async def record_then_fail(self: Sessions, *args: Any) -> Any:
+        entry = await record(self, *args)
+        if failures:
+            raise failures.pop()
+        return entry
+
+    async def reports() -> list[str]:
+        async with container() as request:
+            entries = await (await request.get(SessionService)).entries(parent.id)
+        return [entry.text for entry in entries if entry.kind is EntryKind.REPORT]
+
+    try:
+        await configure(container, config())
+        async with container() as request:
+            project = await (await request.get(ProjectService)).create("P")
+            parent = await (await request.get(SessionService)).create(project.id, "S")
+        turn = await research_turn(container, parent.id, "Survival")
+        monkeypatch.setattr(Sessions, "record_report", record_then_fail)
+        script.then(say("No survival table."))
+        await run_turn(container, turn.id)
+        lost = await reports()
+        clock.advance(seconds=agent_service.TURN_MARGIN.total_seconds() + 1)
+        for _ in range(2):
+            async with container() as request:
+                await (await request.get(AgentTurnService)).recover()
+        recovered = await reports()
+    finally:
+        await container.close()
+
+    # The report written before the failure was rolled back with the turn's settling.
+    assert (failures, lost) == ([], [])
+    assert recovered == ["No survival table.\n\n(incomplete: ended without a report)"]
+
+
+class StalledSearch(FakeWebSearch):
+    """A search that waits until it is let go, like a worker that stalls."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.called, self.go_on = asyncio.Event(), asyncio.Event()
+
+    async def search(self, query: str, scope: SearchScope, limit: int) -> Sequence[SearchHit]:
+        self.called.set()
+        await self.go_on.wait()
+        return await super().search(query, scope, limit)
+
+
+async def test_a_turn_failed_while_its_worker_stalled_stays_failed(
+    migrated_database_url: str, tmp_path: Path
+) -> None:
+    script, clock, search = Script(), FixedClock(), StalledSearch()
+    stalls = Provider(scope=Scope.APP)
+    stalls.provide(lambda: clock, provides=Clock)
+    stalls.provide(lambda: search, provides=WebSearch)
+    settings = settings_in(tmp_path, migrated_database_url)
+    container = create_container(settings, MemoryBackground(), stalls, AgentOverrides(script))
+    try:
+        await configure(container, config())
+        stalled, following = await two_turns(container)
+        async with container() as request:
+            session = await (await request.get(SessionService)).get(
+                (await get_turn(container, stalled)).session_id
+            )
+        source = {
+            "project_id": str(session.project_id),
+            "name": "Late",
+            "address": "https://example.test/late.csv",
+        }
+
+        search_q = {"project_id": str(session.project_id), "query": "q"}
+
+        async def search_then_register(messages: Any, info: AgentInfo) -> AsyncIterator[Any]:
+            yield {
+                0: DeltaToolCall("search_web", json.dumps(search_q), tool_call_id="c1"),
+                1: DeltaToolCall("register_source", json.dumps(source), tool_call_id="c2"),
+            }
+
+        script.then(search_then_register, say("The next turn."))
+        first = asyncio.create_task(run_turn(container, stalled))
+        await asyncio.wait_for(search.called.wait(), 5)
+        bound = agent_service.TURN_TIME_LIMIT + agent_service.TURN_MARGIN
+        clock.advance(seconds=bound.total_seconds() + 1)
+        async with container() as request:
+            await (await request.get(AgentTurnService)).recover()
+        failed = await get_turn(container, stalled)
+        # The second execution: the session's next turn runs while the first still waits.
+        done = await run_turn(container, following)
+        search.go_on.set()
+        resumed = await asyncio.wait_for(first, 5)
+        stored = await get_turn(container, stalled)
+        async with container() as request:
+            sources = await (await request.get(SourceService)).list(session.project_id)
+    finally:
+        await container.close()
+
+    assert (failed.status, failed.error) == ("failed", agent_service.ABANDONED)
+    assert done.status == "done"
+    # Once failed, the stalled worker changed nothing: its next tool call was refused and
+    # its own end was not stored.
+    assert resumed == stored == failed
+    assert sources == []

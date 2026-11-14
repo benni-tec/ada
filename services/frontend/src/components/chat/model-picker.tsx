@@ -20,10 +20,13 @@ import type { LlmModels } from '@/lib/api'
 export function ModelPicker({
   models,
   value,
+  defaultId,
   onChange,
 }: {
   models: LlmModels
   value: string
+  /** The model that answers when none is picked; the session agent unless it is a research session. */
+  defaultId?: string | null
   onChange: (id: string) => void
 }) {
   const short = (id: string) => id.split('/').at(-1) ?? id
@@ -57,7 +60,7 @@ export function ModelPicker({
             <span className="flex min-w-0 flex-col">
               <span className="truncate">
                 {model.id}
-                {model.id === models.session_agent ? ' (default)' : ''}
+                {model.id === (defaultId ?? models.session_agent) ? ' (default)' : ''}
               </span>
               {!model.available && <span className="text-xs text-muted-foreground">{model.reason ?? 'Not available'}</span>}
             </span>

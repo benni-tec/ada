@@ -28,7 +28,7 @@ from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionAgent, SessionEntry
-from ada.core.models.sources import DataSource
+from ada.core.models.sources import DataSource, FreshnessPolicy
 from ada.core.models.widgets import Widget
 from ada.core.ports.agents import ResearchCalls, TurnProgress
 from ada.core.ports.repositories import (
@@ -77,6 +77,8 @@ class MemoryStore:
         self.alerts: dict[Id, Alert] = {}
         self.agent_turns: dict[Id, AgentTurn] = {}
         self.cancel_requests: set[Id] = set()
+        self.turn_starts: dict[Id, datetime] = {}
+        self.settled_turns: set[Id] = set()
         self.llm_providers: dict[Id, LlmProvider] = {}
         # Provider id -> the encrypted key.
         self.llm_api_keys: dict[Id, str] = {}
@@ -89,6 +91,7 @@ class MemoryStore:
         self.research_agent: tuple[Id, str] | None = None
         # Source id -> the sealed secret of its monitor.
         self.monitor_secrets: dict[Id, str] = {}
+        self.freshness_before_watch: dict[Id, FreshnessPolicy] = {}
         # Session id -> its paid web calls.
         self.web_calls: dict[Id, int] = {}
         # The judges' defaults, one per kind from the start, as the migration seeds them;
@@ -195,7 +198,11 @@ class MemoryDataSourceRepository(DataSourceRepository):
         )
 
     async def set_monitor(
-        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+        self,
+        id: Id,
+        monitor_id: str | None,
+        secret_encrypted: str | None,
+        freshness_before: FreshnessPolicy | None,
     ) -> None:
         source = await self.get(id)
         self.store.data_sources[id] = source.model_copy(update={"monitor_id": monitor_id})
@@ -203,10 +210,18 @@ class MemoryDataSourceRepository(DataSourceRepository):
             self.store.monitor_secrets.pop(id, None)
         else:
             self.store.monitor_secrets[id] = secret_encrypted
+        if freshness_before is None:
+            self.store.freshness_before_watch.pop(id, None)
+        else:
+            self.store.freshness_before_watch[id] = freshness_before
 
     async def monitor_secret_encrypted(self, id: Id) -> str | None:
         await self.get(id)
         return self.store.monitor_secrets.get(id)
+
+    async def freshness_before_watch(self, id: Id) -> FreshnessPolicy | None:
+        await self.get(id)
+        return self.store.freshness_before_watch.get(id)
 
 
 class MemorySessionRepository(SessionRepository):
@@ -530,6 +545,9 @@ class MemorySourceCheckLog(SourceCheckLog):
         await MemoryDataSourceRepository(self.store).record_check(id, at, probe_token, error)
 
 
+UNFINISHED = (TurnStatus.QUEUED, TurnStatus.RUNNING)
+
+
 class MemoryAgentTurnRepository(AgentTurnRepository):
     def __init__(self, store: MemoryStore) -> None:
         self.store = store
@@ -544,16 +562,20 @@ class MemoryAgentTurnRepository(AgentTurnRepository):
     async def list(self, session_id: Id) -> Sequence[AgentTurn]:
         return [t for t in self.store.agent_turns.values() if t.session_id == session_id]
 
-    async def start(self, id: Id) -> bool:
+    async def start(self, id: Id, at: datetime) -> bool:
         turn = await self.get(id)
         if turn.status is not TurnStatus.QUEUED:
             return False
         self.store.agent_turns[id] = turn.model_copy(update={"status": TurnStatus.RUNNING})
+        self.store.turn_starts[id] = at
         return True
 
-    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> None:
+    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> bool:
         turn = await self.get(id)
+        if turn.status is not TurnStatus.RUNNING:
+            return False
         self.store.agent_turns[id] = turn.model_copy(update={"parts": tuple(parts)})
+        return True
 
     async def finish(
         self,
@@ -562,12 +584,48 @@ class MemoryAgentTurnRepository(AgentTurnRepository):
         parts: Sequence[TurnPart],
         error: str | None,
         at: datetime,
+    ) -> AgentTurn | None:
+        turn = await self.get(id)
+        if turn.status is not TurnStatus.RUNNING:
+            return None
+        return self._end(turn, status, parts, error, at)
+
+    def _end(
+        self,
+        turn: AgentTurn,
+        status: TurnStatus,
+        parts: Sequence[TurnPart],
+        error: str | None,
+        at: datetime,
     ) -> AgentTurn:
-        turn = (await self.get(id)).model_copy(
+        turn = turn.model_copy(
             update={"status": status, "parts": tuple(parts), "error": error, "finished_at": at}
         )
-        self.store.agent_turns[id] = turn
+        self.store.agent_turns[turn.id] = turn
         return turn
+
+    async def settle(self, id: Id) -> bool:
+        turn = await self.get(id)
+        if turn.status in UNFINISHED or id in self.store.settled_turns:
+            return False
+        self.store.settled_turns.add(id)
+        return True
+
+    async def unsettled(
+        self, started_before: datetime, finished_before: datetime
+    ) -> Sequence[AgentTurn]:
+        def due(turn: AgentTurn) -> bool:
+            if turn.status is TurnStatus.RUNNING:
+                return self.store.turn_starts[turn.id] < started_before
+            if turn.status in UNFINISHED or turn.finished_at is None:
+                return False
+            return turn.finished_at < finished_before
+
+        return [
+            turn
+            for turn in self.store.agent_turns.values()
+            if turn.id not in self.store.settled_turns and due(turn)
+        ]
 
     async def request_cancel(self, id: Id, at: datetime) -> AgentTurn:
         turn = await self.get(id)
@@ -605,13 +663,15 @@ class MemoryTurnProgress(TurnProgress):
     def __init__(self, store: MemoryStore) -> None:
         self.store = store
 
-    async def start(self, id: Id) -> bool:
-        return await MemoryAgentTurnRepository(self.store).start(id)
+    async def start(self, id: Id, at: datetime) -> bool:
+        return await MemoryAgentTurnRepository(self.store).start(id, at)
 
     async def checkpoint(self, id: Id, parts: Sequence[TurnPart]) -> bool:
         turns = MemoryAgentTurnRepository(self.store)
-        await turns.save_parts(id, parts)
-        return await turns.cancel_requested(id)
+        return not await turns.save_parts(id, parts) or await turns.cancel_requested(id)
+
+    async def running(self, id: Id) -> bool:
+        return (await MemoryAgentTurnRepository(self.store).get(id)).status is TurnStatus.RUNNING
 
     async def finish(
         self,
@@ -620,7 +680,7 @@ class MemoryTurnProgress(TurnProgress):
         parts: Sequence[TurnPart],
         error: str | None,
         at: datetime,
-    ) -> AgentTurn:
+    ) -> AgentTurn | None:
         return await MemoryAgentTurnRepository(self.store).finish(id, status, parts, error, at)
 
     async def session_turns(self, id: Id) -> Sequence[AgentTurn]:
@@ -630,10 +690,10 @@ class MemoryTurnProgress(TurnProgress):
     async def abandon(self, id: Id, error: str, at: datetime) -> AgentTurn | None:
         turns = MemoryAgentTurnRepository(self.store)
         turn = await turns.get(id)
-        if turn.status not in (TurnStatus.QUEUED, TurnStatus.RUNNING):
+        if turn.status not in UNFINISHED:
             return None
         self.store.cancel_requests.add(id)
-        return await turns.finish(id, TurnStatus.FAILED, turn.parts, error, at)
+        return turns._end(turn, TurnStatus.FAILED, turn.parts, error, at)
 
 
 class MemoryLlmProviderRepository(LlmProviderRepository):

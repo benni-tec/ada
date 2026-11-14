@@ -16,6 +16,7 @@ from ada.core.models.sources import (
 )
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.transactions import AfterCommit
+from ada.core.services.ports.agents import ResearchService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.refreshes import MAX_WAIT_SECONDS, RefreshService, SnapshotSummary
 from ada.core.services.ports.sources import SourceService
@@ -112,6 +113,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         service: FromDishka[SourceService],
         dispatcher: FromDishka[TaskDispatcher],
         after_commit: FromDishka[AfterCommit],
+        research: FromDishka[ResearchService],
         name: str | None = None,
         address: str | None = None,
         options: JsonObject | None = None,
@@ -139,6 +141,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             provenance=provenance,
         )
         if (before.address, before.options) != (updated.address, updated.options):
+            await research.use_source_read(updated)
             # Queued after the commit: the worker must read the new address, not the old.
             after_commit.add(lambda: dispatcher.refresh_source(source_id, True))
         return updated
@@ -151,6 +154,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         service: FromDishka[SourceService],
         dispatcher: FromDishka[TaskDispatcher],
         refreshes: FromDishka[RefreshService],
+        research: FromDishka[ResearchService],
         force: bool = False,
         wait: bool = False,
         timeout_seconds: Annotated[int, Field(ge=1, le=MAX_WAIT_SECONDS)] = 30,
@@ -164,9 +168,12 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         worker. With `wait` the fetch runs in this call, for at most `timeout_seconds`
         (up to 60), and the answer says how it went: status "fetched", "unchanged" or
         "failed", the source's current `snapshot` (id, row count, when fetched) and the
-        `error` if it failed. Wait when your next step reads the data."""
+        `error` if it failed. Wait when your next step reads the data. In a research
+        session, reading a web source or a document Context.dev parses counts as a web
+        call, and so does queuing a refresh of any document."""
         if not wait:
-            await service.get(source_id)
+            # Read by the worker, outside the research turn: counted here.
+            await research.use_source_read(await service.get(source_id))
             await dispatcher.refresh_source(source_id, force)
             return Refreshed(data_source_id=source_id, force=force)
         outcome = await refreshes.refresh_now(source_id, force, timeout_seconds)
