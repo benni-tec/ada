@@ -19,6 +19,7 @@ from ada.adapters.memory.repositories import (
     MemoryAlertRepository,
     MemoryAlertRuleRepository,
     MemoryAttachmentRepository,
+    MemoryCaseRepository,
     MemoryDashboardRepository,
     MemoryDataSourceRepository,
     MemoryJudgeSettingsRepository,
@@ -49,6 +50,7 @@ from ada.core.ports.repositories import (
     AlertRepository,
     AlertRuleRepository,
     AttachmentRepository,
+    CaseRepository,
     DashboardRepository,
     DataSourceRepository,
     JudgeSettingsRepository,
@@ -114,6 +116,7 @@ class MemoryRepositories(Provider):
     statistical_models = provide(
         MemoryStatisticalModelRepository, provides=StatisticalModelRepository
     )
+    cases = provide(MemoryCaseRepository, provides=CaseRepository)
     source_checks = provide(MemorySourceCheckLog, provides=SourceCheckLog, scope=Scope.APP)
     source_locks = provide(MemorySourceLocks, provides=SourceLocks, scope=Scope.APP)
     turn_progress = provide(MemoryTurnProgress, provides=TurnProgress, scope=Scope.APP)

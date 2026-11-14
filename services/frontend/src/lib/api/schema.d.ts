@@ -63,6 +63,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/case-types/{case_type_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Case Type */
+        get: operations["get_case_type_api_case_types__case_type_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Case Type */
+        patch: operations["update_case_type_api_case_types__case_type_id__patch"];
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cases */
+        get: operations["list_cases_api_case_types__case_type_id__cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/cases/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Case */
+        get: operations["get_case_api_case_types__case_type_id__cases__key__get"];
+        /**
+         * Put Case
+         * @description Create or update the case under `key`; the automatic models run and their results
+         *     are stored on it.
+         */
+        put: operations["put_case_api_case_types__case_type_id__cases__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/cases/{key}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate Case */
+        post: operations["evaluate_case_api_case_types__case_type_id__cases__key__evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/cases/{key}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Case Models */
+        get: operations["case_models_api_case_types__case_type_id__cases__key__models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/open-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Cases
+         * @description Cases whose pathway has not reached treatment start, overdue first; never by
+         *     survival.
+         */
+        get: operations["open_cases_api_case_types__case_type_id__open_cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard-versions/{version_id}": {
         parameters: {
             query?: never;
@@ -366,6 +478,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{model_id}/case-type": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Model Case Type */
+        put: operations["set_model_case_type_api_models__model_id__case_type_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Model Cases
+         * @description Every case of the model's case type, with the model's latest result or none.
+         */
+        get: operations["model_cases_api_models__model_id__cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{model_id}/evaluate": {
         parameters: {
             query?: never;
@@ -565,6 +714,24 @@ export interface paths {
         get: operations["list_alerts_api_projects__project_id__alerts_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/case-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Case Types */
+        get: operations["list_case_types_api_projects__project_id__case_types_get"];
+        put?: never;
+        /** Create Case Type */
+        post: operations["create_case_type_api_projects__project_id__case_types_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1881,6 +2048,122 @@ export interface components {
             /** Survival */
             survival: number;
         };
+        /** Case */
+        Case: {
+            case_type_id: components["schemas"]["Id"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            id: components["schemas"]["Id"];
+            /** Key */
+            key: string;
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+            /** Schema Revision */
+            schema_revision: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            values: components["schemas"]["JsonObject"];
+        };
+        /**
+         * CaseEvent
+         * @description A day-map field's step and its days, as recorded at a save: the history of a
+         *     pathway as it grows.
+         */
+        CaseEvent: {
+            case_id: components["schemas"]["Id"];
+            /** Days */
+            days: number;
+            /** Field */
+            field: string;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+            /** Step */
+            step: string;
+        };
+        /** CaseResult */
+        CaseResult: {
+            case_id: components["schemas"]["Id"];
+            /** Case Revision */
+            case_revision: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            id: components["schemas"]["Id"];
+            model_id: components["schemas"]["Id"];
+            section: components["schemas"]["Section"];
+            trigger: components["schemas"]["ResultTrigger"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * CaseState
+         * @description A case with its step events and every result, newest first.
+         */
+        CaseState: {
+            case: components["schemas"]["Case"];
+            /** Events */
+            events: components["schemas"]["CaseEvent"][];
+            /** Results */
+            results: components["schemas"]["CaseResult"][];
+        };
+        /** CaseType */
+        CaseType: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            /** Description */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["Field"][];
+            id: components["schemas"]["Id"];
+            /** Name */
+            name: string;
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+        };
+        /** CaseTypeChange */
+        CaseTypeChange: {
+            /** Description */
+            description?: string | null;
+            /** Fields */
+            fields?: components["schemas"]["Field"][] | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** CaseValues */
+        CaseValues: {
+            values: components["schemas"]["JsonObject"];
+        };
+        /**
+         * CaseWithResult
+         * @description A case with one model's latest result for it; None when the model has not run.
+         */
+        CaseWithResult: {
+            case: components["schemas"]["Case"];
+            latest: components["schemas"]["CaseResult"] | null;
+        };
         /** CheckResult */
         CheckResult: {
             /** Changed */
@@ -2176,6 +2459,10 @@ export interface components {
             /** Version */
             version?: number | null;
         };
+        /** EvaluateCase */
+        EvaluateCase: {
+            model_id: components["schemas"]["Id"];
+        };
         /** Evaluation */
         Evaluation: {
             /** Contributions */
@@ -2239,12 +2526,48 @@ export interface components {
             toggles: {
                 [key: string]: boolean;
             };
+            /**
+             * Treatment Started
+             * @default false
+             */
+            treatment_started: boolean;
         };
         /**
          * EvidenceGrade
          * @enum {string}
          */
         EvidenceGrade: "standard" | "meta_analysis" | "cohort" | "registry" | "assumption";
+        /** Field */
+        Field: {
+            /**
+             * Help
+             * @default
+             */
+            help: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /**
+             * Levels
+             * @default []
+             */
+            levels: string[];
+            /** Name */
+            name: string;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+            type: components["schemas"]["FieldType"];
+        };
+        /**
+         * FieldType
+         * @enum {string}
+         */
+        FieldType: "text" | "number" | "integer" | "date" | "boolean" | "enum" | "enum_list" | "day_map";
         /** Figure */
         Figure: {
             now: components["schemas"]["Per100"];
@@ -2577,6 +2900,15 @@ export interface components {
          * @enum {string}
          */
         Modality: "surgery" | "radiotherapy" | "drugs";
+        /** ModelCaseType */
+        ModelCaseType: {
+            /**
+             * Auto Run
+             * @default false
+             */
+            auto_run: boolean;
+            case_type_id: components["schemas"]["Id"] | null;
+        };
         /**
          * ModelInfo
          * @description A configured model, as the catalog shows it. Its key is never part of it.
@@ -2609,6 +2941,24 @@ export interface components {
             research_agent?: string | null;
             /** Session Agent */
             session_agent?: string | null;
+        };
+        /**
+         * ModelOnCase
+         * @description A model on the case's type, with its latest result for the case if it has one.
+         */
+        ModelOnCase: {
+            /** Auto Run */
+            auto_run: boolean;
+            /** Kind */
+            kind: string;
+            latest: components["schemas"]["CaseResult"] | null;
+            model_id: components["schemas"]["Id"];
+            /** Name */
+            name: string;
+            /** Results */
+            results: number;
+            /** Version */
+            version: number;
         };
         /**
          * ModelSpec
@@ -2696,6 +3046,18 @@ export interface components {
             ref: string;
             /** Title */
             title?: string | null;
+        };
+        /** NewCaseType */
+        NewCaseType: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["Field"][];
+            /** Name */
+            name: string;
         };
         /** NewDashboard */
         NewDashboard: {
@@ -3256,6 +3618,11 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * ResultTrigger
+         * @enum {string}
+         */
+        ResultTrigger: "auto" | "request";
         /** Roles */
         Roles: {
             geo?: components["schemas"]["GeoRole"] | null;
@@ -3313,6 +3680,19 @@ export interface components {
             /** @default {} */
             time_range: components["schemas"]["TimeRange"];
         };
+        /** SavedCase */
+        SavedCase: {
+            case: components["schemas"]["Case"];
+            /** Events */
+            events: components["schemas"]["CaseEvent"][];
+            /**
+             * Ran
+             * @default []
+             */
+            ran: components["schemas"]["Id"][];
+            /** Results */
+            results: components["schemas"]["CaseResult"][];
+        };
         /**
          * Scale
          * @description What a parameter is measured on. Hazard ratios on overall mortality are converted to
@@ -3344,6 +3724,35 @@ export interface components {
              *     }
              */
             roles: components["schemas"]["Roles"];
+        };
+        /**
+         * Section
+         * @description What one model said about one case. `body` is the model's own result (for
+         *     `patient_pathway`, an Evaluation); `summary`, `status` and `columns` are what lists
+         *     and the cases data source show.
+         */
+        Section: {
+            /** @default {} */
+            body: components["schemas"]["JsonObject"];
+            /**
+             * Columns
+             * @default {}
+             */
+            columns: {
+                [key: string]: string | number | boolean | null;
+            };
+            /** Kind */
+            kind: string;
+            /**
+             * Status
+             * @default info
+             * @enum {string}
+             */
+            status: "ok" | "info" | "warn" | "urgent";
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
         };
         /**
          * Session
@@ -3533,6 +3942,12 @@ export interface components {
         };
         /** StatisticalModel */
         StatisticalModel: {
+            /**
+             * Auto Run
+             * @default false
+             */
+            auto_run: boolean;
+            case_type_id?: components["schemas"]["Id"] | null;
             /**
              * Created At
              * Format: date-time
@@ -4096,6 +4511,270 @@ export interface operations {
             };
         };
     };
+    get_case_type_api_case_types__case_type_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseType"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_case_type_api_case_types__case_type_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseTypeChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseType"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cases_api_case_types__case_type_id__cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Case"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_case_api_case_types__case_type_id__cases__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_case_api_case_types__case_type_id__cases__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseValues"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedCase"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_case_api_case_types__case_type_id__cases__key__evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluateCase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    case_models_api_case_types__case_type_id__cases__key__models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelOnCase"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_cases_api_case_types__case_type_id__open_cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWithResult"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_version_api_dashboard_versions__version_id__get: {
         parameters: {
             query?: never;
@@ -4627,6 +5306,72 @@ export interface operations {
             };
         };
     };
+    set_model_case_type_api_models__model_id__case_type_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCaseType"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatisticalModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    model_cases_api_models__model_id__cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWithResult"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     evaluate_model_api_models__model_id__evaluate_post: {
         parameters: {
             query?: never;
@@ -5023,6 +5768,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_case_types_api_projects__project_id__case_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseType"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_case_type_api_projects__project_id__case_types_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewCaseType"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseType"];
                 };
             };
             /** @description Validation Error */

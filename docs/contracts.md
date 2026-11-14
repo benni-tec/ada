@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent), `0010` named widget inputs and render errors, `0011` session attachments, widget verdicts and the sidebar's order (`dashboards.position`, `reports.position`), `0012` the judges (`judge_defaults`, seeded, and `project_judges`), `0013` agent turn recovery, `0014` the freshness policy a source had before it was watched, `0015` statistical models (`statistical_models`, `statistical_model_versions`) |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent), `0010` named widget inputs and render errors, `0011` session attachments, widget verdicts and the sidebar's order (`dashboards.position`, `reports.position`), `0012` the judges (`judge_defaults`, seeded, and `project_judges`), `0013` agent turn recovery, `0014` the freshness policy a source had before it was watched, `0015` statistical models (`statistical_models`, `statistical_model_versions`), `0016` cases (`case_types`, `cases`, `case_events`, `case_results`; `statistical_models.case_type_id`, `auto_run`) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -1022,7 +1022,8 @@ the source, and cited by that operator and run. Building a model may thus start 
 evaluating one never does.
 
 **An evaluation is computed and returned, never stored**: no run, snapshot, operator or
-widget, and no DuckDB. The platform is not for patient data: the frontend carries a banner
+widget, and no DuckDB. A model run on a case is the exception: its result is stored on the
+case (see Cases). The platform is not for patient data: the frontend carries a banner
 on every page saying so, and evaluations are therefore ordinary tool calls, recorded in the
 session like any other. REST: `GET /projects/{id}/models`, `POST
 /projects/{id}/models` (a spec) and `/models/pathway` (the shipped one; body `{parameters?}`), `GET
@@ -1030,6 +1031,33 @@ session like any other. REST: `GET /projects/{id}/models`, `POST
 /models/{id}/versions`, `POST /models/{id}/evaluate`. MCP: `create_pathway_model`,
 `list_models`, `get_model`, `evaluate_model`. Migration `0015`: `statistical_models`,
 `statistical_model_versions`.
+
+## Cases
+
+A **case type** (`core/models/cases.py`) is a schema of fields (`text`, `number`, `integer`,
+`date`, `boolean`, `enum`, `enum_list`, `day_map`). A **case** is one instance under a `key`
+its caller sets, unique within the type, 1–128 characters of `[A-Za-z0-9._:-]`, and never
+a Finnish personal identity code; saving is an upsert by key. A case keeps its latest
+`values`, a `revision` per save, and append-only **events**: a day-map field's step and its
+days whenever they change. A statistical model names one case type
+(`StatisticalModel.case_type_id`), which must cover what its latest version reads (same
+name and type, required where the model requires, enum levels a subset of the model's);
+creating a model or a version, and changing a case type, are refused otherwise. While a
+case type has cases, its fields may only grow (new optional fields, new levels).
+
+Saving a case runs every model on its type with `auto_run`; any model on the type runs on
+request (`evaluate`). Each run stores a **result** on the case (`CaseResult`: model,
+version, the case revision it read, the section, auto or request, who, when). Results are
+history, never overwritten, and never backfilled: a model added later has no result for
+old cases until it is evaluated or the case is saved again. `CaseRepository`;
+`CaseService` (`create_type`, `update_type`, `get_type`, `list_types`, `put_case`,
+`get_case`, `list_cases`, `models`, `evaluate`, `open_cases`, `model_cases`). The open-case
+list orders by deadline status, never by survival. REST: `GET/POST
+/projects/{id}/case-types`, `GET/PATCH /case-types/{id}`, `GET /case-types/{id}/cases`,
+`GET /case-types/{id}/open-cases`, `GET/PUT /case-types/{id}/cases/{key}`, `GET
+/case-types/{id}/cases/{key}/models`, `POST /case-types/{id}/cases/{key}/evaluate`, `GET
+/models/{id}/cases`, `PUT /models/{id}/case-type`. MCP: `list_case_types`,
+`create_case_type`, `set_case`, `get_case`, `evaluate_case`, `list_open_cases`.
 
 ## REST
 

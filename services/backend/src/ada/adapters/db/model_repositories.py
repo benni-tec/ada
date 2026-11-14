@@ -36,10 +36,20 @@ class SqlStatisticalModelRepository(StatisticalModelRepository):
                 description=model.description,
                 kind=model.kind,
                 latest_version=model.latest_version,
+                case_type_id=model.case_type_id,
+                auto_run=model.auto_run,
                 created_by=dump(model.created_by),
                 created_at=model.created_at,
             ),
         )
+
+    async def update(self, model: StatisticalModel) -> None:
+        row = await fetch(self.session, StatisticalModelRow, model.id, "statistical model")
+        row.name = model.name
+        row.description = model.description
+        row.case_type_id = model.case_type_id
+        row.auto_run = model.auto_run
+        await self.session.flush()
 
     async def add_version(self, version: ModelVersion) -> None:
         model = await fetch(
@@ -87,6 +97,8 @@ def _model(row: StatisticalModelRow) -> StatisticalModel:
         description=row.description,
         kind=row.kind,
         latest_version=row.latest_version,
+        case_type_id=row.case_type_id,
+        auto_run=row.auto_run,
         created_by=Actor.model_validate(row.created_by),
         created_at=row.created_at,
     )

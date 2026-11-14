@@ -13,7 +13,7 @@ All calls of one request share a transaction: it commits when the request succee
 rolls back when it raises.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Protocol
 
@@ -28,6 +28,7 @@ from ada.core.models.agents import (
 from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
+from ada.core.models.cases import Case, CaseEvent, CaseResult, CaseType
 from ada.core.models.dashboards import Dashboard, DashboardVersion
 from ada.core.models.judges import JudgeDefaults, JudgeOverride, Verdict
 from ada.core.models.operators import Operator, OperatorId
@@ -390,10 +391,51 @@ class StatisticalModelRepository(Protocol):
     async def list(self, project_id: Id) -> Sequence[StatisticalModel]: ...
     async def add(self, model: StatisticalModel) -> None: ...
 
+    async def update(self, model: StatisticalModel) -> None:
+        """Store the name, description, case type and auto-run of a model."""
+        ...
+
     async def add_version(self, version: ModelVersion) -> None:
         """Store a version and point its model's `latest_version` at it."""
         ...
 
     async def version(self, model_id: Id, number: int) -> ModelVersion:
         """NotFound for an unknown model or version."""
+        ...
+
+
+class CaseRepository(Protocol):
+    """Case types, their cases, the cases' step events and the results models produced.
+    Results and events are append-only."""
+
+    async def add_type(self, case_type: CaseType) -> None: ...
+    async def get_type(self, id: Id) -> CaseType: ...
+    async def list_types(self, project_id: Id) -> Sequence[CaseType]: ...
+    async def update_type(self, case_type: CaseType) -> None: ...
+
+    async def find(self, case_type_id: Id, key: str) -> Case | None: ...
+    async def list(self, case_type_id: Id) -> Sequence[Case]:
+        """Oldest first."""
+        ...
+
+    async def count(self, case_type_id: Id) -> int: ...
+    async def add(self, case: Case) -> None: ...
+    async def update(self, case: Case) -> None: ...
+
+    async def add_events(self, events: Sequence[CaseEvent]) -> None: ...
+    async def events(self, case_id: Id) -> Sequence[CaseEvent]:
+        """In the order they were recorded."""
+        ...
+
+    async def add_result(self, result: CaseResult) -> None: ...
+    async def results(self, case_id: Id) -> Sequence[CaseResult]:
+        """Newest first."""
+        ...
+
+    async def latest_results(self, model_id: Id) -> Mapping[Id, CaseResult]:
+        """Case id -> this model's newest result for it."""
+        ...
+
+    async def result_counts(self, model_id: Id) -> Mapping[Id, int]:
+        """Case id -> how many results this model has for it."""
         ...

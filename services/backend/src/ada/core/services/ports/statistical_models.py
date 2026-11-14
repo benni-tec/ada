@@ -19,18 +19,35 @@ class StatisticalModelService(Protocol):
     An evaluation is computed and returned; it creates no run, snapshot or operator."""
 
     async def create(
-        self, project_id: Id, name: str, description: str, spec: ModelSpec, actor: Actor
+        self,
+        project_id: Id,
+        name: str,
+        description: str,
+        spec: ModelSpec,
+        actor: Actor,
+        case_type_id: Id | None = None,
+        auto_run: bool = False,
     ) -> ModelVersion:
         """Create a model with its first version. Invalid when the spec does not hold
         together (a site without a baseline, a criterion or target for an unknown site,
-        an unknown toggle, an empty intended use)."""
+        an unknown toggle, an empty intended use), or when `case_type_id` names a case type
+        that does not cover what the model needs."""
+        ...
+
+    async def set_case_type(
+        self, model_id: Id, case_type_id: Id | None, auto_run: bool
+    ) -> StatisticalModel:
+        """Put a model on a case type (or none) and say whether it runs on every save.
+        Invalid when the case type does not cover what the latest version needs."""
         ...
 
     async def create_pathway_model(
         self, project_id: Id, actor: Actor, parameters: OperatorId | None = None
     ) -> ModelVersion:
         """Create the patient pathway model from the figures and provenance in
-        `ada.core.services.statistical_models.pathway`. With `parameters`, the effect sizes
+        `ada.core.services.statistical_models.pathway`, on the project's "Suspected cancer
+        pathway" case type (created when there is none that covers it), running
+        automatically. With `parameters`, the effect sizes
         are read from that operator instead (columns name, estimate, ci_low, ci_high,
         source_id, passage, found), each cited by the operator and the run it was read in.
         Invalid when a row names an unknown parameter, a passage was not found in its
@@ -38,7 +55,8 @@ class StatisticalModelService(Protocol):
         ...
 
     async def add_version(self, model_id: Id, spec: ModelSpec, actor: Actor) -> ModelVersion:
-        """Build a new version; the old ones stay as they are."""
+        """Build a new version; the old ones stay as they are. Invalid when the model's
+        case type does not cover the new version."""
         ...
 
     async def list(self, project_id: Id) -> Sequence[StatisticalModel]: ...

@@ -167,8 +167,9 @@ class _Pathway:
     def __init__(self, inputs: EvaluationInputs) -> None:
         given = [s for s in STEPS if s in inputs.days]
         self.days = {s: inputs.days[s] for s in given}
-        self.current = given[-1] if given else None
-        self.completed = set(given[:-1])
+        done = inputs.treatment_started and PathwayStep.WORKUP_TO_TREATMENT in given
+        self.current = None if done or not given else given[-1]
+        self.completed = set(given if done else given[:-1])
         self.today = sum(
             d for s, d in self.days.items() if s is not PathwayStep.SYMPTOMS_TO_CONTACT
         )

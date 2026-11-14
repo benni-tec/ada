@@ -613,6 +613,293 @@
         "title": "BaselineCell",
         "type": "object"
       },
+      "Case": {
+        "properties": {
+          "case_type_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "revision": {
+            "default": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "schema_revision": {
+            "title": "Schema Revision",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "values": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "required": [
+          "id",
+          "case_type_id",
+          "key",
+          "values",
+          "schema_revision",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Case",
+        "type": "object"
+      },
+      "CaseEvent": {
+        "description": "A day-map field's step and its days, as recorded at a save: the history of a\npathway as it grows.",
+        "properties": {
+          "case_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "field",
+          "step",
+          "days",
+          "recorded_at"
+        ],
+        "title": "CaseEvent",
+        "type": "object"
+      },
+      "CaseResult": {
+        "properties": {
+          "case_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "case_revision": {
+            "title": "Case Revision",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "section": {
+            "$ref": "#/components/schemas/Section"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/ResultTrigger"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "case_id",
+          "model_id",
+          "version",
+          "case_revision",
+          "section",
+          "trigger",
+          "created_by",
+          "created_at"
+        ],
+        "title": "CaseResult",
+        "type": "object"
+      },
+      "CaseState": {
+        "description": "A case with its step events and every result, newest first.",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/Case"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CaseEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CaseResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "case",
+          "events",
+          "results"
+        ],
+        "title": "CaseState",
+        "type": "object"
+      },
+      "CaseType": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "revision": {
+            "default": 1,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "description",
+          "fields",
+          "created_by",
+          "created_at"
+        ],
+        "title": "CaseType",
+        "type": "object"
+      },
+      "CaseTypeChange": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Field"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "CaseTypeChange",
+        "type": "object"
+      },
+      "CaseValues": {
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "title": "CaseValues",
+        "type": "object"
+      },
+      "CaseWithResult": {
+        "description": "A case with one model's latest result for it; None when the model has not run.",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/Case"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaseResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "case",
+          "latest"
+        ],
+        "title": "CaseWithResult",
+        "type": "object"
+      },
       "CheckResult": {
         "properties": {
           "changed": {
@@ -1385,6 +1672,19 @@
         "title": "Evaluate",
         "type": "object"
       },
+      "EvaluateCase": {
+        "additionalProperties": false,
+        "properties": {
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "model_id"
+        ],
+        "title": "EvaluateCase",
+        "type": "object"
+      },
       "Evaluation": {
         "properties": {
           "contributions": {
@@ -1552,6 +1852,11 @@
             "default": {},
             "title": "Toggles",
             "type": "object"
+          },
+          "treatment_started": {
+            "default": false,
+            "title": "Treatment Started",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1570,6 +1875,60 @@
           "assumption"
         ],
         "title": "EvidenceGrade",
+        "type": "string"
+      },
+      "Field": {
+        "properties": {
+          "help": {
+            "default": "",
+            "title": "Help",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "levels": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "required": {
+            "default": false,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FieldType"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "Field",
+        "type": "object"
+      },
+      "FieldType": {
+        "enum": [
+          "text",
+          "number",
+          "integer",
+          "date",
+          "boolean",
+          "enum",
+          "enum_list",
+          "day_map"
+        ],
+        "title": "FieldType",
         "type": "string"
       },
       "Figure": {
@@ -2283,6 +2642,31 @@
         "title": "Modality",
         "type": "string"
       },
+      "ModelCaseType": {
+        "additionalProperties": false,
+        "properties": {
+          "auto_run": {
+            "default": false,
+            "title": "Auto Run",
+            "type": "boolean"
+          },
+          "case_type_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "case_type_id"
+        ],
+        "title": "ModelCaseType",
+        "type": "object"
+      },
       "ModelInfo": {
         "description": "A configured model, as the catalog shows it. Its key is never part of it.",
         "properties": {
@@ -2365,6 +2749,55 @@
           }
         },
         "title": "ModelList",
+        "type": "object"
+      },
+      "ModelOnCase": {
+        "description": "A model on the case's type, with its latest result for the case if it has one.",
+        "properties": {
+          "auto_run": {
+            "title": "Auto Run",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaseResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "results": {
+            "title": "Results",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model_id",
+          "name",
+          "kind",
+          "version",
+          "auto_run",
+          "latest",
+          "results"
+        ],
+        "title": "ModelOnCase",
         "type": "object"
       },
       "ModelSpec": {
@@ -2609,6 +3042,33 @@
           "ref"
         ],
         "title": "NewAttachment",
+        "type": "object"
+      },
+      "NewCaseType": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "fields"
+        ],
+        "title": "NewCaseType",
         "type": "object"
       },
       "NewDashboard": {
@@ -4239,6 +4699,14 @@
         "title": "ReportVersion",
         "type": "object"
       },
+      "ResultTrigger": {
+        "enum": [
+          "auto",
+          "request"
+        ],
+        "title": "ResultTrigger",
+        "type": "string"
+      },
       "Roles": {
         "properties": {
           "geo": {
@@ -4354,6 +4822,42 @@
         "title": "Run",
         "type": "object"
       },
+      "SavedCase": {
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/Case"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CaseEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "ran": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "title": "Ran",
+            "type": "array"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CaseResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "case",
+          "events",
+          "results"
+        ],
+        "title": "SavedCase",
+        "type": "object"
+      },
       "Scale": {
         "description": "What a parameter is measured on. Hazard ratios on overall mortality are converted to\nthe excess scale at build (Compiled.parameters), the others are used as they are.",
         "enum": [
@@ -4396,6 +4900,69 @@
           }
         },
         "title": "Schema",
+        "type": "object"
+      },
+      "Section": {
+        "description": "What one model said about one case. `body` is the model's own result (for\n`patient_pathway`, an Evaluation); `summary`, `status` and `columns` are what lists\nand the cases data source show.",
+        "properties": {
+          "body": {
+            "$ref": "#/components/schemas/JsonObject",
+            "default": {}
+          },
+          "columns": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "default": {},
+            "title": "Columns",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "default": "info",
+            "enum": [
+              "ok",
+              "info",
+              "warn",
+              "urgent"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "summary"
+        ],
+        "title": "Section",
         "type": "object"
       },
       "Session": {
@@ -4894,6 +5461,21 @@
       },
       "StatisticalModel": {
         "properties": {
+          "auto_run": {
+            "default": false,
+            "title": "Auto Run",
+            "type": "boolean"
+          },
+          "case_type_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -6121,6 +6703,426 @@
         ]
       }
     },
+    "/api/case-types/{case_type_id}": {
+      "get": {
+        "operationId": "get_case_type_api_case_types__case_type_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseType"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Case Type",
+        "tags": [
+          "cases"
+        ]
+      },
+      "patch": {
+        "operationId": "update_case_type_api_case_types__case_type_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseTypeChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseType"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Case Type",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/cases": {
+      "get": {
+        "operationId": "list_cases_api_case_types__case_type_id__cases_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Case"
+                  },
+                  "title": "Response List Cases Api Case Types  Case Type Id  Cases Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Cases",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/cases/{key}": {
+      "get": {
+        "operationId": "get_case_api_case_types__case_type_id__cases__key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Case",
+        "tags": [
+          "cases"
+        ]
+      },
+      "put": {
+        "description": "Create or update the case under `key`; the automatic models run and their results\nare stored on it.",
+        "operationId": "put_case_api_case_types__case_type_id__cases__key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseValues"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedCase"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/cases/{key}/evaluate": {
+      "post": {
+        "operationId": "evaluate_case_api_case_types__case_type_id__cases__key__evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateCase"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/cases/{key}/models": {
+      "get": {
+        "operationId": "case_models_api_case_types__case_type_id__cases__key__models_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModelOnCase"
+                  },
+                  "title": "Response Case Models Api Case Types  Case Type Id  Cases  Key  Models Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Case Models",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/open-cases": {
+      "get": {
+        "description": "Cases whose pathway has not reached treatment start, overdue first; never by\nsurvival.",
+        "operationId": "open_cases_api_case_types__case_type_id__open_cases_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseWithResult"
+                  },
+                  "title": "Response Open Cases Api Case Types  Case Type Id  Open Cases Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Cases",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
     "/api/dashboard-versions/{version_id}": {
       "get": {
         "operationId": "get_version_api_dashboard_versions__version_id__get",
@@ -6915,6 +7917,107 @@
         ]
       }
     },
+    "/api/models/{model_id}/case-type": {
+      "put": {
+        "operationId": "set_model_case_type_api_models__model_id__case_type_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCaseType"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatisticalModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Model Case Type",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/models/{model_id}/cases": {
+      "get": {
+        "description": "Every case of the model's case type, with the model's latest result or none.",
+        "operationId": "model_cases_api_models__model_id__cases_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseWithResult"
+                  },
+                  "title": "Response Model Cases Api Models  Model Id  Cases Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Model Cases",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
     "/api/models/{model_id}/evaluate": {
       "post": {
         "description": "Evaluate one synthetic profile. Nothing is stored: no run, no snapshot, no\noperator.",
@@ -7521,6 +8624,104 @@
         "summary": "List Alerts",
         "tags": [
           "alerts"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/case-types": {
+      "get": {
+        "operationId": "list_case_types_api_projects__project_id__case_types_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseType"
+                  },
+                  "title": "Response List Case Types Api Projects  Project Id  Case Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Case Types",
+        "tags": [
+          "cases"
+        ]
+      },
+      "post": {
+        "operationId": "create_case_type_api_projects__project_id__case_types_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCaseType"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseType"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Case Type",
+        "tags": [
+          "cases"
         ]
       }
     },

@@ -279,6 +279,10 @@ class StatisticalModel(DomainModel):
     description: str
     kind: str
     latest_version: int
+    # The case type it runs on (ada.core.models.cases); None for a model on no case type.
+    case_type_id: Id | None = None
+    # Run on every save of a case of its type; otherwise only on request. Never backfilled.
+    auto_run: bool = False
     created_by: Actor
     created_at: datetime
 
@@ -316,6 +320,8 @@ class EvaluationInputs(DomainModel):
     # Ids of the criteria the presentation meets.
     presentation: tuple[str, ...] = ()
     days: dict[PathwayStep, int] = {}
+    # Treatment has started: the last step given is complete, not current.
+    treatment_started: bool = False
     # Toggle name -> on; a toggle left out takes its default.
     toggles: dict[str, bool] = {}
 

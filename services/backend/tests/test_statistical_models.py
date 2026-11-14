@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ada.adapters.memory.repositories import (
+    MemoryCaseRepository,
     MemoryProjectRepository,
     MemoryStatisticalModelRepository,
     MemoryStore,
@@ -365,6 +366,7 @@ async def test_the_service_builds_the_pathway_model_from_a_parameter_operator() 
     service = StatisticalModels(
         MemoryStatisticalModelRepository(store),
         MemoryProjectRepository(store),
+        MemoryCaseRepository(store),
         exploration,
         FixedClock(),
     )
