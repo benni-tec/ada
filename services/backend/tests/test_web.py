@@ -9,7 +9,7 @@ from pydantic import SecretStr
 from ada.adapters.sources.http import create_client
 from ada.adapters.web.context import ContextPages
 from ada.adapters.web.exa import DATA_DOMAINS, ExaSearch
-from ada.core.models.errors import Invalid
+from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.web import SearchScope
 from fakes import WebReplay
 
@@ -83,3 +83,25 @@ async def test_missing_key_fails_clearly() -> None:
 def json_body(replay: WebReplay) -> dict[str, dict[str, object]]:
     body: dict[str, dict[str, object]] = json.loads(replay.requests[0].content)
     return body
+
+
+async def test_error_answers_never_quote_the_body() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/search":
+            return httpx.Response(401, text="Invalid key synthetic-secret-key")
+        if request.url.path.endswith("/web/scrape"):
+            return httpx.Response(
+                400,
+                json={"error_code": "INPUT_VALIDATION_ERROR", "message": "synthetic-secret-key"},
+            )
+        return httpx.Response(200, text="<html>not json</html>")
+
+    secret = SecretStr("synthetic-secret-key")
+    async with create_client(httpx.MockTransport(handler)) as http:
+        with pytest.raises(Unavailable, match="401") as search:
+            await ExaSearch(http, secret).search("x", SearchScope.ANY, 1)
+        with pytest.raises(Unavailable, match="INPUT_VALIDATION_ERROR") as scrape:
+            await ContextPages(http, secret).read(PAGE)
+        with pytest.raises(Unavailable, match="other than JSON"):
+            await ContextPages(http, secret).unwatch("mon_1")
+    assert "synthetic-secret-key" not in str(search.value) + str(scrape.value)

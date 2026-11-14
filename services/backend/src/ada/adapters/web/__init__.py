@@ -1,5 +1,6 @@
 """Web tools: Exa for search (exa.py) and Context.dev for page reading (context.py)."""
 
+import re
 from typing import Any
 
 import httpx
@@ -19,6 +20,26 @@ async def send_json(
     except httpx.HTTPError as error:
         raise Unavailable(f"{method} {url} failed: {str(error) or type(error).__name__}") from error
     if response.is_error:
-        raise Unavailable(f"{method} {url} answered {response.status_code}: {response.text[:300]}")
-    answer: dict[str, Any] = response.json()
+        raise Unavailable(
+            f"{method} {url} answered {response.status_code}{_error_code(response, token)}"
+        )
+    try:
+        answer: dict[str, Any] = response.json()
+    except ValueError:
+        raise Unavailable(f"{method} {url} answered something other than JSON") from None
+    if not isinstance(answer, dict):
+        raise Unavailable(f"{method} {url} answered something other than a JSON object")
     return answer
+
+
+def _error_code(response: httpx.Response, token: str) -> str:
+    """ ": <code>" from the short error code field of an error answer, else nothing. The raw
+    body is never quoted: an authentication error may echo the key."""
+    try:
+        body = response.json()
+    except ValueError:
+        return ""
+    code = body.get("error_code") if isinstance(body, dict) else None
+    if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", code) and token not in code:
+        return f": {code}"
+    return ""
