@@ -19,6 +19,8 @@ class EventType(StrEnum):
     SOURCE_REFRESH_FAILED = "source.refresh_failed"
     DASHBOARD_CHANGED = "dashboard.changed"
     REPORT_VERSION_CREATED = "report.version_created"
+    # The project's dashboards or reports were put in a new order: payload {"list": ...}.
+    ORDER_CHANGED = "project.order_changed"
     ALERT_FIRING = "alert.firing"
     ALERT_RESOLVED = "alert.resolved"
     AGENT_TURN_STARTED = "agent.turn_started"

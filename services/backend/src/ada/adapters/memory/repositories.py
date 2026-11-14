@@ -119,6 +119,22 @@ def _in_project[M](records: dict[Any, M], project_id: Id) -> list[M]:
     return [r for r in records.values() if r.project_id == project_id]  # type: ignore[attr-defined]
 
 
+def _in_position_order[M: Dashboard | Report](records: list[M]) -> list[M]:
+    return sorted(
+        records,
+        key=lambda r: (r.position is None, r.position or 0, r.created_at, r.id),
+    )
+
+
+def _set_positions[M: Dashboard | Report](
+    records: dict[Id, M], project_id: Id, ids: Sequence[Id]
+) -> None:
+    for position, id in enumerate(ids):
+        record = records.get(id)
+        if record is not None and record.project_id == project_id:
+            records[id] = record.model_copy(update={"position": position})
+
+
 class MemoryProjectRepository(ProjectRepository):
     def __init__(self, store: MemoryStore) -> None:
         self.store = store
@@ -321,7 +337,10 @@ class MemoryDashboardRepository(DashboardRepository):
         return _get(self.store.dashboards, "dashboard", id)
 
     async def list(self, project_id: Id) -> Sequence[Dashboard]:
-        return _in_project(self.store.dashboards, project_id)
+        return _in_position_order(_in_project(self.store.dashboards, project_id))
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        _set_positions(self.store.dashboards, project_id, ids)
 
     async def add(self, dashboard: Dashboard) -> None:
         self.store.dashboards[dashboard.id] = dashboard
@@ -368,7 +387,10 @@ class MemoryReportRepository(ReportRepository):
         return _get(self.store.reports, "report", id)
 
     async def list(self, project_id: Id) -> Sequence[Report]:
-        return _in_project(self.store.reports, project_id)
+        return _in_position_order(_in_project(self.store.reports, project_id))
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        _set_positions(self.store.reports, project_id, ids)
 
     async def add(self, report: Report) -> None:
         self.store.reports[report.id] = report

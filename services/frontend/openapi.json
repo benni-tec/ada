@@ -609,6 +609,17 @@
             "title": "Name",
             "type": "string"
           },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
           "project_id": {
             "$ref": "#/components/schemas/Id"
           },
@@ -2152,6 +2163,24 @@
         "title": "OperatorKind",
         "type": "string"
       },
+      "Order": {
+        "additionalProperties": false,
+        "description": "A new order of a project's dashboards or reports: every id of them, once.",
+        "properties": {
+          "ids": {
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "Order",
+        "type": "object"
+      },
       "OutputKind": {
         "enum": [
           "table",
@@ -2647,6 +2676,17 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
           },
           "project_id": {
             "$ref": "#/components/schemas/Id"
@@ -5462,6 +5502,64 @@
         ]
       }
     },
+    "/api/projects/{project_id}/dashboards/order": {
+      "put": {
+        "description": "Put the project's dashboards in a new order, as the sidebar lists them.",
+        "operationId": "reorder_dashboards_api_projects__project_id__dashboards_order_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Dashboard"
+                  },
+                  "title": "Response Reorder Dashboards Api Projects  Project Id  Dashboards Order Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Dashboards",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
     "/api/projects/{project_id}/events": {
       "get": {
         "description": "The project's live stream: each message is `event: <type>` and `data: <Event JSON>`.\n\nFastAPI does the rest of the contract: a `: ping` comment after 15 quiet seconds, so\nproxies keep the connection open, headers that stop proxy buffering (X-Accel-Buffering)\nand caching, and cancelling this generator when the client disconnects, which ends the\nsubscription.",
@@ -5697,7 +5795,7 @@
     },
     "/api/projects/{project_id}/reports": {
       "get": {
-        "description": "The project's reports, oldest first; with `session_id` or `dashboard_id` only the\nones that session or dashboard produced.",
+        "description": "The project's reports in the order people gave them, new ones last; with\n`session_id` or `dashboard_id` only the ones that session or dashboard produced.",
         "operationId": "list_reports_api_projects__project_id__reports_get",
         "parameters": [
           {
@@ -5821,6 +5919,64 @@
           }
         },
         "summary": "Create Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/reports/order": {
+      "put": {
+        "description": "Put the project's reports in a new order, as the sidebar lists them.",
+        "operationId": "reorder_reports_api_projects__project_id__reports_order_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Report"
+                  },
+                  "title": "Response Reorder Reports Api Projects  Project Id  Reports Order Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Reports",
         "tags": [
           "reports"
         ]

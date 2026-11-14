@@ -46,6 +46,9 @@ class Report(DomainModel):
     latest_version_id: Id | None = None
     created_at: datetime
     revision: int = 1
+    # Where people put it among the project's reports; None (new) comes after them, in
+    # creation order. Set by reordering, outside the revision.
+    position: int | None = None
 
 
 class ReportVersion(DomainModel):

@@ -95,6 +95,8 @@ class DashboardRow(Base):
     default_time_end: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(_timestamp)
     revision: Mapped[int] = mapped_column(Integer)
+    # The order people gave the project's dashboards; outside the revision.
+    position: Mapped[int | None] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
 
@@ -404,6 +406,8 @@ class ReportRow(Base):
     latest_version_id: Mapped[UUID | None] = mapped_column(Uuid)
     created_at: Mapped[datetime] = mapped_column(_timestamp)
     revision: Mapped[int] = mapped_column(Integer)
+    # The order people gave the project's reports; outside the revision.
+    position: Mapped[int | None] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
 

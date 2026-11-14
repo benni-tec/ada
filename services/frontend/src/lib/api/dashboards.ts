@@ -48,6 +48,15 @@ export const createDashboard = (projectId: Id, name: string) =>
     }),
   )
 
+/** Every dashboard of the project, once, in the new order; answers the reordered list. */
+export const reorderDashboards = (projectId: Id, ids: Id[]) =>
+  unwrap(
+    api.PUT('/api/projects/{project_id}/dashboards/order', {
+      params: { path: { project_id: projectId } },
+      body: { ids },
+    }),
+  )
+
 export const getDashboard = (id: Id) =>
   unwrap(api.GET('/api/dashboards/{dashboard_id}', { params: { path: { dashboard_id: id } } }))
 

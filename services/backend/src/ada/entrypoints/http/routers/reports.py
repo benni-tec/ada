@@ -22,7 +22,7 @@ from ada.core.models.time import TimeRange
 from ada.core.services.ports.reports import ReportService, TemplateService
 from ada.core.services.ports.runs import RunService
 from ada.entrypoints.http.actor import WEB
-from ada.entrypoints.http.requests import Request
+from ada.entrypoints.http.requests import Order, Request
 
 router = APIRouter(route_class=DishkaRoute, tags=["reports"])
 
@@ -77,14 +77,22 @@ async def list_reports(
     session_id: Id | None = None,
     dashboard_id: Id | None = None,
 ) -> Sequence[Report]:
-    """The project's reports, oldest first; with `session_id` or `dashboard_id` only the
-    ones that session or dashboard produced."""
+    """The project's reports in the order people gave them, new ones last; with
+    `session_id` or `dashboard_id` only the ones that session or dashboard produced."""
     return [
         report
         for report in await service.list(project_id)
         if (session_id is None or report.session_id == session_id)
         and (dashboard_id is None or report.dashboard_id == dashboard_id)
     ]
+
+
+@router.put("/projects/{project_id}/reports/order")
+async def reorder_reports(
+    project_id: Id, body: Order, service: FromDishka[ReportService]
+) -> Sequence[Report]:
+    """Put the project's reports in a new order, as the sidebar lists them."""
+    return await service.reorder(project_id, body.ids)
 
 
 @router.post("/projects/{project_id}/reports", status_code=status.HTTP_201_CREATED)

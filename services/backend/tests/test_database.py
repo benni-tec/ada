@@ -439,6 +439,35 @@ async def test_reporting_records_round_trip(engine: AsyncEngine) -> None:
         assert await repos.reports.list(world.project.id) == [latest]
 
 
+async def test_dashboards_and_reports_keep_the_order_people_gave_them(
+    engine: AsyncEngine,
+) -> None:
+    async with unit_of_work(engine) as repos:
+        world = await make_world(repos)
+        project = world.project.id
+        dashboards = [db_helpers.dashboard(project) for _ in range(3)]
+        reports = [db_helpers.report(project, dashboard_id=dashboards[0].id) for _ in range(2)]
+        for dashboard in dashboards:
+            await repos.dashboards.add(dashboard)
+        for report in reports:
+            await repos.reports.add(report)
+    async with unit_of_work(engine) as repos:
+        await repos.dashboards.reorder(project, [dashboards[2].id, dashboards[0].id])
+        await repos.reports.reorder(project, [reports[1].id, reports[0].id])
+        # Another project's id is left alone.
+        await repos.dashboards.reorder(uuid7(), [dashboards[1].id])
+    async with unit_of_work(engine) as repos:
+        listed = await repos.dashboards.list(project)
+        # Placed ones first, the unplaced one after them; no revision moved.
+        assert [d.id for d in listed] == [dashboards[2].id, dashboards[0].id, dashboards[1].id]
+        assert [(d.position, d.revision) for d in listed] == [(0, 1), (1, 1), (None, 1)]
+        assert [r.id for r in await repos.reports.list(project)] == [reports[1].id, reports[0].id]
+        # An edit after the reorder keeps the position.
+        await repos.dashboards.update(listed[0].model_copy(update={"name": "Renamed"}), 1)
+    async with unit_of_work(engine) as repos:
+        assert (await repos.dashboards.get(dashboards[2].id)).position == 0
+
+
 async def test_alert_rules_and_alerts_round_trip(engine: AsyncEngine) -> None:
     async with unit_of_work(engine) as repos:
         world = await make_world(repos)

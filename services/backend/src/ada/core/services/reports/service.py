@@ -30,6 +30,7 @@ from ada.core.ports.repositories import (
     WidgetRepository,
 )
 from ada.core.ports.system import Clock
+from ada.core.services.order import check_order, order_changed
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.reports import ReportService
 from ada.core.services.ports.runs import RunService
@@ -81,6 +82,13 @@ class Reports(ReportService):
 
     async def list(self, project_id: Id) -> Sequence[Report]:
         await self.projects.get(project_id)
+        return await self.reports.list(project_id)
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> Sequence[Report]:
+        current = await self.list(project_id)
+        check_order("report", [report.id for report in current], ids)
+        await self.reports.reorder(project_id, ids)
+        await self.events.publish(order_changed(project_id, "reports", self.clock.now()))
         return await self.reports.list(project_id)
 
     async def version(self, version_id: Id) -> ReportVersion:
