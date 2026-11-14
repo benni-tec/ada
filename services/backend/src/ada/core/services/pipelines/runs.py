@@ -253,6 +253,11 @@ class _Planner:
             case OperatorKind.HISTORY:
                 # Fix the whole source directly: history ignores the run's row time filter.
                 source = await self.runs._operator(self.run, operator.inputs[0])
+                data_source = await self.runs.sources.get(
+                    SourceParams.model_validate(source.params).data_source_id
+                )
+                if data_source.options.get("pushdown") is not None:
+                    raise Invalid("Source history does not support period (pushdown) sources")
                 anchor_node = await self._plan(source)
                 if not isinstance(anchor_node, SnapshotNode):
                     raise Invalid("Source history needs a whole-source snapshot")

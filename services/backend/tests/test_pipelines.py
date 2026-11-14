@@ -1377,7 +1377,7 @@ async def test_source_history_is_fixed_limited_and_cached(tmp_path: Path) -> Non
 
 async def test_source_history_schema_changes_and_validation(tmp_path: Path) -> None:
     world = World(tmp_path)
-    source, _ = await world.sources.add(world.project_id, b"region\nHelsinki\n")
+    source, _ = await world.sources.add(world.project_id, b"region,removed\nHelsinki,old\n")
     await world.sources.refresh(source.id)
     world.clock.advance(days=1)
     world.sources.content[source.id] = b"region,value\nTurku,10\n"
@@ -1386,6 +1386,8 @@ async def test_source_history_schema_changes_and_validation(tmp_path: Path) -> N
     rows = await world.read(history)
     assert rows[0][:2] == ("Turku", 10)
     assert rows[1][:2] == ("Helsinki", None)
+    removed = await world.transform("SELECT removed FROM input_0", history)
+    assert await world.read(removed) == [(None,), ("old",)]
     for last in (0, -1):
         with pytest.raises(Invalid, match="positive integer"):
             await world.pipelines.add_history(world.project_id, source.id, AGENT, last=last)
@@ -1400,3 +1402,18 @@ async def test_source_history_schema_changes_and_validation(tmp_path: Path) -> N
     reserved, _ = await world.sources.add(world.project_id, b"snapshot_rank\n1\n")
     with pytest.raises(Invalid, match="reserves"):
         await world.pipelines.add_history(world.project_id, reserved.id, AGENT)
+
+
+async def test_source_history_refuses_a_source_changed_to_pushdown(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    source, operator = await world.sources.add(world.project_id, REGIONS)
+    history = await world.pipelines.add_history(world.project_id, source.id, AGENT)
+    run = await world.runs.start(world.project_id, AGENT)
+    await world.runs.read(run.id, operator.id)
+    await world.data_sources.update(
+        source.model_copy(update={"options": {"pushdown": {"param": "years"}}}), source.revision
+    )
+    with pytest.raises(
+        Invalid, match=r"Source history does not support period \(pushdown\) sources"
+    ):
+        await world.runs.execute(run.id, history.id)
