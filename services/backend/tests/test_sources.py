@@ -736,6 +736,11 @@ async def test_the_address_connected_to_is_the_one_checked(
         return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port))]
 
     monkeypatch.setattr(socket, "getaddrinfo", rebinding)
+    # A proxy from the environment keeps working; this test then connects directly.
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.test:3128")
+    async with create_client() as client:
+        assert client._mounts
+    monkeypatch.setenv("NO_PROXY", "*")
     rebound = source(address=f"http://rebind.test:{port}/data.csv")
     async with server:
         async with create_client() as client:

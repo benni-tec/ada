@@ -48,6 +48,7 @@ from typing import Any, Literal, cast
 
 import httpcore
 import httpx
+from httpx._utils import get_environment_proxies
 from pydantic import Field, ValidationError
 
 from ada.adapters.sources.context_dev import ContextDevParser
@@ -101,9 +102,11 @@ def create_client(
     transport: httpx.AsyncBaseTransport | None = None, allow_private: bool = False
 ) -> httpx.AsyncClient:
     """The client every HTTP reader shares, for its connection pool. It connects to
-    public addresses only (_PublicNetwork) unless private ones are allowed. Tests pass a
-    transport that replays recorded answers."""
-    if transport is None and not allow_private:
+    public addresses only (_PublicNetwork) unless private ones are allowed. Behind a proxy
+    from the environment (HTTP_PROXY and the like) the proxy makes the connections, so
+    only the check of each address before it is asked (_check_public) applies. Tests pass
+    a transport that replays recorded answers."""
+    if transport is None and not allow_private and not get_environment_proxies():
         transport = _public_transport()
     return httpx.AsyncClient(
         headers={"User-Agent": USER_AGENT, "Accept-Encoding": ", ".join(ENCODINGS)},
