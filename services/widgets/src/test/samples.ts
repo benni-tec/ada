@@ -21,6 +21,7 @@ export function coverage(overrides: Partial<WidgetData> = {}): WidgetData {
   return {
     widget_id: 'w1',
     run_id: 'r1',
+    output: { columns: [], roles: coverageRoles },
     columns: [
       { name: 'period_start', type: 'date' },
       { name: 'period_end', type: 'date' },

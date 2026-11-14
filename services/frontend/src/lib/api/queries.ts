@@ -8,6 +8,7 @@ import {
   getWidget,
   listEntries,
   listProjects,
+  listProjectWidgets,
   listSessions,
   listSessionWidgets,
   listSources,
@@ -24,6 +25,7 @@ export const keys = {
   sources: (projectId: Id) => ['projects', projectId, 'sources'] as const,
   source: (id: Id) => ['sources', id] as const,
   sessions: (projectId: Id) => ['projects', projectId, 'sessions'] as const,
+  projectWidgets: (projectId: Id) => ['projects', projectId, 'widgets'] as const,
   session: (id: Id) => ['sessions', id] as const,
   entries: (sessionId: Id) => ['sessions', sessionId, 'entries'] as const,
   sessionWidgets: (sessionId: Id) => ['sessions', sessionId, 'widgets'] as const,
@@ -50,6 +52,9 @@ export const entriesQuery = (sessionId: Id) =>
 
 export const sessionWidgetsQuery = (sessionId: Id) =>
   queryOptions({ queryKey: keys.sessionWidgets(sessionId), queryFn: () => listSessionWidgets(sessionId) })
+
+export const projectWidgetsQuery = (projectId: Id) =>
+  queryOptions({ queryKey: keys.projectWidgets(projectId), queryFn: () => listProjectWidgets(projectId) })
 
 export const widgetQuery = (id: Id) => queryOptions({ queryKey: keys.widget(id), queryFn: () => getWidget(id) })
 

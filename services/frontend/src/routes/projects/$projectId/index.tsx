@@ -1,4 +1,4 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
 
@@ -10,9 +10,9 @@ import {
   getProject,
   keys,
   projectQuery,
+  projectWidgetsQuery,
   renameProject,
   sessionsQuery,
-  sessionWidgetsQuery,
   sourcesQuery,
   type DataSource,
   type Id,
@@ -150,22 +150,19 @@ function CreateSession({ projectId }: { projectId: Id }) {
   )
 }
 
-/**
- * The project's widgets, gathered from its sessions' widget lists: the REST contract has
- * no project-wide widget list yet, so widgets made outside any session are not shown.
- */
+/** Every widget of the project, newest first, made in a session or not. */
 function Widgets({ projectId }: { projectId: Id }) {
   const { data: sessions = [] } = useQuery(sessionsQuery(projectId))
-  const lists = useQueries({ queries: sessions.map((session) => sessionWidgetsQuery(session.id)) })
-  const widgets = lists
-    .flatMap((list) => list.data ?? [])
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  const { data, error, isPending } = useQuery(projectWidgetsQuery(projectId))
+  const widgets = [...(data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))
   const sessionTitles = new Map(sessions.map((session: Session) => [session.id, session.title]))
 
   return (
     <Section title="Widgets">
-      {lists.some((list) => list.isPending) && widgets.length === 0 ? (
+      {isPending ? (
         <Loading what="widgets" />
+      ) : error ? (
+        <ErrorNotice error={error} prefix="The widgets cannot be loaded:" />
       ) : widgets.length === 0 ? (
         <p className="text-sm text-neutral-500">No widgets yet. Agents create them in sessions.</p>
       ) : (

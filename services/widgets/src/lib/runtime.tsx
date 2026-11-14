@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 
-import { context, fetchData, fetchOperator, fetchWidget, onContextChange, type WidgetContext } from './host'
+import { context, fetchData, fetchWidget, onContextChange, type WidgetContext } from './host'
 import type { Roles, Widget, WidgetData } from './types'
 
 import './styles.css'
@@ -22,10 +22,7 @@ function useFragment() {
 
 async function load(ctx: WidgetContext): Promise<Loaded> {
   const [widget, data] = await Promise.all([fetchWidget(ctx), fetchData(ctx)])
-  // Roles only refine the display (bands, gaps, which column is the measure), so a
-  // widget still shows its data when the operator cannot be read.
-  const operator = await fetchOperator(widget.operator_id).catch(() => null)
-  return { widget, data, roles: operator?.output.roles ?? {} }
+  return { widget, data, roles: data.output.roles ?? {} }
 }
 
 /** Loads the widget named in the URL fragment and its data, shows loading and error

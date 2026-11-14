@@ -14,6 +14,7 @@ export type Effects = {
 /** Every type the stream may carry; one listener each, since named server-sent events
  * do not reach `onmessage`. */
 export const EVENT_TYPES: readonly EventType[] = [
+  'session.created',
   'session.entry_added',
   'widget.created',
   'run.started',
@@ -40,17 +41,19 @@ export function effectsOf(event: LiveEvent): Effects {
   let reloadWidgets = false
 
   switch (event.type) {
+    case 'session.created':
+      // E.g. an agent over MCP started one: the project page lists it.
+      invalidate.push(keys.sessions(projectId))
+      break
     case 'session.entry_added': {
       const session = id(payload, 'session_id')
       if (session) invalidate.push(keys.entries(session))
-      // There is no "session created" event: an agent over MCP creates a session and
-      // adds to it. The first entry is how the project page learns about the session.
-      invalidate.push(keys.sessions(projectId))
       break
     }
     case 'widget.created': {
       const session = id(payload, 'session_id')
-      if (session) invalidate.push(keys.sessionWidgets(session), keys.sessions(projectId))
+      if (session) invalidate.push(keys.sessionWidgets(session))
+      invalidate.push(keys.projectWidgets(projectId))
       const widget = id(payload, 'widget_id')
       if (widget) invalidate.push(keys.widget(widget))
       break

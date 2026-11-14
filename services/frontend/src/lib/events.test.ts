@@ -8,23 +8,30 @@ function event(type: EventType, payload: Record<string, unknown>) {
   return effectsOf({ type, project_id: 'p1', payload, at: '2026-11-01T10:00:00Z' })
 }
 
-test('a new entry refreshes the session record and the session list', () => {
-  expect(event('session.entry_added', { session_id: 's1', entry_id: 'e1' })).toEqual({
-    invalidate: [
-      ['sessions', 's1', 'entries'],
-      ['projects', 'p1', 'sessions'],
-    ],
+test('a new session refreshes the session list', () => {
+  expect(event('session.created', { session_id: 's1' })).toEqual({
+    invalidate: [['projects', 'p1', 'sessions']],
     reloadWidgets: false,
   })
 })
 
-test('a new widget refreshes its session’s widgets', () => {
+test('a new entry refreshes the session record', () => {
+  expect(event('session.entry_added', { session_id: 's1', entry_id: 'e1' })).toEqual({
+    invalidate: [['sessions', 's1', 'entries']],
+    reloadWidgets: false,
+  })
+})
+
+test('a new widget refreshes its session’s widgets and the project’s', () => {
   expect(event('widget.created', { widget_id: 'w1', session_id: 's1' }).invalidate).toEqual([
     ['sessions', 's1', 'widgets'],
-    ['projects', 'p1', 'sessions'],
+    ['projects', 'p1', 'widgets'],
     ['widgets', 'w1'],
   ])
-  expect(event('widget.created', { widget_id: 'w1' }).invalidate).toEqual([['widgets', 'w1']])
+  expect(event('widget.created', { widget_id: 'w1' }).invalidate).toEqual([
+    ['projects', 'p1', 'widgets'],
+    ['widgets', 'w1'],
+  ])
 })
 
 test('runs refresh the run', () => {
@@ -56,6 +63,6 @@ test('a refresh reloads widgets only when data changed or became stale', () => {
 })
 
 test('payloads without ids invalidate nothing they cannot name', () => {
-  expect(event('session.entry_added', {}).invalidate).toEqual([['projects', 'p1', 'sessions']])
+  expect(event('session.entry_added', {}).invalidate).toEqual([])
   expect(event('alert.firing', { alert_id: 'a1' }).invalidate).toEqual([])
 })

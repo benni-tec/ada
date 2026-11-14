@@ -1,69 +1,88 @@
-// The REST calls of docs/contracts.md. TEMPORARY in the same way as ./models: once the
-// routes are in the OpenAPI schema, integration can move these onto the typed `api`
-// client; the function names and signatures stay.
+// The REST calls of docs/contracts.md, on the typed client: paths, parameters, bodies and
+// answers are checked against the backend's OpenAPI schema.
 
-import { ApiFailure, type ApiError } from './client'
-import type { DataSource, Id, Operator, Project, Session, SessionEntry, Widget } from './models'
+import { api, ApiFailure, type ApiError } from './client'
+import type { Id, Project, Session } from './models'
 
-async function request<T>(method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown): Promise<T> {
-  // Absolute, like the typed client, so the same call works in tests outside a browser.
-  const response = await globalThis.fetch(new URL(path, window.location.origin), {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  if (!response.ok) {
-    const error = (await response.json().catch(() => undefined)) as ApiError | undefined
-    throw new ApiFailure(response.status, typeof error?.detail === 'string' ? error : undefined)
+type Answer<T> = { data?: T; error?: unknown; response: Response }
+
+/** The data of a successful call; an ApiFailure, with the server's detail, otherwise. */
+async function unwrap<T>(call: Promise<Answer<T>>): Promise<T> {
+  const { data, error, response } = await call
+  if (!response.ok || data === undefined) {
+    const body = error as ApiError | undefined
+    throw new ApiFailure(response.status, typeof body?.detail === 'string' ? body : undefined)
   }
-  return response.status === 204 ? (undefined as T) : ((await response.json()) as T)
+  return data
 }
-
-const segment = encodeURIComponent
 
 // Projects
 
-export const listProjects = () => request<Project[]>('GET', '/api/projects')
+export const listProjects = () => unwrap(api.GET('/api/projects'))
 
-export const getProject = (id: Id) => request<Project>('GET', `/api/projects/${segment(id)}`)
+export const getProject = (id: Id) =>
+  unwrap(api.GET('/api/projects/{project_id}', { params: { path: { project_id: id } } }))
 
-export const createProject = (name: string) => request<Project>('POST', '/api/projects', { name })
+export const createProject = (name: string) => unwrap(api.POST('/api/projects', { body: { name } }))
 
 export const renameProject = (project: Project, name: string) =>
-  request<Project>('PATCH', `/api/projects/${segment(project.id)}`, { name, expected_revision: project.revision })
+  unwrap(
+    api.PATCH('/api/projects/{project_id}', {
+      params: { path: { project_id: project.id } },
+      body: { name, expected_revision: project.revision },
+    }),
+  )
 
 // Sources
 
 export const listSources = (projectId: Id) =>
-  request<DataSource[]>('GET', `/api/projects/${segment(projectId)}/sources`)
+  unwrap(api.GET('/api/projects/{project_id}/sources', { params: { path: { project_id: projectId } } }))
 
 // Sessions
 
 export const listSessions = (projectId: Id) =>
-  request<Session[]>('GET', `/api/projects/${segment(projectId)}/sessions`)
+  unwrap(api.GET('/api/projects/{project_id}/sessions', { params: { path: { project_id: projectId } } }))
 
 export const createSession = (projectId: Id, title: string) =>
-  request<Session>('POST', `/api/projects/${segment(projectId)}/sessions`, { title })
+  unwrap(
+    api.POST('/api/projects/{project_id}/sessions', {
+      params: { path: { project_id: projectId } },
+      body: { title },
+    }),
+  )
 
-export const getSession = (id: Id) => request<Session>('GET', `/api/sessions/${segment(id)}`)
+export const getSession = (id: Id) =>
+  unwrap(api.GET('/api/sessions/{session_id}', { params: { path: { session_id: id } } }))
 
 export const renameSession = (session: Session, title: string) =>
-  request<Session>('PATCH', `/api/sessions/${segment(session.id)}`, {
-    title,
-    expected_revision: session.revision,
-  })
+  unwrap(
+    api.PATCH('/api/sessions/{session_id}', {
+      params: { path: { session_id: session.id } },
+      body: { title, expected_revision: session.revision },
+    }),
+  )
 
 export const listEntries = (sessionId: Id) =>
-  request<SessionEntry[]>('GET', `/api/sessions/${segment(sessionId)}/entries`)
+  unwrap(api.GET('/api/sessions/{session_id}/entries', { params: { path: { session_id: sessionId } } }))
 
 export const addMessage = (sessionId: Id, text: string) =>
-  request<SessionEntry>('POST', `/api/sessions/${segment(sessionId)}/messages`, { text })
+  unwrap(
+    api.POST('/api/sessions/{session_id}/messages', {
+      params: { path: { session_id: sessionId } },
+      body: { text },
+    }),
+  )
 
 export const listSessionWidgets = (sessionId: Id) =>
-  request<Widget[]>('GET', `/api/sessions/${segment(sessionId)}/widgets`)
+  unwrap(api.GET('/api/sessions/{session_id}/widgets', { params: { path: { session_id: sessionId } } }))
 
 // Widgets and operators
 
-export const getWidget = (id: Id) => request<Widget>('GET', `/api/widgets/${segment(id)}`)
+export const listProjectWidgets = (projectId: Id) =>
+  unwrap(api.GET('/api/projects/{project_id}/widgets', { params: { path: { project_id: projectId } } }))
 
-export const getOperator = (id: string) => request<Operator>('GET', `/api/operators/${segment(id)}`)
+export const getWidget = (id: Id) =>
+  unwrap(api.GET('/api/widgets/{widget_id}', { params: { path: { widget_id: id } } }))
+
+export const getOperator = (id: string) =>
+  unwrap(api.GET('/api/operators/{operator_id}', { params: { path: { operator_id: id } } }))

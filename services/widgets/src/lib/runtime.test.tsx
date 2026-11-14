@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 
-import { coverage, coverageRoles, widget } from '@/test/samples'
+import { coverage, widget } from '@/test/samples'
 
 import { WidgetRuntime } from './runtime'
 import type { WidgetData } from './types'
@@ -10,16 +10,12 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** Answers the three requests a widget makes; `operator: null` makes that one fail. */
-function serve({ data = coverage(), operator = { id: 'op_1', output: { columns: [], roles: coverageRoles } } } = {} as {
-  data?: WidgetData
-  operator?: unknown
-}) {
+/** Answers the two requests a widget makes. */
+function serve({ data = coverage() } = {} as { data?: WidgetData }) {
   const fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
     if (url.startsWith('/api/widgets/w1/data')) return json(data)
     if (url === '/api/widgets/w1') return json(widget())
-    if (url === '/api/operators/op_1') return operator ? json(operator) : json({ detail: 'gone' }, 404)
     return json({ detail: 'unexpected' }, 500)
   })
   vi.stubGlobal('fetch', fetch)
@@ -66,8 +62,8 @@ test('marks data that is both simulated and stale', async () => {
   expect(await screen.findAllByRole('listitem')).toHaveLength(2)
 })
 
-test('still shows the data when the operator cannot be read', async () => {
-  serve({ operator: null })
+test('shows data whose output declares no roles', async () => {
+  serve({ data: coverage({ output: { columns: [] } }) })
   show()
 
   expect(await screen.findByText('6 rows, 0 measures')).toBeInTheDocument()

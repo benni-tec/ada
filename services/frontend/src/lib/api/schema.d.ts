@@ -41,10 +41,499 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/operators/{operator_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Operator */
+        get: operations["get_operator_api_operators__operator_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/operators/{operator_id}/lineage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lineage
+         * @description The operator and everything upstream of it, inputs first.
+         */
+        get: operations["get_lineage_api_operators__operator_id__lineage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Projects */
+        get: operations["list_projects_api_projects_get"];
+        put?: never;
+        /** Create Project */
+        post: operations["create_project_api_projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Project */
+        get: operations["get_project_api_projects__project_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Project */
+        patch: operations["rename_project_api_projects__project_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{project_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Events
+         * @description The project's live stream: each message is `event: <type>` and `data: <Event JSON>`.
+         *
+         *     FastAPI does the rest of the contract: a `: ping` comment after 15 quiet seconds, so
+         *     proxies keep the connection open, headers that stop proxy buffering (X-Accel-Buffering)
+         *     and caching, and cancelling this generator when the client disconnects, which ends the
+         *     subscription.
+         */
+        get: operations["project_events_api_projects__project_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Operator */
+        post: operations["add_operator_api_projects__project_id__operators_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Run */
+        post: operations["start_run_api_projects__project_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sessions */
+        get: operations["list_sessions_api_projects__project_id__sessions_get"];
+        put?: never;
+        /** Create Session */
+        post: operations["create_session_api_projects__project_id__sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sources */
+        get: operations["list_sources_api_projects__project_id__sources_get"];
+        put?: never;
+        /** Register Source */
+        post: operations["register_source_api_projects__project_id__sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Widgets
+         * @description Every widget of the project, in a session or not, oldest first.
+         */
+        get: operations["list_widgets_api_projects__project_id__widgets_get"];
+        put?: never;
+        /** Create Widget */
+        post: operations["create_widget_api_projects__project_id__widgets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run */
+        get: operations["get_run_api_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/operators/{operator_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Rows */
+        get: operations["read_rows_api_runs__run_id__operators__operator_id__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session */
+        get: operations["get_session_api_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change Session */
+        patch: operations["change_session_api_sessions__session_id__patch"];
+        trace?: never;
+    };
+    "/api/sessions/{session_id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Entries */
+        get: operations["list_entries_api_sessions__session_id__entries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sessions/{session_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Message */
+        post: operations["add_message_api_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sessions/{session_id}/widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Session Widgets */
+        get: operations["list_session_widgets_api_sessions__session_id__widgets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Source */
+        get: operations["get_source_api_sources__source_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Source
+         * @description Change a source. A changed address or options queues a forced refresh, so the
+         *     snapshots come from what the source now says.
+         */
+        patch: operations["update_source_api_sources__source_id__patch"];
+        trace?: never;
+    };
+    "/api/sources/{source_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Source
+         * @description Queue a refresh and answer at once; the worker reports the outcome as a
+         *     `source.refreshed` or `source.refresh_failed` event.
+         */
+        post: operations["refresh_source_api_sources__source_id__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/widgets/{widget_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Widget */
+        get: operations["get_widget_api_widgets__widget_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/widgets/{widget_id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Widget Data
+         * @description What the widget shows. Without `run_id` a new run is started, with no bindings and
+         *     an open time range.
+         */
+        get: operations["get_widget_data_api_widgets__widget_id__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccessKind
+         * @enum {string}
+         */
+        AccessKind: "url" | "request" | "browser" | "document";
+        /**
+         * Actor
+         * @description Who did something. There are no users yet, so this is a label, not an identity.
+         */
+        Actor: {
+            kind: components["schemas"]["ActorKind"];
+            /** Name */
+            name: string;
+        };
+        /**
+         * ActorKind
+         * @enum {string}
+         */
+        ActorKind: "user" | "agent" | "external_agent" | "system";
+        /** Column */
+        Column: {
+            /** Name */
+            name: string;
+            /**
+             * Nullable
+             * @default true
+             */
+            nullable: boolean;
+            type: components["schemas"]["ColumnType"];
+        };
+        /**
+         * ColumnType
+         * @enum {string}
+         */
+        ColumnType: "text" | "integer" | "number" | "boolean" | "date" | "timestamp" | "json";
+        /**
+         * DataFormat
+         * @enum {string}
+         */
+        DataFormat: "csv" | "json" | "parquet";
+        /**
+         * DataSource
+         * @description Registered once per project and referenced by source operators.
+         */
+        DataSource: {
+            access_kind: components["schemas"]["AccessKind"];
+            /** Address */
+            address: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            declared_schema?: components["schemas"]["Schema"] | null;
+            format: components["schemas"]["DataFormat"];
+            /**
+             * @default {
+             *       "kind": "manual"
+             *     }
+             */
+            freshness: components["schemas"]["FreshnessPolicy"];
+            id: components["schemas"]["Id"];
+            /** Last Checked At */
+            last_checked_at?: string | null;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Probe Token */
+            last_probe_token?: string | null;
+            /** Name */
+            name: string;
+            /** @default {} */
+            options: components["schemas"]["JsonObject"];
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+        };
+        /**
+         * EntryKind
+         * @enum {string}
+         */
+        EntryKind: "message" | "operator" | "widget";
+        /**
+         * FreshnessKind
+         * @enum {string}
+         */
+        FreshnessKind: "manual" | "ttl" | "probe" | "push";
+        /** FreshnessPolicy */
+        FreshnessPolicy: {
+            /** @default manual */
+            kind: components["schemas"]["FreshnessKind"];
+            /** Latest Period Ttl Seconds */
+            latest_period_ttl_seconds?: number | null;
+            /** Ttl Seconds */
+            ttl_seconds?: number | null;
+        };
+        /**
+         * GeoRole
+         * @description Which column holds a region code, in which code system and at which level, e.g.
+         *     system "sotkanet" and level "wellbeing_services_county".
+         */
+        GeoRole: {
+            /** Code */
+            code: string;
+            /** Level */
+            level: string;
+            /** System */
+            system: string;
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
         /** Health */
         Health: {
             /**
@@ -84,6 +573,11 @@ export interface components {
              */
             worker: "ok" | "unavailable";
         };
+        /** Format: uuid */
+        Id: string;
+        JsonObject: {
+            [key: string]: unknown;
+        };
         /** Liveness */
         Liveness: {
             /**
@@ -91,6 +585,450 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /**
+         * MeasureRole
+         * @description A value column and the columns that qualify it.
+         */
+        MeasureRole: {
+            /** Coverage */
+            coverage?: string | null;
+            /** Lower */
+            lower?: string | null;
+            /** Suppressed */
+            suppressed?: string | null;
+            /** Upper */
+            upper?: string | null;
+            /** Value */
+            value: string;
+        };
+        /** NewInput */
+        NewInput: {
+            default: components["schemas"]["OperatorId"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "input";
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            output: components["schemas"]["Schema"];
+            session_id?: components["schemas"]["Id"] | null;
+        };
+        /** NewMessage */
+        NewMessage: {
+            /** Text */
+            text: string;
+        };
+        /** NewProject */
+        NewProject: {
+            /** Name */
+            name: string;
+        };
+        /** NewRun */
+        NewRun: {
+            /** Bindings */
+            bindings?: {
+                [key: string]: components["schemas"]["OperatorId"];
+            } | null;
+            time_range?: components["schemas"]["TimeRange"] | null;
+        };
+        /** NewSession */
+        NewSession: {
+            origin_dashboard_id?: components["schemas"]["Id"] | null;
+            /** Title */
+            title: string;
+        };
+        /** NewSource */
+        NewSource: {
+            access_kind: components["schemas"]["AccessKind"];
+            /** Address */
+            address: string;
+            declared_schema?: components["schemas"]["Schema"] | null;
+            format: components["schemas"]["DataFormat"];
+            freshness?: components["schemas"]["FreshnessPolicy"] | null;
+            /** Name */
+            name: string;
+            options?: components["schemas"]["JsonObject"] | null;
+        };
+        /** NewSourceOperator */
+        NewSourceOperator: {
+            data_source_id: components["schemas"]["Id"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "source";
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            session_id?: components["schemas"]["Id"] | null;
+        };
+        /** NewTransform */
+        NewTransform: {
+            /** Inputs */
+            inputs: components["schemas"]["OperatorId"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "transform";
+            /**
+             * Materialize
+             * @default false
+             */
+            materialize: boolean;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            roles?: components["schemas"]["Roles"] | null;
+            session_id?: components["schemas"]["Id"] | null;
+            /** Sql */
+            sql: string;
+        };
+        /** NewWidget */
+        NewWidget: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            operator_id: components["schemas"]["OperatorId"];
+            session_id?: components["schemas"]["Id"] | null;
+            spec?: components["schemas"]["JsonObject"] | null;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+        };
+        /**
+         * Operator
+         * @description One step of a pipeline. Immutable: changing anything makes a different operator.
+         *     A pipeline is an operator together with everything upstream of it.
+         */
+        Operator: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            id: components["schemas"]["OperatorId"];
+            /**
+             * Inputs
+             * @default []
+             */
+            inputs: components["schemas"]["OperatorId"][];
+            kind: components["schemas"]["OperatorKind"];
+            /** Materializing */
+            materializing: boolean;
+            output: components["schemas"]["Schema"];
+            params: components["schemas"]["JsonObject"];
+            project_id: components["schemas"]["Id"];
+        };
+        OperatorId: string;
+        /**
+         * OperatorKind
+         * @enum {string}
+         */
+        OperatorKind: "source" | "extract" | "input" | "transform" | "statistic" | "agent";
+        /**
+         * OutputKind
+         * @enum {string}
+         */
+        OutputKind: "table" | "document" | "result";
+        /**
+         * Project
+         * @description The top-level container. Everything else belongs to exactly one project.
+         */
+        Project: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            id: components["schemas"]["Id"];
+            /** Name */
+            name: string;
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+        };
+        /** ProjectRename */
+        ProjectRename: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Name */
+            name: string;
+        };
+        /** RefreshQueued */
+        RefreshQueued: {
+            data_source_id: components["schemas"]["Id"];
+            /** Force */
+            force: boolean;
+        };
+        /** RefreshRequest */
+        RefreshRequest: {
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+        };
+        /** Roles */
+        Roles: {
+            geo?: components["schemas"]["GeoRole"] | null;
+            /**
+             * Measures
+             * @default []
+             */
+            measures: components["schemas"]["MeasureRole"][];
+            time?: components["schemas"]["TimeRole"] | null;
+        };
+        /**
+         * Rows
+         * @description A small result held in memory: a preview or a widget's data. Never whole snapshots.
+         */
+        Rows: {
+            /** Columns */
+            columns: components["schemas"]["Column"][];
+            /** Rows */
+            rows: unknown[][];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /**
+         * Run
+         * @description One execution of a pipeline for a set of parameters. It fixes which snapshot each
+         *     materializing operator uses, so everything read through the run is one consistent
+         *     state. Immutable.
+         */
+        Run: {
+            /**
+             * Bindings
+             * @default {}
+             */
+            bindings: {
+                [key: string]: components["schemas"]["OperatorId"];
+            };
+            id: components["schemas"]["Id"];
+            project_id: components["schemas"]["Id"];
+            /**
+             * Snapshots
+             * @default {}
+             */
+            snapshots: {
+                [key: string]: components["schemas"]["Id"];
+            };
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            started_by: components["schemas"]["Actor"];
+            /** @default {} */
+            time_range: components["schemas"]["TimeRange"];
+        };
+        /**
+         * Schema
+         * @description What an operator produces. Every operator states it; `derived` says whether the
+         *     platform worked it out from the inputs or its creator declared it.
+         */
+        Schema: {
+            /**
+             * Columns
+             * @default []
+             */
+            columns: components["schemas"]["Column"][];
+            /**
+             * Derived
+             * @default false
+             */
+            derived: boolean;
+            /** @default table */
+            kind: components["schemas"]["OutputKind"];
+            /**
+             * @default {
+             *       "measures": []
+             *     }
+             */
+            roles: components["schemas"]["Roles"];
+        };
+        /**
+         * Session
+         * @description Exploratory work led by an agent. Belongs to a project, not to a user.
+         */
+        Session: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            id: components["schemas"]["Id"];
+            origin_dashboard_id?: components["schemas"]["Id"] | null;
+            panel_dashboard_id?: components["schemas"]["Id"] | null;
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+            /** Title */
+            title: string;
+        };
+        /**
+         * SessionChange
+         * @description Rename, or put a dashboard in the panel, or both. `panel_dashboard_id` set to null
+         *     clears the panel; leaving it out keeps it.
+         */
+        SessionChange: {
+            /** Expected Revision */
+            expected_revision: number;
+            panel_dashboard_id?: components["schemas"]["Id"] | null;
+            /** Title */
+            title?: string | null;
+        };
+        /**
+         * SessionEntry
+         * @description One item in a session's record, in order. A session is this record, not a chat
+         *     transcript: an external agent's tool calls land here although its conversation
+         *     happens elsewhere.
+         */
+        SessionEntry: {
+            actor: components["schemas"]["Actor"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            id: components["schemas"]["Id"];
+            kind: components["schemas"]["EntryKind"];
+            /** Ref */
+            ref?: string | null;
+            session_id: components["schemas"]["Id"];
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+        };
+        /**
+         * SourceChange
+         * @description Fields left out stay as they are.
+         */
+        SourceChange: {
+            /** Address */
+            address?: string | null;
+            declared_schema?: components["schemas"]["Schema"] | null;
+            /** Expected Revision */
+            expected_revision: number;
+            freshness?: components["schemas"]["FreshnessPolicy"] | null;
+            /** Name */
+            name?: string | null;
+            options?: components["schemas"]["JsonObject"] | null;
+        };
+        /**
+         * TimeRange
+         * @description What a run or a dashboard asks for. An open end means no bound on that side.
+         */
+        TimeRange: {
+            /** End */
+            end?: string | null;
+            /** Start */
+            start?: string | null;
+        };
+        /**
+         * TimeRole
+         * @description Which columns hold the period a row describes.
+         */
+        TimeRole: {
+            /** End */
+            end: string;
+            /** Start */
+            start: string;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+        };
+        /**
+         * Widget
+         * @description A display of one operator's output. It never holds data: it fetches the output of
+         *     its operator from the server, for the run it is shown in.
+         */
+        Widget: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            id: components["schemas"]["Id"];
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            operator_id: components["schemas"]["OperatorId"];
+            project_id: components["schemas"]["Id"];
+            session_id?: components["schemas"]["Id"] | null;
+            /** @default {} */
+            spec: components["schemas"]["JsonObject"];
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+        };
+        /**
+         * WidgetData
+         * @description What a widget gets when it asks for its data.
+         */
+        WidgetData: {
+            /** Columns */
+            columns: components["schemas"]["Column"][];
+            /**
+             * Is Scenario
+             * @default false
+             */
+            is_scenario: boolean;
+            /**
+             * Is Stale
+             * @default false
+             */
+            is_stale: boolean;
+            output: components["schemas"]["Schema"];
+            /** Rows */
+            rows: unknown[][];
+            run_id: components["schemas"]["Id"];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+            widget_id: components["schemas"]["Id"];
         };
     };
     responses: never;
@@ -137,6 +1075,880 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Liveness"];
+                };
+            };
+        };
+    };
+    get_operator_api_operators__operator_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operator_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operator"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lineage_api_operators__operator_id__lineage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operator_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operator"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_projects_api_projects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"][];
+                };
+            };
+        };
+    };
+    create_project_api_projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProject"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_project_api_projects__project_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_project_api_projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_events_api_projects__project_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_operator_api_projects__project_id__operators_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSourceOperator"] | components["schemas"]["NewTransform"] | components["schemas"]["NewInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operator"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_run_api_projects__project_id__runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NewRun"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_projects__project_id__sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_session_api_projects__project_id__sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSession"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_projects__project_id__sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSource"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_source_api_projects__project_id__sources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSource"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSource"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_widgets_api_projects__project_id__widgets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Widget"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_widget_api_projects__project_id__widgets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewWidget"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Widget"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_api_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_rows_api_runs__run_id__operators__operator_id__rows_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+                operator_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rows"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_api_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_session_api_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_entries_api_sessions__session_id__entries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_message_api_sessions__session_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewMessage"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_session_widgets_api_sessions__session_id__widgets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Widget"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_api_sources__source_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSource"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_source_api_sources__source_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSource"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_source_api_sources__source_id__refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefreshQueued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_widget_api_widgets__widget_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Widget"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_widget_data_api_widgets__widget_id__data_get: {
+        parameters: {
+            query?: {
+                run_id?: components["schemas"]["Id"] | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetData"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

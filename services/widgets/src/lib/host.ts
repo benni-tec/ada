@@ -2,7 +2,7 @@
 // inside an MCP host, where data comes through tool calls instead of REST, changes this
 // file and nothing else.
 
-import type { Operator, Widget, WidgetData } from './types'
+import type { Widget, WidgetData } from './types'
 
 export type WidgetContext = {
   widgetId: string
@@ -38,15 +38,10 @@ export function fetchWidget({ widgetId }: WidgetContext): Promise<Widget> {
   return get(`/api/widgets/${encodeURIComponent(widgetId)}`)
 }
 
-/** The output of the widget's operator, with the scenario and stale flags. */
+/** The output of the widget's operator, with what its columns mean (`output`) and the
+ * scenario and stale flags. */
 export function fetchData({ widgetId, runId }: WidgetContext, limit = 1000): Promise<WidgetData> {
   const query = new URLSearchParams({ limit: String(limit) })
   if (runId) query.set('run_id', runId)
   return get(`/api/widgets/${encodeURIComponent(widgetId)}/data?${query}`)
-}
-
-/** The operator behind the widget, for the roles of its output (measures, bounds,
- * suppression, time). The data itself carries column names and types only. */
-export function fetchOperator(operatorId: string): Promise<Operator> {
-  return get(`/api/operators/${encodeURIComponent(operatorId)}`)
 }

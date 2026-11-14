@@ -38,6 +38,8 @@ export type Widget = {
 export type WidgetData = {
   widget_id: string
   run_id: string
+  /** The operator's declared output: what the columns mean. */
+  output: Schema
   columns: Column[]
   rows: unknown[][]
   truncated: boolean
@@ -45,8 +47,5 @@ export type WidgetData = {
   is_stale: boolean
 }
 
-/** The part of an operator a widget reads: what its output columns mean. */
-export type Operator = {
-  id: string
-  output: { columns: Column[]; roles?: Roles }
-}
+/** The part of an operator's output schema a widget reads. */
+export type Schema = { columns: Column[]; roles?: Roles }

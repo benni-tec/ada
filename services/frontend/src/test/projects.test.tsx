@@ -57,7 +57,7 @@ test('shows a project with its sessions, widgets and sources', async () => {
   serveApi({
     'GET /api/projects/p1': project(),
     'GET /api/projects/p1/sessions': [session()],
-    'GET /api/sessions/s1/widgets': [widget({ created_by: claude, note: 'Coverage per region over time' })],
+    'GET /api/projects/p1/widgets': [widget({ created_by: claude, note: 'Coverage per region over time' })],
     'GET /api/projects/p1/sources': [
       {
         id: 'd1',
