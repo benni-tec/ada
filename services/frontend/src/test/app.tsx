@@ -6,7 +6,19 @@ import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/rea
 import { render } from '@testing-library/react'
 import { vi } from 'vitest'
 
-import type { Actor, AgentTurn, LlmModels, Pipeline, Project, Session, SessionEntry, Widget } from '@/lib/api'
+import type {
+  Actor,
+  AgentTurn,
+  Dashboard,
+  DashboardSlot,
+  LlmModels,
+  Pipeline,
+  Project,
+  Run,
+  Session,
+  SessionEntry,
+  Widget,
+} from '@/lib/api'
 import { routeTree } from '@/routeTree.gen'
 
 type Handler = (body: unknown, request: Request) => Response | unknown
@@ -142,6 +154,36 @@ export function widget(overrides: Partial<Widget> = {}): Widget {
     created_at: '2026-11-01T09:10:00Z',
     ...overrides,
   }
+}
+
+export function run(id: string, overrides: Partial<Run> = {}): Run {
+  return {
+    id,
+    project_id: 'p1',
+    time_range: { start: null, end: null },
+    bindings: {},
+    snapshots: {},
+    started_by: web,
+    started_at: '2026-11-03T08:00:00Z',
+    ...overrides,
+  } as Run
+}
+
+export function dashboard(overrides: Partial<Dashboard> = {}): Dashboard {
+  return {
+    id: 'd1',
+    project_id: 'p1',
+    name: 'Screening overview',
+    current_version_id: 'v2',
+    default_time_range: { start: '2020-01-01', end: '2024-12-31' },
+    created_at: '2026-11-01T08:00:00Z',
+    revision: 3,
+    ...overrides,
+  }
+}
+
+export function slot(name: string, widgetId: string | null, x: number, y: number, w = 6, h = 4): DashboardSlot {
+  return { name, description: '', widget_id: widgetId, layout: { x, y, w, h } }
 }
 
 // The agent (docs/contracts.md, "The agent")

@@ -28,7 +28,7 @@ const slot = operator('op_i', 'input', ['op_s'], { name: 'screening' })
 const map = operator('op_t', 'transform', ['op_j', 'op_i'], { sql: '-- Latest year per county\nSELECT 1' })
 const lineage = [screening, regions, join, slot, map]
 
-test('lays operators out by depth, sources at the left and the widget’s operator at the right', () => {
+test('lays operators out by depth, sources at the left, and draws a shared input once', () => {
   const graph = layoutGraph(lineage)
   const layer = Object.fromEntries(graph.nodes.map((node) => [node.operator.id, node.layer]))
   expect(layer).toEqual({ op_s: 0, op_r: 0, op_j: 1, op_i: 1, op_t: 2 })
@@ -44,10 +44,7 @@ test('lays operators out by depth, sources at the left and the widget’s operat
     expect(node.x + NODE_WIDTH).toBeLessThanOrEqual(graph.width)
     expect(node.y + NODE_HEIGHT).toBeLessThanOrEqual(graph.height)
   }
-})
 
-test('draws a shared input once, with an edge to each operator that reads it', () => {
-  const graph = layoutGraph(lineage)
   expect(graph.nodes.filter((node) => node.operator.id === 'op_s')).toHaveLength(1)
   expect(graph.edges.map((edge) => `${edge.from}->${edge.to}`).sort()).toEqual([
     'op_i->op_t',
@@ -64,32 +61,28 @@ test('draws a shared input once, with an edge to each operator that reads it', (
   expect(edge.path.endsWith(`${to.x} ${to.y + NODE_HEIGHT / 2}`)).toBe(true)
 })
 
-test('an input read twice is one edge, and inputs outside the lineage are ignored', () => {
+test('an input read twice is one edge, inputs outside the lineage are ignored, and a column follows its inputs', () => {
   const self = operator('op_x', 'transform', ['op_s', 'op_s', 'op_gone'], { sql: 'SELECT 1' })
   const graph = layoutGraph([screening, self])
   expect(graph.edges.map((edge) => `${edge.from}->${edge.to}`)).toEqual(['op_s->op_x'])
-})
 
-test('orders a column by where its inputs are, so edges do not cross', () => {
   const a = operator('op_a', 'source')
   const b = operator('op_b', 'source')
   // Listed in the opposite order of their inputs.
   const fromB = operator('op_fb', 'transform', ['op_b'])
   const fromA = operator('op_fa', 'transform', ['op_a'])
-  const graph = layoutGraph([a, b, fromB, fromA])
-  const row = Object.fromEntries(graph.nodes.map((node) => [node.operator.id, node.row]))
+  const ordered = layoutGraph([a, b, fromB, fromA])
+  const row = Object.fromEntries(ordered.nodes.map((node) => [node.operator.id, node.row]))
   expect(row).toMatchObject({ op_a: 0, op_b: 1, op_fa: 0, op_fb: 1 })
 })
 
-test('names a query by its leading comment, else by its first words', () => {
+test('names a query by its leading comment, and each column by its roles', () => {
   expect(sqlHeadline('-- Latest year per county\nSELECT 1')).toBe('Latest year per county')
   expect(sqlHeadline('SELECT b.county_code, b.name, d.value FROM input_2 AS b LEFT JOIN input_0')).toBe(
     'SELECT b.county_code, b.name,…',
   )
   expect(sqlHeadline('/* note */ SELECT   *\n FROM input_0')).toBe('SELECT * FROM input_0')
-})
 
-test('says what each column means by the roles', () => {
   const roles = columnRoles({
     time: { start: 'period_start', end: 'period_end', grain: 'year' },
     geo: { code: 'county_code', system: 'statfin', level: 'wellbeing_services_county' },

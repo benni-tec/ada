@@ -981,10 +981,19 @@ not describe it.
   off, to check the unreachable provider without any network.
 - The frontend's API types are generated: `moon run frontend:generate` after the routes
   change, and commit `openapi.json` and `schema.d.ts`.
-- The frontend's tests are Vitest with mocked fetch and EventSource. `src/test/setup.ts`
-  adds what jsdom lacks for Radix, cmdk and the sidebar. Whole routes are slow on a busy
-  machine, so the async utilities wait up to 15 s (`setup.ts`) and a test up to 60 s
-  (`testTimeout` in `vite.config.ts`).
+- The frontend's tests are Vitest with mocked fetch and EventSource, a few seconds in all
+  on a quiet machine. A few long user flows render the whole app through the real routes
+  (`renderAt`, `serveApi` and the fixtures in `src/test/app.tsx`), one file per area:
+  `project`, `session`, `dashboard`, `reports`, `alerts` in `src/test/`. Beside the code,
+  unit tests guard the logic: the formula builder, the pipeline graph's layout, the
+  dashboard layout, agent-turn parts, live event effects, the live connection and widget
+  frames. Under Vitest the routes are not code-split (`vite.config.ts`), so a file loads
+  them while it is imported rather than inside its first test; the async utilities wait up
+  to 5 s (`setup.ts`) and a test up to 15 s. `setup.ts` also adds what jsdom lacks for
+  Radix, cmdk and the sidebar.
+- The widgets' tests check each widget's model and drawing (the map's classes and legend
+  most) and the runtime: loading from the page's address or from an MCP host, and the
+  theme.
 - **The development mock** (`src/dev/mock-agent.ts`): in a dev build only, and only with
   `?mock-agent=1` (until `?mock-agent=0`, kept in `sessionStorage`), it answers the
   agent's routes from memory (models, pipelines derived from the project's widgets,

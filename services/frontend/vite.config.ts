@@ -9,8 +9,10 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    // Must come before the React plugin.
-    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    // Must come before the React plugin. Not split under Vitest: each test file then loads
+    // the routes while it is imported, instead of lazily inside its first test (where it
+    // counted against that test's timeouts, and was transformed once more per route).
+    tanstackRouter({ target: 'react', autoCodeSplitting: !process.env.VITEST }),
     react(),
     tailwindcss(),
   ],
@@ -32,7 +34,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    // Whole routes render in these tests; on a busy machine the defaults time out.
-    testTimeout: 60_000,
+    // A whole-route test takes up to a second on a quiet machine; leave room for a busy one.
+    testTimeout: 15_000,
   },
 })

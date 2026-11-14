@@ -12,7 +12,7 @@ function Epoch() {
 }
 
 function renderLive(queryClient = new QueryClient()) {
-  render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <ProjectLive projectId="p1">
         <ConnectionIndicator />
@@ -20,7 +20,7 @@ function renderLive(queryClient = new QueryClient()) {
       </ProjectLive>
     </QueryClientProvider>,
   )
-  return queryClient
+  return { queryClient, invalidate: vi.spyOn(queryClient, 'invalidateQueries'), unmount: view.unmount }
 }
 
 beforeEach(() => {
@@ -32,13 +32,9 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-test('backs off up to 30 seconds', () => {
+test('reconnects with backoff up to 30 seconds, refetches everything after a reconnect, and closes when the project is left', () => {
   expect([0, 1, 2, 3, 4, 5, 6].map(retryDelay)).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000])
-})
-
-test('reconnects with backoff and refetches everything after a reconnect', () => {
-  const queryClient = renderLive()
-  const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+  const { invalidate, unmount } = renderLive()
   expect(screen.getByRole('status')).toHaveAccessibleName('Live updates: Connecting')
 
   act(() => FakeEventSource.latest().open())
@@ -49,7 +45,6 @@ test('reconnects with backoff and refetches everything after a reconnect', () =>
   act(() => first.fail())
   expect(first.closed).toBe(true)
   expect(screen.getByRole('status')).toHaveAccessibleName('Live updates: Reconnecting')
-
   act(() => vi.advanceTimersByTime(999))
   expect(FakeEventSource.instances).toHaveLength(1)
   act(() => vi.advanceTimersByTime(1))
@@ -62,16 +57,18 @@ test('reconnects with backoff and refetches everything after a reconnect', () =>
   act(() => vi.advanceTimersByTime(1))
   expect(FakeEventSource.instances).toHaveLength(3)
 
+  // Events may have been missed while away: refetch everything, reload widgets.
   act(() => FakeEventSource.latest().open())
   expect(screen.getByRole('status')).toHaveAccessibleName('Live updates: Live')
-  // Events may have been missed while away: refetch everything, reload widgets.
   expect(invalidate).toHaveBeenCalledWith()
   expect(screen.getByText('epoch 1')).toBeInTheDocument()
+
+  unmount()
+  expect(FakeEventSource.latest().closed).toBe(true)
 })
 
-test('reloads widget frames when a source brought new data', () => {
-  const queryClient = renderLive()
-  const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+test('an event makes its queries stale, and new data reloads widget frames', () => {
+  const { invalidate } = renderLive()
   const stream = FakeEventSource.latest()
   act(() => stream.open())
 
@@ -86,16 +83,4 @@ test('reloads widget frames when a source brought new data', () => {
 
   expect(screen.getByText('epoch 1')).toBeInTheDocument()
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['projects', 'p1', 'sources'] })
-})
-
-test('closes the stream when the project is left', () => {
-  render(
-    <QueryClientProvider client={new QueryClient()}>
-      <ProjectLive projectId="p1">
-        <span />
-      </ProjectLive>
-    </QueryClientProvider>,
-  ).unmount()
-
-  expect(FakeEventSource.latest().closed).toBe(true)
 })
