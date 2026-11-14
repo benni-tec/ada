@@ -8,6 +8,7 @@ from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.schema import Schema
 from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy
 from ada.core.ports.tasks import TaskDispatcher
+from ada.core.ports.transactions import AfterCommit
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.http.requests import Request
@@ -82,9 +83,16 @@ async def get_source(source_id: Id, service: FromDishka[SourceService]) -> DataS
 
 @router.patch("/sources/{source_id}")
 async def update_source(
-    source_id: Id, body: SourceChange, service: FromDishka[SourceService]
+    source_id: Id,
+    body: SourceChange,
+    service: FromDishka[SourceService],
+    dispatcher: FromDishka[TaskDispatcher],
+    after_commit: FromDishka[AfterCommit],
 ) -> DataSource:
-    return await service.update(
+    """Change a source. A changed address or options queues a forced refresh, so the
+    snapshots come from what the source now says."""
+    before = await service.get(source_id)
+    updated = await service.update(
         source_id,
         body.expected_revision,
         name=body.name,
@@ -93,6 +101,15 @@ async def update_source(
         freshness=body.freshness,
         declared_schema=body.declared_schema,
     )
+    if refetch_needed(before, updated):
+        # Queued after the commit: the worker must read the new address, not the old one.
+        after_commit.add(lambda: dispatcher.refresh_source(source_id, True))
+    return updated
+
+
+def refetch_needed(before: DataSource, after: DataSource) -> bool:
+    """Whether an edit changed what a fetch of the source returns."""
+    return (before.address, before.options) != (after.address, after.options)
 
 
 @router.post("/sources/{source_id}/refresh", status_code=status.HTTP_202_ACCEPTED)

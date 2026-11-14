@@ -30,6 +30,7 @@ WAVE_1_TOOLS = {
     "register_source",
     "list_sources",
     "refresh_source",
+    "update_source",
     "create_session",
     "add_source_operator",
     "add_transform",
@@ -106,7 +107,7 @@ async def test_every_wave_1_tool_is_served(client: Client) -> None:
 
 
 async def test_tool_names_are_snake_case_verbs(client: Client) -> None:
-    verbs = {"list", "create", "register", "refresh", "add", "get", "preview", "system"}
+    verbs = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
     for tool in await client.list_tools():
         assert tool.name == tool.name.lower()
         assert tool.name.split("_")[0] in verbs
@@ -175,6 +176,41 @@ async def test_a_source_is_registered_and_listed(
     assert source["access_kind"] == "url"
     assert source["format"] == "csv"
     assert await call(client, "list_sources", project_id=project["id"]) == [source]
+
+
+async def test_a_changed_address_is_fetched_again(
+    client: Client, seen: Seen, source: dict[str, Any]
+) -> None:
+    renamed = await call(
+        client, "update_source", source_id=source["id"], expected_revision=1, name="Renamed"
+    )
+    assert renamed["revision"] == 2
+    assert (await seen.dispatcher()).refreshes == []
+
+    moved = await call(
+        client,
+        "update_source",
+        source_id=source["id"],
+        expected_revision=2,
+        address="https://example.test/other.csv",
+    )
+    assert moved["address"] == "https://example.test/other.csv"
+    refreshes = (await seen.dispatcher()).refreshes
+    assert [(str(id), force) for id, force in refreshes] == [(source["id"], True)]
+
+
+async def test_an_update_from_a_stale_revision_queues_nothing(
+    client: Client, seen: Seen, source: dict[str, Any]
+) -> None:
+    with pytest.raises(ToolError, match="revision"):
+        await call(
+            client,
+            "update_source",
+            source_id=source["id"],
+            expected_revision=7,
+            address="https://example.test/other.csv",
+        )
+    assert (await seen.dispatcher()).refreshes == []
 
 
 async def test_a_request_source_is_registered_with_options_and_freshness(

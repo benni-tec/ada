@@ -185,6 +185,18 @@ def test_sources_are_registered_listed_read_and_updated(
     # Left out means unchanged.
     assert updated["address"] == source["address"]
     assert updated["revision"] == 2
+    # New options change what a fetch returns, so the source is fetched again, at once.
+    assert [(str(id), force) for id, force in dispatcher(client).refreshes] == [
+        (source["id"], True)
+    ]
+
+
+def test_renaming_a_source_fetches_nothing(client: TestClient, source: dict[str, Any]) -> None:
+    response = client.patch(
+        f"/api/sources/{source['id']}", json={"expected_revision": 1, "name": "Renamed"}
+    )
+    assert response.status_code == 200
+    assert dispatcher(client).refreshes == []
 
 
 def test_updating_a_source_from_a_stale_revision_conflicts(
