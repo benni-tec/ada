@@ -230,6 +230,49 @@ POKHREL = Citation(
     source_id="01a1dc00-fb5c-7686-b8a2-19282fd57961",
 )
 
+DENMARK = Citation(
+    source="Sundhedsstyrelsen, Pakkeforløb for lungekræft, for fagfolk, version 2.2 (2024-12-10)",
+    passage="Fra henvisning modtaget til første fremmøde på udredende afdeling 6 kalenderdage; "
+    "til afslutning af udredning 24; fra afslutning af udredning til start på initial "
+    "behandling: kirurgisk 14, medicinsk 11, strålebehandling 15; samlet forløbstid 44 / 41 / 45. "
+    "Kriterier for henvisning: malignitetssuspekt lungeinfiltrat eller tumor i mediastinum ved "
+    "billeddiagnostisk undersøgelse; biopsi fra metastase tyder på primært udgangspunkt i lungen; "
+    "meget klare sygdomsrelaterede symptomer, uanset om et nyligt røntgen af thorax er normalt. "
+    "Over 40 år med relevant tobaksanamnese bør lægen overveje CT ved hoste af mere end 4-6 ugers "
+    "varighed, brystsmerter, skuldersmerter; ved hæmoptyse uanset alder.",
+    grade=EvidenceGrade.STANDARD,
+    url="https://www.sst.dk/media/estk2oo1/pakkeforloeb-for-lungekraeft-jan-2025.pdf",
+    country="Denmark",
+    source_id="01a1dc05-6d93-73af-a6d6-df162af64956",
+)
+DENMARK_CRC = Citation(
+    source="Sundhedsstyrelsen, Pakkeforløb for kræft i tyk- og endetarm, for fagfolk (2022)",
+    passage="Fra henvisning modtaget til første fremmøde 9 kalenderdage; til afslutning af "
+    "udredning 18; til start på initial behandling: kirurgi 10, strålebehandling 14, "
+    "medicinsk-onkologisk 10; samlet forløbstid 37 / 41 / 37. Særligt over 40 år: blødning fra "
+    "tarmen uden anden oplagt årsag; ændring af et ellers stabilt afføringsmønster i over fire "
+    "uger; uforklaret blødningsanæmi/jernmangelanæmi; nytilkomne mavesmerter over 4 uger. "
+    "Kriterier for henvisning: mistanke om eller konstateret malignitet ved koloskopi; fund af "
+    "metastaser, der giver mistanke om udgangspunkt i tyk- og endetarm.",
+    grade=EvidenceGrade.STANDARD,
+    url="https://www.sst.dk/media/ovabkmzr/pakkeforloeb.pdf",
+    country="Denmark",
+    source_id="01a1dc05-6de9-750f-8933-c33653ccfe3a",
+)
+DENMARK_PANCREAS = Citation(
+    source="Sundhedsstyrelsen, Pakkeforløb for kræft i bugspytkirtel, galdegange og lever, for "
+    "fagfolk (2021)",
+    passage="Fra henvisning modtaget til første fremmøde 6 kalenderdage; til afslutning af "
+    "udredning 27; til start på initial behandling: kirurgisk 10, medicinsk 11; samlet "
+    "forløbstid 43 / 44. Kriterier for henvisning: gulsot uden oplagt forklaring; "
+    "billeddiagnostisk påvisning af tumor i bugspytkirtlen, tolvfingertarmen eller det "
+    "periampullære område; billeddiagnostisk uafklaret proces i bugspytkirtlen.",
+    grade=EvidenceGrade.STANDARD,
+    url="https://www.sst.dk/media/kpznsa1b/pakkeforloeb-for-kraeft-bugl.pdf",
+    country="Denmark",
+    source_id="01a1dc05-6e36-7706-a237-081e4ad9b459",
+)
+
 LUNG, COLORECTAL, PANCREAS = "lung", "colorectal", "pancreas"
 # NORDCAN's own age groups for survival; no interpolation between them.
 AGE_BANDS = ("00-49", "50-59", "60-69", "70-79", "80-89")
@@ -256,31 +299,31 @@ def _lung_criteria() -> tuple[Criterion, ...]:
         c(
             "lung_symptoms_smoker",
             S,
-            "New airway symptoms (cough, breathlessness) for 6 weeks in a smoker or ex-smoker over "
-            "40",
-            ("Sweden",),
+            "New airway symptoms (cough, breathlessness) for 6 weeks (Denmark: 4-6) in a smoker or "
+            "ex-smoker over 40",
+            ("Denmark", "Sweden"),
             SWEDEN_SUSPICION,
         ),
         c(
             "lung_chest_pain",
             S,
             "Chest or shoulder pain without another explanation",
-            ("Sweden",),
+            ("Denmark", "Sweden"),
             SWEDEN_SUSPICION,
         ),
-        c("lung_haemoptysis", S, "Coughing blood", ("Sweden",), SWEDEN_SUSPICION),
+        c("lung_haemoptysis", S, "Coughing blood", ("Denmark", "Sweden"), SWEDEN_SUSPICION),
         c(
             "lung_imaging",
             W,
             "Imaging finding suggesting lung cancer",
-            ("Norway", "Sweden"),
+            ("Denmark", "Norway", "Sweden"),
             SWEDEN_WELL_FOUNDED,
         ),
         c(
             "lung_metastasis",
             W,
             "A metastasis or a biopsy from another organ suggesting lung cancer",
-            ("Norway", "Sweden"),
+            ("Denmark", "Norway", "Sweden"),
             NORWAY_CRITERIA,
         ),
         c(
@@ -289,6 +332,13 @@ def _lung_criteria() -> tuple[Criterion, ...]:
             "Repeated haemoptysis without another obvious cause, even with a normal X-ray",
             ("Sweden",),
             SWEDEN_WELL_FOUNDED,
+        ),
+        c(
+            "lung_clear_symptoms",
+            W,
+            "Very clear symptoms of lung cancer, even with a recent normal chest X-ray",
+            ("Denmark",),
+            DENMARK,
         ),
         c("lung_svc", W, "Superior vena cava obstruction", ("Sweden",), SWEDEN_WELL_FOUNDED),
         c(
@@ -305,14 +355,21 @@ def _colorectal_criteria() -> tuple[Criterion, ...]:
     S, W = TriggerStage.SUSPICION, TriggerStage.WELL_FOUNDED
     c = lambda *a: _criterion(COLORECTAL, *a)  # noqa: E731
     return (
-        c("crc_blood", S, "Blood in the stool, over 40", ("Sweden",), SWEDEN_CRC),
-        c("crc_anaemia", S, "Anaemia, over 40", ("Sweden",), SWEDEN_CRC),
+        c("crc_blood", S, "Blood in the stool, over 40", ("Denmark", "Sweden"), SWEDEN_CRC),
+        c("crc_anaemia", S, "Anaemia, over 40", ("Denmark", "Sweden"), SWEDEN_CRC),
         c(
             "crc_habit_change",
             S,
             "A change of otherwise stable bowel habits for more than 4 weeks, over 40",
-            ("Sweden",),
+            ("Denmark", "Sweden"),
             SWEDEN_CRC,
+        ),
+        c(
+            "crc_abdominal_pain",
+            S,
+            "New abdominal pain persisting for more than 4 weeks, over 40",
+            ("Denmark",),
+            DENMARK_CRC,
         ),
         c(
             "crc_unexplained_bleeding",
@@ -348,8 +405,15 @@ def _colorectal_criteria() -> tuple[Criterion, ...]:
             "crc_imaging_finding",
             W,
             "A finding at imaging, tissue diagnostics or colonoscopy suggesting colorectal cancer",
-            ("Sweden",),
+            ("Denmark", "Sweden"),
             SWEDEN_CRC,
+        ),
+        c(
+            "crc_metastasis",
+            W,
+            "Metastases suggesting colorectal cancer as the origin",
+            ("Denmark",),
+            DENMARK_CRC,
         ),
     )
 
@@ -373,15 +437,22 @@ def _pancreas_criteria() -> tuple[Criterion, ...]:
             W,
             "An imaging or endoscopic finding of a potentially malignant change in the pancreas or "
             "periampullary region",
-            ("Norway", "Sweden"),
+            ("Denmark", "Norway", "Sweden"),
             SWEDEN_PANCREAS,
         ),
         c(
             "panc_cholestasis",
             W,
             "Cholestasis or jaundice not explained by gallstone or liver disease",
-            ("Norway", "Sweden"),
+            ("Denmark", "Norway", "Sweden"),
             NORWAY_PANCREAS,
+        ),
+        c(
+            "panc_unclear_process",
+            W,
+            "An unclear process in the pancreas at imaging",
+            ("Denmark",),
+            DENMARK_PANCREAS,
         ),
         c(
             "panc_ipmn",
@@ -412,9 +483,17 @@ def _targets() -> tuple[TargetTime, ...]:
     P = PathwayStep
     SU, RT, DR = Modality.SURGERY, Modality.RADIOTHERAPY, Modality.DRUGS
 
-    def t(site, step, days, provenance, modality=None):
+    DK, SE = (DENMARK,), (SWEDEN,)
+    CRC, PAN = (DENMARK_CRC, SWEDEN_CRC), (DENMARK_PANCREAS, SWEDEN_PANCREAS)
+
+    def t(site, step, days, provenance, modality=None, also=()):
         return TargetTime(
-            site=site, step=step, modality=modality, days_by_country=days, provenance=provenance
+            site=site,
+            step=step,
+            modality=modality,
+            days_by_country=days,
+            provenance=provenance,
+            other_sources=also,
         )
 
     return (
@@ -422,34 +501,128 @@ def _targets() -> tuple[TargetTime, ...]:
         t(LUNG, P.CONTACT_TO_PHYSICIAN, {"Nordic reference": 7}, KHALIFE),
         t(LUNG, P.PHYSICIAN_TO_IMAGING, {"Sweden": 6}, SWEDEN),
         t(LUNG, P.IMAGING_TO_REFERRAL, {"Sweden": 4}, SWEDEN),
-        t(LUNG, P.REFERRAL_TO_SPECIALIST, {"Norway": 7}, NORWAY),
-        t(LUNG, P.SPECIALIST_TO_WORKUP, {"Norway": 21}, NORWAY),
-        t(LUNG, P.WORKUP_TO_TREATMENT, {"Norway": 14}, NORWAY, SU),
-        t(LUNG, P.WORKUP_TO_TREATMENT, {"Norway": 14}, NORWAY, RT),
-        t(LUNG, P.WORKUP_TO_TREATMENT, {"Norway": 7}, NORWAY, DR),
-        t(LUNG, None, {"Norway": 42, "Sweden": 44}, NORWAY, SU),
-        t(LUNG, None, {"Norway": 42, "Sweden": 44}, NORWAY, RT),
-        t(LUNG, None, {"Norway": 35, "Sweden": 40}, NORWAY, DR),
+        t(LUNG, P.REFERRAL_TO_SPECIALIST, {"Norway": 7, "Denmark": 6}, NORWAY, also=DK),
+        t(LUNG, P.SPECIALIST_TO_WORKUP, {"Norway": 21, "Denmark": 24}, NORWAY, also=DK),
+        t(LUNG, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Denmark": 14}, NORWAY, SU, DK),
+        t(LUNG, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Denmark": 15}, NORWAY, RT, DK),
+        t(LUNG, P.WORKUP_TO_TREATMENT, {"Norway": 7, "Denmark": 11}, NORWAY, DR, DK),
+        t(LUNG, None, {"Norway": 42, "Sweden": 44, "Denmark": 44}, NORWAY, SU, DK + SE),
+        t(LUNG, None, {"Norway": 42, "Sweden": 44, "Denmark": 45}, NORWAY, RT, DK + SE),
+        t(LUNG, None, {"Norway": 35, "Sweden": 40, "Denmark": 41}, NORWAY, DR, DK + SE),
         # Colorectal: Sweden's investigations within 10 days of suspicion stand for the step to
         # the finding; the referral is received a day after the decision.
         t(COLORECTAL, P.PHYSICIAN_TO_IMAGING, {"Sweden": 10}, SWEDEN_CRC),
         t(COLORECTAL, P.IMAGING_TO_REFERRAL, {"Sweden": 1}, SWEDEN_CRC),
-        t(COLORECTAL, P.REFERRAL_TO_SPECIALIST, {"Norway": 10, "Sweden": 10}, NORWAY_CRC),
-        t(COLORECTAL, P.SPECIALIST_TO_WORKUP, {"Norway": 12, "Sweden": 14}, NORWAY_CRC),
-        t(COLORECTAL, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Sweden": 21}, NORWAY_CRC, SU),
-        t(COLORECTAL, P.WORKUP_TO_TREATMENT, {"Norway": 18, "Sweden": 21}, NORWAY_CRC, RT),
-        t(COLORECTAL, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Sweden": 21}, NORWAY_CRC, DR),
-        t(COLORECTAL, None, {"Norway": 36, "Sweden": 46}, NORWAY_CRC, SU),
-        t(COLORECTAL, None, {"Norway": 40, "Sweden": 46}, NORWAY_CRC, RT),
-        t(COLORECTAL, None, {"Norway": 36, "Sweden": 46}, NORWAY_CRC, DR),
+        t(
+            COLORECTAL,
+            P.REFERRAL_TO_SPECIALIST,
+            {"Norway": 10, "Sweden": 10, "Denmark": 9},
+            NORWAY_CRC,
+            also=CRC,
+        ),
+        t(
+            COLORECTAL,
+            P.SPECIALIST_TO_WORKUP,
+            {"Norway": 12, "Sweden": 14, "Denmark": 18},
+            NORWAY_CRC,
+            also=CRC,
+        ),
+        t(
+            COLORECTAL,
+            P.WORKUP_TO_TREATMENT,
+            {"Norway": 14, "Sweden": 21, "Denmark": 10},
+            NORWAY_CRC,
+            SU,
+            CRC,
+        ),
+        t(
+            COLORECTAL,
+            P.WORKUP_TO_TREATMENT,
+            {"Norway": 18, "Sweden": 21, "Denmark": 14},
+            NORWAY_CRC,
+            RT,
+            CRC,
+        ),
+        t(
+            COLORECTAL,
+            P.WORKUP_TO_TREATMENT,
+            {"Norway": 14, "Sweden": 21, "Denmark": 10},
+            NORWAY_CRC,
+            DR,
+            CRC,
+        ),
+        t(
+            COLORECTAL,
+            None,
+            {"Norway": 36, "Sweden": 46, "Denmark": 37},
+            NORWAY_CRC,
+            SU,
+            CRC,
+        ),
+        t(
+            COLORECTAL,
+            None,
+            {"Norway": 40, "Sweden": 46, "Denmark": 41},
+            NORWAY_CRC,
+            RT,
+            CRC,
+        ),
+        t(
+            COLORECTAL,
+            None,
+            {"Norway": 36, "Sweden": 46, "Denmark": 37},
+            NORWAY_CRC,
+            DR,
+            CRC,
+        ),
         # Pancreas
         t(PANCREAS, P.IMAGING_TO_REFERRAL, {"Sweden": 1}, SWEDEN_PANCREAS),
-        t(PANCREAS, P.REFERRAL_TO_SPECIALIST, {"Norway": 8, "Sweden": 7}, NORWAY_PANCREAS),
-        t(PANCREAS, P.SPECIALIST_TO_WORKUP, {"Norway": 21, "Sweden": 14}, NORWAY_PANCREAS),
-        t(PANCREAS, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Sweden": 7}, NORWAY_PANCREAS, SU),
-        t(PANCREAS, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Sweden": 7}, NORWAY_PANCREAS, DR),
-        t(PANCREAS, None, {"Norway": 43, "Sweden": 36}, NORWAY_PANCREAS, SU),
-        t(PANCREAS, None, {"Norway": 43, "Sweden": 29}, NORWAY_PANCREAS, DR),
+        t(
+            PANCREAS,
+            P.REFERRAL_TO_SPECIALIST,
+            {"Norway": 8, "Sweden": 7, "Denmark": 6},
+            NORWAY_PANCREAS,
+            also=PAN,
+        ),
+        t(
+            PANCREAS,
+            P.SPECIALIST_TO_WORKUP,
+            {"Norway": 21, "Sweden": 14, "Denmark": 27},
+            NORWAY_PANCREAS,
+            also=PAN,
+        ),
+        t(
+            PANCREAS,
+            P.WORKUP_TO_TREATMENT,
+            {"Norway": 14, "Sweden": 7, "Denmark": 10},
+            NORWAY_PANCREAS,
+            SU,
+            PAN,
+        ),
+        t(
+            PANCREAS,
+            P.WORKUP_TO_TREATMENT,
+            {"Norway": 14, "Sweden": 7, "Denmark": 11},
+            NORWAY_PANCREAS,
+            DR,
+            PAN,
+        ),
+        t(
+            PANCREAS,
+            None,
+            {"Norway": 43, "Sweden": 36, "Denmark": 43},
+            NORWAY_PANCREAS,
+            SU,
+            PAN,
+        ),
+        t(
+            PANCREAS,
+            None,
+            {"Norway": 43, "Sweden": 29, "Denmark": 44},
+            NORWAY_PANCREAS,
+            DR,
+            PAN,
+        ),
     )
 
 

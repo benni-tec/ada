@@ -204,7 +204,8 @@ def _trigger(spec: ModelSpec, inputs: EvaluationInputs, pathway: _Pathway) -> Tr
     well_founded = results[TriggerStage.WELL_FOUNDED]
     clock_start = pathway.end_of(TRIGGER_STEP) if well_founded.fired else None
     if well_founded.fired:
-        where = " and ".join(well_founded.countries)
+        *rest, last = well_founded.countries
+        where = f"{', '.join(rest)} and {last}" if rest else last
         note = (
             f"This presentation would start a pathway in {where}. "
             "Finland has no national trigger and no standard times."

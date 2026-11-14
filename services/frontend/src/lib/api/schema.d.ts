@@ -3589,6 +3589,11 @@ export interface components {
                 [key: string]: number;
             };
             modality?: components["schemas"]["Modality"] | null;
+            /**
+             * Other Sources
+             * @default []
+             */
+            other_sources: components["schemas"]["Citation"][];
             provenance: components["schemas"]["Citation"];
             /** Site */
             site: string;

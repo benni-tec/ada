@@ -149,6 +149,8 @@ class TargetTime(DomainModel):
     modality: Modality | None = None
     days_by_country: dict[str, int]
     provenance: Citation
+    # The documents of the other countries in `days_by_country`.
+    other_sources: tuple[Citation, ...] = ()
 
 
 class BaselineCell(DomainModel):

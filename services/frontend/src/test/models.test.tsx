@@ -37,7 +37,7 @@ const version: ModelVersion = {
       { id: 'lung_symptoms_smoker', site: 'lung', stage: 'suspicion', text: 'Cough for 6 weeks, smoker over 40', countries: ['Sweden'], provenance },
       { id: 'lung_imaging', site: 'lung', stage: 'well_founded', text: 'Imaging finding suggesting lung cancer', countries: ['Norway', 'Sweden'], provenance },
     ],
-    targets: [{ site: 'lung', step: null, modality: 'surgery', days_by_country: { Norway: 42, Sweden: 44 }, provenance }],
+    targets: [{ site: 'lung', step: null, modality: 'surgery', days_by_country: { Norway: 42, Sweden: 44 }, provenance, other_sources: [] }],
     baseline: [{ site: 'lung', sex: 'female', age_band: null, stage: null, survival: 0.38, excess_share: null, provenance }],
     parameters: {},
     arrows: {},

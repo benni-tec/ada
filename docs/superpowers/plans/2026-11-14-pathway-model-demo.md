@@ -14,7 +14,7 @@ started.
 A woman of 64, smoker, basic education, first contact at a public health centre with a
 nurse. Cough for eight weeks at first contact (Sweden's suspicion criteria), seen by a
 physician two weeks later, chest X-ray two weeks after that showing a suspicious lesion
-(the trigger). Work-up complete; nine days waiting for the treatment plan.
+(the trigger). Work-up complete; twelve days waiting for the treatment plan.
 
 ```json
 {"site": "lung", "sex": "female", "age_band": "60-69", "education": "basic",
@@ -22,13 +22,14 @@ physician two weeks later, chest X-ray two weeks after that showing a suspicious
  "presentation": ["lung_symptoms_smoker", "lung_imaging"],
  "days": {"symptoms_to_contact": 51, "contact_to_physician": 14, "physician_to_imaging": 13,
           "imaging_to_referral": 1, "referral_to_specialist": 8, "specialist_to_workup": 26,
-          "workup_to_treatment": 9}}
+          "workup_to_treatment": 12}}
 ```
 
-What the page shows: the pathway would have started in Norway and Sweden on day 27;
-treatment start was due on day 70 and today is day 71 (overdue by one day); 20 days behind
-target so far, most of them before the X-ray. Survival second: about 30 of 100 as it
-stands, 31 on target, with the range across the settings. Support: a navigator, and a
+What the page shows: the pathway would have started in Denmark, Norway and Sweden on day
+27; treatment start was due on day 71 and today is day 74 (overdue by three days); 20 days
+behind target so far, most of them before the X-ray. Survival second: 34 of 100 as it stands
+and on target (the remaining wait is under Heiden's twelve weeks), 32–39 across the
+settings. Support: a navigator, and a
 check that every treatment option was discussed.
 
 ### 2. On time after the trigger, slow before it
@@ -75,16 +76,17 @@ source is `2026-11-14-pathway-model-slides.html` beside this file. The outline:
    67 in Denmark; in Finland more than 50 the patient, 41 primary care, 58 specialised
    care (Yle MOT 2025, unpublished). Only 40–60 % see a doctor at first contact, 14 days
    to an appointment (Khalife 2025, a survey).
-3. **What Norway and Sweden have that Finland does not.** A trigger: "well-founded
-   suspicion", an imaging finding or a metastasis. A clock: 7 days to the first visit, 28
-   to the end of work-up, 42–44 to treatment. Finland: no national trigger, no standard
-   times, no cancer-specific waiting-time statistics. (Helsedirektoratet; RCC.)
+3. **What Denmark, Norway and Sweden have that Finland does not.** A trigger:
+   "well-founded suspicion", an imaging finding or a metastasis. A clock: 6–7 days to the
+   first visit, 28–30 to the end of work-up, 42–45 to treatment. Finland: no national
+   trigger, no standard times, no cancer-specific waiting-time statistics.
+   (Helsedirektoratet; RCC; Sundhedsstyrelsen.)
 4. **Does it matter?** After Denmark's pathways, lung 3-year survival among symptomatic
    primary-care patients 11 → 20 %, adjusted for stage (Jensen 2017); with the lead-time
    caveat the authors give themselves.
 5. **The tool at the point of care.** Live demo, profile 1: the trigger fires, the
-   deadlines show, treatment start overdue. The exact part: no hazard ratio needed.
-6. **Then survival, second and graded.** 30 → 31 of 100; two settings; every lever
+   deadlines show, treatment start overdue by three days. The exact part: no hazard ratio needed.
+6. **Then survival, second and graded.** 34 of 100, 32–39 across two settings; every lever
    names its evidence (national standard, meta-analysis, one cohort, assumption).
 7. **How it is built.** One parameter per arrow, so nothing counts twice (Westreich &
    Greenland 2013); Nordic baseline, Finnish education gradient (Zai 2025), international
@@ -99,6 +101,5 @@ source is `2026-11-14-pathway-model-slides.html` beside this file. The outline:
 10. **What it is not.** Lead time, the waiting-time paradox, no Finnish patient-level
     validation. Educational use, synthetic profiles, a banner on every page. A clinical
     version would be a medical device (MDR Rule 11) and need Findata.
-11. **Next.** Denmark's standard as the third country; a stage-specific and age-banded
-    baseline; Finland's days per step for colorectal and pancreas; every parameter as a
-    registered source with its lineage, as the baseline already is.
+11. **Next.** A stage-specific baseline; Finland's days per step for colorectal and
+    pancreas; every parameter read from an operator, as the baseline already is.

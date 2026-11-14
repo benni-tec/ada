@@ -5014,6 +5014,14 @@
               }
             ]
           },
+          "other_sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Other Sources",
+            "type": "array"
+          },
           "provenance": {
             "$ref": "#/components/schemas/Citation"
           },

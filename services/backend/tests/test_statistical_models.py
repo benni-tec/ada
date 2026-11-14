@@ -49,7 +49,7 @@ EXAMPLE = EvaluationInputs(
         S.IMAGING_TO_REFERRAL: 1,
         S.REFERRAL_TO_SPECIALIST: 8,
         S.SPECIALIST_TO_WORKUP: 26,
-        S.WORKUP_TO_TREATMENT: 9,
+        S.WORKUP_TO_TREATMENT: 12,
     },
 )
 
@@ -72,10 +72,11 @@ def version() -> ModelVersion:
 
 def test_build_takes_the_median_target_and_computes_the_residual(version: ModelVersion) -> None:
     targets = version.compiled.targets["lung"]
-    # Norway 42 and Sweden 44 for surgery; Norway 35 and Sweden 40 for drugs.
-    assert targets["pathway"]["surgery"] == 43
-    assert targets["pathway"]["drugs"] == 38
-    assert targets[S.REFERRAL_TO_SPECIALIST.value]["any"] == 7
+    # Norway 42, Sweden 44 and Denmark 44 for surgery; 35, 40 and 41 for drugs.
+    assert targets["pathway"]["surgery"] == 44
+    assert targets["pathway"]["drugs"] == 40
+    # Norway 7 and Denmark 6: the median 6.5 rounds to even.
+    assert targets[S.REFERRAL_TO_SPECIALIST.value]["any"] == 6
     figures = {(p.site, p.sex): p for p in version.compiled.population}
     men = figures[("lung", "male")]
     # The Nordic level, lowered by Finland's extra days, then what is left to the observed figure.
@@ -104,9 +105,9 @@ def test_the_build_checks_itself_against_figures_it_was_not_built_from(
 
 def test_colorectal_and_pancreas_have_their_own_triggers_and_targets(version: ModelVersion) -> None:
     targets = version.compiled.targets
-    # Norway 36 and Sweden 46 for colorectal surgery; Norway 43 and Sweden 36 for pancreas.
-    assert targets["colorectal"]["pathway"]["surgery"] == 41
-    assert targets["pancreas"]["pathway"]["surgery"] == 40
+    # Norway 36, Sweden 46 and Denmark 37 for colorectal surgery; 43, 36 and 43 for pancreas.
+    assert targets["colorectal"]["pathway"]["surgery"] == 37
+    assert targets["pancreas"]["pathway"]["surgery"] == 43
     crc = evaluate(
         version,
         EXAMPLE.model_copy(
@@ -127,7 +128,7 @@ def test_colorectal_and_pancreas_have_their_own_triggers_and_targets(version: Mo
     pancreas = evaluate(
         version, EXAMPLE.model_copy(update={"site": "pancreas", "presentation": ("panc_imaging",)})
     )
-    assert pancreas.trigger.well_founded.countries == ("Norway", "Sweden")
+    assert pancreas.trigger.well_founded.countries == ("Denmark", "Norway", "Sweden")
     assert all(lever.grade is EvidenceGrade.ASSUMPTION for lever in pancreas.levers)
 
 
@@ -154,9 +155,10 @@ def test_the_spec_must_hold_together() -> None:
 def test_the_trigger_fires_and_the_deadlines_count_from_it(version: ModelVersion) -> None:
     result = evaluate(version, EXAMPLE)
     assert result.trigger.suspicion.fired
-    assert result.trigger.suspicion.countries == ("Sweden",)
+    assert result.trigger.suspicion.countries == ("Denmark", "Sweden")
     assert result.trigger.well_founded.fired
-    assert result.trigger.well_founded.countries == ("Norway", "Sweden")
+    assert result.trigger.well_founded.countries == ("Denmark", "Norway", "Sweden")
+    assert "Denmark, Norway and Sweden" in result.trigger.note
     # The X-ray on day 14 + 13 = 27 started the clock.
     assert result.trigger.clock_start == 27
     by_label = {d.label: d for d in result.deadlines}
@@ -164,14 +166,14 @@ def test_the_trigger_fires_and_the_deadlines_count_from_it(version: ModelVersion
     # Due 6 days after the physician's decision on day 14; done on day 27.
     assert (imaging.due_day, imaging.status, imaging.by) == (20, DeadlineStatus.LATE, 7)
     visit = by_label["First specialist visit"]
-    # 4 + 7 days after the trigger: day 38; the visit was on day 27 + 1 + 8 = 36.
-    assert (visit.due_day, visit.status, visit.by) == (38, DeadlineStatus.MET, 2)
+    # 4 + 6 days after the trigger: day 37; the visit was on day 27 + 1 + 8 = 36.
+    assert (visit.due_day, visit.status, visit.by) == (37, DeadlineStatus.MET, 1)
     workup = by_label["Work-up complete"]
     assert (workup.due_day, workup.status, workup.by) == (59, DeadlineStatus.LATE, 3)
     treatment = by_label["Treatment start"]
-    # 43 days after the trigger: day 70; today is day 71.
-    assert (treatment.due_day, treatment.status, treatment.by) == (70, DeadlineStatus.OVERDUE, 1)
-    assert "Norway" in treatment.countries and "Sweden" in treatment.countries
+    # 44 days after the trigger: day 71; today is day 74.
+    assert (treatment.due_day, treatment.status, treatment.by) == (71, DeadlineStatus.OVERDUE, 3)
+    assert treatment.countries == ("Denmark", "Norway", "Sweden")
 
 
 def test_days_behind_are_exact_and_do_not_depend_on_the_toggles(version: ModelVersion) -> None:
@@ -185,7 +187,7 @@ def test_days_behind_are_exact_and_do_not_depend_on_the_toggles(version: ModelVe
         rows[S.CONTACT_TO_PHYSICIAN].gap,
     ) == (14, 7, 7)
     assert rows[S.PHYSICIAN_TO_IMAGING].gap == 7
-    assert rows[S.SPECIALIST_TO_WORKUP].gap == 5
+    assert rows[S.SPECIALIST_TO_WORKUP].gap == 4
     assert rows[S.WORKUP_TO_TREATMENT].current and rows[S.WORKUP_TO_TREATMENT].gap == 0
     for toggles in ({}, {"pre_trigger": True}, {"finland_residual": False}):
         result = evaluate(version, EXAMPLE.model_copy(update={"toggles": toggles}))
