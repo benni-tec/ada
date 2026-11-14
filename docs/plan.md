@@ -207,6 +207,8 @@ implementations; one set of service fakes in `tests/fakes.py`; a shorter long-ch
 markers for the PostgreSQL and Valkey tests; parallel runs with `pytest-xdist`. No change
 in behaviour.
 
+Frontend and widgets: done. Frontend 18 files, 132 tests, 33 s on a quiet machine → 12 files, 46 tests, 4 s (route files no longer load the routes lazily inside their first test); widgets 6 files, 33 tests → 5 files, 17 tests.
+
 ## Later, not planned here
 
 Agent operators and the recommendation widget; Input operators with simulation bindings;
