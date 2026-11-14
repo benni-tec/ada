@@ -249,7 +249,9 @@ class Widgets(WidgetService):
                 raise Invalid("The run belongs to another project than the widget")
         rows = await self.runs.read(run.id, operator_id, limit)
         # Reading fixed the run's snapshots, so the sources name what these rows came from.
-        sources = await self.sources_list.entries(await self.runs.get(run.id), [widget])
+        # Only the input read here: another input's snapshot is fixed when it is read.
+        read = widget.model_copy(update={"operator_id": operator_id, "inputs": {}})
+        sources = await self.sources_list.entries(await self.runs.get(run.id), [read])
         operator = await self.operators.get(operator_id)
         return WidgetData(
             widget_id=widget.id,

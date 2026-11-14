@@ -113,7 +113,8 @@ WITH page AS (
 ),
 cells AS (
     SELECT list_transform(
-        string_split(trim(line, '| '), '|'),
+        -- One outer pipe each side, so an empty last cell stays a cell.
+        string_split(regexp_replace(trim(line), '^\|\s*|\s*\|$', '', 'g'), '|'),
         lambda c: trim(regexp_replace(regexp_replace(regexp_replace(
             c, '\[([^\]]*)\]\([^)]*\)', '\1', 'g'), '\*\*', '', 'g'), '\s+', ' ', 'g'))
     ) AS c
