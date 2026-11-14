@@ -207,10 +207,10 @@ The agent is configured on a settings page (bottom of the project sidebar) inste
 the project's data sources, to add, edit and refresh. One backend and one frontend agent;
 the contract is folded into `docs/contracts.md`.
 
-## Wave 4: a better MCP for analysis (three agents at once)
+## Wave 4: a better MCP for analysis (three agents at once) (done)
 
 Learned from building the goal 3 analysis through the MCP tools (30 calls, 9 dashboard
-versions, exploration outside ADA). Contract: `docs/contracts/wave4.md`.
+versions, exploration outside ADA). The contract is folded into `docs/contracts.md`.
 
 | Agent | Builds |
 | --- | --- |
@@ -218,7 +218,10 @@ versions, exploration outside ADA). Contract: `docs/contracts/wave4.md`.
 | Documents | `document` sources: PDFs fetched and extracted locally with pdfplumber, as pages or as table rows |
 | Widgets | `chart` widgets in Vega-Lite (target lines, layers, formats); table labels and formats; value `compare_to`; years without thousands separators |
 
-Then integration 4, and the goal 3 analysis rebuilt with the new tools as the acceptance check.
+Integration 4 merged the three, regenerated the client, and taught the platform's own agent
+the new rules (explore with `query_operator` but never present its rows; batch with
+`build_pipeline` and one `edit_dashboard`). The acceptance check is the goal 3 analysis
+rebuilt with the new tools.
 
 ## Functions (later)
 
@@ -264,5 +267,5 @@ statistic operators; document and browser sources; alert pipelines; data-quality
 Foundation ──▶ A  B  C  D  E  F ──▶ Integration 1 ──▶ G  H  I  J ──▶ Integration 2 (all done)
 ──▶ Pipeline view ──▶ Wave 3 (backend, frontend) ──▶ Integration 3 (all done)
 ──▶ Bottom-up invalidation (proposed) ──▶ Test consolidation (done) ──▶ Settings page (done)
-──▶ Wave 4 (MCP, documents, widgets) ──▶ Integration 4 ──▶ Functions (later)
+──▶ Wave 4 (MCP, documents, widgets) ──▶ Integration 4 (done) ──▶ Functions (later)
 ```

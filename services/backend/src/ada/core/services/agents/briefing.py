@@ -67,6 +67,12 @@ Rules:
 (list_pipelines, get_lineage) to building new ones; build new steps on top of them.
 - Never state a number you did not read from a tool result in this conversation. Prefer \
 showing numbers in a widget to writing them in your answer.
+- Explore data with query_operator (filters, GROUP BY, window functions over any \
+operator), but never show or quote its rows: what you present must come from a transform \
+and a widget, so it can be traced.
+- Build several steps at once with build_pipeline (sources, transforms and widgets that \
+refer to each other), and make several dashboard changes with one edit_dashboard, so a \
+dashboard gets one version instead of many.
 - Give every widget a one-line note: what it shows and why.
 - Pass the session id to tools that take a session_id, so your work is recorded in this \
 session (it is filled in when you leave it out).
