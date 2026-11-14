@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give ada web search and page reading, Context.dev page sources with monitor-driven refresh, provenance on datasets, and a Gemini research agent that runs as a delegated child session.
+**Goal:** Give ada web search and page reading, Context.dev page sources with monitor-driven refresh, provenance on datasets, and a research agent (Gemini or any other configured model) that runs as a delegated child session.
 
 **Architecture:** Two new outbound ports (`WebSearch` for Exa, `PageReader` for Context.dev) with httpx adapters, exposed as MCP tools so every agent gets them. `AccessKind.DOCUMENT` gets a reader on `PageReader`; a webhook route turns Context.dev monitor deliveries into forced refreshes, which the existing alert sweep picks up. The research agent is a second agent profile: a session with `agent = research` runs with its own model, briefing and tool filter, and reports into its parent session.
 
@@ -160,7 +160,7 @@
 
 **Files:**
 - Create: `B/entrypoints/mcp/tools/research.py`, `B/core/services/agents/research.py` (delegation and report-back logic)
-- Modify: `B/core/services/agents/service.py`, `B/core/services/agents/briefing.py` (research briefing), `B/core/services/agents/settings.py` (`set_research_agent`, catalog purpose, fallback), `B/entrypoints/http/routers/settings.py` (set research agent), `B/entrypoints/http/routers/sessions.py` (`POST /sessions/{id}/research` → delegate as the person), `B/core/ports/agents.py` + `B/entrypoints/mcp/agent.py` (tool filter by profile), `B/entrypoints/mcp/tools/web.py` (call cap), `B/adapters/llm/runtime.py` (Gemini built-ins only if Task 0 found them usable)
+- Modify: `B/core/services/agents/service.py`, `B/core/services/agents/briefing.py` (research briefing), `B/core/services/agents/settings.py` (`set_research_agent`, catalog purpose, fallback), `B/entrypoints/http/routers/settings.py` (set research agent), `B/entrypoints/http/routers/sessions.py` (`POST /sessions/{id}/research` → delegate as the person), `B/core/ports/agents.py` + `B/entrypoints/mcp/agent.py` (tool filter by profile), `B/entrypoints/mcp/tools/web.py` (call cap), `B/adapters/llm/runtime.py` (Gemini built-ins only when the research model is a GEMINI target and Task 0 found them usable; Task 0 left this unchecked, so none for now). The research agent must work on any catalog model (GEMINI or OPENAI_COMPATIBLE): nothing may depend on Gemini
 - Test: `T/test_agent.py`, `T/test_api.py`
 
 **Interfaces (produces):**
@@ -194,10 +194,10 @@
 
 ### Task 8: Deploy and the demo run
 
-**Model:** controller (needs Felix for the Gemini key; no subagent).
+**Model:** controller (needs Felix for a model provider key; no subagent).
 
 - [ ] **Step 1:** Rebuild on the VM with the ship script (`/tmp/ada-ship.sh` on the dev box, pointing at branch `research-agent`); migration 0006 runs; health OK.
-- [ ] **Step 2:** Felix adds the Gemini provider and models on the Settings page and sets the research agent.
+- [ ] **Step 2:** Felix adds a provider on the Settings page (OpenAI-compatible now, Gemini once its key exists) and sets the research agent; swapping later only changes that setting.
 - [ ] **Step 3:** In the "Nordic cancer care" project, delegate the Goal 3 brief (spec §6) and check the report: Sotkanet survival sources added with provenance, Cancer Registry per Task 0's finding, "not found" list includes open waiting-time data by county.
 - [ ] **Step 4:** Watch one page with a document source and an alert rule; trigger a change or a test delivery; the alert fires in-app.
 - [ ] **Step 5:** Note what ran and what didn't in the vault project file.
