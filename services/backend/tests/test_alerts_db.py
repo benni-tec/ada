@@ -13,7 +13,7 @@ from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.alerts import AlertState
 from ada.core.models.events import EventType
-from alerts_support import AlertOverrides, World, below, csv
+from alerts_support import AlertOverrides, World, csv
 from memory import MemoryBackground
 
 pytestmark = pytest.mark.anyio
@@ -54,19 +54,27 @@ async def test_alerts_fire_stay_and_resolve_on_postgresql(world: World) -> None:
     assert stored.revision == rule.revision
 
     world.clock.advance(days=1)
-    # A stricter formula rather than new data: a refetch with changed content fails on
-    # PostgreSQL in wave 1 (the source service adds the new snapshot before superseding the
-    # current one, which uq_snapshots_current rejects; reported for integration).
+    # New data that recovers: the second fetch with changed content, which supersedes the
+    # current snapshot before adding the new one (uq_snapshots_current allows one).
+    await world.refetch(setup.source, csv(("north", 2024, 85), ("south", 2024, 90)))
     async with world.alerts() as service:
-        await service.update_rule(rule.id, rule.revision, formula=below(60))
         (resolved,) = await service.check(rule.id)
         assert await service.alerts(setup.project_id, AlertState.FIRING) == []
         assert await service.alerts(setup.project_id, AlertState.RESOLVED) == [resolved]
     assert resolved.id == fired.id
     assert resolved.resolved_at == world.clock.now()
 
+    # And a third that falls again: a new alert for the same key.
+    world.clock.advance(days=1)
+    await world.refetch(setup.source, csv(("north", 2024, 75), ("south", 2024, 90)))
+    async with world.alerts() as service:
+        (again,) = await service.check(rule.id)
+    assert again.id != fired.id
+    assert again.key == fired.key
+    assert again.condition_operator_id == fired.condition_operator_id
+
     types = [event.type for event in await world.events()]
-    assert types.count(EventType.ALERT_FIRING) == 1
+    assert types.count(EventType.ALERT_FIRING) == 2
     assert types.count(EventType.ALERT_RESOLVED) == 1
 
 
