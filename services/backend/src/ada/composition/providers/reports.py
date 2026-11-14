@@ -1,7 +1,8 @@
 from dishka import Provider, Scope, provide
 
-from ada.composition.unbuilt import unbuilt
 from ada.core.services.ports.reports import ReportService, TemplateService
+from ada.core.services.reports.service import Reports
+from ada.core.services.reports.templates import Templates
 
 
 class ReportProvider(Provider):
@@ -9,8 +10,8 @@ class ReportProvider(Provider):
 
     scope = Scope.REQUEST
 
-    reports = provide(unbuilt(ReportService))
-    templates = provide(unbuilt(TemplateService))
+    reports = provide(Reports, provides=ReportService)
+    templates = provide(Templates, provides=TemplateService)
 
 
 provider = ReportProvider()
