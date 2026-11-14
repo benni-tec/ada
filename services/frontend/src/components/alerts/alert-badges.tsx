@@ -7,9 +7,9 @@ import { countBySeverity, countsText } from './labels'
 import { SeverityBadge } from './severity'
 
 /**
- * The firing alerts of a dashboard's rules, counted by severity, linking to the project's
- * alert feed. Shows nothing while loading or when the dashboard has no rules; a quiet line
- * when nothing fires.
+ * The active alerts of a dashboard's rules, counted by severity, linking to the project's
+ * alerts. Shows nothing while loading or when the dashboard has no rules; a quiet line
+ * when nothing is active.
  */
 export function AlertBadges({ dashboardId }: { dashboardId: Id }) {
   const { data } = useQuery(dashboardAlertsQuery(dashboardId))
@@ -18,7 +18,7 @@ export function AlertBadges({ dashboardId }: { dashboardId: Id }) {
   if (counts.length === 0) {
     return (
       <p role="status" className="text-xs text-neutral-500">
-        No alerts firing
+        No active alerts
       </p>
     )
   }
@@ -27,7 +27,7 @@ export function AlertBadges({ dashboardId }: { dashboardId: Id }) {
     <Link
       to="/projects/$projectId/alerts"
       params={{ projectId: data[0].alert.project_id }}
-      aria-label={`${total} firing ${total === 1 ? 'alert' : 'alerts'}: ${countsText(counts)}. Open the alert feed`}
+      aria-label={`${total} active ${total === 1 ? 'alert' : 'alerts'}: ${countsText(counts)}. Open the alerts`}
       className="inline-flex flex-wrap items-center gap-1 rounded-md hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2"
     >
       {counts.map(([severity, count]) => (

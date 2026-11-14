@@ -116,8 +116,8 @@ test('the slots on the grid all read one run of the dashboard’s range, which t
   expect(within(cells[2]).getByText(/Empty slot/)).toBeInTheDocument()
   expect(screen.getByText(/Showing 2020 to 2024 \(the dashboard’s default\)/)).toBeInTheDocument()
 
-  // The header: firing alerts by severity, and a report from this dashboard.
-  expect(await screen.findByRole('link', { name: /2 firing alerts: 2 critical/ })).toHaveAttribute('href', '/projects/p1/alerts')
+  // The header: active alerts by severity, and a report from this dashboard.
+  expect(await screen.findByRole('link', { name: /2 active alerts: 2 critical/ })).toHaveAttribute('href', '/projects/p1/alerts')
   expect(screen.getByRole('link', { name: 'Generate report' })).toHaveAttribute('href', '/projects/p1/reports/new?dashboard=d1')
 
   // A range that ends before it starts is refused; a new one starts a run every widget reads.

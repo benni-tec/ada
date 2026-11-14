@@ -330,14 +330,14 @@ function Reports({ projectId }: { projectId: Id }) {
   )
 }
 
-/** One page, not a list: the feed and the rules, with the firing alerts counted. */
+/** One page, not a list: the dashboards' rules and alerts, with the active alerts counted. */
 function Alerts({ projectId }: { projectId: Id }) {
   const { data: firing } = useQuery(alertFeedQuery(projectId, 'firing'))
   const count = firing?.length ?? 0
   const Icon = pageTypes.alerts.icon
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild tooltip={count > 0 ? `Alerts: ${count} firing` : 'Alerts'}>
+      <SidebarMenuButton asChild tooltip={count > 0 ? `Alerts: ${count} active` : 'Alerts'}>
         <Link to="/projects/$projectId/alerts" params={{ projectId }} activeProps={{ 'data-active': true }}>
           <Icon aria-hidden="true" />
           <span>Alerts</span>
@@ -346,7 +346,7 @@ function Alerts({ projectId }: { projectId: Id }) {
       {count > 0 && (
         <SidebarMenuBadge className="bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200">
           {count}
-          <span className="sr-only"> firing</span>
+          <span className="sr-only"> active</span>
         </SidebarMenuBadge>
       )}
     </SidebarMenuItem>

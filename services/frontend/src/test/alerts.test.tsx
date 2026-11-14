@@ -138,42 +138,47 @@ function alertsApi(extra: Record<string, unknown> = {}) {
 
 // The feed
 
-test('the feed, dashboard by dashboard: firing first, filtered by state, refetched on a live event; each alert opens its rows', async () => {
+test('one card per dashboard, its rules in a table, each opening to its alerts and those to their data; filtered by state, refetched on a live event', async () => {
   const fetch = alertsApi()
   renderAt('/projects/p1/alerts')
 
-  // The project's alerts are its dashboards': one section each, named after it.
+  // The project's alerts are its dashboards': one card each, named after it.
   const section = await screen.findByRole('region', { name: 'Screening' })
   expect(within(section).getByRole('link', { name: 'Screening' })).toHaveAttribute('href', '/projects/p1/dashboards/d1')
-  expect(section).toHaveTextContent('1 firing')
-  const list = within(section).getByRole('list', { name: 'Alerts on Screening' })
-  const [firing, resolved] = within(list).getAllByRole('listitem')
-  expect(firing).toHaveTextContent('Critical')
-  expect(firing).toHaveTextContent('region: north')
-  expect(firing).toHaveTextContent('Coverage below target')
-  expect(firing).toHaveTextContent('Firing')
-  expect(resolved).toHaveTextContent('region: south')
-  expect(resolved).toHaveTextContent('Resolved')
+  expect(section).toHaveTextContent('1 active')
+  expect(section).not.toHaveTextContent(/firing/i)
+  const rules = within(section).getByRole('table', { name: 'Rules of Screening' })
+  const [, ruleRow] = within(rules).getAllByRole('row')
+  expect(ruleRow).toHaveTextContent('Critical')
+  expect(ruleRow).toHaveTextContent('Coverage below target')
+  expect(ruleRow).toHaveTextContent('1 active')
+
+  // A rule with an active alert starts open: its alerts, a table in its row.
+  expect(within(ruleRow).getByRole('button', { name: 'Hide its alerts' })).toHaveAttribute('aria-expanded', 'true')
+  const alerts = within(section).getByRole('table', { name: 'Alerts of Coverage below target' })
+  const [, active, ended] = within(alerts).getAllByRole('row')
+  expect(active).toHaveTextContent('region: north')
+  expect(active).toHaveTextContent('Active')
+  expect(ended).toHaveTextContent('region: south')
+  expect(ended).toHaveTextContent('Ended')
 
   // The rows of its key in the run that showed it, with the history the time functions read.
-  const toggle = within(firing).getByRole('button', { name: 'Show the data that fires' })
+  const toggle = within(active).getByRole('button', { name: 'Show the data behind it' })
   fireEvent.click(toggle)
   expect(toggle).toHaveAttribute('aria-expanded', 'true')
-  let table = await within(firing).findByRole('table')
-  expect(within(table).getByText(/Rows for region: north in run/)).toBeInTheDocument()
+  let table = await screen.findByRole('table', { name: /^Rows for region: north in run/ })
   expect(within(table).getAllByRole('row')).toHaveLength(3)
   expect(within(table).queryByText('south')).not.toBeInTheDocument()
 
-  // With a recorded condition: the rows that raised it. An outline is cut short, whole in its title.
-  fireEvent.click(within(resolved).getByRole('button', { name: 'Show the data it last fired on' }))
-  table = await within(resolved).findByRole('table')
-  expect(within(table).getByText(/Alerting rows for region: south in run/)).toBeInTheDocument()
+  // With a recorded condition: the rows behind it. An outline is cut short, whole in its title.
+  fireEvent.click(within(ended).getByRole('button', { name: 'Show the data it last showed on' }))
+  table = await screen.findByRole('table', { name: /^The rows behind it for region: south in run/ })
   expect(within(table).getAllByRole('row')).toHaveLength(2)
   expect(within(table).getByText(/^\{"type":"Polygon".*…$/)).toHaveAttribute('title', expect.stringContaining('[1,2]]}'))
 
-  fireEvent.click(screen.getByRole('button', { name: 'Resolved' }))
-  await waitFor(() => expect(within(screen.getByRole('list', { name: 'Alerts on Screening' })).getAllByRole('listitem')).toHaveLength(1))
-  expect(screen.getByRole('button', { name: 'Resolved' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: 'Ended' }))
+  await waitFor(() => expect(within(screen.getByRole('table', { name: 'Rules of Screening' })).getByRole('row', { name: /1 ended/ })).toBeInTheDocument())
+  expect(screen.getByRole('button', { name: 'Ended' })).toHaveAttribute('aria-pressed', 'true')
   const urls = () => fetch.mock.calls.map(([input]) => new Request(input as RequestInfo).url)
   expect(urls()).toContainEqual(expect.stringContaining('/api/projects/p1/alerts?state=resolved'))
 
@@ -196,14 +201,14 @@ test('rules are listed per dashboard and checked on request; an edit sends the r
   })
   renderAt('/projects/p1/alerts')
 
-  const rules = await screen.findByRole('list', { name: 'Rules of Screening' })
-  const item = within(rules).getByRole('listitem')
+  const rules = await screen.findByRole('table', { name: 'Rules of Screening' })
+  const item = within(rules).getAllByRole('row')[1]
   expect(item).toHaveTextContent('Coverage below target')
   expect(item).toHaveTextContent('value < 80')
   expect(item).toHaveTextContent('per region')
   expect(item).toHaveTextContent('every hour')
   fireEvent.click(within(item).getByRole('button', { name: 'Check now' }))
-  expect(await within(item).findByRole('status')).toHaveTextContent('1 new, 0 resolved, 1 firing now')
+  expect(await within(item).findByRole('status')).toHaveTextContent('1 new, 0 ended, 1 active now')
 
   fireEvent.click(within(rules).getByRole('button', { name: 'Edit' }))
   const form = await screen.findByRole('form', { name: 'Edit rule Coverage below target' })

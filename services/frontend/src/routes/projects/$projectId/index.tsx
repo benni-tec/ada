@@ -100,7 +100,7 @@ function Counts({ projectId }: { projectId: Id }) {
       <Count type="report" label="Reports" value={count(reports.data)} />
       <Count
         type="alerts"
-        label="Alerts firing"
+        label="Active alerts"
         value={count(firing.data)}
         link={
           <Link to="/projects/$projectId/alerts" params={{ projectId }} className="text-xs underline underline-offset-2">

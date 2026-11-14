@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, RefreshCw } from 'lucide-react'
+import { ChevronRight, Pencil, Plus, RefreshCw } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import { IconButton } from '@/components/icon-action'
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { ErrorNotice } from '@/components/notices'
 import { Time } from '@/components/provenance'
@@ -11,47 +12,69 @@ import {
   alertKeys,
   checkAlertRule,
   type AlertRule,
+  type AlertView,
   type CheckResult,
   type DashboardRules,
   type Id,
 } from '@/lib/api'
 
+import { AlertTable } from './alert-table'
 import { asFormula, describe } from './formula'
 import { intervalText } from './labels'
 import { RuleEditor } from './rule-editor'
 import { SeverityBadge } from './severity'
 
-const listClass =
-  'divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800'
-
-/** A dashboard's alert rules, where they are added and edited. */
-export function DashboardRuleList({ projectId, group }: { projectId: Id; group: DashboardRules }) {
+/**
+ * A dashboard's alert rules as a table, where they are added and edited. A rule with alerts
+ * opens to them, a table in its row; one with an active alert starts open.
+ */
+export function DashboardRuleList({
+  projectId,
+  group,
+  alerts,
+}: {
+  projectId: Id
+  group: DashboardRules
+  alerts: ReadonlyMap<Id, AlertView[]>
+}) {
   const [adding, setAdding] = useState(false)
-  const headingId = useId()
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <h3 id={headingId} className="text-sm font-medium text-muted-foreground">
-          Rules
-        </h3>
-        {!adding && (
-          <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
-            <Plus data-icon="inline-start" aria-hidden="true" />
-            New rule
-          </Button>
-        )}
-      </div>
-      {adding && <RuleEditor projectId={projectId} dashboardId={group.dashboard.id} onDone={() => setAdding(false)} />}
+    <div className="flex flex-col gap-2">
       {group.rules.length === 0 ? (
-        !adding && <p className="text-sm text-neutral-500">No rules on this dashboard.</p>
+        !adding && <p className="text-sm text-muted-foreground">No rules on this dashboard.</p>
       ) : (
-        <ul className={listClass} aria-label={`Rules of ${group.dashboard.name}`}>
-          {group.rules.map((rule) => (
-            <RuleItem key={rule.id} projectId={projectId} rule={rule} />
-          ))}
-        </ul>
+        <Table aria-label={`Rules of ${group.dashboard.name}`}>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-0">
+                <span className="sr-only">Alerts</span>
+              </TableHead>
+              <TableHead>Severity</TableHead>
+              <TableHead>Rule</TableHead>
+              <TableHead>Alerts when</TableHead>
+              <TableHead>Checked</TableHead>
+              <TableHead>Alerts</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {group.rules.map((rule) => (
+              <RuleRow key={rule.id} projectId={projectId} rule={rule} alerts={alerts.get(rule.id) ?? []} />
+            ))}
+          </TableBody>
+        </Table>
       )}
-    </section>
+      {adding ? (
+        <RuleEditor projectId={projectId} dashboardId={group.dashboard.id} onDone={() => setAdding(false)} />
+      ) : (
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setAdding(true)}>
+          <Plus data-icon="inline-start" aria-hidden="true" />
+          New rule
+        </Button>
+      )}
+    </div>
   )
 }
 
@@ -59,12 +82,17 @@ function checkSummary(result: CheckResult): string {
   const fired = result.changed.filter((alert) => alert.state === 'firing').length
   const resolved = result.changed.length - fired
   const now = result.firing.length
-  return `Checked: ${fired} new, ${resolved} resolved, ${now} firing now.`
+  return `Checked: ${fired} new, ${resolved} ended, ${now} active now.`
 }
 
-function RuleItem({ projectId, rule }: { projectId: Id; rule: AlertRule }) {
+/** One rule as a table row; editing it opens the editor in a row of its own. */
+function RuleRow({ projectId, rule, alerts }: { projectId: Id; rule: AlertRule; alerts: AlertView[] }) {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
+  const active = alerts.filter((view) => view.alert.state === 'firing').length
+  const [open, setOpen] = useState<boolean>()
+  const shown = open ?? active > 0
+  const alertsId = useId()
   const check = useMutation({
     mutationFn: () => checkAlertRule(rule.id),
     onSuccess: () => {
@@ -75,37 +103,44 @@ function RuleItem({ projectId, rule }: { projectId: Id; rule: AlertRule }) {
 
   if (editing) {
     return (
-      <li className="px-4 py-3">
-        <RuleEditor projectId={projectId} dashboardId={rule.dashboard_id} rule={rule} onDone={() => setEditing(false)} />
-      </li>
+      <TableRow className="hover:bg-transparent">
+        <TableCell colSpan={7} className="whitespace-normal">
+          <RuleEditor projectId={projectId} dashboardId={rule.dashboard_id} rule={rule} onDone={() => setEditing(false)} />
+        </TableCell>
+      </TableRow>
     )
   }
 
   return (
-    <li className="flex flex-col gap-2 px-4 py-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <>
+    <TableRow data-state={shown ? 'selected' : undefined}>
+      <TableCell>
+        {alerts.length > 0 && (
+          <IconButton
+            label={shown ? 'Hide its alerts' : 'Show its alerts'}
+            aria-expanded={shown}
+            aria-controls={alertsId}
+            onClick={() => setOpen(!shown)}
+          >
+            <ChevronRight className={shown ? 'rotate-90 transition-transform' : 'transition-transform'} />
+          </IconButton>
+        )}
+      </TableCell>
+      <TableCell>
         <SeverityBadge severity={rule.severity} />
+      </TableCell>
+      <TableCell>
         <span className="font-medium">{rule.name}</span>
         {!rule.enabled && (
-          <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
-            Disabled
-          </span>
+          <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Disabled</span>
         )}
-        <div className="ml-auto flex gap-1">
-          <IconButton label="Check now" disabled={check.isPending} onClick={() => check.mutate()}>
-            <RefreshCw className={check.isPending ? 'animate-spin motion-reduce:animate-none' : undefined} />
-          </IconButton>
-          <IconButton label="Edit" onClick={() => setEditing(true)}>
-            <Pencil />
-          </IconButton>
-        </div>
-      </div>
-      <p className="text-sm">
-        Alerts when <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono dark:bg-neutral-800">{describe(asFormula(rule.formula))}</code>
-        {rule.key_columns.length > 0 && <>, per {rule.key_columns.join(' and ')}</>}
-      </p>
-      <p className="text-xs text-neutral-600 dark:text-neutral-400">
-        Checked {intervalText(rule.check_interval_seconds)}
+      </TableCell>
+      <TableCell className="whitespace-normal">
+        <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{describe(asFormula(rule.formula))}</code>
+        {rule.key_columns.length > 0 && <span className="text-muted-foreground">, per {rule.key_columns.join(' and ')}</span>}
+      </TableCell>
+      <TableCell className="whitespace-normal text-muted-foreground">
+        {intervalText(rule.check_interval_seconds)}
         {rule.last_checked_at ? (
           <>
             {' · last '}
@@ -114,13 +149,34 @@ function RuleItem({ projectId, rule }: { projectId: Id; rule: AlertRule }) {
         ) : (
           ' · not checked yet'
         )}
-      </p>
-      {check.data && (
-        <p role="status" className="text-xs text-neutral-700 dark:text-neutral-300">
-          {checkSummary(check.data)}
-        </p>
-      )}
-      {check.error && <ErrorNotice error={check.error} prefix="The check failed:" />}
-    </li>
+        {check.data && (
+          <p role="status" className="text-xs text-foreground">
+            {checkSummary(check.data)}
+          </p>
+        )}
+        {check.error && <ErrorNotice error={check.error} prefix="The check failed:" />}
+      </TableCell>
+      <TableCell className={active > 0 ? 'font-medium text-red-700 dark:text-red-400' : 'text-muted-foreground'}>
+        {active > 0 ? `${active} active` : alerts.length > 0 ? `${alerts.length} ended` : 'None'}
+      </TableCell>
+      <TableCell className="w-0">
+        <div className="flex justify-end gap-1">
+          <IconButton label="Check now" disabled={check.isPending} onClick={() => check.mutate()}>
+            <RefreshCw className={check.isPending ? 'animate-spin motion-reduce:animate-none' : undefined} />
+          </IconButton>
+          <IconButton label="Edit" onClick={() => setEditing(true)}>
+            <Pencil />
+          </IconButton>
+        </div>
+      </TableCell>
+    </TableRow>
+    {shown && alerts.length > 0 && (
+      <TableRow className="hover:bg-transparent">
+        <TableCell colSpan={7} id={alertsId} className="bg-muted/30 py-2 pl-12 whitespace-normal">
+          <AlertTable views={alerts} label={`Alerts of ${rule.name}`} />
+        </TableCell>
+      </TableRow>
+    )}
+    </>
   )
 }
