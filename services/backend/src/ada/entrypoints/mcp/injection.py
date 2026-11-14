@@ -5,7 +5,7 @@ from dishka import AsyncContainer
 from dishka.integrations.base import wrap_injection
 from fastmcp.exceptions import ToolError
 
-from ada.core.models.errors import Conflict, Invalid, NotFound, Unavailable
+from ada.core.models.errors import Conflict, Invalid, NotConfigured, NotFound, Unavailable
 
 type Inject = Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]
 
@@ -35,7 +35,7 @@ def make_inject(container: AsyncContainer) -> Inject:
                 return await injected(*args, **kwargs)
             except Unavailable as error:
                 raise ToolError(f"{error}. This is temporary; try again later.") from error
-            except (NotFound, Conflict, Invalid) as error:
+            except (NotFound, Conflict, Invalid, NotConfigured) as error:
                 raise ToolError(str(error)) from error
 
         # FastMCP builds the tool's schema from these: the injected function's, which no

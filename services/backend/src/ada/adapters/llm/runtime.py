@@ -1,5 +1,5 @@
-"""Runs a turn with pydantic-ai: the configured model, the turn's tools, and the run's
-events turned into the parts of the turn as they happen."""
+"""Runs a turn with pydantic-ai: the model the turn's request names, the turn's tools, and
+the run's events turned into the parts of the turn as they happen."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -33,9 +33,10 @@ from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
 from pydantic_core import to_jsonable_python
 
-from ada.adapters.llm.config import LlmsConfig, LlmsConfigError, ProviderKind, Target
 from ada.core.models.agents import (
     HistoryMessage,
+    ModelTarget,
+    ProviderKind,
     ReasoningPart,
     TextPart,
     ToolPart,
@@ -60,16 +61,15 @@ type ModelFactory = Callable[[str], Model]
 
 
 class PydanticAiRuntime(AgentRuntime):
-    """`model_factory` replaces the configured providers, e.g. with pydantic-ai's
-    FunctionModel in tests, so nothing calls a provider."""
+    """Calls the model of the request's target. `model_factory` replaces the providers,
+    e.g. with pydantic-ai's FunctionModel in tests, so nothing calls a provider."""
 
-    def __init__(self, config: LlmsConfig, model_factory: ModelFactory | None = None) -> None:
-        self.config = config
+    def __init__(self, model_factory: ModelFactory | None = None) -> None:
         self.model_factory = model_factory
 
     async def run(self, request: TurnRequest, tools: AgentTools, sink: TurnSink) -> TurnStatus:
         agent = Agent(
-            self._model(request.model),
+            self._model(request),
             output_type=str,
             tools=[_tool(spec, tools) for spec in tools.specs()],
             retries={"tools": TOOL_RETRIES},
@@ -111,36 +111,31 @@ class PydanticAiRuntime(AgentRuntime):
             raise AgentFailed(f"The agent run failed: {error}") from error
         return TurnStatus.DONE
 
-    def _model(self, model_id: str) -> Model:
+    def _model(self, request: TurnRequest) -> Model:
         if self.model_factory is not None:
-            return self.model_factory(model_id)
-        try:
-            target = self.config.target(model_id)
-        except LlmsConfigError as error:
-            raise AgentFailed(str(error)) from error
-        if target.provider.api_key_env and not target.key:
-            raise AgentFailed(f"The environment variable {target.provider.api_key_env} is not set")
-        return provider_model(target)
+            return self.model_factory(request.model)
+        return provider_model(request.target)
 
 
-def provider_model(target: Target) -> Model:
-    """The pydantic-ai model for a configured target. Builds clients only; nothing is sent
-    until a turn runs."""
-    match target.provider.kind:
+def provider_model(target: ModelTarget) -> Model:
+    """The pydantic-ai model for a target. Builds clients only; nothing is sent until a
+    turn runs."""
+    key = target.api_key.get_secret_value() if target.api_key is not None else None
+    match target.kind:
         case ProviderKind.OPENAI_COMPATIBLE:
             from pydantic_ai.models.openai import OpenAIChatModel
             from pydantic_ai.providers.openai import OpenAIProvider
 
             # The client insists on a key; an endpoint without one ignores whatever it gets.
-            provider = OpenAIProvider(
-                base_url=target.provider.base_url, api_key=target.key or "none"
-            )
+            provider = OpenAIProvider(base_url=target.base_url, api_key=key or "none")
             return OpenAIChatModel(target.model, provider=provider)
         case ProviderKind.GEMINI:
             from pydantic_ai.models.google import GoogleModel
             from pydantic_ai.providers.google import GoogleProvider
 
-            return GoogleModel(target.model, provider=GoogleProvider(api_key=target.key))
+            return GoogleModel(
+                target.model, provider=GoogleProvider(api_key=key, base_url=target.base_url)
+            )
 
 
 def _tool(spec: ToolSpec, tools: AgentTools) -> Tool[Any]:

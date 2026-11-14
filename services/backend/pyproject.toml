@@ -5,6 +5,7 @@ description = "ADA backend: pipelines of operators over data sources, served ove
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.20.1",
+    "cryptography>=50.0.2",
     "dishka>=1.10.1",
     "duckdb>=2.0.0",
     "fastapi>=0.162.7",
@@ -13,7 +14,6 @@ dependencies = [
     "psycopg[binary,pool]>=3.3.9",
     "pydantic-ai-slim[google,openai]>=2.68.0",
     "pydantic-settings>=2.16.3",
-    "pyyaml>=6.0.3",
     "sqlalchemy[asyncio]>=2.1.8",
     "taskiq>=0.13.0",
     "taskiq-redis>=1.2.4",

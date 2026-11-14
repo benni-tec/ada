@@ -2,6 +2,11 @@ from dishka import Provider, Scope, provide
 
 from ada.adapters.db.agent_repositories import SqlAgentTurnRepository, SqlTurnProgress
 from ada.adapters.db.alert_repositories import SqlAlertRepository, SqlAlertRuleRepository
+from ada.adapters.db.llm_repositories import (
+    SqlAgentSettingsRepository,
+    SqlLlmModelRepository,
+    SqlLlmProviderRepository,
+)
 from ada.adapters.db.pipeline_repositories import (
     SqlOperatorRepository,
     SqlRunRepository,
@@ -22,11 +27,14 @@ from ada.adapters.db.workspace_repositories import (
 )
 from ada.core.ports.agents import TurnProgress
 from ada.core.ports.repositories import (
+    AgentSettingsRepository,
     AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
     DashboardRepository,
     DataSourceRepository,
+    LlmModelRepository,
+    LlmProviderRepository,
     OperatorRepository,
     ProjectRepository,
     ReportRepository,
@@ -59,6 +67,9 @@ class RepositoryProvider(Provider):
     alert_rules = provide(SqlAlertRuleRepository, provides=AlertRuleRepository)
     alerts = provide(SqlAlertRepository, provides=AlertRepository)
     agent_turns = provide(SqlAgentTurnRepository, provides=AgentTurnRepository)
+    llm_providers = provide(SqlLlmProviderRepository, provides=LlmProviderRepository)
+    llm_models = provide(SqlLlmModelRepository, provides=LlmModelRepository)
+    agent_settings = provide(SqlAgentSettingsRepository, provides=AgentSettingsRepository)
 
     source_locks = provide(SqlSourceLocks, provides=SourceLocks)
     # Its own connection per record, from the engine, not the request's session.

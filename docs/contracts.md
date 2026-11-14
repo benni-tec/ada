@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed) |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -43,12 +43,24 @@ What wave 3 (the agent) added to them:
 | `core/models/sessions.py` | `Context` (`PipelineContext`, `DashboardContext`, `WidgetContext`), `SessionEntry.context`, `EntryKind.AGENT_TURN` |
 | `core/models/widgets.py` | `Widget.copied_from` |
 | `core/models/events.py` | `agent.turn_started`, `agent.turn_part`, `agent.turn_finished` |
-| `core/ports/agents.py` | `LanguageModels` (the models file), `AgentRuntime` (runs a model with tools), `AgentTools` and `AgentToolbox` (the tools of a turn), `TurnSink` (where a running turn reports parts), `TurnProgress` (a running turn's writes, each committed at once), `AgentFailed`, `ToolCallFailed` |
+| `core/ports/agents.py` | `LanguageModels` (the configured models), `AgentRuntime` (runs a model with tools), `AgentTools` and `AgentToolbox` (the tools of a turn), `TurnSink` (where a running turn reports parts), `TurnProgress` (a running turn's writes, each committed at once), `AgentFailed`, `ToolCallFailed` |
 | `core/ports/repositories.py`, `core/ports/tasks.py` | `AgentTurnRepository`; `TaskDispatcher.run_turn` |
 | `core/services/ports/agents.py` | `AgentTurnService`: `models`, `post_message`, `turns`, `get`, `cancel`, `run` |
 | `core/services/ports/sessions.py`, `pipelines.py` | `SessionService.add_message(..., context)`, `record_agent_turn`, `dashboard_agent_session`; `PipelineService.pipelines` |
 | Migration `0003` | `session_entries.context` (JSONB, default `[]`), `widgets.copied_from` (to widgets, `SET NULL`), the table `agent_turns` (with `cancel_requested`) |
 | `tach.toml` | Inbound ports may name outbound ports (`AgentTurnService.run` takes the toolbox its caller provides); the worker may import `ada.entrypoints.mcp` (the agent's tools are the MCP tools, served in process) |
+
+What the settings page added to them (the agent configured in the platform, not a file):
+
+| Where | Change |
+| --- | --- |
+| `core/models/agents.py` | `ProviderKind` (moved from the YAML loader), `LlmProvider`, `LlmModel`, `AgentSettings`, `AgentSettingsView`, `ModelTarget`; `TurnRequest.target` |
+| `core/models/errors.py` | `NotConfigured`: the platform is not set up for the request (409, see REST) |
+| `core/ports/secrets.py` | `SecretBox` (`available`, `encrypt`, `decrypt`), `SecretUnreadable` |
+| `core/ports/agents.py` | `LanguageModels` is async: `catalog()`, and `target(model_id)` for a turn that runs |
+| `core/ports/repositories.py` | `LlmProviderRepository`, `LlmModelRepository`, `AgentSettingsRepository` |
+| `core/services/ports/agents.py` | `AgentSettingsService`; `AgentTurnService.models` is async |
+| Migration `0005` | The tables `llm_providers`, `llm_models` and `agent_settings` (one row, inserted by the migration) |
 
 ## Adding a feature without touching shared files
 
@@ -73,7 +85,7 @@ on the stand-in.
 | --- | --- |
 | `infrastructure.py` | Settings, database engine and request session, `AfterCommit` (`PendingWork`), Valkey client, `Clock` |
 | `system.py` | `Database`, `TaskQueue`, `SystemStatusService` |
-| `repositories.py` | All thirteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog` and `TurnProgress` (own connection, a short transaction per write) |
+| `repositories.py` | All sixteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog` and `TurnProgress` (own connection, a short transaction per write) |
 | `analysis.py` | `AnalysisStore` (Parquet and DuckDB), `PipelineService`, `RunService` |
 | `sources.py` | `SourceReaders` (HTTP: URL and request sources), `SourceService` |
 | `workspace.py` | `ProjectService`, `SessionService`, `WidgetService` |
@@ -81,7 +93,7 @@ on the stand-in.
 | `dashboards.py` | `DashboardService` (`Dashboards`) |
 | `reports.py` | `ReportService` (`Reports`), `TemplateService` (`Templates`) |
 | `alerts.py` | `AlertService` (`Alerts`) |
-| `agents.py` | `LanguageModels` (the models file, read once per process), `AgentRuntime` (`PydanticAiRuntime`), `AgentTurnService` (`AgentTurns`). The toolbox is not bound: whoever runs a turn passes it |
+| `agents.py` | `SecretBox` (`FernetSecretBox`, from `ADA_SECRET_KEY`), `AgentSettingsService` and `LanguageModels` (both `AgentConfiguration`, per request), `AgentRuntime` (`PydanticAiRuntime`), `AgentTurnService` (`AgentTurns`). The toolbox is not bound: whoever runs a turn passes it |
 
 Services are bound at `Scope.REQUEST`; whatever holds a connection or shared state at
 `Scope.APP`. The in-memory repositories, event bus and task dispatcher in
@@ -456,35 +468,45 @@ so whatever it makes is recorded like any client's work.
 
 ### Configuration
 
-- **The models file.** `ADA_LLMS_CONFIG` names it (default `llms.yml` in the working
-  directory; moon sets `config/llms.yml` of the checkout, the compose file
-  `/config/llms.yml`, the mounted `config/`). `llms.yml` is git-ignored;
-  `llms.example.yml` at the root is committed and documents the format. A missing file is
-  an empty catalog: the platform runs without an agent and says so.
+The agent is configured in the platform, on the Settings page, and the configuration is
+shared by all projects (one ADA instance, one set of keys). There is no models file.
 
-  ```yaml
-  providers:
-    gemini:
-      kind: openai-compatible        # or: gemini (Google's own API)
-      base_url: https://generativelanguage.googleapis.com/v1beta/openai/
-      api_key_env: GEMINI_API_KEY    # the variable that holds the key
-  models:
-    session_agent: gemini/<model>    # answers sessions and dashboard agent panels
-  ```
-
-- **Keys** are never in the file and never returned by the API. A provider names the
-  variable that holds its key (`api_key_env`; left out for an endpoint without a key).
-  The full stack and `moon run :dev` pass `.env.local` to the backend and the worker. Keys
-  are read once per process.
-- **Checks.** The file is validated with pydantic: unknown keys are errors, an
-  `openai-compatible` provider needs `base_url`, every model names a configured provider,
-  purposes are known. Every problem is named with its path. The API's lifespan and the
-  worker's startup read the file, so a broken one stops them at start.
-- **Model ids** are `<provider>/<model>`, split at the first slash, so model names may
-  contain slashes. `kind: gemini` uses pydantic-ai's `GoogleModel`; the dependency is
+- **Providers** (`LlmProvider {id, name, kind, base_url, has_api_key, created_at,
+  revision}`, table `llm_providers`): `name` is a slug (`[a-z0-9-]+`), unique, the first
+  half of its models' ids. `kind` is `openai-compatible` (the OpenAI chat API: Gemini's
+  OpenAI endpoint, NVIDIA NIM, OpenAI, vLLM; needs `base_url`) or `gemini` (Google's own
+  API through pydantic-ai's `GoogleModel`; `base_url` optional). The dependency is
   `pydantic-ai-slim[openai,google]`.
-- **`GET /api/llm/models`** lists them. A model whose key's variable is not set is
-  `available: false`, with a `reason`.
+- **API keys** are stored encrypted (`llm_providers.api_key_encrypted`) by the `SecretBox`
+  (`core/ports/secrets.py`; `adapters/secrets/fernet.py`, Fernet from `cryptography`).
+  The master key is `ADA_SECRET_KEY` (or the file `ADA_SECRET_KEY_FILE` names); it may
+  hold several keys separated by commas, the first encrypting, all decrypting (rotation
+  with `MultiFernet`). No key ever leaves the platform: models and responses carry
+  `has_api_key` only. A change never needs the old key; `api_key: ""` or `null` clears it.
+  Without a master key the platform runs, but storing a key is `NotConfigured` (409, the
+  detail names `ADA_SECRET_KEY`) and `secrets_available` is false. A master key that is
+  set but malformed stops the API and the worker at start. `moon run :dev` adds a fresh
+  one to `.env.local` when it has none (`backend:secret-key`, never overwrites).
+- **Models** (`LlmModel {id, provider_id, model, created_at}`, table `llm_models`, unique
+  per provider): the id is `<provider name>/<model>`, split at the first slash, so model
+  names may contain slashes; it follows a renamed provider. Deleting a provider deletes
+  its models (`CASCADE`).
+- **The session agent** (`AgentSettings {session_agent, revision}`, the one row of
+  `agent_settings`, inserted by migration `0005`): the model that answers sessions and
+  dashboard panels, or null. Deleting its model or provider clears it (`SET NULL`); that
+  does not count the revision up.
+- **Availability.** A `gemini` provider needs a key ("The provider <name> needs an API
+  key"); an `openai-compatible` one works without. A key the master key cannot decrypt
+  (master key changed or lost) makes the provider's models unavailable with "The stored
+  key cannot be decrypted; enter it again".
+- **`AgentConfiguration`** (`core/services/agents/settings.py`) implements
+  `AgentSettingsService` (the settings routes) and `LanguageModels`: `catalog()` (the
+  `ModelList` with availability; `purposes` holds `session_agent` for the session agent)
+  and `target(model_id)` (`ModelTarget {model_id, kind, base_url, model, api_key}` with the
+  key decrypted; `Invalid` with the reason when the model is unknown or unavailable).
+  Both are read from the database per unit of work, so a change applies to the next
+  message without a restart.
+- **`GET /api/llm/models`** lists the catalog, unchanged in shape.
 
 ### Turns, parts and context
 
@@ -520,17 +542,19 @@ its entry (`SessionEntry.context`, empty by default) and checked when it is post
 ### How a turn runs
 
 1. **Posting.** `POST /sessions/{id}/messages` calls `AgentTurnService.post_message` in
-   one unit of work: the message entry with its context; when the models file names a
-   session agent (or the body names another configured `model`), a queued `AgentTurn` and
+   one unit of work: the message entry with its context; when a session agent is set
+   (or the body names another configured `model`), a queued `AgentTurn` and
    an `agent_turn` entry (`ref` the turn id, added now so the record orders it right
    after the message); `agent.turn_started` and the task after the commit. An unknown
-   `model` is 422 and nothing is stored. A configured model whose key is not set gives a
-   turn that is `failed` at once with the reason ("The environment variable
-   GEMINI_API_KEY is not set"), and no task. If queueing the task fails after the commit,
+   `model` is 422 and nothing is stored. A configured model that is unavailable gives a
+   turn that is `failed` at once with the reason ("The provider gemini needs an API
+   key"), and no task. If queueing the task fails after the commit,
    the turn is marked failed ("The turn could not be queued: …").
 2. **Starting.** `run_turn` calls `AgentTurnService.run(turn_id, InProcessToolbox(...))`.
    `TurnProgress.start` moves queued to running (a turn cancelled while queued is
-   skipped); then `agent.turn_started` is broadcast again.
+   skipped); then `agent.turn_started` is broadcast again. `LanguageModels.target` gives
+   the model's target with its key decrypted, into `TurnRequest.target`; a model removed
+   or made unavailable since the message fails the turn with the reason.
 3. **The request.** `Briefing` (`briefing.py`) builds the system prompt: what ADA is, the
    project and session with ids, the panel and origin dashboards, the rules, and each
    context item explained (a pipeline to build on with its name and columns, a dashboard
@@ -545,7 +569,8 @@ its entry (`SessionEntry.context`, empty by default) and checked when it is post
    takes `session_id` gets the turn's session when the model leaves it out. A tool error
    comes back as `ToolCallFailed`, which the runtime hands to the model as a retry.
 5. **Running.** `PydanticAiRuntime` (`adapters/llm/runtime.py`) builds a pydantic-ai
-   `Agent` per turn: text output, the tools called one at a time, 3 retries per tool, at
+   `Agent` per turn, on the model of the request's target (it holds no configuration; a
+   `model_factory` replaces the providers in tests): text output, the tools called one at a time, 3 retries per tool, at
    most 24 model requests. It streams each model request and each tool step and calls
    `TurnSink.checkpoint()` between steps.
 6. **Parts.** Text and reasoning parts are added when they first have text and replaced as
@@ -629,6 +654,13 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /sessions/{id}/turns`, `GET /turns/{id}` | The session's agent turns, oldest first; one turn |
 | `POST /turns/{id}/cancel` | Ask a queued or running turn to stop; 202 with the turn |
 | `GET /llm/models` | `ModelList {models: [{id, provider, model, purposes, available, reason}], session_agent}`; `session_agent` is a model id or null |
+| `GET /settings/agent` | `AgentSettingsView {providers: LlmProvider[], models: ModelList, session_agent, secrets_available, revision}` (tag `settings`, instance-wide, like all below) |
+| `POST /settings/llm-providers {name, kind, base_url?, api_key?}` | Add a provider; 201 `LlmProvider`. A key without a master key is 409 |
+| `PATCH /settings/llm-providers/{id} {expected_revision, name?, kind?, base_url?, api_key?}` | Change it; fields left out stay, `null` or `""` clears `base_url` and `api_key`; 409 on a stale revision |
+| `DELETE /settings/llm-providers/{id}` | 204; its models go with it, a session agent among them is cleared |
+| `POST /settings/llm-models {provider_id, model}` | Add a model; 201 `ModelInfo` |
+| `DELETE /settings/llm-models/{id}` | 204; `id` is `<provider>/<model>`, URL-encoded; clears the session agent when it was this one |
+| `PUT /settings/session-agent {model_id, expected_revision}` | Set (or with `null` clear) the session agent; the `GET /settings/agent` body. An unknown model is 422 |
 | `GET /sessions/{id}/widgets` | The session's widgets |
 | `POST /projects/{id}/operators` | Add an operator; the body's `kind` selects source, transform or input |
 | `GET /operators/{id}`, `GET /operators/{id}/lineage` | Read; the pipeline, inputs first |
@@ -663,11 +695,13 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /projects/{id}/alert-rules` | `{dashboard, rules}[]` for every dashboard of the project |
 
 - **Status codes.** 201 for a create (including a message, a pin, a dashboard run, a
-  report or version, a new agent session), 202 for a queued refresh and a turn cancel,
-  200 otherwise. Errors are `{"detail": "..."}` with
+  report or version, a new agent session, a provider or model), 202 for a queued
+  refresh and a turn cancel, 204 for a delete, 200 otherwise. Errors are `{"detail": "..."}` with
   404 for `NotFound`, 422 for `Invalid` (and malformed bodies; a formula error's detail
   names the node; an unknown widget inside report content is 422, not 404), 409 for
-  `Conflict`, 503 for `Unavailable`. A 409 adds `expected_revision` and `revision`.
+  `Conflict`, 503 for `Unavailable`. A 409 for a `Conflict` adds `expected_revision` and
+  `revision`; a 409 for `NotConfigured` (e.g. storing an API key without a master key) has
+  only the detail.
 - **Who is acting.** There are no users: requests from the frontend act as
   `Actor(kind="user", name="web")`.
 
@@ -1007,10 +1041,11 @@ not describe it.
   table widget; and Sotkanet pushed down to a dashboard's years, mapped to the counties on
   a map, a report and its minor version, and an alert rule that fires for four counties
   and resolves when the next (recorded, then raised) answer recovers.
-- **The agent.** Tests never read the developer's models file: `tests/conftest.py` points
-  `ADA_LLMS_CONFIG` at a file that does not exist. The agent tests use pydantic-ai's
-  `FunctionModel` (`tests/agent_support.py`: a scripted model whose steps call tools or
-  stream text). One test uses a real OpenAI client against `127.0.0.1:1` with retries
+- **The agent.** Tests never use the developer's master key: `tests/conftest.py` removes
+  `ADA_SECRET_KEY` and `ADA_SECRET_KEY_FILE`. The agent tests bind a master key of their
+  own and store their configuration through the settings service (`configure` in
+  `tests/agent_support.py`), and use pydantic-ai's `FunctionModel` (a scripted model whose
+  steps call tools or stream text). One test uses a real OpenAI client against `127.0.0.1:1` with retries
   off, to check the unreachable provider without any network.
 - The frontend's API types are generated: `moon run frontend:generate` after the routes
   change, and commit `openapi.json` and `schema.d.ts`.
@@ -1139,11 +1174,8 @@ and queues the remaining sources for the worker.
 - **Source parts come only from source operators in tool results** (`add_source_operator`,
   `get_lineage`); reading a pipeline's data through `preview_operator` does not add one.
 - **The agent's text is plain text.** The record does not render Markdown yet.
-- **The models file is read once per process.** Changing it or a key means restarting the
-  backend and the worker.
-- **The image runs as the user `ada` (uid 1000)**, so a `config/llms.yml` that only its
-  owner may read stops the backend at start ("could not be read as YAML: Permission
-  denied") on a Linux host; Docker Desktop's bind mounts do not have this problem.
+- **No key rotation tool.** Rotating the master key means putting the new key in front
+  of `ADA_SECRET_KEY` and saving every provider's key again; nothing re-encrypts them.
 - **No authentication.** Whoever can reach the gateway can use the API and the MCP
   endpoint.
 
@@ -1165,11 +1197,13 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `VALKEY_URL` | Valkey URL, e.g. `redis://…` |
 | `DATA_DIR` | Directory for snapshots (default `data`; `/data` in the image) |
 | `WIDGETS_DIR` | The built widgets (default `services/widgets/dist` of the checkout; `/app/widgets` in the image) |
-| `ADA_LLMS_CONFIG` | The agent's models file (default `llms.yml`; moon: `config/llms.yml` of the checkout; compose: `/config/llms.yml`, the mounted `config/`). See The agent |
+| `ADA_SECRET_KEY` | The master key of the agent's API keys: a Fernet key, or several separated by commas (the first encrypts). Unset: no key can be stored. See The agent |
+| `ADA_SECRET_KEY_FILE` | A file holding the master key instead (Docker secrets); `ADA_SECRET_KEY` wins when both are set |
 
 There are no users and no authentication yet: whoever can reach the gateway can use the
 API and the MCP endpoint. Do not expose it publicly as it is.
 
 Secrets never go into the repository. `.env` holds only `VERSION`; put local secrets,
-such as the model providers' keys, in `.env.local`, which git ignores and the compose file
-passes to the backend and the worker. The models file is git-ignored too.
+such as `ADA_SECRET_KEY`, in `.env.local`, which git ignores and the compose file passes
+to the backend and the worker. The model providers' keys are entered on the Settings page
+and stored encrypted in the database.

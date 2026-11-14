@@ -179,6 +179,53 @@ class AgentTurnRow(Base):
     finished_at: Mapped[datetime | None] = mapped_column(_timestamp)
 
 
+class LlmProviderRow(Base):
+    """The in-platform agent's model providers, shared by all projects."""
+
+    __tablename__ = "llm_providers"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    base_url: Mapped[str | None] = mapped_column(Text)
+    # The SecretBox token of the key, never the key.
+    api_key_encrypted: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+    revision: Mapped[int] = mapped_column(Integer)
+
+    __mapper_args__ = {"version_id_col": revision}
+
+
+class LlmModelRow(Base):
+    """A provider's model. The domain addresses it as "<provider name>/<model>"; the uuid
+    is only for the session agent's reference."""
+
+    __tablename__ = "llm_models"
+    __table_args__ = (UniqueConstraint("provider_id", "model"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    provider_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("llm_providers.id", ondelete="CASCADE")
+    )
+    model: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+
+
+class AgentSettingsRow(Base):
+    """One row (id 1, inserted by the migration): which model does what."""
+
+    __tablename__ = "agent_settings"
+    __table_args__ = (CheckConstraint("id = 1", name="agent_settings_one_row"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_agent_model_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("llm_models.id", ondelete="SET NULL")
+    )
+    revision: Mapped[int] = mapped_column(Integer)
+
+    __mapper_args__ = {"version_id_col": revision}
+
+
 class OperatorRow(Base):
     __tablename__ = "operators"
 

@@ -39,6 +39,50 @@
         "title": "ActorKind",
         "type": "string"
       },
+      "AgentSettingsView": {
+        "description": "Everything the settings page shows about the agent, in one read.",
+        "properties": {
+          "models": {
+            "$ref": "#/components/schemas/ModelList",
+            "default": {
+              "models": []
+            }
+          },
+          "providers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LlmProvider"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "secrets_available": {
+            "title": "Secrets Available",
+            "type": "boolean"
+          },
+          "session_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Agent"
+          }
+        },
+        "required": [
+          "secrets_available",
+          "revision"
+        ],
+        "title": "AgentSettingsView",
+        "type": "object"
+      },
       "AgentTurn": {
         "description": "The agent's answer to one message. Written by the worker as it goes; no revision,\nsince nobody else edits it (a cancel request is a flag of its own).",
         "properties": {
@@ -1040,6 +1084,55 @@
         "title": "Liveness",
         "type": "object"
       },
+      "LlmProvider": {
+        "description": "Where models are served. Its API key is stored encrypted beside it and never leaves\nthe platform: `has_api_key` is all anyone is told.",
+        "properties": {
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "has_api_key": {
+            "default": false,
+            "title": "Has Api Key",
+            "type": "boolean"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProviderKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revision": {
+            "default": 1,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "created_at"
+        ],
+        "title": "LlmProvider",
+        "type": "object"
+      },
       "MeasureRole": {
         "description": "A value column and the columns that qualify it.",
         "properties": {
@@ -1099,7 +1192,7 @@
         "type": "object"
       },
       "ModelInfo": {
-        "description": "A model from the models file. Its key is never part of it.",
+        "description": "A configured model, as the catalog shows it. Its key is never part of it.",
         "properties": {
           "available": {
             "title": "Available",
@@ -1344,6 +1437,24 @@
         "title": "NewMessage",
         "type": "object"
       },
+      "NewModel": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "provider_id",
+          "model"
+        ],
+        "title": "NewModel",
+        "type": "object"
+      },
       "NewProject": {
         "additionalProperties": false,
         "properties": {
@@ -1356,6 +1467,46 @@
           "name"
         ],
         "title": "NewProject",
+        "type": "object"
+      },
+      "NewProvider": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProviderKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "NewProvider",
         "type": "object"
       },
       "NewReport": {
@@ -2015,6 +2166,72 @@
         "title": "ProjectRename",
         "type": "object"
       },
+      "ProviderChange": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are. `base_url` and `api_key` may be emptied: null or\n\"\" clears them. A new key never needs the old one.",
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "ProviderChange",
+        "type": "object"
+      },
+      "ProviderKind": {
+        "enum": [
+          "openai-compatible",
+          "gemini"
+        ],
+        "title": "ProviderKind",
+        "type": "string"
+      },
       "ReasoningPart": {
         "properties": {
           "text": {
@@ -2462,6 +2679,32 @@
           "created_at"
         ],
         "title": "Session",
+        "type": "object"
+      },
+      "SessionAgentChoice": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          }
+        },
+        "required": [
+          "model_id",
+          "expected_revision"
+        ],
+        "title": "SessionAgentChoice",
         "type": "object"
       },
       "SessionChange": {
@@ -4084,7 +4327,7 @@
     },
     "/api/llm/models": {
       "get": {
-        "description": "The models of the models file, whether each can be used (a missing key makes one\nunavailable, with the reason), and the session agent. Keys are never returned.",
+        "description": "The configured models (see the settings routes), whether each can be used (a\nprovider without the key it needs makes its models unavailable, with the reason), and\nthe session agent. Keys are never returned.",
         "operationId": "list_models_api_llm_models_get",
         "responses": {
           "200": {
@@ -5951,6 +6194,275 @@
         "summary": "List Session Widgets",
         "tags": [
           "sessions"
+        ]
+      }
+    },
+    "/api/settings/agent": {
+      "get": {
+        "description": "Providers (with `has_api_key`, never the key), the models with their availability,\nthe session agent, whether keys can be stored (`secrets_available`), and the revision\nfor setting the session agent.",
+        "operationId": "get_agent_settings_api_settings_agent_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Agent Settings",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/llm-models": {
+      "post": {
+        "operationId": "add_model_api_settings_llm_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewModel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Model",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/llm-models/{model_id}": {
+      "delete": {
+        "description": "The session agent is cleared when it was this model.",
+        "operationId": "delete_model_api_settings_llm_models__model_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Model",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/llm-providers": {
+      "post": {
+        "operationId": "add_provider_api_settings_llm_providers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProvider"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmProvider"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Provider",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/llm-providers/{provider_id}": {
+      "delete": {
+        "description": "With its models; the session agent is cleared when it was one of them.",
+        "operationId": "delete_provider_api_settings_llm_providers__provider_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Provider",
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "operationId": "update_provider_api_settings_llm_providers__provider_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmProvider"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Provider",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/session-agent": {
+      "put": {
+        "operationId": "set_session_agent_api_settings_session_agent_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionAgentChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Session Agent",
+        "tags": [
+          "settings"
         ]
       }
     },

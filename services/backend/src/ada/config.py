@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # services/widgets/dist of this checkout, for a backend running from source.
@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """Read from the environment. The URLs are required so a misconfigured container
     stops at startup; moon sets the development values (services/backend/moon.yml)."""
 
-    # populate_by_name: callers pass llms_config by its name, the environment by its alias.
+    # populate_by_name: callers pass secret_key by its name, the environment by its alias.
     model_config = SettingsConfigDict(extra="ignore", populate_by_name=True)
 
     # Definitions: projects, operators, runs, dashboards. SQLAlchemy URL for psycopg 3.
@@ -28,6 +28,18 @@ class Settings(BaseSettings):
     # served to the frontend and as MCP App resources. The image sets its own copy.
     widgets_dir: Path = SOURCE_WIDGETS_DIR
 
-    # The models file of the in-platform agent (llms.example.yml shows the format). A
-    # missing file means no agent, not an error.
-    llms_config: Path = Field(Path("llms.yml"), validation_alias="ADA_LLMS_CONFIG")
+    # The master key that encrypts the model providers' API keys in the database: a Fernet
+    # key, or several separated by commas (the first encrypts, all decrypt, for rotation).
+    # Or the file holding it (Docker secrets). Neither set: the platform runs, but no API
+    # key can be stored.
+    secret_key: SecretStr | None = Field(None, validation_alias="ADA_SECRET_KEY")
+    secret_key_file: Path | None = Field(None, validation_alias="ADA_SECRET_KEY_FILE")
+
+    def master_key(self) -> str | None:
+        """ADA_SECRET_KEY, else the contents of ADA_SECRET_KEY_FILE; None when neither is
+        set. A file that is named but cannot be read is an error, not a missing key."""
+        if self.secret_key is not None and self.secret_key.get_secret_value().strip():
+            return self.secret_key.get_secret_value().strip()
+        if self.secret_key_file is not None:
+            return self.secret_key_file.read_text().strip() or None
+        return None

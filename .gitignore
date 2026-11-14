@@ -8,8 +8,6 @@ __pycache__
 .moon/docker
 # Secrets and local overrides. The committed .env holds only VERSION.
 .env.local
-# The in-platform agent's models (llms.example.yml shows the format).
-llms.yml
 .DS_Store
 # Parquet snapshots written by a backend running from source.
 /data

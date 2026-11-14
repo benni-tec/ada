@@ -14,8 +14,6 @@ env:
   DATA_DIR: "$workspaceRoot/data"
   # Built by `moon run widgets:build`; served at /api/widget-bundles and over MCP.
   WIDGETS_DIR: "$workspaceRoot/services/widgets/dist"
-  # The in-platform agent's models (llms.example.yml); a missing file means no agent.
-  ADA_LLMS_CONFIG: "$workspaceRoot/config/llms.yml"
 
 fileGroups:
   sources:
@@ -35,6 +33,8 @@ tasks:
     preset: "server"
     deps:
       - "~:migrate"
+      # The master key that encrypts the agent's API keys, in .env.local.
+      - "~:secret-key"
       # Persistent too, so moon starts them alongside the API.
       - "~:worker"
       - "~:scheduler"
@@ -46,6 +46,7 @@ tasks:
     preset: "server"
     deps:
       - "~:migrate"
+      - "~:secret-key"
     options:
       envFile: "/.env.local"
 
@@ -54,6 +55,15 @@ tasks:
     preset: "server"
     deps:
       - "~:migrate"
+
+  secret-key:
+    description: "Add an ADA_SECRET_KEY to .env.local when it has none (never overwrites)"
+    # Standard library only, so it needs no environment of its own.
+    command: "python scripts/dev_secret_key.py $workspaceRoot/.env.local"
+    inputs: []
+    options:
+      cache: false
+      runInCI: false
 
   migrate:
     description: "Apply pending database migrations"

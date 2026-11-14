@@ -9,9 +9,16 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from ada.core.models.agents import AgentTurn, TurnPart, TurnStatus
+from ada.core.models.agents import (
+    AgentSettings,
+    AgentTurn,
+    LlmModel,
+    LlmProvider,
+    TurnPart,
+    TurnStatus,
+)
 from ada.core.models.alerts import Alert, AlertRule, AlertState
-from ada.core.models.base import DomainModel, Id, JsonObject
+from ada.core.models.base import UNCHANGED, Change, DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
 from ada.core.models.errors import Conflict, NotFound
 from ada.core.models.operators import Operator, OperatorId, OperatorKind
@@ -23,11 +30,14 @@ from ada.core.models.sources import DataSource
 from ada.core.models.widgets import Widget
 from ada.core.ports.agents import TurnProgress
 from ada.core.ports.repositories import (
+    AgentSettingsRepository,
     AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
     DashboardRepository,
     DataSourceRepository,
+    LlmModelRepository,
+    LlmProviderRepository,
     OperatorRepository,
     ProjectRepository,
     ReportRepository,
@@ -62,6 +72,15 @@ class MemoryStore:
         self.alerts: dict[Id, Alert] = {}
         self.agent_turns: dict[Id, AgentTurn] = {}
         self.cancel_requests: set[Id] = set()
+        self.llm_providers: dict[Id, LlmProvider] = {}
+        # Provider id -> the encrypted key.
+        self.llm_api_keys: dict[Id, str] = {}
+        # By (provider id, model); the stored id is recomputed from the provider's name.
+        self.llm_models: dict[tuple[Id, str], LlmModel] = {}
+        self.agent_settings = AgentSettings()
+        # The session agent as (provider id, model), so it follows a renamed provider and
+        # is gone with its model, as the database's SET NULL has it.
+        self.session_agent: tuple[Id, str] | None = None
 
 
 def _get[K, M](records: dict[K, M], kind: str, id: K) -> M:
@@ -484,3 +503,112 @@ class MemoryTurnProgress(TurnProgress):
         at: datetime,
     ) -> AgentTurn:
         return await MemoryAgentTurnRepository(self.store).finish(id, status, parts, error, at)
+
+
+class MemoryLlmProviderRepository(LlmProviderRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    def _stored(self, provider: LlmProvider) -> LlmProvider:
+        has_key = provider.id in self.store.llm_api_keys
+        return provider.model_copy(update={"has_api_key": has_key})
+
+    async def get(self, id: Id) -> LlmProvider:
+        return self._stored(_get(self.store.llm_providers, "llm provider", id))
+
+    async def list(self) -> Sequence[LlmProvider]:
+        return [self._stored(p) for p in self.store.llm_providers.values()]
+
+    async def add(self, provider: LlmProvider, api_key: str | None) -> LlmProvider:
+        self.store.llm_providers[provider.id] = provider
+        if api_key is not None:
+            self.store.llm_api_keys[provider.id] = api_key
+        return self._stored(provider)
+
+    async def update(
+        self,
+        provider: LlmProvider,
+        expected_revision: int,
+        api_key: Change[str | None] = UNCHANGED,
+    ) -> LlmProvider:
+        updated = _update(self.store.llm_providers, "llm provider", provider, expected_revision)
+        if api_key is None:
+            self.store.llm_api_keys.pop(provider.id, None)
+        elif api_key is not UNCHANGED:
+            self.store.llm_api_keys[provider.id] = api_key
+        return self._stored(updated)
+
+    async def delete(self, id: Id) -> None:
+        _get(self.store.llm_providers, "llm provider", id)
+        del self.store.llm_providers[id]
+        self.store.llm_api_keys.pop(id, None)
+        for key in [key for key in self.store.llm_models if key[0] == id]:
+            del self.store.llm_models[key]
+
+    async def api_key(self, id: Id) -> str | None:
+        _get(self.store.llm_providers, "llm provider", id)
+        return self.store.llm_api_keys.get(id)
+
+
+def _model_id(store: MemoryStore, provider_id: Id, model: str) -> str:
+    return f"{store.llm_providers[provider_id].name}/{model}"
+
+
+def _model_key(store: MemoryStore, id: str) -> tuple[Id, str]:
+    """The (provider id, model) of a model id; NotFound when there is no such model."""
+    provider_name, _, model = id.partition("/")
+    for provider in store.llm_providers.values():
+        if provider.name == provider_name and (provider.id, model) in store.llm_models:
+            return provider.id, model
+    raise NotFound("model", id)
+
+
+class MemoryLlmModelRepository(LlmModelRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    def _current(self, key: tuple[Id, str]) -> LlmModel:
+        model = self.store.llm_models[key]
+        return model.model_copy(update={"id": _model_id(self.store, *key)})
+
+    async def get(self, id: str) -> LlmModel:
+        return self._current(_model_key(self.store, id))
+
+    async def list(self) -> Sequence[LlmModel]:
+        return [self._current(key) for key in self.store.llm_models]
+
+    async def add(self, model: LlmModel) -> LlmModel:
+        _get(self.store.llm_providers, "llm provider", model.provider_id)
+        key = (model.provider_id, model.model)
+        self.store.llm_models[key] = model
+        return self._current(key)
+
+    async def delete(self, id: str) -> None:
+        del self.store.llm_models[_model_key(self.store, id)]
+
+
+class MemoryAgentSettingsRepository(AgentSettingsRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def get(self) -> AgentSettings:
+        ref = self.store.session_agent
+        session_agent = (
+            _model_id(self.store, *ref)
+            if ref is not None and ref in self.store.llm_models
+            else None
+        )
+        return self.store.agent_settings.model_copy(update={"session_agent": session_agent})
+
+    async def update(self, settings: AgentSettings, expected_revision: int) -> AgentSettings:
+        actual = self.store.agent_settings.revision
+        if actual != expected_revision:
+            raise Conflict("agent settings", 1, expected_revision, actual)
+        ref = (
+            _model_key(self.store, settings.session_agent)
+            if settings.session_agent is not None
+            else None
+        )
+        self.store.session_agent = ref
+        self.store.agent_settings = AgentSettings(revision=expected_revision + 1)
+        return await self.get()

@@ -314,8 +314,9 @@ export interface paths {
         };
         /**
          * List Models
-         * @description The models of the models file, whether each can be used (a missing key makes one
-         *     unavailable, with the reason), and the session agent. Keys are never returned.
+         * @description The configured models (see the settings routes), whether each can be used (a
+         *     provider without the key it needs makes its models unavailable, with the reason), and
+         *     the session agent. Keys are never returned.
          */
         get: operations["list_models_api_llm_models_get"];
         put?: never;
@@ -837,6 +838,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agent Settings
+         * @description Providers (with `has_api_key`, never the key), the models with their availability,
+         *     the session agent, whether keys can be stored (`secrets_available`), and the revision
+         *     for setting the session agent.
+         */
+        get: operations["get_agent_settings_api_settings_agent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Model */
+        post: operations["add_model_api_settings_llm_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm-models/{model_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Model
+         * @description The session agent is cleared when it was this model.
+         */
+        delete: operations["delete_model_api_settings_llm_models__model_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Provider */
+        post: operations["add_provider_api_settings_llm_providers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm-providers/{provider_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Provider
+         * @description With its models; the session agent is cleared when it was one of them.
+         */
+        delete: operations["delete_provider_api_settings_llm_providers__provider_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Provider */
+        patch: operations["update_provider_api_settings_llm_providers__provider_id__patch"];
+        trace?: never;
+    };
+    "/api/settings/session-agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Session Agent */
+        put: operations["set_session_agent_api_settings_session_agent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/snapshots/{snapshot_id}": {
         parameters: {
             query?: never;
@@ -1041,6 +1156,29 @@ export interface components {
          * @enum {string}
          */
         ActorKind: "user" | "agent" | "external_agent" | "system";
+        /**
+         * AgentSettingsView
+         * @description Everything the settings page shows about the agent, in one read.
+         */
+        AgentSettingsView: {
+            /**
+             * @default {
+             *       "models": []
+             *     }
+             */
+            models: components["schemas"]["ModelList"];
+            /**
+             * Providers
+             * @default []
+             */
+            providers: components["schemas"]["LlmProvider"][];
+            /** Revision */
+            revision: number;
+            /** Secrets Available */
+            secrets_available: boolean;
+            /** Session Agent */
+            session_agent?: string | null;
+        };
         /**
          * AgentTurn
          * @description The agent's answer to one message. Written by the worker as it goes; no revision,
@@ -1443,6 +1581,34 @@ export interface components {
             status: "ok";
         };
         /**
+         * LlmProvider
+         * @description Where models are served. Its API key is stored encrypted beside it and never leaves
+         *     the platform: `has_api_key` is all anyone is told.
+         */
+        LlmProvider: {
+            /** Base Url */
+            base_url?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Has Api Key
+             * @default false
+             */
+            has_api_key: boolean;
+            id: components["schemas"]["Id"];
+            kind: components["schemas"]["ProviderKind"];
+            /** Name */
+            name: string;
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+        };
+        /**
          * MeasureRole
          * @description A value column and the columns that qualify it.
          */
@@ -1460,7 +1626,7 @@ export interface components {
         };
         /**
          * ModelInfo
-         * @description A model from the models file. Its key is never part of it.
+         * @description A configured model, as the catalog shows it. Its key is never part of it.
          */
         ModelInfo: {
             /** Available */
@@ -1544,8 +1710,24 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** NewModel */
+        NewModel: {
+            /** Model */
+            model: string;
+            provider_id: components["schemas"]["Id"];
+        };
         /** NewProject */
         NewProject: {
+            /** Name */
+            name: string;
+        };
+        /** NewProvider */
+        NewProvider: {
+            /** Api Key */
+            api_key?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            kind: components["schemas"]["ProviderKind"];
             /** Name */
             name: string;
         };
@@ -1784,6 +1966,27 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * ProviderChange
+         * @description Fields left out stay as they are. `base_url` and `api_key` may be emptied: null or
+         *     "" clears them. A new key never needs the old one.
+         */
+        ProviderChange: {
+            /** Api Key */
+            api_key?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            /** Expected Revision */
+            expected_revision: number;
+            kind?: components["schemas"]["ProviderKind"] | null;
+            /** Name */
+            name?: string | null;
+        };
+        /**
+         * ProviderKind
+         * @enum {string}
+         */
+        ProviderKind: "openai-compatible" | "gemini";
         /** ReasoningPart */
         ReasoningPart: {
             /** Text */
@@ -1979,6 +2182,13 @@ export interface components {
             revision: number;
             /** Title */
             title: string;
+        };
+        /** SessionAgentChoice */
+        SessionAgentChoice: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Model Id */
+            model_id: string | null;
         };
         /**
          * SessionChange
@@ -4072,6 +4282,218 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Widget"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_settings_api_settings_agent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSettingsView"];
+                };
+            };
+        };
+    };
+    add_model_api_settings_llm_models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewModel"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_model_api_settings_llm_models__model_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_provider_api_settings_llm_providers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProvider"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProvider"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_provider_api_settings_llm_providers__provider_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_provider_api_settings_llm_providers__provider_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProvider"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_session_agent_api_settings_session_agent_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionAgentChoice"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSettingsView"];
                 };
             };
             /** @description Validation Error */
