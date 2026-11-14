@@ -71,7 +71,8 @@ class ContextDevParser:
                 timeout=TIMEOUT,
             )
         except httpx.HTTPError as error:
-            raise Unavailable(f"Context.dev could not be reached: {error}") from error
+            # The exception text can carry the response's own headers or the rejected key.
+            raise Unavailable(f"Context.dev could not be reached: {type(error).__name__}") from error
 
 
 def markdown_pages(markdown: str) -> list[tuple[int, str]]:
