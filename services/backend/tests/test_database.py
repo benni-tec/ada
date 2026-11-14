@@ -146,12 +146,12 @@ def test_migrations_from_0005_keep_existing_rows(database_url: str) -> None:
         assert tuple(source_row) == (None, None, None)
         assert tuple(session_row) == ("session", None, 0)
         assert tuple(settings) == (None,)
-        # An ended turn was announced then, so recovery leaves it alone; a running one is
-        # recovered once it is overdue, counted from its creation.
-        assert [tuple(row) for row in turns] == [
-            ("done", True, None),
-            ("running", False, datetime(2026, 1, 1, 12, 0, tzinfo=UTC)),
-        ]
+        # An ended turn was announced then, so recovery leaves it alone; a running one counts
+        # from the upgrade, not from its creation, so it is not failed straight away.
+        (done, running) = turns
+        assert tuple(done) == ("done", True, None)
+        assert running[:2] == ("running", False)
+        assert running[2] > datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
     finally:
         engine.dispose()
 

@@ -22,10 +22,10 @@ def upgrade() -> None:
         "agent_turns",
         sa.Column("settled", sa.Boolean(), server_default=sa.text("false"), nullable=False),
     )
-    # Turns that ended before this were announced then; one still running gets its start
-    # from its creation, so it is recovered once it is overdue by that.
+    # Turns that ended before this were announced then. One still running counts from the
+    # upgrade: its real start is unknown, and failing a live turn is worse than waiting.
     op.execute("UPDATE agent_turns SET settled = true WHERE status NOT IN ('queued', 'running')")
-    op.execute("UPDATE agent_turns SET started_at = created_at WHERE status = 'running'")
+    op.execute("UPDATE agent_turns SET started_at = now() WHERE status = 'running'")
     op.create_index(
         "ix_agent_turns_unsettled",
         "agent_turns",
