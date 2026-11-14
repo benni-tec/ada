@@ -29,7 +29,7 @@ from ada.core.ports.repositories import (
     ProjectRepository,
     SnapshotRepository,
 )
-from ada.core.ports.sources import SourceCheckLog, SourceReader, SourceReaders
+from ada.core.ports.sources import SourceCheckLog, SourceLocks, SourceReader, SourceReaders
 from ada.core.ports.system import Clock
 from ada.core.services.pipelines.fusion import stand_in_sql, union
 from ada.core.services.pipelines.schemas import check_unique
@@ -80,6 +80,7 @@ class DataSources(SourceService):
         store: AnalysisStore,
         events: EventPublisher,
         clock: Clock,
+        locks: SourceLocks,
     ) -> None:
         self.projects = projects
         self.sources = sources
@@ -90,6 +91,7 @@ class DataSources(SourceService):
         self.store = store
         self.events = events
         self.clock = clock
+        self.locks = locks
 
     async def register(
         self,
@@ -177,6 +179,13 @@ class DataSources(SourceService):
         if not force and not wants_check(source, current, now):
             # The common case when a run starts: nothing to do, and nothing is fetched.
             return RefreshResult(data_source_id=source.id, changed=False)
+        # Only now, so runs that fetch nothing never wait. Whoever held it may have just
+        # fetched: read again and decide again.
+        await self.locks.hold(source.id)
+        source = await self.sources.get(id)
+        current = await self.snapshots.current(operator_id, WHOLE_SOURCE)
+        if not force and not wants_check(source, current, now):
+            return RefreshResult(data_source_id=source.id, changed=False)
 
         token = source.last_probe_token
         try:
@@ -221,6 +230,9 @@ class DataSources(SourceService):
         )
 
     async def refresh_range(self, id: Id, time_range: TimeRange) -> Snapshot | None:
+        return await self._refresh_range(id, time_range, locked=False)
+
+    async def _refresh_range(self, id: Id, time_range: TimeRange, locked: bool) -> Snapshot | None:
         source = await self.sources.get(id)
         pushdown = pushdown_options(source.options)
         role = time_role(source)
@@ -234,6 +246,12 @@ class DataSources(SourceService):
             period: await self.snapshots.current(operator_id, period_key(period))
             for period in wanted
         }
+        newest = await self._newest_period(operator_id)
+        if not locked and _wants_work(source, stored, newest, now):
+            # Only when something is to be fetched or probed, so runs on fresh periods never
+            # wait. Whoever held it may have stored these periods: read again.
+            await self.locks.hold(source.id)
+            return await self._refresh_range(id, time_range, locked=True)
 
         token = source.last_probe_token
         probed = changed_token = False
@@ -250,7 +268,6 @@ class DataSources(SourceService):
                 token = await reader.probe(source)
                 probed = True
                 changed_token = token is None or token != source.last_probe_token
-            newest = await self._newest_period(operator_id)
             fetch = [
                 period
                 for period, snapshot in stored.items()
@@ -396,6 +413,11 @@ class DataSources(SourceService):
         key = "range:" + _digest([[part.parameters_key, part.content_hash] for part in present])
         if existing := await self.snapshots.current(operator_id, key):
             return existing
+        # Two runs on the same fresh periods would both put the union together; the second
+        # finds the first's once it holds the source. Taking the lock again is harmless.
+        await self.locks.hold(source.id)
+        if existing := await self.snapshots.current(operator_id, key):
+            return existing
         query = union(columns, present, role.start) if present else Query(sql=stand_in_sql(columns))
         data = await self.store.materialize(source.project_id, query)
         snapshot = Snapshot(
@@ -444,6 +466,24 @@ class DataSources(SourceService):
         await self.events.publish(
             Event(type=type, project_id=source.project_id, payload=payload, at=self.clock.now())
         )
+
+
+def _wants_work(
+    source: DataSource,
+    stored: dict[Interval, Snapshot | None],
+    newest: date | None,
+    now: datetime,
+) -> bool:
+    """Whether refreshing these periods would probe or fetch anything."""
+    present = [snapshot for snapshot in stored.values() if snapshot is not None]
+    if source.freshness.kind is FreshnessKind.PROBE and wants_check(
+        source, present[0] if present else None, now
+    ):
+        return True
+    return any(
+        snapshot is None or is_stale(source, period, snapshot, newest, now)
+        for period, snapshot in stored.items()
+    )
 
 
 def _check(source: DataSource) -> None:

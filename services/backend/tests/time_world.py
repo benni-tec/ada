@@ -21,6 +21,7 @@ from ada.adapters.memory.repositories import (
     MemorySessionRepository,
     MemorySnapshotRepository,
     MemorySourceCheckLog,
+    MemorySourceLocks,
     MemoryStore,
     MemoryWidgetRepository,
 )
@@ -84,6 +85,7 @@ class World:
             store=self.store,
             events=self.events,
             clock=self.clock,
+            locks=MemorySourceLocks(),
         )
         self.pipelines = Pipelines(
             self.operators, self.data_sources, self.snapshots, self.sources, self.store, self.clock

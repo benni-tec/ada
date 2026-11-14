@@ -27,6 +27,18 @@ class SourceReaders(Protocol):
         ...
 
 
+class SourceLocks(Protocol):
+    """Keeps two units of work from fetching the same data source at once."""
+
+    async def hold(self, id: Id) -> None:
+        """Wait until no other unit of work holds the source, then hold it until the
+        caller's transaction ends. Two runs that both find a period missing would both
+        store it, and the second could not: one snapshot per operator and key is current.
+        After this returns, the caller reads again what it decided on, since the other
+        unit of work may have stored it meanwhile."""
+        ...
+
+
 class SourceCheckLog(Protocol):
     """Where failed refreshes are recorded, apart from the caller's transaction."""
 

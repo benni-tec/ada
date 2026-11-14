@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import update
+from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from ada.adapters.db.support import (
@@ -38,7 +38,7 @@ from ada.core.ports.repositories import (
     SessionRepository,
     WidgetRepository,
 )
-from ada.core.ports.sources import SourceCheckLog
+from ada.core.ports.sources import SourceCheckLog, SourceLocks
 
 
 def _project(row: ProjectRow) -> Project:
@@ -283,6 +283,20 @@ class SqlWidgetRepository(WidgetRepository):
     async def list_by_session(self, session_id: Id) -> Sequence[Widget]:
         statement = oldest_first(WidgetRow, WidgetRow.session_id == session_id)
         return [_widget(row) for row in await rows(self.session, statement)]
+
+
+class SqlSourceLocks(SourceLocks):
+    """A transaction-level advisory lock per data source on the request's session: it is
+    released when the unit of work commits or rolls back, never left behind."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def hold(self, id: Id) -> None:
+        # Advisory locks take a 64-bit key; the first half of the UUIDv7 is its time and
+        # randomness enough to keep two sources apart in practice.
+        key = int.from_bytes(id.bytes[:8], "big", signed=True)
+        await self.session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
 
 
 class SqlSourceCheckLog(SourceCheckLog):

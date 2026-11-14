@@ -34,7 +34,7 @@ from ada.core.ports.repositories import (
     TemplateRepository,
     WidgetRepository,
 )
-from ada.core.ports.sources import SourceCheckLog
+from ada.core.ports.sources import SourceCheckLog, SourceLocks
 
 
 class MemoryStore:
@@ -380,6 +380,14 @@ class MemoryAlertRepository(AlertRepository):
             if state is None or alert.state is state
         ]
         return sorted(alerts, key=lambda alert: alert.started_at, reverse=True)
+
+
+class MemorySourceLocks(SourceLocks):
+    """Memory writes at once and has no unique index for two fetches to collide on, so
+    there is nothing to wait for."""
+
+    async def hold(self, id: Id) -> None:
+        return None
 
 
 class MemorySourceCheckLog(SourceCheckLog):

@@ -25,6 +25,7 @@ from ada.adapters.memory.repositories import (
     MemorySessionRepository,
     MemorySnapshotRepository,
     MemorySourceCheckLog,
+    MemorySourceLocks,
     MemoryStore,
     MemoryTemplateRepository,
     MemoryWidgetRepository,
@@ -45,7 +46,7 @@ from ada.core.ports.repositories import (
     TemplateRepository,
     WidgetRepository,
 )
-from ada.core.ports.sources import SourceCheckLog
+from ada.core.ports.sources import SourceCheckLog, SourceLocks
 from ada.core.ports.tasks import TaskDispatcher
 
 
@@ -86,6 +87,7 @@ class MemoryRepositories(Provider):
     alert_rules = provide(MemoryAlertRuleRepository, provides=AlertRuleRepository)
     alerts = provide(MemoryAlertRepository, provides=AlertRepository)
     source_checks = provide(MemorySourceCheckLog, provides=SourceCheckLog, scope=Scope.APP)
+    source_locks = provide(MemorySourceLocks, provides=SourceLocks, scope=Scope.APP)
 
 
 def memory_adapters() -> tuple[Provider, Provider]:

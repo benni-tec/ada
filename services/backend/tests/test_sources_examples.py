@@ -18,6 +18,7 @@ from ada.adapters.memory.repositories import (
     MemoryProjectRepository,
     MemorySnapshotRepository,
     MemorySourceCheckLog,
+    MemorySourceLocks,
     MemoryStore,
 )
 from ada.adapters.sources.examples import (
@@ -109,6 +110,7 @@ async def world() -> World:
         store=store,
         events=MemoryEventBus(),
         clock=clock,
+        locks=MemorySourceLocks(),
     )
     return World(service, memory, store, replay, clock, project.id)
 
