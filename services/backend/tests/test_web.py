@@ -236,7 +236,8 @@ async def test_a_web_tool_takes_a_session_of_its_own_project_only(
     _, foreign_session = await _project_and_session(client)
     explorer.calls.clear()
 
-    with pytest.raises(ToolError, match="is not in project"):
+    # Refused before anything is sent: the session middleware checks every call's session.
+    with pytest.raises(ToolError, match="another project"):
         await call(
             client, "web_map", project_id=project_id, session_id=foreign_session, domain="thl.fi"
         )
