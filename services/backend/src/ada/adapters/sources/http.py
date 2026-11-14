@@ -29,7 +29,7 @@ has its own keys (ada.core.services.sources.shaping).
     or null values are errors. `method` defaults to GET; `body` sends JSON, e.g. with
     `method: "POST"` for a search API. Source headers apply, with probe headers overriding
     them. Without `field` or `fields` the token hashes the whole answer. Without `probe`,
-    ETag or Last-Modified from HEAD is the token when the source is read with GET.
+    ETag or Last-Modified from HEAD is the token for non-paginated GET sources.
 
 A URL source is always read with GET; `method` and `body` belong to request sources.
 
@@ -224,7 +224,12 @@ class HttpReader(SourceReader):
             if number == 1:
                 document = answer
             combined.extend(rows)
-            next_value = _at(answer, pagination.token or pagination.more or "")
+            missing = object()
+            next_value = _at(answer, pagination.token or pagination.more or "", missing)
+            if next_value is missing:
+                if pagination.more:
+                    raise Invalid(f"Paginated response has no field {pagination.more!r}")
+                next_value = None
             if pagination.token and next_value is not None and not isinstance(next_value, str):
                 raise Invalid("paginate.token must point to a string or null")
             if not next_value:
@@ -259,8 +264,8 @@ class HttpReader(SourceReader):
         options = _options(source)
         if options.probe is not None:
             return await self._declared_probe(options.probe, options.headers)
-        if self._method(options) != "GET":
-            # A validator of the address describes what GET returns, not what a POST does.
+        if options.paginate is not None or self._method(options) != "GET":
+            # A validator of the address covers neither later pages nor a POST response.
             return None
         response = await self._send(
             "HEAD", _url(source, options), headers=options.headers, ok=False
@@ -481,15 +486,15 @@ def _options(source: DataSource) -> HttpOptions:
         ) from None
 
 
-def _at(document: Any, path: str) -> Any:
+def _at(document: Any, path: str, default: Any = None) -> Any:
     found = document
     for segment in path.split("."):
         if isinstance(found, dict):
-            found = found.get(segment)
+            found = found.get(segment, default)
         elif isinstance(found, list) and segment.isdigit() and int(segment) < len(found):
             found = found[int(segment)]
         else:
-            return None
+            return default
     return found
 
 
