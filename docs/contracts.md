@@ -145,6 +145,17 @@ What named widget inputs added to them (before wave 6 and the text widget; see "
 | `core/services/ports/batches.py` | `WidgetPart.inputs: dict[str, str] \| None`, each an operator id or `$ref` |
 | Migration `0010` (down revision `0009`) | `widgets.inputs` (JSONB, `'{}'`, not null), `widgets.render_error` (text, nullable) |
 
+What Context.dev search and PDF reads added to them (see "The web tools" and "Web
+sources"):
+
+| Where | Change |
+| --- | --- |
+| `core/models/web.py` | `SearchResults {hits, credits}` (credits `None` for Exa); `PdfOptions {start, end, ocr}`, `pdf_options(start, end, ocr)` and `pdf_page_range("25-26")` (both `Invalid` when malformed); `WebPage.credits` (what Context.dev charged for a read, when it said); `WebNotConfigured(what, remedy)`: search's reads `"web search is not configured: set EXA_API_KEY or CONTEXT_DEV_API_KEY"` |
+| `core/models/sources.py` | `web_pdf(options)` (`options.pdf` of a web source), `WEB_PDF_OPERATIONS` (scrape, extract) |
+| `core/ports/web.py` | `WebSearch.search(query, scope, limit, *, tags) -> SearchResults`; `WebExplorer.read(..., focus=None, pdf=None)`, `extract(..., pdf=None)` |
+| `core/services/ports/web.py` | `WebExplorationService.read(..., query=None, pdf_pages=None, ocr=False)`; `MAX_FOCUS_CHARS` (2,000) |
+| `adapters/web/scopes.py` | The scopes' domain lists (`DATA_DOMAINS`, `NEWS_DOMAINS`, `RESEARCH_DOMAINS`, `DOMAINS`), moved out of `exa.py` and shared by both engines |
+
 ## Adding a feature without touching shared files
 
 Four packages are scanned at startup. A feature adds a module; no list is edited.
@@ -171,7 +182,7 @@ stand-in.
 | `repositories.py` | All sixteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog`, `TurnProgress` and `ResearchCalls` (`SqlResearchCalls`) (own connection, a short transaction per write) |
 | `analysis.py` | `AnalysisStore` (Parquet and DuckDB), `PipelineService`, `RunService`, `ExplorationService` (`Exploration`), `BatchService` (`Batches`) |
 | `sources.py` | `SourceReaders` (HTTP: URL, request, document and web sources), `SourceService` (with the `WebExplorer` for monitors, the `SecretBox` for their secrets and `ADA_PUBLIC_URL`), `RefreshService` (`WaitingRefreshes`) |
-| `web.py` | `WebSearch` (`ExaSearch`, ADA's Exa key), `WebExplorer` (`ContextDevWeb`, REST, ADA's Context.dev key), both on one HTTP client of their own; `WebBudget` (`SqlWebBudget`: own connection, a short transaction per write), `WebExplorationService` (`WebExploration`) |
+| `web.py` | `WebSearch` (`ExaSearch` on ADA's Exa key when it is set, else `ContextDevSearch` on its Context.dev key, else an unconfigured `ExaSearch`), `WebExplorer` (`ContextDevWeb`, REST, ADA's Context.dev key), all on one HTTP client of their own; `WebBudget` (`SqlWebBudget`: own connection, a short transaction per write), `WebExplorationService` (`WebExploration`) |
 | `workspace.py` | `ProjectService`, `SessionService`, `WidgetService` |
 | `background.py` | `EventBroadcaster` (Valkey pub/sub), `EventPublisher` (transactional, per request), `EventStream` (Valkey), `TaskDispatcher` (taskiq on Valkey) |
 | `dashboards.py` | `DashboardService` (`Dashboards`) |
@@ -356,11 +367,22 @@ sources only, and they have no other) reads the web through Context.dev on ADA's
 
 | `options.operation` | Context.dev | Credits | Rows |
 | --- | --- | --- | --- |
-| `"scrape"` (default) | `POST /v1/web/scrape`, Markdown only | 1 | The page at the address, with the document columns and converters (`DOCUMENT_COLUMNS`, `markdown_pages`, `markdown_tables`): `extract: "pages"` (default) one row `page 1, text <markdown>`; `"tables"` the rows of its Markdown tables, `page, table, row, cells` |
+| `"scrape"` (default) | `POST /v1/web/scrape`, Markdown only; `options.pdf` as below | 1 (a PDF page read with OCR 1 each) | The page at the address, with the document columns and converters (`DOCUMENT_COLUMNS`, `markdown_pages`, `markdown_tables`): `extract: "pages"` (default) one row `page 1, text <markdown>`; `"tables"` the rows of its Markdown tables, `page, table, row, cells` |
 | `"crawl"` | `POST /v1/web/crawl`: `max_pages` (1–50, default 10), `max_depth`, `url_regex`, `exclude_url_regex` | 1 per page | `pages`: one row per crawled page in crawl order, `page` its number, `text` its URL on the first line, a blank line, then its Markdown (the document columns stay as they are); `tables`: the Markdown tables of all pages, `page` the crawled page's number |
 | `"answers"` | `POST /v1/web/answers`, mode `fast`: `task` (1–2000 characters) and `json_format`, an example object whose top level has one array of records | 10 | The records of that array, in the **declared** columns (required: an answers source has no fixed columns), each value converted to its column's type (`TRY_CAST`; one that does not convert is null), plus `sources json` (added at registration): the URLs the answer read or cites, on every row |
-| `"extract"` | `POST /v1/web/scrape` with `formats: {json: true}`: a JSON schema of `rows`, one nullable string property per declared column, and `instruction` (1–2000 characters) | about 5 | The rows a model reads off the page, in the **declared** columns (1–30, required), converted like an answer's; a value the page does not state is null |
+| `"extract"` | `POST /v1/web/scrape` with `formats: {json: true}`: a JSON schema of `rows`, one nullable string property per declared column, and `instruction` (1–2000 characters); `options.pdf` as below | about 5 | The rows a model reads off the page, in the **declared** columns (1–30, required), converted like an answer's; a value the page does not state is null |
 
+- **PDF pages and OCR.** When the address is a PDF, scrape and extract take `options.pdf
+  = {"start": 25, "end": 26, "ocr": true}` (each optional; `web_pdf`): Context.dev reads
+  only those pages (from 1, both inclusive), with OCR when `ocr` is true, for tables that
+  are images (pdfplumber and a plain read give empty cells there), sent as
+  `sharedParams.parsers.pdf {startPage, endPage, ocr: "auto"|"off", includeNumberedPages:
+  true}`, so each page starts with a `<!-- page N -->` line. Checked at registration and
+  update: a page is a number from 1, `end` is not before `start`, `ocr` is a boolean, no
+  other keys (`Invalid("options.pdf is an object with \"start\" and \"end\" …")`), and
+  only scrape and extract take it (`Invalid("options.pdf is for the operations
+  \"scrape\" and \"extract\", not \"crawl\"")`). The recorded read of pages 25–26 of the
+  Cancer Registry's lung cancer report with OCR cost 2 credits.
 - **Answers and extractions are model-extracted.** Their rows are what a model researched
   or read off a page and wrote down, not text parsed from a document: their provenance
   says so (`extracted_by_model`), and an answer's rows carry its `sources`, which a widget
@@ -382,7 +404,7 @@ sources only, and they have no other) reads the web through Context.dev on ADA's
 - **Credits.** Each fetch spends the project's daily credits (below) before it is sent:
   1 for a scrape, `max_pages` for a crawl (what Context.dev did not charge, by its
   `key_metadata.credits_consumed`, is given back afterwards), 10 for answers and 5 for an
-  extraction (both corrected likewise). Over the budget the refresh fails with `Invalid("The web budget of this
+  extraction (all corrected likewise, a scrape too when Context.dev states its charge). Over the budget the refresh fails with `Invalid("The web budget of this
   project (300 credits a day) does not leave the N this refresh of <name> needs today")`.
 - Readable failures, recorded as the source's `last_error` like a document's: no key
   (`CONTEXT_DEV_API_KEY`), refused key, no credits, a page Context.dev could not read
@@ -422,17 +444,19 @@ the page changes instead of on a schedule. Freshness is either: a long ttl or a 
 Exa and Context.dev are used on ADA's accounts, so each project may spend at most
 `Settings.web_daily_credit_limit` credits a day (UTC; `WEB_DAILY_CREDIT_LIMIT`, default
 300), the web tools and web sources together. Credits are Context.dev's; an Exa search is
-counted at a fixed weight. `WebBudget` counts them in `web_usage
+counted at a fixed weight, a Context.dev search at what it charged. `WebBudget` counts them in `web_usage
 (project_id, day, credits)` (migration `0006`): `spend` checks and counts in one upsert,
 in a short transaction of its own (`SqlWebBudget`), so concurrent calls cannot overrun
 it and a call that was sent stays counted when its tool call or refresh fails and rolls
 back; `adjust` corrects a reservation afterwards. Nothing is counted for a call refused
 before it is sent (no key, bad arguments, over the budget). Prices
-(`core/services/ports/web.py`): `search_web` 5 (`WEB_SEARCH_CREDITS`: an Exa search with
-highlights costs about $0.005–0.01, the recorded one of five results $0.007, several
-Context.dev scrapes' worth, so it counts as much as an extraction), `read_page` 1,
-`extract_table` 5 reserved and corrected to what Context.dev charged, `map_site` 1; web
-sources as above. A monitor costs no credits; each refetch it triggers does.
+(`core/services/ports/web.py`): `search_web` 5 reserved (`WEB_SEARCH_CREDITS`: an Exa
+search with highlights costs about $0.005–0.01, the recorded one of five results $0.007,
+several Context.dev scrapes' worth, so it counts as much as an extraction; a Context.dev
+search is corrected to what it charged: the recorded web search of three results with
+passages 2, the news search of three 1), `read_page` 1 reserved and corrected likewise
+(a PDF page read with OCR costs 1), `extract_table` 5 reserved and corrected,
+`map_site` 1; web sources as above. A monitor costs no credits; each refetch it triggers does.
 
 ### Periods and pushdown
 
@@ -1121,20 +1145,39 @@ or in a new run with no bindings and an open range. Nothing is stored. It return
 agent's exploration only and must not be shown or quoted to the person, and so does the
 tool's description.
 
-**The web tools** (`entrypoints/mcp/tools/web.py`) search the web on ADA's Exa key and
-read it on ADA's Context.dev key, so neither an external client nor the in-platform agent
-needs an account. Each takes a required `project_id` and `session_id` (the session
-middleware refuses a session of another project before the call) and goes through
-`WebExplorationService` (`core/services/exploration/web.py`, which reads nothing from the
-database, so no connection is held while the service works) to the `WebSearch` port
-(`ExaSearch` in `adapters/web/exa.py`, `https://api.exa.ai`) or the `WebExplorer` port
-(`ContextDevWeb` in `adapters/web/context_dev.py`, `https://api.context.dev/v1`), both
-`Authorization: Bearer <key>`:
+**The web tools** (`entrypoints/mcp/tools/web.py`) search the web on ADA's Exa key, or
+on its Context.dev key without one, and read it on ADA's Context.dev key, so neither an
+external client nor the in-platform agent needs an account. Each takes a required
+`project_id` and `session_id` (the session middleware refuses a session of another
+project before the call) and goes through `WebExplorationService`
+(`core/services/exploration/web.py`, which reads nothing from the database, so no
+connection is held while the service works) to the `WebSearch` port or the `WebExplorer`
+port (`ContextDevWeb` in `adapters/web/context_dev.py`, `https://api.context.dev/v1`),
+all `Authorization: Bearer <key>`.
+
+**Search engines.** `WebProvider.search` binds `ExaSearch` (`adapters/web/exa.py`,
+`https://api.exa.ai`) when `EXA_API_KEY` is set (not blank), else `ContextDevSearch`
+(`adapters/web/context_dev.py`) when the Context.dev key is, else an unconfigured
+`ExaSearch`. Both search the scope's sites (`DOMAINS` in `adapters/web/scopes.py`):
+`data` statistics offices, registries and open-data portals (THL, Sotkanet, Statistics
+Finland, the Finnish Cancer Registry and Cancer Society, Sundhedsdatastyrelsen,
+Helsedirektoratet, Cancercentrum, IARC, Eurostat, OECD, WHO, Kela, Zenodo, Kaggle, …),
+`research` papers (PubMed, PubMed Central, preprint servers, Acta Oncologica at
+medicaljournalssweden.se, BMJ, The Lancet, Nature, Science, ScienceDirect, Springer,
+Taylor & Francis, Wiley, Oxford Academic, …), `news` news sites, `any` none.
+
+| Scope | Exa | Context.dev |
+| --- | --- | --- |
+| `data`, `research`, `any` | `POST /search`, type `auto`, `includeDomains` (none for `any`), highlights (600 characters) as the snippet | `POST /web/search`, `includeDomains` (none for `any`), `highlightsOptions {enabled, maxCharacters: 600}`; the snippet is the passages joined (entities decoded, on one line, at most 600 characters), else the `description`; no publication date |
+| `news` | `POST /search` on the news sites | `POST /news/search`, `searchBy {type: "natural_language", query}`, `limit`; `published` is `published_at`, the snippet the article's description |
+
+Context.dev's searches carry the project's tags and report `credits_consumed`, which the
+budget is corrected to; Exa takes no tags and counts at its fixed weight.
 
 | Tool | Service | Forwarded | Returns |
 | --- | --- | --- | --- |
-| `search_web(query, scope="data", limit=8)` | Exa `POST /search`, type `auto`, highlights as snippets | `numResults` (1–10); `scope` `data` limits `includeDomains` to statistics offices, registries and open-data portals (THL, Sotkanet, Statistics Finland, the Cancer Registry, IARC, Eurostat, OECD, WHO, Kela, Zenodo, Kaggle, …), `news` to news sites, `research` to papers, `any` none (`DOMAINS` in `exa.py`) | `{results: [{url, title, published, snippet}], note}` |
-| `read_page(url, max_chars=20000)` | Context.dev `POST /web/scrape` | `formats: {markdown: true}`, main content only, no links | `{url, title, markdown (cut to max_chars, at most 60000), truncated, note}` |
+| `search_web(query, scope="data", limit=8)` | The search engine (above) | `numResults`/`limit` (1–10), the scope's sites | `{results: [{url, title, published, snippet}], note}` |
+| `read_page(url, max_chars=20000, query=None, pdf_pages=None, ocr=False)` | Context.dev `POST /web/scrape` | `formats: {markdown: true}`, main content only, no links; with `query` (at most 2,000 characters) `formats: {highlights: true}`, `highlightsParams {query, maxCharacters: 8000}` instead, and the passages relevant to it (Markdown, in page order, separated by blank lines) come back in place of the page: a cheap way to check a figure on a page; `pdf_pages` (`"25"` or `"25-26"`) and `ocr` as `sharedParams.parsers.pdf {startPage, endPage, ocr: "auto"\|"off", includeNumberedPages: true}`, with `query` or without | `{url, title, markdown (cut to max_chars, at most 60000), truncated, note}` |
 | `extract_table(url, instruction, columns)` | Context.dev `POST /web/scrape`, `formats: {json: true}` | a schema of `rows` with one nullable string per column (1–30), `instructions` (1–2000 characters) | `{url, rows, truncated, note}`: model-extracted, null where the page states nothing |
 | `map_site(domain, search?, max_links=50)` | Context.dev `GET /web/urls` | `domain`, `search`, `maxLinks` (1–500) | `{links: [{url, title}], note}` |
 
@@ -1143,19 +1186,21 @@ database, so no connection is held while the service works) to the `WebSearch` p
   batches, logs or usage, people or company data. The dearer operations (crawl, answers,
   and an extraction kept as data) exist only as web sources, with a long minimum
   freshness (Sources: Web sources); monitors only through `watch_source`.
-- No key: `"web search is not configured: EXA_API_KEY is not set"`, `"page reading is not
-  configured: CONTEXT_DEV_API_KEY is not set"`, nothing counted. Each call spends the
+- No key: `"web search is not configured: set EXA_API_KEY or CONTEXT_DEV_API_KEY"`,
+  `"page reading is not configured: CONTEXT_DEV_API_KEY is not set"`, nothing counted. A
+  malformed `pdf_pages` is refused likewise before anything is sent. Each call spends the
   project's daily credits (Sources: The daily web budget); over it: `Invalid("The web
   budget of this project (300 credits a day) is used up for today")`. In a research
   session each call also counts against its web call cap, first.
 - Context.dev's refusals are `Invalid` (refused key, no credits, a page it could not
-  read, with its message, the key never quoted), busy or unreachable `Unavailable`. Exa's
-  errors are `Unavailable` naming the status and its short error code, never the body.
+  read, with its message, the key never quoted), busy or unreachable `Unavailable`; its
+  searches likewise. Exa's errors are `Unavailable` naming the status and its short error code, never the body.
 - Every answer carries `note`, `EXPLORATION_NOTE`: "For your own exploration only. Do not
   show or quote this to the person: to present web data, register its URL as a source
   (register_source, access_kind \"web\" or \"document\") and build on it, so it can be
   traced." The tools' descriptions and the server instructions say the same.
-- `system_status` says which are configured (`web_search`, `page_reading`, `watching`).
+- `system_status` says which are configured (`web_search`, true with either key;
+  `page_reading`, `watching`).
 
 **`build_pipeline(project_id, session_id, steps)`**: each step is
 `{ref?, note?, <kind>: {...}}` with exactly one kind: `register_source` (the fields of
@@ -1858,8 +1903,8 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `WIDGETS_DIR` | The built widgets (default `services/widgets/dist` of the checkout; `/app/widgets` in the image) |
 | `ADA_SECRET_KEY` | The master key of the agent's API keys: a Fernet key, or several separated by commas (the first encrypts). Unset: no key can be stored. See The agent |
 | `ADA_SECRET_KEY_FILE` | A file holding the master key instead (Docker secrets); `ADA_SECRET_KEY` wins when both are set |
-| `CONTEXT_DEV_API_KEY` (or `CONTEXT_API_KEY`) | ADA's Context.dev key: the `context.dev` document engine, web sources, page monitors and `read_page`, `extract_table`, `map_site`. Unset: those refuse readably |
-| `EXA_API_KEY` | ADA's Exa key, for `search_web`. Unset: it refuses, naming the variable |
+| `CONTEXT_DEV_API_KEY` (or `CONTEXT_API_KEY`) | ADA's Context.dev key: the `context.dev` document engine, web sources, page monitors and `read_page`, `extract_table`, `map_site`, and `search_web` when `EXA_API_KEY` is unset. Unset: those refuse readably |
+| `EXA_API_KEY` | ADA's Exa key, for `search_web`, which uses Exa when it is set and Context.dev otherwise. Neither set: it refuses, naming both |
 | `ADA_PUBLIC_URL` | Where Context.dev reaches this platform (`{ADA_PUBLIC_URL}/api/hooks/context/{id}`), for watched sources. Unset: watching refuses, naming it |
 | `WEB_DAILY_CREDIT_LIMIT` | Web credits each project may spend per day, web tools (Exa searches at 5) and web sources together (default 300); shown read only in Settings › Web |
 | `RESEARCH_WEB_CALLS` | Web tool calls a research session may make over all its turns (default 40) |
