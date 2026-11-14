@@ -15,6 +15,7 @@ from ada.entrypoints.mcp.actor import calling_agent
 from ada.entrypoints.mcp.apps import ANY_WIDGET
 from ada.entrypoints.mcp.injection import Inject
 from ada.entrypoints.mcp.links import widget_url
+from ada.entrypoints.mcp.sessions import SessionId
 
 # The same bound as the REST route: rows travel as JSON.
 MAX_WIDGET_ROWS = 10_000
@@ -31,13 +32,13 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool(app=AppConfig(resource_uri=ANY_WIDGET))
     @inject
     async def create_widget(
+        session_id: SessionId,
         operator_id: OperatorId,
         type: str,
         title: str,
         pipelines: FromDishka[PipelineService],
         widgets: FromDishka[WidgetService],
         spec: JsonObject | None = None,
-        session_id: Id | None = None,
         note: str = "",
     ) -> WidgetView:
         """Show an operator's output to the person you work with. Pass only the operator
@@ -93,8 +94,8 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
         A widget marks simulated and outdated data by itself.
 
-        Pass `session_id` and a one-line `note` on what the widget shows and why, to put it
-        in that session, with the note on its card. Returns the widget and its `url`: give
+        Give a one-line `note` on what the widget shows and why: the session shows the
+        widget with the note on its card. Returns the widget and its `url`: give
         the url to the person."""
         operator = await pipelines.get(operator_id)
         widget = await widgets.create(
@@ -112,6 +113,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool(app=AppConfig(resource_uri=ANY_WIDGET))
     @inject
     async def update_widget(
+        session_id: SessionId,
         widget_id: Id,
         widgets: FromDishka[WidgetService],
         title: str | None = None,
@@ -146,7 +148,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def list_session_widgets(
-        session_id: Id, widgets: FromDishka[WidgetService]
+        session_id: SessionId, widgets: FromDishka[WidgetService]
     ) -> Sequence[WidgetView]:
         """List the widgets shown in a session, each with its url. Use it to see what has
         already been shown before adding more, or to point the person to one."""

@@ -1,4 +1,5 @@
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from dishka import AsyncContainer
@@ -8,6 +9,18 @@ from fastmcp.exceptions import ToolError
 from ada.core.models.errors import Conflict, Invalid, NotConfigured, NotFound, Unavailable
 
 type Inject = Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]
+
+
+@contextmanager
+def tool_errors() -> Iterator[None]:
+    """The core's errors as tool errors with a readable message. Use it outside the scope
+    whose transaction they should roll back."""
+    try:
+        yield
+    except Unavailable as error:
+        raise ToolError(f"{error}. This is temporary; try again later.") from error
+    except (NotFound, Conflict, Invalid, NotConfigured) as error:
+        raise ToolError(str(error)) from error
 
 
 def make_inject(container: AsyncContainer) -> Inject:
@@ -31,12 +44,8 @@ def make_inject(container: AsyncContainer) -> Inject:
         )
 
         async def reported(*args: Any, **kwargs: Any) -> Any:
-            try:
+            with tool_errors():
                 return await injected(*args, **kwargs)
-            except Unavailable as error:
-                raise ToolError(f"{error}. This is temporary; try again later.") from error
-            except (NotFound, Conflict, Invalid, NotConfigured) as error:
-                raise ToolError(str(error)) from error
 
         # FastMCP builds the tool's schema from these: the injected function's, which no
         # longer list the FromDishka parameters. functools.wraps would carry the original

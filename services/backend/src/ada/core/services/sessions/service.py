@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Any
 from uuid import uuid7
 
 from ada.core.models.actors import Actor
@@ -13,6 +14,7 @@ from ada.core.models.sessions import (
     PipelineContext,
     Session,
     SessionEntry,
+    ToolCall,
     WidgetContext,
 )
 from ada.core.ports.events import EventPublisher
@@ -154,6 +156,18 @@ class Sessions(SessionService):
         session = await self.sessions.get(session_id)
         return await self._append(session, EntryKind.AGENT_TURN, "", str(turn_id), actor)
 
+    async def record_tool_call(self, session_id: Id, call: ToolCall, actor: Actor) -> SessionEntry:
+        session = await self.sessions.get(session_id)
+        error = _cut(call.error, MAX_ERROR) if call.error is not None else None
+        kept = call.model_copy(update={"arguments": shortened(call.arguments), "error": error})
+        return await self._append(session, EntryKind.TOOL_CALL, "", None, actor, tool_call=kept)
+
+    async def check(self, session_id: Id, project_id: Id | None = None) -> Session:
+        session = await self.sessions.get(session_id)
+        if project_id is not None and session.project_id != project_id:
+            raise Invalid("The session belongs to another project than the one given")
+        return session
+
     async def _checked(self, session: Session, item: Context) -> Context:
         """A context item that names something of the session's project. A message about
         another project's pipeline would send the agent building on it."""
@@ -181,6 +195,7 @@ class Sessions(SessionService):
         ref: str | None,
         actor: Actor,
         context: tuple[Context, ...] = (),
+        tool_call: ToolCall | None = None,
     ) -> SessionEntry:
         entry = SessionEntry(
             id=uuid7(),
@@ -191,6 +206,7 @@ class Sessions(SessionService):
             actor=actor,
             created_at=self.clock.now(),
             context=context,
+            tool_call=tool_call,
         )
         await self.sessions.add_entry(entry)
         await self.events.publish(
@@ -207,6 +223,38 @@ class Sessions(SessionService):
         dashboard = await self.dashboards.get(dashboard_id)
         if dashboard.project_id != project_id:
             raise Invalid("The dashboard belongs to another project than the session")
+
+
+# How much of a tool call's arguments the record keeps: enough to see what was asked, not
+# whole datasets or documents. SQL is what a person reads to follow the work, so it is kept
+# whole up to a much greater length.
+MAX_TEXT = 200
+MAX_SQL = 2000
+MAX_ITEMS = 10
+MAX_ERROR = 2000
+SQL_KEYS = frozenset({"sql", "select", "where", "group_by", "having", "order_by"})
+
+
+def shortened(value: Any, key: str | None = None) -> Any:
+    """`value` with strings over 200 characters cut (SQL, under the keys in SQL_KEYS, over
+    2,000) and lists over 10 items cut, at any depth. A cut string ends with "…"; a cut
+    list ends with a string saying how many items were left out."""
+    match value:
+        case str():
+            return _cut(value, MAX_SQL if key in SQL_KEYS else MAX_TEXT)
+        case dict():
+            return {k: shortened(v, k) for k, v in value.items()}
+        case list() | tuple():
+            kept = [shortened(item, key) for item in value[:MAX_ITEMS]]
+            if len(value) > MAX_ITEMS:
+                kept.append(f"… {len(value) - MAX_ITEMS} more")
+            return kept
+        case _:
+            return value
+
+
+def _cut(text: str, length: int) -> str:
+    return text if len(text) <= length else text[:length] + "…"
 
 
 def _title(title: str) -> str:

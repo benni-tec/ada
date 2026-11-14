@@ -444,16 +444,27 @@ async def test_an_agent_pins_a_widget_and_shows_the_dashboard_in_its_session(
 ) -> None:
     client, seen = agent
     project = await call(client, "create_project", name="Wellbeing")
-    created = await call(client, "create_dashboard", project_id=project["id"], name="Overview")
+    session = await call(client, "create_session", project_id=project["id"], title="Look")
+    created = await call(
+        client,
+        "create_dashboard",
+        project_id=project["id"],
+        session_id=session["id"],
+        name="Overview",
+    )
     dashboard_id = created["dashboard"]["id"]
     assert created["url"] == f"/projects/{project['id']}/dashboards/{dashboard_id}"
     widget = widget_in(await seen.container.get(MemoryStore), project["id"])
-    pin = {"dashboard_id": dashboard_id, "widget_id": str(widget.id), "slot": "coverage"}
+    pin = {
+        "session_id": session["id"],
+        "dashboard_id": dashboard_id,
+        "widget_id": str(widget.id),
+        "slot": "coverage",
+    }
 
     pinned = await call(client, "pin_widget", **pin, expected_revision=1)
     with pytest.raises(ToolError, match="revision 2.*expected revision 1"):
         await call(client, "pin_widget", **pin, expected_revision=1)
-    session = await call(client, "create_session", project_id=project["id"], title="Look")
     shown = await call(
         client,
         "show_dashboard_in_session",
@@ -463,7 +474,10 @@ async def test_an_agent_pins_a_widget_and_shows_the_dashboard_in_its_session(
     )
 
     assert pinned["version"]["created_by"] == {"kind": "external_agent", "name": "claude-code"}
-    assert await call(client, "get_dashboard", dashboard_id=dashboard_id) == pinned
+    assert (
+        await call(client, "get_dashboard", session_id=session["id"], dashboard_id=dashboard_id)
+        == pinned
+    )
     assert shown["session"]["panel_dashboard_id"] == dashboard_id
     assert shown["url"] == f"/projects/{project['id']}/sessions/{session['id']}"
     elsewhere = await call(client, "create_project", name="Elsewhere")

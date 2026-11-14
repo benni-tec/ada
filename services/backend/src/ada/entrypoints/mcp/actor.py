@@ -35,6 +35,11 @@ def calling_agent() -> Actor:
     )
 
 
+def in_platform_agent() -> bool:
+    """Whether the in-platform agent is calling (see acting_as)."""
+    return _in_platform_agent.get() is not None
+
+
 @contextmanager
 def acting_as(agent: Actor) -> Iterator[None]:
     """Tool calls made from inside this block, including those of servers and clients

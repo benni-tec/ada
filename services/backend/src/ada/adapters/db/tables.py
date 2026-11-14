@@ -156,6 +156,8 @@ class SessionEntryRow(Base):
     created_at: Mapped[datetime] = mapped_column(_timestamp)
     # What a message is about: the domain model's context items as JSON.
     context: Mapped[list[Json]] = mapped_column(JSONB, server_default=_empty_list)
+    # For a tool call: the domain model's ToolCall as JSON.
+    tool_call: Mapped[Json | None] = mapped_column(JSONB)
 
 
 class AgentTurnRow(Base):

@@ -34,6 +34,7 @@ from ada.core.services.ports.runs import RunService
 from ada.discovery import modules
 from ada.entrypoints.mcp import actor
 from ada.entrypoints.mcp.server import create_mcp
+from ada.entrypoints.mcp.sessions import SESSIONLESS
 from api_support import (
     Overrides,
     Seen,
@@ -460,10 +461,14 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
         assert name.split("_")[0] in verbs, name
         assert tool.description and len(tool.description) > 40, name
         assert not set(tool.input_schema.get("properties", {})) & injected, name
+    # Every tool works in a session, but those that find or make one, and the widget's own.
+    for name, tool in tools.items():
+        required = "session_id" in tool.input_schema.get("required", [])
+        assert required is (name not in SESSIONLESS), name
     # What an agent makes in a session may say why; a widget carries no data.
     for name in ("add_source_operator", "add_transform", "create_widget"):
-        assert {"session_id", "note"} <= set(tools[name].input_schema["properties"]), name
-        assert not {"session_id", "note"} & set(tools[name].input_schema.get("required", []))
+        assert "note" in tools[name].input_schema["properties"]
+        assert "note" not in tools[name].input_schema["required"]
     assert set(tools["create_widget"].input_schema["properties"]) == {
         "operator_id",
         "type",
@@ -486,6 +491,7 @@ async def test_an_agent_builds_a_widget_in_a_session_and_is_recorded_as_itself(
         client,
         "register_source",
         project_id=project["id"],
+        session_id=session["id"],
         name="Statfin",
         address="https://example.test/api",
         access_kind="request",
@@ -505,11 +511,14 @@ async def test_an_agent_builds_a_widget_in_a_session_and_is_recorded_as_itself(
         client,
         "add_transform",
         project_id=project["id"],
+        session_id=session["id"],
         sql="SELECT region, value FROM input_0",
         inputs=[operator["id"]],
         roles={"measures": [{"value": "value"}]},
     )
-    preview = await call(client, "preview_operator", operator_id=transform["id"], limit=1)
+    preview = await call(
+        client, "preview_operator", session_id=session["id"], operator_id=transform["id"], limit=1
+    )
     created = await call(
         client,
         "create_widget",
@@ -531,15 +540,25 @@ async def test_an_agent_builds_a_widget_in_a_session_and_is_recorded_as_itself(
     )
     assert await call(client, "list_session_widgets", session_id=session["id"]) == [created]
     entries = await seen.entries(UUID(session["id"]))
-    assert [(e.kind, e.ref, e.actor.name) for e in entries] == [
+    # Each call is recorded after it ran, so after the entry of what it made.
+    assert [
+        (e.kind, e.ref or (e.tool_call and e.tool_call.tool), e.actor.name) for e in entries
+    ] == [
+        ("tool_call", "register_source", "claude-code"),
         ("operator", operator["id"], "claude-code"),
+        ("tool_call", "add_source_operator", "claude-code"),
+        ("operator", transform["id"], "claude-code"),
+        ("tool_call", "add_transform", "claude-code"),
+        ("tool_call", "preview_operator", "claude-code"),
         ("widget", widget["id"], "claude-code"),
+        ("tool_call", "create_widget", "claude-code"),
+        ("tool_call", "list_session_widgets", "claude-code"),
     ]
     assert [e.type for e in await seen.events(project["id"])] == [
         "session.created",
-        "session.entry_added",
+        *["session.entry_added"] * 6,
         "widget.created",
-        "session.entry_added",
+        *["session.entry_added"] * 3,
     ]
 
 
@@ -548,8 +567,14 @@ async def test_tool_errors_say_what_is_wrong_and_change_nothing(
 ) -> None:
     client, seen = agent
     project = await call(client, "create_project", name="Wellbeing")
+    here = (await call(client, "create_session", project_id=project["id"], title="Here"))["id"]
     source = await call(
-        client, "register_source", project_id=project["id"], name="S", address="https://x.test"
+        client,
+        "register_source",
+        project_id=project["id"],
+        session_id=here,
+        name="S",
+        address="https://x.test",
     )
     other = await call(client, "create_project", name="Other")
     elsewhere = await call(client, "create_session", project_id=other["id"], title="Elsewhere")
@@ -563,6 +588,7 @@ async def test_tool_errors_say_what_is_wrong_and_change_nothing(
         await call(
             client,
             "update_source",
+            session_id=here,
             source_id=source["id"],
             expected_revision=7,
             address="https://example.test/other.csv",
@@ -581,8 +607,92 @@ async def test_tool_errors_say_what_is_wrong_and_change_nothing(
 
     with patch.object(recording, "refresh_source", unreachable):
         with pytest.raises(ToolError, match=r"could not be reached: .*try again later"):
-            await call(client, "refresh_source", source_id=source["id"])
+            await call(client, "refresh_source", session_id=here, source_id=source["id"])
     assert UUID(source["id"]) not in [i for i, _ in recording.refreshes]
+
+
+async def test_every_tool_call_needs_a_session_of_its_project(
+    agent: tuple[Client, Seen],
+) -> None:
+    client, seen = agent
+    project = await call(client, "create_project", name="Wellbeing")
+    session = await call(client, "create_session", project_id=project["id"], title="Here")
+    other = await call(client, "create_project", name="Other")
+
+    with pytest.raises(ToolError, match="Pass `session_id`.*create_session"):
+        await call(client, "list_sources", project_id=project["id"])
+    with pytest.raises(ToolError, match="session .* not found"):
+        await call(client, "list_sources", project_id=project["id"], session_id=str(uuid7()))
+    with pytest.raises(ToolError, match="another project"):
+        await call(
+            client,
+            "register_source",
+            project_id=other["id"],
+            session_id=session["id"],
+            name="S",
+            address="https://x.test",
+        )
+
+    # Refused before they ran: nothing was made, and the session shows none of them.
+    assert await seen.entries(UUID(session["id"])) == []
+    there = await call(client, "create_session", project_id=other["id"], title="There")
+    assert await call(client, "list_sources", project_id=other["id"], session_id=there["id"]) == []
+
+
+async def test_each_call_is_recorded_with_its_outcome_and_shortened_arguments(
+    agent: tuple[Client, Seen],
+) -> None:
+    client, seen = agent
+    project = await call(client, "create_project", name="Wellbeing")
+    session = await call(client, "create_session", project_id=project["id"], title="Here")
+    sql = "SELECT " + ", ".join(f"c{i}" for i in range(500)) + " FROM input_0"
+
+    await call(
+        client,
+        "register_source",
+        project_id=project["id"],
+        session_id=session["id"],
+        name="S" * 300,
+        address="https://x.test",
+        options={"rows_path": [str(i) for i in range(12)]},
+    )
+    with pytest.raises(ToolError, match="Not a query"):
+        await call(
+            client,
+            "add_transform",
+            project_id=project["id"],
+            session_id=session["id"],
+            sql="nope",
+            inputs=[],
+        )
+    with pytest.raises(ToolError):
+        await call(
+            client,
+            "add_transform",
+            project_id=project["id"],
+            session_id=session["id"],
+            sql=sql,
+            inputs=[str(uuid7())],
+        )
+
+    registered, refused, unknown = await seen.entries(UUID(session["id"]))
+    assert all(
+        e.kind == "tool_call" and e.actor.model_dump() == AGENT for e in (registered, refused)
+    )
+    assert registered.tool_call is not None and refused.tool_call is not None
+    assert (registered.tool_call.status, registered.tool_call.error) == ("ok", None)
+    arguments = registered.tool_call.arguments
+    assert arguments["name"] == "S" * 200 + "…"
+    assert arguments["options"]["rows_path"] == [*map(str, range(10)), "… 2 more"]
+    assert (refused.tool_call.tool, refused.tool_call.status) == ("add_transform", "error")
+    assert refused.tool_call.error == "Not a query: nope"
+    assert refused.tool_call.duration_ms >= 0
+    # SQL is what a person reads to follow the work: kept whole up to 2,000 characters.
+    assert unknown.tool_call is not None and unknown.tool_call.arguments["sql"] == sql[:2000] + "…"
+    entries_added = [e for e in await seen.events(project["id"]) if e.type == "session.entry_added"]
+    assert [e.payload["entry_id"] for e in entries_added] == [
+        str(e.id) for e in (registered, refused, unknown)
+    ]
 
 
 @pytest.mark.parametrize(

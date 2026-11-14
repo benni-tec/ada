@@ -728,7 +728,9 @@ async def test_an_agent_learns_the_formula_from_the_tool_and_sets_a_rule(
     for word in ("rolling_mean", "previous", "suppressed", '"kind": "compare"', "key_columns"):
         assert word in description
     setup = await world.setup(START)
+    session = await call(client, "create_session", project_id=str(setup.project_id), title="A")
     arguments = {
+        "session_id": session["id"],
         "dashboard_id": str(setup.dashboard.id),
         "name": "Coverage below target",
         "operator_id": setup.measure.id,
@@ -736,11 +738,18 @@ async def test_an_agent_learns_the_formula_from_the_tool_and_sets_a_rule(
     }
 
     rule = await call(client, "create_alert_rule", **arguments, formula=below(80))
-    checked = await call(client, "check_alert_rule", rule_id=rule["id"])
-    feed = await call(client, "list_alerts", project_id=str(setup.project_id), state="firing")
+    checked = await call(client, "check_alert_rule", session_id=session["id"], rule_id=rule["id"])
+    feed = await call(
+        client,
+        "list_alerts",
+        project_id=str(setup.project_id),
+        session_id=session["id"],
+        state="firing",
+    )
     changed = await call(
         client,
         "update_alert_rule",
+        session_id=session["id"],
         rule_id=rule["id"],
         expected_revision=1,
         max_data_age_seconds=600,

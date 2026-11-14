@@ -48,7 +48,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == ["0001", "0002", "0003", "0004", "0005", "0006"]
+    assert migrate(database_url) == ["0001", "0002", "0003", "0004", "0005", "0006", "0007"]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -67,10 +67,11 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "agent_turns" not in inspector.get_table_names()
         assert "condition_sql" not in {c["name"] for c in inspector.get_columns("alerts")}
         assert "agent_settings" not in inspector.get_table_names()
+        assert "tool_call" not in {c["name"] for c in inspector.get_columns("session_entries")}
         assert "web_usage" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == ["0002", "0003", "0004", "0005", "0006"]
+    assert migrate(database_url) == ["0002", "0003", "0004", "0005", "0006", "0007"]
     assert migrate(database_url) == []
 
 

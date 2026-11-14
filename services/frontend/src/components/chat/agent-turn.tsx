@@ -203,7 +203,8 @@ function ToolRow({ part, active }: { part: ToolPart; active: boolean }) {
   )
 }
 
-function Json({ label, value, error = false }: { label: string; value: unknown; error?: boolean }) {
+/** A JSON value under a caption, scrollable; red for an error. */
+export function Json({ label, value, error = false }: { label: string; value: unknown; error?: boolean }) {
   const captionId = useId()
   const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2)
   return (

@@ -11,6 +11,7 @@ from ada.core.models.operators import OperatorId
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.projects import ProjectService
 from ada.entrypoints.mcp.injection import Inject
+from ada.entrypoints.mcp.sessions import SessionId
 
 # The fields of a rule that may be empty, which update_alert_rule can clear.
 type Clearable = Literal["check_interval_seconds", "max_data_age_seconds", "alert_pipeline_id"]
@@ -74,6 +75,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool(description=_create_description())
     @inject
     async def create_alert_rule(
+        session_id: SessionId,
         dashboard_id: Id,
         name: str,
         operator_id: OperatorId,
@@ -100,7 +102,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def list_alert_rules(
-        dashboard_id: Id, service: FromDishka[AlertService]
+        session_id: SessionId, dashboard_id: Id, service: FromDishka[AlertService]
     ) -> Sequence[AlertRule]:
         """List a dashboard's alert rules, each with its formula, key columns, severity,
         check interval, whether it is enabled and when it was last checked. Use it before
@@ -109,13 +111,16 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
     @mcp.tool
     @inject
-    async def get_alert_rule(rule_id: Id, service: FromDishka[AlertService]) -> AlertRule:
+    async def get_alert_rule(
+        session_id: SessionId, rule_id: Id, service: FromDishka[AlertService]
+    ) -> AlertRule:
         """Read one alert rule with its current `revision`, which update_alert_rule needs."""
         return await service.get_rule(rule_id)
 
     @mcp.tool
     @inject
     async def update_alert_rule(
+        session_id: SessionId,
         rule_id: Id,
         expected_revision: int,
         service: FromDishka[AlertService],
@@ -170,7 +175,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
     @mcp.tool
     @inject
-    async def check_alert_rule(rule_id: Id, service: FromDishka[AlertService]) -> RuleCheck:
+    async def check_alert_rule(
+        session_id: SessionId, rule_id: Id, service: FromDishka[AlertService]
+    ) -> RuleCheck:
         """Check an alert rule now instead of waiting for its interval: start a new run of
         its measure, evaluate the formula, and open, keep or resolve one alert per key.
         Sources older than the rule's maximum data age are fetched again first. Returns
@@ -189,6 +196,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @inject
     async def list_alerts(
         project_id: Id,
+        session_id: SessionId,
         projects: FromDishka[ProjectService],
         service: FromDishka[AlertService],
         state: AlertState | None = None,

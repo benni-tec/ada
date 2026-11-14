@@ -476,6 +476,8 @@ async def test_the_agent_gets_every_tool_it_can_use_and_acts_in_its_session(
         InProcessToolbox(task_scope).connect(TOOL_AGENT, session["id"]) as tools,
     ):
         names = {spec.name for spec in tools.specs()}
+        # The turn fills in its session, so the model need not.
+        required = {spec.name: spec.input_schema.get("required", []) for spec in tools.specs()}
         operator = await tools.call(
             "add_source_operator",
             {"project_id": project["id"], "data_source_id": source["id"], "note": "why"},
@@ -489,7 +491,9 @@ async def test_the_agent_gets_every_tool_it_can_use_and_acts_in_its_session(
             await tools.call("get_widget_data", {"widget_id": str(uuid7())})
 
     assert names == everything - LEFT_OUT
+    assert not [name for name, fields in required.items() if "session_id" in fields]
     assert {"list_pipelines", "create_widget", "pin_widget"} <= names
+    # Its calls, the failed ones too, show in its turn: the record has no tool call entries.
     [entry] = send(client, "GET", f"/sessions/{session['id']}/entries")
     assert (entry["kind"], entry["ref"], entry["text"]) == ("operator", operator["id"], "why")
     assert entry["actor"] == TOOL_AGENT.model_dump(mode="json")
@@ -524,10 +528,13 @@ async def test_an_outside_client_cannot_pass_for_the_agent(
             },
         )
 
-    actors = [e["actor"] for e in send(client, "GET", f"/sessions/{session['id']}/entries")]
-    assert actors == [
-        {"kind": "external_agent", "name": CLIENT.name},
-        {"kind": "external_agent", "name": "gemini/flash"},
+    entries = send(client, "GET", f"/sessions/{session['id']}/entries")
+    # Each call made its entry and was recorded as a tool call, both as the client it is.
+    assert [(e["kind"], e["actor"]["kind"], e["actor"]["name"]) for e in entries] == [
+        ("operator", "external_agent", CLIENT.name),
+        ("tool_call", "external_agent", CLIENT.name),
+        ("widget", "external_agent", "gemini/flash"),
+        ("tool_call", "external_agent", "gemini/flash"),
     ]
 
 
