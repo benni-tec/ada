@@ -30,19 +30,24 @@ fileGroups:
 
 tasks:
   dev:
-    command: "uv run uvicorn ada.entrypoints.http.app:create_app --factory --reload --port 8000"
+    # The live stream never closes by itself, so a reload would wait for it forever.
+    command: "uv run uvicorn ada.entrypoints.http.app:create_app --factory --reload --port 8000 --timeout-graceful-shutdown 2"
     preset: "server"
     deps:
       - "~:migrate"
       # Persistent too, so moon starts them alongside the API.
       - "~:worker"
       - "~:scheduler"
+    options:
+      envFile: "/.env.local"
 
   worker:
     command: "uv run taskiq worker ada.entrypoints.worker:broker --reload"
     preset: "server"
     deps:
       - "~:migrate"
+    options:
+      envFile: "/.env.local"
 
   scheduler:
     command: "uv run taskiq scheduler ada.entrypoints.worker:scheduler"
@@ -87,6 +92,8 @@ tasks:
 
   format:
     command: "uv run ruff format --check ."
+    options:
+      envFile: "/.env.local"
     inputs:
       - "@group(sources)"
       - "@group(tests)"

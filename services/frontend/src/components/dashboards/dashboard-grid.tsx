@@ -247,6 +247,18 @@ export function DashboardGrid({
     <OnDashboard>
       <div className="@container">
         {editing && (
+          // The grid's width decides, not the window's: the agent panel narrows it too.
+          <p className="mb-4 text-sm text-muted-foreground">
+            <span className="@3xl:hidden">
+              Too narrow to arrange: widen the window or close the agent panel to see the handles.
+            </span>
+            <span className="hidden @3xl:inline">
+              Drag a widget by its handle to move it, or by its corner to resize it; maps keep their shape. Each drop
+              saves a new version of the dashboard.
+            </span>
+          </p>
+        )}
+        {editing && (
           <p id={helpId} className="sr-only">
             Drag a slot by its handle, or press Enter on the handle, move it with the arrow keys and press Enter to drop
             it. Escape puts it back.

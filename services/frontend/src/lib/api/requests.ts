@@ -2,7 +2,7 @@
 // answers are checked against the backend's OpenAPI schema.
 
 import { api, ApiFailure, type ApiError } from './client'
-import type { Id, Project, Session, SessionEntry } from './models'
+import type { Id, Project, Session } from './models'
 
 type Answer<T> = { data?: T; error?: unknown; response: Response }
 
@@ -71,11 +71,10 @@ export const setPanelDashboard = (session: Session, dashboardId: Id | null) =>
     }),
   )
 
-// Typed as the wave 3 entry (models.ts), which the generated schema does not have yet.
-export const listEntries = (sessionId: Id): Promise<SessionEntry[]> =>
+export const listEntries = (sessionId: Id) =>
   unwrap(api.GET('/api/sessions/{session_id}/entries', { params: { path: { session_id: sessionId } } }))
 
-// Messages are posted with their context and model by `postMessage` (agent.ts, wave 3).
+// Messages are posted with their context and model by `postMessage` (agent.ts).
 
 export const listSessionWidgets = (sessionId: Id) =>
   unwrap(api.GET('/api/sessions/{session_id}/widgets', { params: { path: { session_id: sessionId } } }))

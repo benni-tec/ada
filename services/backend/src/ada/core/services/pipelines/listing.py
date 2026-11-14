@@ -5,6 +5,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from uuid import UUID
 
+from ada.core.models.actors import PLATFORM
 from ada.core.models.base import Id
 from ada.core.models.operators import Operator, OperatorId, OperatorKind
 from ada.core.models.pipelines import Pipeline, PipelineSource
@@ -14,10 +15,13 @@ MAX_NAME_LENGTH = 60
 
 
 def pipelines(operators: Sequence[Operator], source_names: Mapping[Id, str]) -> list[Pipeline]:
-    """The operators that no other operator uses as an input, newest first."""
+    """The operators that no other operator uses as an input, newest first. An alert rule's
+    filter is left out: nobody asked for it as a pipeline, and the measure it filters is
+    still one."""
     by_id = {operator.id: operator for operator in operators}
-    used = {input_id for operator in operators for input_id in operator.inputs}
-    roots = [operator for operator in operators if operator.id not in used]
+    made = [operator for operator in operators if not _platform_made(operator)]
+    used = {input_id for operator in made for input_id in operator.inputs}
+    roots = [operator for operator in made if operator.id not in used]
     roots.sort(key=lambda operator: (operator.created_at, operator.id), reverse=True)
     return [
         Pipeline(
@@ -33,6 +37,11 @@ def pipelines(operators: Sequence[Operator], source_names: Mapping[Id, str]) -> 
         )
         for root in roots
     ]
+
+
+def _platform_made(operator: Operator) -> bool:
+    """Besides a source's operator, the platform makes only alert rules' filters."""
+    return operator.created_by == PLATFORM and operator.kind is not OperatorKind.SOURCE
 
 
 def name(operator: Operator, source_names: Mapping[Id, str]) -> str:

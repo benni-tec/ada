@@ -39,6 +39,73 @@
         "title": "ActorKind",
         "type": "string"
       },
+      "AgentTurn": {
+        "description": "The agent's answer to one message. Written by the worker as it goes; no revision,\nsince nobody else edits it (a cancel request is a flag of its own).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "parts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TurnPart"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "prompt_entry_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TurnStatus",
+            "default": "queued"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "prompt_entry_id",
+          "model",
+          "created_at"
+        ],
+        "title": "AgentTurn",
+        "type": "object"
+      },
       "Alert": {
         "description": "One instance per rule and key. A region that stays below target alerts once.",
         "properties": {
@@ -411,6 +478,27 @@
         "title": "ColumnType",
         "type": "string"
       },
+      "Context": {
+        "discriminator": {
+          "mapping": {
+            "dashboard": "#/components/schemas/DashboardContext",
+            "pipeline": "#/components/schemas/PipelineContext",
+            "widget": "#/components/schemas/WidgetContext"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PipelineContext"
+          },
+          {
+            "$ref": "#/components/schemas/DashboardContext"
+          },
+          {
+            "$ref": "#/components/schemas/WidgetContext"
+          }
+        ]
+      },
       "Dashboard": {
         "description": "A live view that follows the latest run. Its content lives in its versions; this\nrecord only points at the current one.",
         "properties": {
@@ -474,6 +562,36 @@
           "expected_revision"
         ],
         "title": "DashboardChange",
+        "type": "object"
+      },
+      "DashboardContext": {
+        "description": "A message about a dashboard: what the agent makes goes there, into `slot` if named.",
+        "properties": {
+          "dashboard_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "dashboard",
+            "default": "dashboard",
+            "title": "Kind",
+            "type": "string"
+          },
+          "slot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot"
+          }
+        },
+        "required": [
+          "dashboard_id"
+        ],
+        "title": "DashboardContext",
         "type": "object"
       },
       "DashboardRules": {
@@ -683,7 +801,8 @@
         "enum": [
           "message",
           "operator",
-          "widget"
+          "widget",
+          "agent_turn"
         ],
         "title": "EntryKind",
         "type": "string"
@@ -978,6 +1097,79 @@
         "title": "MeasureRole",
         "type": "object"
       },
+      "ModelInfo": {
+        "description": "A model from the models file. Its key is never part of it.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "purposes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Purposes",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "model",
+          "available"
+        ],
+        "title": "ModelInfo",
+        "type": "object"
+      },
+      "ModelList": {
+        "properties": {
+          "models": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ModelInfo"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "session_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Agent"
+          }
+        },
+        "title": "ModelList",
+        "type": "object"
+      },
       "NewAlertRule": {
         "additionalProperties": false,
         "properties": {
@@ -1121,6 +1313,25 @@
       "NewMessage": {
         "additionalProperties": false,
         "properties": {
+          "context": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Context"
+            },
+            "title": "Context",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "text": {
             "title": "Text",
             "type": "string"
@@ -1657,6 +1868,104 @@
         "title": "Pin",
         "type": "object"
       },
+      "Pipeline": {
+        "description": "An operator no other operator uses as an input, with what it reads: a pipeline a\nperson can put a widget on or an agent can build on.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/OperatorKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "operator_id": {
+            "$ref": "#/components/schemas/OperatorId"
+          },
+          "output": {
+            "$ref": "#/components/schemas/Schema"
+          },
+          "sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PipelineSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "operator_id",
+          "name",
+          "kind",
+          "output",
+          "created_at"
+        ],
+        "title": "Pipeline",
+        "type": "object"
+      },
+      "PipelineContext": {
+        "description": "A message about a pipeline: the agent builds on this operator.",
+        "properties": {
+          "kind": {
+            "const": "pipeline",
+            "default": "pipeline",
+            "title": "Kind",
+            "type": "string"
+          },
+          "operator_id": {
+            "$ref": "#/components/schemas/OperatorId"
+          }
+        },
+        "required": [
+          "operator_id"
+        ],
+        "title": "PipelineContext",
+        "type": "object"
+      },
+      "PipelineSource": {
+        "properties": {
+          "data_source_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_source_id",
+          "name"
+        ],
+        "title": "PipelineSource",
+        "type": "object"
+      },
+      "PostedMessage": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/SessionEntry"
+          },
+          "turn": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTurn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "entry"
+        ],
+        "title": "PostedMessage",
+        "type": "object"
+      },
       "Project": {
         "description": "The top-level container. Everything else belongs to exactly one project.",
         "properties": {
@@ -1703,6 +2012,25 @@
           "expected_revision"
         ],
         "title": "ProjectRename",
+        "type": "object"
+      },
+      "ReasoningPart": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "reasoning",
+            "default": "reasoning",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "ReasoningPart",
         "type": "object"
       },
       "RefreshQueued": {
@@ -2177,6 +2505,14 @@
           "actor": {
             "$ref": "#/components/schemas/Actor"
           },
+          "context": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Context"
+            },
+            "title": "Context",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2424,6 +2760,41 @@
         "title": "SourceChange",
         "type": "object"
       },
+      "SourcePart": {
+        "description": "A data source the agent read, so the answer shows where its numbers come from.",
+        "properties": {
+          "source_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "const": "source",
+            "default": "source",
+            "title": "Type",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "source_id",
+          "title"
+        ],
+        "title": "SourcePart",
+        "type": "object"
+      },
       "Template": {
         "properties": {
           "content": {
@@ -2479,6 +2850,25 @@
         ],
         "title": "TemplateKind",
         "type": "string"
+      },
+      "TextPart": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "text",
+            "default": "text",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "TextPart",
+        "type": "object"
       },
       "TimeRange": {
         "description": "What a run or a dashboard asks for. An open end means no bound on that side.",
@@ -2540,6 +2930,97 @@
         "title": "TimeRole",
         "type": "object"
       },
+      "ToolPart": {
+        "properties": {
+          "error_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Text"
+          },
+          "input": {
+            "$ref": "#/components/schemas/JsonObject",
+            "default": {}
+          },
+          "output": {
+            "title": "Output"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ToolState"
+          },
+          "tool_call_id": {
+            "title": "Tool Call Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool",
+            "default": "tool",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_call_id",
+          "tool_name",
+          "state"
+        ],
+        "title": "ToolPart",
+        "type": "object"
+      },
+      "ToolState": {
+        "enum": [
+          "input-available",
+          "output-available",
+          "output-error"
+        ],
+        "title": "ToolState",
+        "type": "string"
+      },
+      "TurnPart": {
+        "discriminator": {
+          "mapping": {
+            "reasoning": "#/components/schemas/ReasoningPart",
+            "source": "#/components/schemas/SourcePart",
+            "text": "#/components/schemas/TextPart",
+            "tool": "#/components/schemas/ToolPart"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ReasoningPart"
+          },
+          {
+            "$ref": "#/components/schemas/ToolPart"
+          },
+          {
+            "$ref": "#/components/schemas/TextPart"
+          },
+          {
+            "$ref": "#/components/schemas/SourcePart"
+          }
+        ]
+      },
+      "TurnStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed",
+          "cancelled"
+        ],
+        "title": "TurnStatus",
+        "type": "string"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -2592,6 +3073,16 @@
       "Widget": {
         "description": "A display of one operator's output. It never holds data: it fetches the output of\nits operator from the server, for the run it is shown in.",
         "properties": {
+          "copied_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2647,6 +3138,25 @@
           "created_at"
         ],
         "title": "Widget",
+        "type": "object"
+      },
+      "WidgetContext": {
+        "description": "A message about a widget the person points at.",
+        "properties": {
+          "kind": {
+            "const": "widget",
+            "default": "widget",
+            "title": "Kind",
+            "type": "string"
+          },
+          "widget_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "widget_id"
+        ],
+        "title": "WidgetContext",
         "type": "object"
       },
       "WidgetData": {
@@ -2986,6 +3496,60 @@
         ]
       }
     },
+    "/api/dashboards/{dashboard_id}/agent-session": {
+      "post": {
+        "description": "The session behind the dashboard's agent panel: the newest one that started from\nthe dashboard and shows it, else a new one (201).",
+        "operationId": "dashboard_agent_session_api_dashboards__dashboard_id__agent_session_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dashboard Agent Session",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
     "/api/dashboards/{dashboard_id}/alert-rules": {
       "get": {
         "operationId": "list_alert_rules_api_dashboards__dashboard_id__alert_rules_get",
@@ -3151,7 +3715,7 @@
     },
     "/api/dashboards/{dashboard_id}/pins": {
       "post": {
-        "description": "Put a widget in a slot, adding the slot when there is none of that name. Adds a\nversion.",
+        "description": "Put a copy of a widget in a slot, adding the slot when there is none of that name.\nThe copy's `copied_from` names the original. Adds a version.",
         "operationId": "pin_widget_api_dashboards__dashboard_id__pins_post",
         "parameters": [
           {
@@ -3460,6 +4024,28 @@
         "summary": "Live",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/llm/models": {
+      "get": {
+        "description": "The models of the models file, whether each can be used (a missing key makes one\nunavailable, with the reason), and the session agent. Keys are never returned.",
+        "operationId": "list_models_api_llm_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "agent"
         ]
       }
     },
@@ -4046,6 +4632,54 @@
           }
         },
         "summary": "Add Operator",
+        "tags": [
+          "operators"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/pipelines": {
+      "get": {
+        "description": "The project's pipelines: operators no other operator uses as an input, newest\nfirst, with a readable name and the data sources each reads.",
+        "operationId": "list_pipelines_api_projects__project_id__pipelines_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Pipeline"
+                  },
+                  "title": "Response List Pipelines Api Projects  Project Id  Pipelines Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Pipelines",
         "tags": [
           "operators"
         ]
@@ -5118,6 +5752,7 @@
     },
     "/api/sessions/{session_id}/messages": {
       "post": {
+        "description": "Add a message. With a session agent configured, its answer is queued as a turn,\nwhich the response carries; `turn` is null without one.",
         "operationId": "add_message_api_sessions__session_id__messages_post",
         "parameters": [
           {
@@ -5146,7 +5781,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionEntry"
+                  "$ref": "#/components/schemas/PostedMessage"
                 }
               }
             },
@@ -5166,6 +5801,54 @@
         "summary": "Add Message",
         "tags": [
           "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/turns": {
+      "get": {
+        "description": "The agent's turns in a session, oldest first.",
+        "operationId": "list_turns_api_sessions__session_id__turns_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentTurn"
+                  },
+                  "title": "Response List Turns Api Sessions  Session Id  Turns Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Turns",
+        "tags": [
+          "agent"
         ]
       }
     },
@@ -5456,6 +6139,94 @@
         "summary": "Get Template",
         "tags": [
           "reports"
+        ]
+      }
+    },
+    "/api/turns/{turn_id}": {
+      "get": {
+        "description": "One turn with its parts so far. A client that connects late reads this, then applies\nthe agent.turn_part events with a higher index.",
+        "operationId": "get_turn_api_turns__turn_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTurn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Turn",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/turns/{turn_id}/cancel": {
+      "post": {
+        "description": "Ask a turn to stop: a queued one is cancelled at once, a running one stops at its\nnext step and then reports agent.turn_finished. A finished turn is returned as it is.",
+        "operationId": "cancel_turn_api_turns__turn_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTurn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Turn",
+        "tags": [
+          "agent"
         ]
       }
     },

@@ -19,6 +19,7 @@ from ada.adapters.memory.repositories import (
 )
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.models.actors import PLATFORM
 from ada.core.models.operators import Operator, OperatorKind
 from ada.core.services.pipelines.listing import sql_name
 from ada.core.services.pipelines.service import Pipelines
@@ -106,6 +107,19 @@ async def test_only_operators_nothing_builds_on_are_pipelines_newest_first() -> 
     assert [s.name for s in by_id[baseline.id].sources] == ["Regions"]
     assert by_id[unused.id].name == "Boundaries"
     assert by_id[unused.id].kind is OperatorKind.SOURCE
+
+
+async def test_an_alert_filter_is_not_a_pipeline_and_hides_nothing() -> None:
+    world = World()
+    source = world.source("Sotkanet")
+    world.store.operators[source.id] = source.model_copy(update={"created_by": PLATFORM})
+    measure = world.transform("-- Screening coverage\nSELECT 1", source)
+    alerting = world.transform("SELECT * FROM measure WHERE value < 80", measure)
+    world.store.operators[alerting.id] = alerting.model_copy(update={"created_by": PLATFORM})
+
+    pipelines = await world.pipelines()
+
+    assert [p.operator_id for p in pipelines] == [measure.id]
 
 
 async def test_a_project_without_operators_has_no_pipelines() -> None:

@@ -192,6 +192,7 @@ export function installMockAgent() {
           kind: 'agent_turn',
           text: '',
           ref: turn.id,
+          context: [],
           actor: { kind: 'agent', name: turn.model },
           created_at: now,
         }

@@ -81,6 +81,27 @@ export interface paths {
         patch: operations["change_dashboard_api_dashboards__dashboard_id__patch"];
         trace?: never;
     };
+    "/api/dashboards/{dashboard_id}/agent-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dashboard Agent Session
+         * @description The session behind the dashboard's agent panel: the newest one that started from
+         *     the dashboard and shows it, else a new one (201).
+         */
+        post: operations["dashboard_agent_session_api_dashboards__dashboard_id__agent_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboards/{dashboard_id}/alert-rules": {
         parameters: {
             query?: never;
@@ -135,8 +156,8 @@ export interface paths {
         put?: never;
         /**
          * Pin Widget
-         * @description Put a widget in a slot, adding the slot when there is none of that name. Adds a
-         *     version.
+         * @description Put a copy of a widget in a slot, adding the slot when there is none of that name.
+         *     The copy's `copied_from` names the original. Adds a version.
          */
         post: operations["pin_widget_api_dashboards__dashboard_id__pins_post"];
         delete?: never;
@@ -256,6 +277,27 @@ export interface paths {
          * @description Liveness for container healthchecks: the API answers, whatever its dependencies do.
          */
         get: operations["live_api_health_live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llm/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Models
+         * @description The models of the models file, whether each can be used (a missing key makes one
+         *     unavailable, with the reason), and the session agent. Keys are never returned.
+         */
+        get: operations["list_models_api_llm_models_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -431,6 +473,27 @@ export interface paths {
         put?: never;
         /** Add Operator */
         post: operations["add_operator_api_projects__project_id__operators_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/pipelines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pipelines
+         * @description The project's pipelines: operators no other operator uses as an input, newest
+         *     first, with a readable name and the data sources each reads.
+         */
+        get: operations["list_pipelines_api_projects__project_id__pipelines_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -705,8 +768,32 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Message */
+        /**
+         * Add Message
+         * @description Add a message. With a session agent configured, its answer is queued as a turn,
+         *     which the response carries; `turn` is null without one.
+         */
         post: operations["add_message_api_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sessions/{session_id}/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Turns
+         * @description The agent's turns in a session, oldest first.
+         */
+        get: operations["list_turns_api_sessions__session_id__turns_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -810,6 +897,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/turns/{turn_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Turn
+         * @description One turn with its parts so far. A client that connects late reads this, then applies
+         *     the agent.turn_part events with a higher index.
+         */
+        get: operations["get_turn_api_turns__turn_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/turns/{turn_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Turn
+         * @description Ask a turn to stop: a queued one is cancelled at once, a running one stops at its
+         *     next step and then reports agent.turn_finished. A finished turn is returned as it is.
+         */
+        post: operations["cancel_turn_api_turns__turn_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/widget-bundles/{name}.html": {
         parameters: {
             query?: never;
@@ -892,6 +1021,34 @@ export interface components {
          * @enum {string}
          */
         ActorKind: "user" | "agent" | "external_agent" | "system";
+        /**
+         * AgentTurn
+         * @description The agent's answer to one message. Written by the worker as it goes; no revision,
+         *     since nobody else edits it (a cancel request is a flag of its own).
+         */
+        AgentTurn: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error */
+            error?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+            id: components["schemas"]["Id"];
+            /** Model */
+            model: string;
+            /**
+             * Parts
+             * @default []
+             */
+            parts: components["schemas"]["TurnPart"][];
+            prompt_entry_id: components["schemas"]["Id"];
+            session_id: components["schemas"]["Id"];
+            /** @default queued */
+            status: components["schemas"]["TurnStatus"];
+        };
         /**
          * Alert
          * @description One instance per rule and key. A region that stays below target alerts once.
@@ -1012,6 +1169,7 @@ export interface components {
          * @enum {string}
          */
         ColumnType: "text" | "integer" | "number" | "boolean" | "date" | "timestamp" | "json";
+        Context: components["schemas"]["PipelineContext"] | components["schemas"]["DashboardContext"] | components["schemas"]["WidgetContext"];
         /**
          * Dashboard
          * @description A live view that follows the latest run. Its content lives in its versions; this
@@ -1041,6 +1199,20 @@ export interface components {
             default_time_range: components["schemas"]["TimeRange"];
             /** Expected Revision */
             expected_revision: number;
+        };
+        /**
+         * DashboardContext
+         * @description A message about a dashboard: what the agent makes goes there, into `slot` if named.
+         */
+        DashboardContext: {
+            dashboard_id: components["schemas"]["Id"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "dashboard";
+            /** Slot */
+            slot?: string | null;
         };
         /** DashboardRules */
         DashboardRules: {
@@ -1127,7 +1299,7 @@ export interface components {
          * EntryKind
          * @enum {string}
          */
-        EntryKind: "message" | "operator" | "widget";
+        EntryKind: "message" | "operator" | "widget" | "agent_turn";
         /**
          * FreshnessKind
          * @enum {string}
@@ -1265,6 +1437,37 @@ export interface components {
             /** Value */
             value: string;
         };
+        /**
+         * ModelInfo
+         * @description A model from the models file. Its key is never part of it.
+         */
+        ModelInfo: {
+            /** Available */
+            available: boolean;
+            /** Id */
+            id: string;
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Purposes
+             * @default []
+             */
+            purposes: string[];
+            /** Reason */
+            reason?: string | null;
+        };
+        /** ModelList */
+        ModelList: {
+            /**
+             * Models
+             * @default []
+             */
+            models: components["schemas"]["ModelInfo"][];
+            /** Session Agent */
+            session_agent?: string | null;
+        };
         /** NewAlertRule */
         NewAlertRule: {
             alert_pipeline_id?: components["schemas"]["OperatorId"] | null;
@@ -1310,6 +1513,13 @@ export interface components {
         };
         /** NewMessage */
         NewMessage: {
+            /**
+             * Context
+             * @default []
+             */
+            context: components["schemas"]["Context"][];
+            /** Model */
+            model?: string | null;
             /** Text */
             text: string;
         };
@@ -1483,6 +1693,51 @@ export interface components {
             widget_id: components["schemas"]["Id"];
         };
         /**
+         * Pipeline
+         * @description An operator no other operator uses as an input, with what it reads: a pipeline a
+         *     person can put a widget on or an agent can build on.
+         */
+        Pipeline: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            kind: components["schemas"]["OperatorKind"];
+            /** Name */
+            name: string;
+            operator_id: components["schemas"]["OperatorId"];
+            output: components["schemas"]["Schema"];
+            /**
+             * Sources
+             * @default []
+             */
+            sources: components["schemas"]["PipelineSource"][];
+        };
+        /**
+         * PipelineContext
+         * @description A message about a pipeline: the agent builds on this operator.
+         */
+        PipelineContext: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "pipeline";
+            operator_id: components["schemas"]["OperatorId"];
+        };
+        /** PipelineSource */
+        PipelineSource: {
+            data_source_id: components["schemas"]["Id"];
+            /** Name */
+            name: string;
+        };
+        /** PostedMessage */
+        PostedMessage: {
+            entry: components["schemas"]["SessionEntry"];
+            turn?: components["schemas"]["AgentTurn"] | null;
+        };
+        /**
          * Project
          * @description The top-level container. Everything else belongs to exactly one project.
          */
@@ -1507,6 +1762,16 @@ export interface components {
             expected_revision: number;
             /** Name */
             name: string;
+        };
+        /** ReasoningPart */
+        ReasoningPart: {
+            /** Text */
+            text: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "reasoning";
         };
         /** RefreshQueued */
         RefreshQueued: {
@@ -1715,6 +1980,11 @@ export interface components {
         SessionEntry: {
             actor: components["schemas"]["Actor"];
             /**
+             * Context
+             * @default []
+             */
+            context: components["schemas"]["Context"][];
+            /**
              * Created At
              * Format: date-time
              */
@@ -1799,6 +2069,22 @@ export interface components {
             name?: string | null;
             options?: components["schemas"]["JsonObject"] | null;
         };
+        /**
+         * SourcePart
+         * @description A data source the agent read, so the answer shows where its numbers come from.
+         */
+        SourcePart: {
+            source_id: components["schemas"]["Id"];
+            /** Title */
+            title: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "source";
+            /** Url */
+            url?: string | null;
+        };
         /** Template */
         Template: {
             /** @default {} */
@@ -1829,6 +2115,16 @@ export interface components {
          * @enum {string}
          */
         TemplateKind: "report" | "dashboard";
+        /** TextPart */
+        TextPart: {
+            /** Text */
+            text: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "text";
+        };
         /**
          * TimeRange
          * @description What a run or a dashboard asks for. An open end means no bound on that side.
@@ -1851,6 +2147,36 @@ export interface components {
             /** Start */
             start: string;
         };
+        /** ToolPart */
+        ToolPart: {
+            /** Error Text */
+            error_text?: string | null;
+            /** @default {} */
+            input: components["schemas"]["JsonObject"];
+            /** Output */
+            output?: unknown;
+            state: components["schemas"]["ToolState"];
+            /** Tool Call Id */
+            tool_call_id: string;
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool";
+        };
+        /**
+         * ToolState
+         * @enum {string}
+         */
+        ToolState: "input-available" | "output-available" | "output-error";
+        TurnPart: components["schemas"]["ReasoningPart"] | components["schemas"]["ToolPart"] | components["schemas"]["TextPart"] | components["schemas"]["SourcePart"];
+        /**
+         * TurnStatus
+         * @enum {string}
+         */
+        TurnStatus: "queued" | "running" | "done" | "failed" | "cancelled";
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -1875,6 +2201,7 @@ export interface components {
          *     its operator from the server, for the run it is shown in.
          */
         Widget: {
+            copied_from?: components["schemas"]["Id"] | null;
             /**
              * Created At
              * Format: date-time
@@ -1896,6 +2223,18 @@ export interface components {
             title: string;
             /** Type */
             type: string;
+        };
+        /**
+         * WidgetContext
+         * @description A message about a widget the person points at.
+         */
+        WidgetContext: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "widget";
+            widget_id: components["schemas"]["Id"];
         };
         /**
          * WidgetData
@@ -2115,6 +2454,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dashboard_agent_session_api_dashboards__dashboard_id__agent_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
                 };
             };
             /** @description Validation Error */
@@ -2434,6 +2813,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Liveness"];
+                };
+            };
+        };
+    };
+    list_models_api_llm_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelList"];
                 };
             };
         };
@@ -2802,6 +3201,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Operator"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pipelines_api_projects__project_id__pipelines_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pipeline"][];
                 };
             };
             /** @description Validation Error */
@@ -3525,7 +3955,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionEntry"];
+                    "application/json": components["schemas"]["PostedMessage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_turns_api_sessions__session_id__turns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTurn"][];
                 };
             };
             /** @description Validation Error */
@@ -3720,6 +4181,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Template"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_turn_api_turns__turn_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTurn"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_turn_api_turns__turn_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTurn"];
                 };
             };
             /** @description Validation Error */

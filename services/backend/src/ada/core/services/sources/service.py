@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import date, datetime
 from uuid import uuid7
 
-from ada.core.models.actors import Actor, ActorKind
+from ada.core.models.actors import PLATFORM
 from ada.core.models.analysis import Query
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.errors import Invalid
@@ -46,9 +46,6 @@ from ada.core.services.sources.pushdown import (
     time_role,
 )
 from ada.core.services.sources.shaping import shape, shape_options, split_periods
-
-# Refreshes and source operators are platform work, whoever triggered them.
-PLATFORM = Actor(kind=ActorKind.SYSTEM, name="ada")
 
 # The key of the snapshot of the whole source, as `refresh` fetches it. A source that
 # fetches by period (pushdown.py) also keeps one snapshot per period, keyed

@@ -134,7 +134,7 @@ the merge it:
 - folded the four wave 2 contract files into `docs/contracts.md`, with the known issues
   the next wave starts from.
 
-## Pipeline view (in progress)
+## Pipeline view (done)
 
 One agent: a footer on every widget card with the one-line pipeline summary on the left
 and icon actions on the right (add to dashboard; on dashboards, go to the session the
@@ -142,7 +142,7 @@ widget came from, disabled when it has none); a dialog with the operator tree as
 the selected operator's details, and a preview of its rows in the card's run. Sessions
 and widget pages show one run per view, like dashboards.
 
-## Wave 3: the agent in the platform, and the workspace (two agents at once)
+## Wave 3: the agent in the platform, and the workspace (two agents at once) (done)
 
 Decided with the user:
 
@@ -183,6 +183,13 @@ Decided with the user:
 | Backend | `llms.yml` loading; the pydantic-ai agent task; turns as parts, stored and streamed; messages with context; dashboard agent sessions; the pipelines list (route and MCP tool); copy on pin with `copied_from` (migration); layout saves |
 | Frontend | shadcn; side navigation and full-width layout; type labels and rename icons; chat with Trace and context chips; "Add widget"; dashboard agent panel; the half-width dashboard beside a session; widget modal; drag and resize |
 
+### Integration 3 (done)
+
+Merged both; regenerated the typed client and replaced the frontend's temporary agent
+types with it; left operators the platform made (an alert rule's filter) out of the
+pipelines list; explained in the grid why a narrow dashboard has no handles; folded the
+wave 3 contracts into `docs/contracts.md`.
+
 ## Bottom-up invalidation of definitions (proposed, after wave 3)
 
 A source's definition (address, options, declared schema) becomes part of its operator's
@@ -219,6 +226,6 @@ statistic operators; document and browser sources; alert pipelines; data-quality
 
 ```
 Foundation ──▶ A  B  C  D  E  F ──▶ Integration 1 ──▶ G  H  I  J ──▶ Integration 2 (all done)
-──▶ Pipeline view ──▶ Wave 3 (backend, frontend) ──▶ Integration 3
+──▶ Pipeline view ──▶ Wave 3 (backend, frontend) ──▶ Integration 3 (all done)
 ──▶ Bottom-up invalidation (proposed) ──▶ Test consolidation
 ```

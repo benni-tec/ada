@@ -121,6 +121,7 @@ export function entry(overrides: Partial<SessionEntry> = {}): SessionEntry {
     kind: 'message',
     text: '',
     ref: null,
+    context: [],
     actor: web,
     created_at: '2026-11-01T09:06:00Z',
     ...overrides,
@@ -143,7 +144,7 @@ export function widget(overrides: Partial<Widget> = {}): Widget {
   }
 }
 
-// Wave 3: the agent (docs/contracts/wave3.md)
+// The agent (docs/contracts.md, "The agent")
 
 export function turn(overrides: Partial<AgentTurn> = {}): AgentTurn {
   return {

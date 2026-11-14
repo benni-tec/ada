@@ -216,13 +216,6 @@ function DashboardPage() {
             {viewing !== undefined && !old && versions.isSuccess && (
               <ErrorNotice error={new Error(`Version ${viewing} does not exist.`)} />
             )}
-            {editing && !old && (
-              <p className="text-sm text-muted-foreground">
-                Drag a widget by its handle to move it, or by its corner to resize it; maps keep their shape. Each drop
-                saves a new version of the dashboard.
-              </p>
-            )}
-
             {run.error ? (
               <ErrorNotice error={run.error} prefix="The data cannot be read:" />
             ) : widgets.error ? (

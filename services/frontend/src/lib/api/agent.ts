@@ -1,112 +1,70 @@
-// TEMPORARY, wave 3: the agent's routes and models, written by hand from
-// docs/contracts/wave3.md because the backend that serves them is being built at the same
-// time. Integration regenerates the typed client (`moon run frontend:generate`) and moves
-// these onto it: the types become `Schemas[...]` names and the calls go through `api`.
+// The agent's routes and models (docs/contracts.md, "The agent"), on the typed client.
 
 import { queryOptions } from '@tanstack/react-query'
 
 import { withLiveParts } from '../agent-turns'
-import { ApiFailure, type ApiError } from './client'
-import type { DateTime, Id, OperatorId, Schema, Session, SessionEntry } from './models'
+import { api, ApiFailure, type ApiError, type Schemas } from './client'
+import type { Id } from './models'
 
 /** What a message is about, stored with its entry: chips in the composer. */
-export type Context =
-  | { kind: 'pipeline'; operator_id: OperatorId }
-  | { kind: 'dashboard'; dashboard_id: Id; slot?: string | null }
-  | { kind: 'widget'; widget_id: Id }
+export type Context = Schemas['Context']
 
-export type TurnStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
+export type TurnStatus = Schemas['TurnStatus']
 
 // Parts follow the AI SDK UI message parts, which the shadcn Trace component renders.
-export type ReasoningPart = { type: 'reasoning'; text: string }
-export type ToolPart = {
-  type: 'tool'
-  tool_call_id: string
-  tool_name: string
-  state: 'input-available' | 'output-available' | 'output-error'
-  input: Record<string, unknown>
-  output: unknown
-  error_text: string | null
-}
-export type TextPart = { type: 'text'; text: string }
-export type SourcePart = { type: 'source'; source_id: Id; title: string; url: string | null }
-export type Part = ReasoningPart | ToolPart | TextPart | SourcePart
+export type ReasoningPart = Schemas['ReasoningPart']
+export type ToolPart = Schemas['ToolPart']
+export type TextPart = Schemas['TextPart']
+export type SourcePart = Schemas['SourcePart']
+export type Part = Schemas['TurnPart']
 
 /** One answer of the session's agent: the steps it took and what it said, in order. */
-export type AgentTurn = {
-  id: Id
-  session_id: Id
-  prompt_entry_id: Id
-  model: string
-  status: TurnStatus
+export type AgentTurn = Omit<Schemas['AgentTurn'], 'parts'> & {
   /** Sparse while streaming: a part can arrive before the ones before it. */
   parts: (Part | undefined)[]
-  error: string | null
-  created_at: DateTime
-  finished_at: DateTime | null
 }
 
-export type LlmModel = {
-  id: string
-  provider: string
-  model: string
-  purposes: string[]
-  available: boolean
-  /** Why it cannot be used, e.g. its key's variable is not set. */
-  reason: string | null
-}
+export type LlmModel = Schemas['ModelInfo']
 
 /** The models of `llms.yml`; `session_agent` is null when none drives sessions. */
-export type LlmModels = { models: LlmModel[]; session_agent: string | null }
+export type LlmModels = Schemas['ModelList']
 
 /** An operator no other operator reads: the end of a pipeline, what a widget can show. */
-export type Pipeline = {
-  operator_id: OperatorId
-  name: string
-  kind: string
-  sources: { data_source_id: Id; name: string }[]
-  output: Schema
-  created_at: DateTime
-}
+export type Pipeline = Schemas['Pipeline']
 
 /** The answer to a message: its entry, and the turn queued for the agent (null when no
  * agent is configured, so nobody will answer). */
-export type PostedMessage = { entry: SessionEntry; turn: AgentTurn | null }
+export type PostedMessage = Schemas['PostedMessage']
 
-export type NewMessage = { text: string; context: Context[]; model?: string }
+export type NewMessage = Schemas['NewMessage']
 
-/** A call outside the typed client; an ApiFailure, with the server's detail, otherwise. */
-async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  // Absolute, as in client.ts: Request rejects relative URLs outside a browser (tests).
-  const response = await globalThis.fetch(`${window.location.origin}${path}`, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  const data: unknown = await response.json().catch(() => undefined)
-  if (!response.ok) {
-    const error = data as ApiError | undefined
-    throw new ApiFailure(response.status, typeof error?.detail === 'string' ? error : undefined)
+type Answer<T> = { data?: T; error?: unknown; response: Response }
+
+async function unwrap<T>(call: Promise<Answer<T>>): Promise<T> {
+  const { data, error, response } = await call
+  if (!response.ok || data === undefined) {
+    const body = error as ApiError | undefined
+    throw new ApiFailure(response.status, typeof body?.detail === 'string' ? body : undefined)
   }
-  return data as T
+  return data
 }
 
-const path = encodeURIComponent
-
 export const postMessage = (sessionId: Id, message: NewMessage) =>
-  call<PostedMessage>('POST', `/api/sessions/${path(sessionId)}/messages`, message)
+  unwrap(api.POST('/api/sessions/{session_id}/messages', { params: { path: { session_id: sessionId } }, body: message }))
 
-export const getTurn = (id: Id) => call<AgentTurn>('GET', `/api/turns/${path(id)}`)
+export const getTurn = (id: Id) => unwrap(api.GET('/api/turns/{turn_id}', { params: { path: { turn_id: id } } }))
 
-export const cancelTurn = (id: Id) => call<unknown>('POST', `/api/turns/${path(id)}/cancel`)
+export const cancelTurn = (id: Id) =>
+  unwrap(api.POST('/api/turns/{turn_id}/cancel', { params: { path: { turn_id: id } } }))
 
-export const listModels = () => call<LlmModels>('GET', '/api/llm/models')
+export const listModels = () => unwrap(api.GET('/api/llm/models'))
 
-export const listPipelines = (projectId: Id) => call<Pipeline[]>('GET', `/api/projects/${path(projectId)}/pipelines`)
+export const listPipelines = (projectId: Id) =>
+  unwrap(api.GET('/api/projects/{project_id}/pipelines', { params: { path: { project_id: projectId } } }))
 
 /** The dashboard's agent session, found or created (the agent panel's conversation). */
 export const openDashboardAgentSession = (dashboardId: Id) =>
-  call<Session>('POST', `/api/dashboards/${path(dashboardId)}/agent-session`)
+  unwrap(api.POST('/api/dashboards/{dashboard_id}/agent-session', { params: { path: { dashboard_id: dashboardId } } }))
 
 export const agentKeys = {
   // Not under ['sessions', id]: the record's events would refetch turns mid-stream.

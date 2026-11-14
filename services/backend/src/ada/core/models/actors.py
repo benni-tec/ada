@@ -19,3 +19,7 @@ class Actor(DomainModel):
     kind: ActorKind
     # For an external agent, the client name it reported when connecting over MCP.
     name: str
+
+
+# The platform's own work: refreshes, source operators, alert checks and their filters.
+PLATFORM = Actor(kind=ActorKind.SYSTEM, name="ada")

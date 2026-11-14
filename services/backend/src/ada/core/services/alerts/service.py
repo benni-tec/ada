@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import date, datetime, timedelta
 from uuid import uuid7
 
-from ada.core.models.actors import Actor, ActorKind
+from ada.core.models.actors import PLATFORM
 from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.errors import Invalid, NotFound
@@ -35,9 +35,6 @@ from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sources import SourceService
 
 logger = logging.getLogger(__name__)
-
-# Checks are platform work, whoever asked for one.
-PLATFORM = Actor(kind=ActorKind.SYSTEM, name="ada")
 
 # Alerting rows are one per key at most (with a time role), so this bounds the keys a rule
 # may alert on at once. Past it, resolving would be guesswork; the check fails instead.

@@ -4,7 +4,7 @@ What the workstreams of `docs/plan.md` agree on. These are fixed for a wave: if 
 turns out wrong, report it instead of changing it, so everyone changes together.
 
 The spec (`docs/spec.md`) says what the system does and why. This file says where things
-live and how the pieces talk. It describes the code as integrated after wave 2.
+live and how the pieces talk. It describes the code as integrated after wave 3.
 
 ## Frozen code
 
@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations are written by the foundation (`0001`) and the integration steps (`0002`); nobody adds one during a wave |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -33,6 +33,22 @@ What the integration after wave 2 changed in them:
 | `core/services/ports/alerts.py` | `AlertService.update_rule` also takes `key_columns`, `max_data_age_seconds`, `alert_pipeline_id`; the three fields that may be empty take `Change[...]` |
 | `core/ports/sources.py` | `SourceLocks`: one unit of work fetches a source at a time |
 | `core/services/ports/runs.py` | `RunService.snapshot(id)`: a snapshot by id, for the pipeline view (after wave 2) |
+
+What wave 3 (the agent) added to them:
+
+| Where | Change |
+| --- | --- |
+| `core/models/agents.py` | `ModelInfo`, `ModelList`, `AgentTurn`, `TurnStatus`, the four parts, `PostedMessage`, `TurnRequest`, `HistoryMessage`, `ToolSpec` |
+| `core/models/pipelines.py` | `Pipeline`, `PipelineSource`: one entry of the pipelines list |
+| `core/models/sessions.py` | `Context` (`PipelineContext`, `DashboardContext`, `WidgetContext`), `SessionEntry.context`, `EntryKind.AGENT_TURN` |
+| `core/models/widgets.py` | `Widget.copied_from` |
+| `core/models/events.py` | `agent.turn_started`, `agent.turn_part`, `agent.turn_finished` |
+| `core/ports/agents.py` | `LanguageModels` (the models file), `AgentRuntime` (runs a model with tools), `AgentTools` and `AgentToolbox` (the tools of a turn), `TurnSink` (where a running turn reports parts), `TurnProgress` (a running turn's writes, each committed at once), `AgentFailed`, `ToolCallFailed` |
+| `core/ports/repositories.py`, `core/ports/tasks.py` | `AgentTurnRepository`; `TaskDispatcher.run_turn` |
+| `core/services/ports/agents.py` | `AgentTurnService`: `models`, `post_message`, `turns`, `get`, `cancel`, `run` |
+| `core/services/ports/sessions.py`, `pipelines.py` | `SessionService.add_message(..., context)`, `record_agent_turn`, `dashboard_agent_session`; `PipelineService.pipelines` |
+| Migration `0003` | `session_entries.context` (JSONB, default `[]`), `widgets.copied_from` (to widgets, `SET NULL`), the table `agent_turns` (with `cancel_requested`) |
+| `tach.toml` | Inbound ports may name outbound ports (`AgentTurnService.run` takes the toolbox its caller provides); the worker may import `ada.entrypoints.mcp` (the agent's tools are the MCP tools, served in process) |
 
 ## Adding a feature without touching shared files
 
@@ -57,7 +73,7 @@ on the stand-in.
 | --- | --- |
 | `infrastructure.py` | Settings, database engine and request session, `AfterCommit` (`PendingWork`), Valkey client, `Clock` |
 | `system.py` | `Database`, `TaskQueue`, `SystemStatusService` |
-| `repositories.py` | All twelve repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog` (own connection) |
+| `repositories.py` | All thirteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog` and `TurnProgress` (own connection, a short transaction per write) |
 | `analysis.py` | `AnalysisStore` (Parquet and DuckDB), `PipelineService`, `RunService` |
 | `sources.py` | `SourceReaders` (HTTP: URL and request sources), `SourceService` |
 | `workspace.py` | `ProjectService`, `SessionService`, `WidgetService` |
@@ -65,6 +81,7 @@ on the stand-in.
 | `dashboards.py` | `DashboardService` (`Dashboards`) |
 | `reports.py` | `ReportService` (`Reports`), `TemplateService` (`Templates`) |
 | `alerts.py` | `AlertService` (`Alerts`) |
+| `agents.py` | `LanguageModels` (the models file, read once per process), `AgentRuntime` (`PydanticAiRuntime`), `AgentTurnService` (`AgentTurns`). The toolbox is not bound: whoever runs a turn passes it |
 
 Services are bound at `Scope.REQUEST`; whatever holds a connection or shared state at
 `Scope.APP`. The in-memory repositories, event bus and task dispatcher in
@@ -88,7 +105,10 @@ ends normally and rolls back when it raises.
 - **After the commit.** `AfterCommit.add(action)` runs an action once the unit's
   transaction has committed, never after a rollback. A failing action is logged, not
   raised: the commit cannot be undone. The REST and MCP source update paths use it to
-  queue the forced refresh.
+  queue the forced refresh; posting a message uses it to queue the agent's turn.
+- **Agent turns.** A turn is not one unit of work. Each tool call the agent makes is one,
+  as over MCP; the turn's own writes go through `TurnProgress`, each in a short
+  transaction of its own (see The agent).
 
 ## Behaviour every implementation of a port must share
 
@@ -105,7 +125,8 @@ pass the same ones (`tests/test_db_repositories.py`).
   (`last_checked_at` and, for sources, `last_probe_token` and `last_error`) with a plain
   UPDATE that leaves the revision alone, so a refresh or check never makes a concurrent
   edit conflict, and `update` never writes those columns, so an edit never puts back an
-  old outcome.
+  old outcome. An agent turn has no revision: its writes are plain UPDATEs of their own
+  columns (see The agent).
 - **Immutable records.** Operators, snapshots, runs, dashboard versions and report
   versions are only ever added. A source operator keeps the output schema the source was
   registered with, even after the source's declared schema is edited.
@@ -117,7 +138,7 @@ pass the same ones (`tests/test_db_repositories.py`).
   `EventPublisher`, which hands each event to `AfterCommit`; the APP-scoped
   `EventBroadcaster` (Valkey) delivers it once the unit has committed, and it is dropped on
   a rollback. A client that fetches on an event finds what it names; failed work announces
-  nothing. `publish` never raises.
+  nothing. `publish` never raises. The agent's turns are the exception (see Live events).
 - **External failures are `Unavailable`.** An external dependency that could not be
   reached or answered with an error (a data source, the task queue) raises
   `Unavailable` (`core/models/errors.py`): nothing is wrong with the request and retrying
@@ -278,6 +299,7 @@ Named `<module>:<function>`; the dispatcher queues them by name
 | `ada.entrypoints.worker.tasks.alerts:check_alert_rule` | Queued by `check_due_alert_rules` and `TaskDispatcher.check_alert_rule` | Skips a rule disabled after it was queued; `AlertService.check`. A failure is logged and the task ends normally (the rule stays due) |
 | `ada.entrypoints.worker.tasks.alerts:check_due_alert_rules` | Every minute (scheduler) | Queues `check_alert_rule` for each rule `AlertService.due()` returns; a failure to queue one is logged and the others are still queued |
 | `ada.entrypoints.worker.tasks.system:record_heartbeat` | Every minute (scheduler) | Proves scheduler, queue and worker work (health) |
+| `ada.entrypoints.worker.tasks.agent:run_turn` | Queued by `AgentTurnService.post_message` after the commit (`TaskDispatcher.run_turn(turn_id)`) | `AgentTurnService.run(turn, InProcessToolbox(container))` with the application's container (see The agent). Never raises: everything is caught and logged, and a failure ends the turn `failed` |
 
 ## Dashboards
 
@@ -291,9 +313,15 @@ carries the revision.
   updated first with `expected_revision`, so a stale caller gets `Conflict` before a
   version exists; the revision increases on every edit, pin and range change.
 - **Slots.** Names are trimmed, not blank and unique within a version. A slot's widget
-  must exist and be in the dashboard's project. The same widget may sit in several slots;
-  pinning references the widget, never copies it. `pin_widget(id, widget_id, slot)` fills
-  the slot of that name, keeping its layout, or appends one.
+  must exist and be in the dashboard's project. The same widget may sit in several slots.
+  `pin_widget(id, widget_id, slot)` fills the slot of that name, keeping its layout, or
+  appends one.
+- **Pinning copies.** The dashboard gets a widget of its own: the same operator, type,
+  spec, title and note, `copied_from` set to the original, no `session_id`, created by
+  whoever pins, announced with `widget.created`. Either can change later without the
+  other. `copied_from` always names the original made in a session: pinning a copy copies
+  its `copied_from`, so one step leads back to the session. A stale `expected_revision` is
+  refused before the copy is made.
 - **Layout.** `{x, y, w, h}` on a 12-column grid (`layout.py`): `x` 0–11, `w` and `h` at
   least 1, `x + w` at most 12, whole numbers, no other keys. Missing keys get `w = 6`,
   `h = 4` and a place after the previous slot of the same edit. Overlap is not checked.
@@ -419,6 +447,168 @@ the old one stays for the alerts it raised. **Each alert records it**
   check (any upstream snapshot newer than it; reads no data, fetches nothing).
 - **`alerts(project, state)`**: newest first.
 
+## The agent
+
+The agent inside the platform answers messages in sessions and in a dashboard's agent
+panel (`core/services/agents/`). It works only through the MCP tools, served in process,
+so whatever it makes is recorded like any client's work.
+
+### Configuration
+
+- **The models file.** `ADA_LLMS_CONFIG` names it (default `llms.yml` in the working
+  directory; moon sets `config/llms.yml` of the checkout, the compose file
+  `/config/llms.yml`, the mounted `config/`). `llms.yml` is git-ignored;
+  `llms.example.yml` at the root is committed and documents the format. A missing file is
+  an empty catalog: the platform runs without an agent and says so.
+
+  ```yaml
+  providers:
+    gemini:
+      kind: openai-compatible        # or: gemini (Google's own API)
+      base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+      api_key_env: GEMINI_API_KEY    # the variable that holds the key
+  models:
+    session_agent: gemini/<model>    # answers sessions and dashboard agent panels
+  ```
+
+- **Keys** are never in the file and never returned by the API. A provider names the
+  variable that holds its key (`api_key_env`; left out for an endpoint without a key).
+  The full stack passes `.env.local` to the backend and the worker. Keys are read once per
+  process.
+- **Checks.** The file is validated with pydantic: unknown keys are errors, an
+  `openai-compatible` provider needs `base_url`, every model names a configured provider,
+  purposes are known. Every problem is named with its path. The API's lifespan and the
+  worker's startup read the file, so a broken one stops them at start.
+- **Model ids** are `<provider>/<model>`, split at the first slash, so model names may
+  contain slashes. `kind: gemini` uses pydantic-ai's `GoogleModel`; the dependency is
+  `pydantic-ai-slim[openai,google]`.
+- **`GET /api/llm/models`** lists them. A model whose key's variable is not set is
+  `available: false`, with a `reason`.
+
+### Turns, parts and context
+
+`AgentTurn` (`core/models/agents.py`) is the agent's answer to one message:
+
+```
+{"id", "session_id", "prompt_entry_id", "model",
+ "status": "queued" | "running" | "done" | "failed" | "cancelled",
+ "parts": [Part], "error": "<text or null>", "created_at", "finished_at"}
+```
+
+Its parts are in the order they happened. They follow the AI SDK UI message parts that
+the shadcn Trace component renders:
+
+```
+{"type": "reasoning", "text": "..."}
+{"type": "tool", "tool_call_id": "...", "tool_name": "...",
+ "state": "input-available" | "output-available" | "output-error",
+ "input": {...}, "output": <json or null>, "error_text": "<text or null>"}
+{"type": "text", "text": "..."}
+{"type": "source", "source_id": "<data source id>", "title": "...", "url": "<or null>"}
+```
+
+A message may carry context besides its text (the chips of the chat input), stored with
+its entry (`SessionEntry.context`, empty by default) and checked when it is posted:
+
+```
+{"kind": "pipeline", "operator_id": "op_..."}
+{"kind": "dashboard", "dashboard_id": "...", "slot": "<name, optional>"}
+{"kind": "widget", "widget_id": "..."}
+```
+
+### How a turn runs
+
+1. **Posting.** `POST /sessions/{id}/messages` calls `AgentTurnService.post_message` in
+   one unit of work: the message entry with its context; when the models file names a
+   session agent (or the body names another configured `model`), a queued `AgentTurn` and
+   an `agent_turn` entry (`ref` the turn id, added now so the record orders it right
+   after the message); `agent.turn_started` and the task after the commit. An unknown
+   `model` is 422 and nothing is stored. A configured model whose key is not set gives a
+   turn that is `failed` at once with the reason ("The environment variable
+   GEMINI_API_KEY is not set"), and no task. If queueing the task fails after the commit,
+   the turn is marked failed ("The turn could not be queued: …").
+2. **Starting.** `run_turn` calls `AgentTurnService.run(turn_id, InProcessToolbox(...))`.
+   `TurnProgress.start` moves queued to running (a turn cancelled while queued is
+   skipped); then `agent.turn_started` is broadcast again.
+3. **The request.** `Briefing` (`briefing.py`) builds the system prompt: what ADA is, the
+   project and session with ids, the panel and origin dashboards, the rules, and each
+   context item explained (a pipeline to build on with its name and columns, a dashboard
+   and slot to pin to, a widget referred to). The history is at most the last 40
+   messages: earlier answers as their text plus one line per tool call naming what it
+   made, a line per source read, and a note when they failed or were cancelled; operators
+   and widgets that other clients recorded, as notes.
+4. **Tools.** `InProcessToolbox` (`entrypoints/mcp/agent.py`) opens FastMCP's in-memory
+   client on the platform's MCP server. Every tool call is a unit of work of its own, as
+   over HTTP, so entries and widgets appear in the session as they are made.
+   `get_widget_data`, `create_project` and `create_session` are left out. A tool that
+   takes `session_id` gets the turn's session when the model leaves it out. A tool error
+   comes back as `ToolCallFailed`, which the runtime hands to the model as a retry.
+5. **Running.** `PydanticAiRuntime` (`adapters/llm/runtime.py`) builds a pydantic-ai
+   `Agent` per turn: text output, the tools called one at a time, 3 retries per tool, at
+   most 24 model requests. It streams each model request and each tool step and calls
+   `TurnSink.checkpoint()` between steps.
+6. **Parts.** Text and reasoning parts are added when they first have text and replaced as
+   deltas arrive. A tool part is added when the call is made (`input-available`, the full
+   arguments) and replaced at its result (`output-available` with the JSON result, or
+   `output-error` with the message). After a successful tool result, every source operator
+   in it (`add_source_operator`, `get_lineage`) adds a `source` part, once per data source
+   per turn, with the source's name and its address when that is a URL. Every change is
+   broadcast at once as `agent.turn_part`.
+7. **Checkpoints.** After each step the parts so far are stored
+   (`TurnProgress.checkpoint`), which also reads the cancel flag.
+8. **The end.** `TurnProgress.finish` stores status, parts, error and `finished_at`; then
+   `agent.turn_finished` with the status is broadcast.
+
+- **A running turn writes through `TurnProgress`**, not the task's transaction. A turn runs
+  for minutes; written in the task's unit of work, its parts would stay invisible until
+  the end and its row locked, so a cancel request would wait for the turn it means to
+  stop. `SqlTurnProgress` opens a short transaction per write, like `SourceCheckLog`. The
+  started and finished events are broadcast right after those commits, the parts at once,
+  so `AgentTurns` is the one service that holds the `EventBroadcaster`.
+- **Turn writes are plain UPDATEs of their own columns**, without a revision. The worker is
+  the only writer of status and parts; a cancel request writes `cancel_requested` (and,
+  for a queued turn, the status, in one conditional statement). Neither overwrites the
+  other, and a cancel racing a start is decided by the database.
+- **Cancelling** a queued turn ends it at once (`cancelled`, `finished_at`,
+  `agent.turn_finished` after the commit); a running one is flagged and stops at its next
+  checkpoint; a finished one is returned unchanged.
+- **Failures are readable.** "The agent did not finish within 24 steps", "The model
+  provider refused the key: …", "… could not be reached: …", "… answered with an error:
+  …", "The model did not answer as expected: …" (e.g. a tool that kept failing beyond its
+  retries). Anything else becomes "The turn failed unexpectedly: <type>: <message>" and is
+  logged with its traceback.
+
+### Who the agent acts as
+
+Operators and widgets the agent makes, and its turn entries, are recorded with
+`Actor(kind="agent", name="<model id>")`. `acting_as(agent)` (`entrypoints/mcp/actor.py`)
+sets a context variable before the in-memory client starts its server; the server's tasks
+inherit it, so `calling_agent()` returns the agent. A client over HTTP runs in the HTTP
+server's tasks, which never see it: whatever name it reports (including the in-process
+client's, `ada-in-platform-agent`, which is only for logs), it is `external_agent`.
+
+### The pipelines list
+
+`PipelineService.pipelines(project)` (`core/services/pipelines/listing.py`), served by
+`GET /projects/{id}/pipelines` and `list_pipelines`, is what the chat's "Add widget"
+chooses from and what the agent looks at before building.
+
+- **Which operators.** Those no other operator uses as an input, newest first:
+  `{operator_id, name, kind, sources: [{data_source_id, name}], output, created_at}`.
+  Operators a `system` actor made (an alert rule's condition) are left out: they are not
+  listed, and they do not stop the operator they build on from counting as a pipeline.
+- **Names.** A source operator by its source's name; a transform by its leading `--`
+  comment lines (joined), else its whitespace-collapsed SQL, cut at 60 characters with
+  "…"; an input by its slot name.
+- **Sources** are listed once each, inputs first, so a diamond lists its source once.
+
+### The dashboard's agent session
+
+`POST /dashboards/{id}/agent-session` (`SessionService.dashboard_agent_session`) returns
+the newest session whose `origin_dashboard_id` and `panel_dashboard_id` are the dashboard,
+else a new one titled "<dashboard name> (agent)", announced with `session.created`. It
+answers 200 when found and 201 when created.
+
 ## REST
 
 All routes are under `/api`. Bodies are the domain models' JSON forms; request bodies
@@ -433,10 +623,15 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `POST /sources/{id}/refresh {force?}` | Queue a refresh; answers 202 |
 | `GET /projects/{id}/sessions`, `POST /projects/{id}/sessions {title, origin_dashboard_id?}` | List; create |
 | `GET /sessions/{id}`, `PATCH /sessions/{id} {expected_revision, title?, panel_dashboard_id?}` | Read; rename or set the panel dashboard |
-| `GET /sessions/{id}/entries`, `POST /sessions/{id}/messages {text}` | The session's record, oldest first; add a message |
+| `GET /sessions/{id}/entries` | The session's record, oldest first |
+| `POST /sessions/{id}/messages {text, context?, model?}` | Add a message (see The agent); 201 `PostedMessage {entry, turn}`, `turn` null when no session agent is configured. An unknown `model` is 422 |
+| `GET /sessions/{id}/turns`, `GET /turns/{id}` | The session's agent turns, oldest first; one turn |
+| `POST /turns/{id}/cancel` | Ask a queued or running turn to stop; 202 with the turn |
+| `GET /llm/models` | `ModelList {models: [{id, provider, model, purposes, available, reason}], session_agent}`; `session_agent` is a model id or null |
 | `GET /sessions/{id}/widgets` | The session's widgets |
 | `POST /projects/{id}/operators` | Add an operator; the body's `kind` selects source, transform or input |
 | `GET /operators/{id}`, `GET /operators/{id}/lineage` | Read; the pipeline, inputs first |
+| `GET /projects/{id}/pipelines` | The pipelines list (see The agent): `Pipeline[]`, newest first |
 | `POST /projects/{id}/runs`, `GET /runs/{id}` | Start; read |
 | `GET /runs/{id}/operators/{operator_id}/rows?limit=` | An operator's output in a run |
 | `GET /snapshots/{id}` | A snapshot a run fixed (`Run.snapshots` names them by id): `fetched_at`, `content_hash`, `row_count`, `period` (`RunService.snapshot`) |
@@ -447,8 +642,9 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /projects/{id}/dashboards`, `POST /projects/{id}/dashboards {name}` | List, oldest first; create |
 | `GET /dashboards/{id}` | `DashboardView {dashboard, version}`: what it points at, with the revision for the next write |
 | `PATCH /dashboards/{id} {default_time_range, expected_revision}` | Set the default range; `DashboardView` |
-| `PUT /dashboards/{id}/slots {slots, expected_revision}` | Replace the slots; adds a version; `DashboardView` |
-| `POST /dashboards/{id}/pins {widget_id, slot, expected_revision}` | Pin a widget; adds a version; 201 `DashboardView` |
+| `PUT /dashboards/{id}/slots {slots, expected_revision}` | Replace the slots (the grid's drag and resize save the full list); adds a version; `DashboardView` |
+| `POST /dashboards/{id}/pins {widget_id, slot, expected_revision}` | Pin a copy of the widget (see Dashboards); adds a version; 201 `DashboardView` |
+| `POST /dashboards/{id}/agent-session` | The dashboard's agent session (see The agent): 200 when found, 201 when created; `Session` |
 | `GET /dashboards/{id}/versions`, `GET /dashboard-versions/{id}` | Versions, oldest first; one version |
 | `POST /dashboards/{id}/runs {time_range?}` | Start the run the dashboard is viewed at; 201 `Run` |
 | `GET /projects/{id}/reports?session_id=&dashboard_id=` | Reports, oldest first, optionally one owner's |
@@ -464,8 +660,9 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /projects/{id}/alerts?state=`, `GET /dashboards/{id}/alerts?state=` | `AlertView[] {alert, rule}`, firing first, newest first within a state |
 | `GET /projects/{id}/alert-rules` | `{dashboard, rules}[]` for every dashboard of the project |
 
-- **Status codes.** 201 for a create (including a pin, a dashboard run, a report or
-  version), 202 for a queued refresh, 200 otherwise. Errors are `{"detail": "..."}` with
+- **Status codes.** 201 for a create (including a message, a pin, a dashboard run, a
+  report or version, a new agent session), 202 for a queued refresh and a turn cancel,
+  200 otherwise. Errors are `{"detail": "..."}` with
   404 for `NotFound`, 422 for `Invalid` (and malformed bodies; a formula error's detail
   names the node; an unknown widget inside report content is 422, not 404), 409 for
   `Conflict`, 503 for `Unavailable`. A 409 adds `expected_revision` and `revision`.
@@ -478,14 +675,15 @@ Tool names are snake case and start with a verb (`list create register update re
 add get preview system pin edit set show generate check`; `tests/test_api_mcp.py`). Tools
 that create something in a session take an optional `session_id` and a `note`: one line
 on why the agent is doing this, shown in the session. The acting `Actor` is
-`external_agent` with the client name the MCP host reported when it connected.
+`external_agent` with the client name the MCP host reported when it connected; the
+in-platform agent's calls act as `agent` with its model id (see The agent).
 
 | Group | Tools |
 | --- | --- |
 | Projects, sources | `list_projects`, `create_project`, `register_source`, `list_sources`, `update_source`, `refresh_source` |
-| Sessions, pipelines | `create_session`, `add_source_operator`, `add_transform`, `get_lineage`, `preview_operator` |
+| Sessions, pipelines | `create_session`, `add_source_operator`, `add_transform`, `list_pipelines` (the pipelines list: look there before building), `get_lineage`, `preview_operator` |
 | Widgets | `create_widget`, `list_session_widgets`, and `get_widget_data` for the widget itself (MCP Apps visibility `app`) |
-| Dashboards | `create_dashboard`, `list_dashboards`, `get_dashboard`, `list_dashboard_versions`, `pin_widget`, `edit_dashboard`, `set_dashboard_time_range` (ISO dates), `show_dashboard_in_session` (the session's revision). They return `{dashboard, version, url}` |
+| Dashboards | `create_dashboard`, `list_dashboards`, `get_dashboard`, `list_dashboard_versions`, `pin_widget` (its description says the dashboard gets a copy), `edit_dashboard`, `set_dashboard_time_range` (ISO dates), `show_dashboard_in_session` (the session's revision). They return `{dashboard, version, url}` |
 | Reports | `create_report`, `add_report_version`, `generate_report_from_dashboard`, `list_reports`, `get_report` (optional `version`), `create_template`, `list_templates`. They return `{report, version, versions, url}` |
 | Alerts | `create_alert_rule` (its description carries the formula format), `list_alert_rules`, `get_alert_rule`, `update_alert_rule` (a `clear` list empties the interval, maximum age or alert pipeline), `check_alert_rule` (`{rule, changed, firing}`), `list_alerts` (`{alert, rule_name, severity, dashboard_id, url}`) |
 | System | `system_status` |
@@ -520,6 +718,7 @@ data: <the Event as JSON>
 Payloads carry ids only; the client fetches what it needs. The types are in
 `ada/core/models/events.py`. A comment line is sent after 15 quiet seconds to keep the
 connection open. Events are broadcast after the unit of work that caused them commits.
+`agent.turn_part` is the exception to both: it carries content and is sent at once.
 
 | Event | Payload |
 | --- | --- |
@@ -531,6 +730,12 @@ connection open. Events are broadcast after the unit of work that caused them co
 | `dashboard.changed` | `dashboard_id`, `version_id` (the new version for an edit or pin; the current one, or null, for a new dashboard or a range change) |
 | `report.version_created` | `report_id`, `version_id`, `version` |
 | `alert.firing`, `alert.resolved` | `alert_id`, `rule_id` |
+| `agent.turn_started` | `session_id`, `turn_id`. After the commit that queued the turn, and again after the one that started it |
+| `agent.turn_part` | `session_id`, `turn_id`, `index`, `part` (the whole part). At once, not after a commit: token deltas cannot be fetched afterwards. A part with the same `index` replaces the earlier one (text grows; a tool's state moves on) |
+| `agent.turn_finished` | `session_id`, `turn_id`, `status`. After the commit that stored the final turn |
+
+A client that connects late reads `GET /turns/{id}` and then applies parts with a higher
+index.
 
 ## Widgets
 
@@ -543,9 +748,14 @@ receives data from an agent; it asks the server for the output of its operator.
   checkout; moon sets it; `/app/widgets` in the backend image, which builds them).
   `GET /api/widget-bundles/<type>.html` serves a file that exists there; names other than
   `[a-z0-9][a-z0-9-]*` are 404, so no path leaves the directory.
-- **In the frontend.** The frontend loads `<base>/<type>.html#widget=<id>&run=<run>` in
-  an iframe, `run` optional, with the base from `VITE_WIDGETS_URL`: the widgets dev server
-  in development, `/api/widget-bundles` otherwise. The widget reads
+- **In the frontend.** The frontend loads
+  `<base>/<type>.html#widget=<id>&run=<run>&theme=<light|dark>` in an iframe, `run` and
+  `theme` optional, with the base from `VITE_WIDGETS_URL`: the widgets dev server in
+  development, `/api/widget-bundles` otherwise. Inside a frame `prefers-color-scheme`
+  follows the system, not the page, so `theme` is set when the person picked a theme apart
+  from the system's; the widget (`followTheme` in `host.ts`, and `styles.css`) applies it
+  and follows hash changes, so switching needs no reload. Without it, page and widget both
+  follow the system. The widget reads
   `GET /api/widgets/{id}` and `GET /api/widgets/{id}/data` on the same origin.
   `WidgetData.output` is the operator's output schema, so the roles need no third request.
   **One run per view.** Every page shows its widgets at one run, which it passes to every
@@ -557,13 +767,23 @@ receives data from an agent; it asks the server for the output of its operator.
   data changed (the widget epoch), a following page starts a new run (`useViewRun` in
   `lib/view-run.ts`) and the frames reload by their new address; a frozen run (a report,
   `?run=`) never changes.
-- **The card's footer** is one line: at the left the pipeline in one line ("Pipeline:
-  Sotkanet screening → 2 steps → map": the source names, the steps that are not sources,
-  the widget type), from `GET /operators/{id}/lineage`, which opens the pipeline view; at
-  the right icon actions with tooltips (their accessible names): "Add to dashboard" (the
-  pin chooser, opening below the line) wherever the widget is not on a dashboard, and on
-  a dashboard "Go to the session it came from" (`?widget=<id>`), disabled with "Not made
-  in a session" when it has no session.
+- **The card.** The type is a badge in the header; the title is plain text. The footer is
+  one line: at the left "Pipeline" with an open-in-a-popup icon, one button that opens the
+  pipeline view (the lineage is read only when it opens); at the right icon actions with
+  tooltips (their accessible names): "Open full size" (unless already full size), then
+  "Add to dashboard" (the pin chooser, opening below the line; it says the dashboard gets
+  a copy) wherever the widget is not on a dashboard, and on a dashboard "Go to the session
+  it came from". That uses the widget's `session_id`, else its original's (`copied_from`,
+  read with `GET /widgets/{id}`), and links to `?widget=<that widget's id>`; it is
+  disabled with "Not made in a session" when neither has one.
+- **Full size.** `?open=<widget id>` on any page of a project (checked on the project's
+  layout route) shows the widget in a modal over the page (`components/widget-modal.tsx`).
+  "Open full size" (`open-widget-link.tsx`) pushes the address and puts the card's run in
+  the history entry's state (`openRun`), so the modal shows the same numbers. Closing
+  (Escape, ×) goes back in history, as does the browser's back; the page beneath was never
+  unmounted, so its scroll position is kept. A direct link to `?open=` has no run in its
+  state: the modal starts a run of its own, like the widget page, and closing replaces the
+  address without `open`.
 - **The pipeline view** is a modal dialog (`components/pipeline/`): the operator tree as a
   graph laid out by depth (sources at the left, the widget's operator at the right, a
   shared input drawn once; materializing nodes solid and tinted, pass-through dashed;
@@ -589,23 +809,140 @@ receives data from an agent; it asks the server for the output of its operator.
   corrected by the middle latitude. Outlines come as data, not with the bundle.
 - **Access to the host.** All of the above goes through `services/widgets/src/lib/host.ts`.
 
+## The frontend
+
+### Look and layout
+
+- **shadcn/ui** (CLI 4.23): style `radix-nova` (Radix primitives), Tailwind 4, neutral,
+  lucide icons (`components.json`). The components in `src/components/ui/` are exactly as
+  the CLI wrote them, except `hooks/use-mobile.ts` (useSyncExternalStore instead of state
+  set in an effect, which lint flags); the code block's syntax highlighter (and `shiki`)
+  is left out.
+- **Theme.** shadcn switches colours on a `.dark` class. `lib/theme.tsx` sets it from the
+  person's choice (light, dark, or as the system, remembered in `localStorage`
+  `ada-theme`), with a script in `index.html` so a dark page does not flash light. The
+  theme menu is the sun or moon at the top right. Widget frames follow it (see Widgets).
+- **Sidebar** (`components/project-sidebar.tsx`): "All projects", the project (a link to
+  its overview), then the groups Sessions (and a new session dialog), Dashboards (and a
+  new dashboard dialog), Reports (and a link to `/reports/new`), Alerts ("Feed and rules",
+  with the firing count) and Data sources (each links to its card on the overview,
+  `#source-<id>`, marked when its last refresh failed). Sessions and reports newest first.
+  The current item is marked (`data-active`, and the router's `aria-current="page"`).
+  Collapsible (the top bar's toggle, Ctrl/Cmd+B); a sheet on phones.
+- **Pages** fill the width under a top bar with the sidebar toggle, the live indicator and
+  the theme menu; each page scrolls inside.
+- **Type labels, no breadcrumbs.** Every page shows its type with the sidebar's icon above
+  its title (`PageType`, `PageHeader` in `components/page-header.tsx`; icons and labels in
+  `lib/page-types.ts`).
+- **Icons.** Icons instead of words where clear (dialog close, rename, version view and
+  restore, alert rule check and edit, pin, open full size, go to session, detach, stop,
+  send); primary actions keep a word and an icon ("Add widget", "Generate report", "Edit
+  layout"). `IconButton` (`components/icon-action.tsx`) is an icon-only button whose
+  tooltip is also its `aria-label`, disabled with `aria-disabled` and a reason so the
+  keyboard still reaches it; `Hint` puts a tooltip on any control. Every icon-only control
+  has a name and a tooltip.
+- **Rename** is a pencil ("Rename"): Enter saves, Escape cancels (without closing a dialog
+  around it), the check and × save and cancel by pointer.
+- **Dialogs** (`components/modal.tsx`, shadcn's Dialog with an × "Close"): focus moves in
+  (to `[data-autofocus]`, else the dialog itself, so no tooltip opens by itself and the
+  first Escape closes the dialog), stays inside and returns to the opener; Escape and a
+  click outside close; the page behind is `inert` as well as `aria-hidden`.
+
+### Chat
+
+- **The record** (`components/session-record.tsx`): the person's messages as bubbles on
+  the right with their context chips (named from what they point at), other actors' on
+  the left, agent turns (`agent_turn` entries) as the agent's answers, and operators and
+  widget cards as before. It follows the bottom while the person is there (new entries,
+  streaming text) and stays put when they scrolled up; `?widget=` scrolls to a widget and
+  marks it.
+- **An agent turn** (`components/chat/agent-turn.tsx`) is read with `GET /turns/{id}`.
+  Consecutive parts that are not text form one shadcn Trace: reasoning ("Thinking" open
+  while it streams, "Thought" folded after), tool calls ("Calling / Called / Failed:
+  <tool>", opening to their input and output or error as JSON), neighbouring sources as
+  one line ("Used n sources", each a link when it has a URL). Text parts are the answer
+  between them. Queued, running without parts, failed (with the error, `role="alert"`)
+  and cancelled are said.
+- **Streaming** (`lib/agent-turns.ts`, `lib/events.ts`, `lib/live.ts`): `agent.turn_part`
+  puts the part at its index into the cached turn. Parts of running turns are also kept
+  aside, and a fetched turn gets those with a higher index than it has, so a refetch that
+  lags behind the stream drops none. `agent.turn_started` and `agent.turn_finished`
+  refetch the record and the turn; a finished turn's kept parts are forgotten. A reconnect
+  forgets all kept parts and refetches everything.
+- **The composer** (`components/chat/composer.tsx`): Enter sends, Shift+Enter is a new line
+  (Enter ending an IME composition does not send). The body is `{text, context, model?}`,
+  the chips' contexts flattened; chips are removable. A model picker lists
+  `GET /api/llm/models`, default `session_agent`, unavailable models disabled with their
+  reason; `model` is sent when the models are known. While the latest turn is queued or
+  running, a stop button posts `POST /turns/{id}/cancel`. Without an agent
+  (`session_agent` null or unavailable, or a post answered with `turn: null`) the message
+  is still recorded and a note says nobody will answer and how to configure
+  `session_agent` in `llms.yml`. If the models route fails, the picker and the note are
+  left out and the message is sent without `model`.
+- **Add widget** (`components/chat/add-widget.tsx`): a Popover with a Command over the
+  pipelines list, searchable by name, source names and column names. Choosing one adds a
+  chip. One chip may carry several contexts (`chat-draft.ts`): on a dashboard the
+  pipeline and `{kind: "dashboard", dashboard_id, slot?}` together, removed together; no
+  slot means a new one. The draft lives on the page, so "Add widget" elsewhere on the page
+  fills the composer, which then takes the focus.
+
+### Dashboards and the panel beside a session
+
+- **The agent panel** (`components/dashboards/agent-panel.tsx`) is docked at the right of a
+  dashboard, closed at first (opening it finds or creates the agent session, which a mere
+  look should not do), and remembered per browser (`localStorage`
+  `ada-dashboard-agent-panel`). Opening it posts `POST /dashboards/{id}/agent-session`
+  once per page (`dashboardSessionQuery`, not under `['dashboards', id]`, so dashboard
+  events do not post again) and shows that session's chat; a link opens it as a session.
+  "Add widget" in the header (a new slot) and in empty slots (that slot) adds the chip and
+  opens the panel.
+- **Layout editing** (`components/dashboards/dashboard-grid.tsx`, `layout.ts`): "Edit
+  layout" shows two handles per slot, on its corners: move and resize. Rows are 80 px, the
+  gap 16 px, and a widget fills its cell. Dragging previews the layout; others in the way
+  move down (never up or sideways). Maps keep their aspect ratio (the pixel ratio when the
+  resize began; the width decides, or the height when only it changed). Minimums: value
+  2×2; table, line chart and map 3×3; empty 2×2. Escape during a drag puts it back. A drop
+  saves the full slot list with `PUT /dashboards/{id}/slots` and `expected_revision` (a
+  new version); the grid shows the new layout until answered; a 409 reads the dashboard
+  again and says so. Keyboard: Enter or Space on a handle picks the slot up, the arrows
+  move or resize by one cell, Enter or Space drops (saves), Escape or leaving the handle
+  puts it back; a live region says what happens.
+- **Handles need the 12-column grid**, a container at least 48rem wide, and never show on
+  an old version. The hint above the grid says how to drag; in a narrower grid (one
+  column, including a laptop with the agent panel open) it says the grid is too narrow to
+  arrange and to widen the window or close the agent panel.
+- **A dashboard beside a session** splits the page half and half (`lg` and up; stacked
+  below): the conversation, and the dashboard under a black bar (both themes) saying
+  "DASHBOARD" and its name (a link to it), with an × "Detach the dashboard" that sends
+  `PATCH /sessions/{id} {panel_dashboard_id: null, expected_revision}`; the conversation
+  then takes the full width. The half shows the dashboard's grid, read only, in one column
+  when the half is narrow. Its empty slots offer "Add widget" into the session's composer,
+  with the dashboard and slot.
+
 ## Frontend routes
 
 | Path | Shows |
 | --- | --- |
 | `/` | Projects |
-| `/projects/{id}` | A project: sessions, dashboards, reports, widgets, firing alerts and data sources |
-| `/projects/{id}/sessions/{session_id}` | A session's record with its widget cards, all at one run of the page (each can be added to a dashboard), and its panel dashboard beside it at the dashboard's run; `?widget=<id>` scrolls to one. MCP tools return this address for widgets made in a session |
-| `/projects/{id}/widgets/{widget_id}` | One widget on its own page, at `?run=` when given, else at one run of the page; the address of widgets made outside a session |
-| `/projects/{id}/dashboards/{dashboard_id}` | The slots on the grid, all on one run; firing alert badges; the time range control (whole years; "Show" starts a run, "Save as default"); "Generate report"; version history with view (`?version=n`) and restore; start a session from it |
-| `/projects/{id}/reports/{report_id}` | A report version (`?version=1.2.0`, default the latest): its tree with each widget at the version's run, the run, range, dashboard version, the sources list; each card's pipeline view previews the version's run |
+| `/projects/{id}` | A project's overview: counts per kind, the five newest sessions with the dashboard beside them, and the data sources with their state (`#source-<id>`). The lists of dashboards, reports and alerts are in the sidebar; widgets are not listed on their own |
+| `/projects/{id}/sessions/{session_id}` | A session: its record as a chat with its widget cards, all at one run of the page (each can be added to a dashboard), the composer, and its panel dashboard beside it at the dashboard's run, which can be detached; `?widget=<id>` scrolls to one. MCP tools return this address for widgets made in a session |
+| `/projects/{id}/widgets/{widget_id}` | One widget on its own page, at `?run=` when given, else at one run of the page; the address MCP tools return for widgets made outside a session. In-app links open widgets full size instead (`?open=`) |
+| `/projects/{id}/dashboards/{dashboard_id}` | The slots on the grid, all on one run; firing alert badges; the time range control (whole years; "Show" starts a run, "Save as default"); "Edit layout"; "Add widget" and the agent panel; "Generate report"; version history with view (`?version=n`) and restore; start a session from it |
+| `/projects/{id}/reports/{report_id}` | A report version (`?version=1.2.0`, default the latest): its tree with each widget at the version's run (opening full size at that run), the run, range, dashboard version, the sources list; each card's pipeline view previews the version's run |
 | `/projects/{id}/reports/new` | Generate a report from a dashboard (`?dashboard=<id>` preselects it) |
 | `/projects/{id}/alerts` | The alert feed (all, firing, resolved; each alert opens its alerting rows) and the rules by dashboard, with the rule editor and its formula builder |
+| `?open=<widget id>`, on any of the project's pages | The widget full size in a modal over the page (see Widgets) |
 
 A write the page makes carries the revision it last showed; a 409 reads the record again
 and says so. The query keys are in `lib/api` (`keys`, `dashboardKeys`, `reportKeys`,
-`alertKeys`, `runKeys`); `lib/events.ts` maps each live event to the keys it makes stale.
-Every widget card has the footer and pipeline view of "Widgets" above, at its page's run.
+`alertKeys`, `runKeys`, `agentKeys`); `lib/events.ts` maps each live event to the keys it
+makes stale, except `agent.turn_part`, which goes into the cached turn. Every widget card
+has the footer and pipeline view of "Widgets" above, at its page's run.
+
+The API types are generated from the backend's OpenAPI schema (`Schemas[...]`, the typed
+`api` client in `lib/api/client.ts`); the agent's calls are in `lib/api/agent.ts`. Only
+the live stream's types are written by hand (`lib/api/models.ts`), since the schema does
+not describe it.
 
 ## Tests
 
@@ -629,18 +966,32 @@ Every widget card has the footer and pipeline view of "Widgets" above, at its pa
   table widget; and Sotkanet pushed down to a dashboard's years, mapped to the counties on
   a map, a report and its minor version, and an alert rule that fires for four counties
   and resolves when the next (recorded, then raised) answer recovers.
+- **The agent.** Tests never read the developer's models file: `tests/conftest.py` points
+  `ADA_LLMS_CONFIG` at a file that does not exist. The agent tests use pydantic-ai's
+  `FunctionModel` (`tests/agent_support.py`: a scripted model whose steps call tools or
+  stream text). One test uses a real OpenAI client against `127.0.0.1:1` with retries
+  off, to check the unreachable provider without any network.
 - The frontend's API types are generated: `moon run frontend:generate` after the routes
   change, and commit `openapi.json` and `schema.d.ts`.
+- The frontend's tests are Vitest with mocked fetch and EventSource. `src/test/setup.ts`
+  adds what jsdom lacks for Radix, cmdk and the sidebar. Whole routes are slow on a busy
+  machine, so the async utilities wait up to 15 s (`setup.ts`) and a test up to 60 s
+  (`testTimeout` in `vite.config.ts`).
+- **The development mock** (`src/dev/mock-agent.ts`): in a dev build only, and only with
+  `?mock-agent=1` (until `?mock-agent=0`, kept in `sessionStorage`), it answers the
+  agent's routes from memory (models, pipelines derived from the project's widgets,
+  messages and turns, dashboard agent sessions) and streams a scripted turn as live
+  events on the page's own stream. Nothing it answers reaches the backend; every other
+  request goes through. A production build does not contain it.
 
 | Package | Holds | May import |
 | --- | --- | --- |
 | `ada.core.models` | Domain models | nothing of ours |
 | `ada.core.ports` | Outbound ports: what the core needs from the outside | models |
-| `ada.core.services.ports` | Inbound ports: the use cases | models |
+| `ada.core.services.ports` | Inbound ports: the use cases | models, outbound ports (a use case may take one its caller provides, as `AgentTurnService.run` takes the toolbox) |
 | `ada.core.services` | The use cases' implementations | models and both kinds of ports |
-| `ada.adapters` | Implementations of outbound ports: PostgreSQL, Valkey, DuckDB, HTTP | models, outbound ports |
-| `ada.entrypoints` | HTTP, MCP, worker, CLI | models and both kinds of ports, resolved through the container |
-| `ada.composition` | Binds every port to its implementation | everything |
+| `ada.adapters` | Implementations of outbound ports: PostgreSQL, Valkey, DuckDB, HTTP, the language models (pydantic-ai) | models, outbound ports |
+| `ada.entrypoints` | HTTP, MCP, worker, CLI | models and both kinds of ports, resolved through the container. The worker also imports the MCP entrypoint: the agent's tools are the MCP tools, served in process || `ada.composition` | Binds every port to its implementation | everything |
 
 Two stores, with different jobs:
 
@@ -650,8 +1001,8 @@ Two stores, with different jobs:
   never changed, and every process reads the files with its own in-memory DuckDB, so the
   API and the workers do not contend for one database file.
 
-Background work (runs, source refreshes, alert checks) goes through taskiq with Valkey as
-the broker. There is exactly one scheduler.
+Background work (runs, source refreshes, alert checks, agent turns) goes through taskiq
+with Valkey as the broker. There is exactly one scheduler.
 
 ## Demo data
 
@@ -716,10 +1067,33 @@ and queues the remaining sources for the worker.
   filtered). `refresh_range` lists all of a source's snapshots to find the newest period:
   fine for years, slow for thousands of periods. The map's equal classes put most regions
   in one class when one region is an outlier; a quantile option can come later.
-- **Dashboards and reports.** Slot positions are not edited by drag: layout changes come
-  from agents over MCP, or by restoring a version. Sessions do not record reports in their
-  entries (`EntryKind` has no report kind); a session's reports are listed by
+- **Dashboards and reports.** The dashboard beside a session is read only; its layout is
+  edited on the dashboard page. Moving a slot changes the DOM order after the save
+  (reading order), which reloads the moved frames once. Sessions do not record reports in
+  their entries (`EntryKind` has no report kind); a session's reports are listed by
   `?session_id=`.
+- **A turn keeps a connection idle.** `run_turn` reads the turn, the session and its record
+  through the task's request scope, which keeps one pooled connection idle in a
+  transaction until the turn ends (minutes). Harmless for correctness (no locks beyond
+  reads); reading them in a scope of their own would free it.
+- **A worker killed mid-turn leaves the turn `running`.** Cancellation by the process
+  (`CancelledError`) is not caught, and nothing sweeps stale running turns. A sweep (e.g.
+  running turns with no checkpoint for some minutes become failed) would fix it.
+- **Two messages in quick succession run two turns at once**, each with the history it
+  found; the second does not wait for the first's answer.
+- **The agent's history is bounded by count (40 messages), not by tokens**, and tool
+  results are given to the model in full (a long `get_lineage` costs tokens). Earlier
+  answers keep only a one-line summary per tool call.
+- **Token deltas are broadcast one event each.** Fine for a demo; a busy model may want
+  them batched.
+- **Source parts come only from source operators in tool results** (`add_source_operator`,
+  `get_lineage`); reading a pipeline's data through `preview_operator` does not add one.
+- **The agent's text is plain text.** The record does not render Markdown yet.
+- **The models file is read once per process.** Changing it or a key means restarting the
+  backend and the worker.
+- **The image runs as the user `ada` (uid 1000)**, so a `config/llms.yml` that only its
+  owner may read stops the backend at start ("could not be read as YAML: Permission
+  denied") on a Linux host; Docker Desktop's bind mounts do not have this problem.
 - **No authentication.** Whoever can reach the gateway can use the API and the MCP
   endpoint.
 
@@ -741,9 +1115,11 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `VALKEY_URL` | Valkey URL, e.g. `redis://…` |
 | `DATA_DIR` | Directory for snapshots (default `data`; `/data` in the image) |
 | `WIDGETS_DIR` | The built widgets (default `services/widgets/dist` of the checkout; `/app/widgets` in the image) |
+| `ADA_LLMS_CONFIG` | The agent's models file (default `llms.yml`; moon: `config/llms.yml` of the checkout; compose: `/config/llms.yml`, the mounted `config/`). See The agent |
 
 There are no users and no authentication yet: whoever can reach the gateway can use the
 API and the MCP endpoint. Do not expose it publicly as it is.
 
-Secrets never go into the repository. `.env` holds only `VERSION`; put local secrets in
-`.env.local`, which git ignores.
+Secrets never go into the repository. `.env` holds only `VERSION`; put local secrets,
+such as the model providers' keys, in `.env.local`, which git ignores and the compose file
+passes to the backend and the worker. The models file is git-ignored too.
