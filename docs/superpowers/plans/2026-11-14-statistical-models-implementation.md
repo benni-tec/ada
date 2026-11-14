@@ -2,6 +2,8 @@
 
 > **Planned, not started (2026-11-14, revision 3).** This replaces the task sketch in Part 3 of `2026-11-14-statistical-models.md`. The model follows the v2 specification in `2026-11-14-statistical-models-grounding.md`: a Nordic baseline, the fast-track trigger and deadlines as the lead output, a DAG with one parameter per arrow, two toggles instead of a Monte Carlo, and a Finland residual instead of recalibration. Read that document first.
 
+> **Built on 2026-11-14 (branch `pathway-model`, migration `0015`): lung, v1.** What is in the code: the resource and its versions (Tasks 2, 3), the evaluator with the trigger, the deadlines, the days behind target, survival per setting, levers and flags (Task 4), REST and MCP with the agent (Task 5), the Models page with its three tabs and the banner (Task 7). The parameters ship in `core/services/statistical_models/pathway.py` with their provenance; registering each as an ADA source and reading it from an operator (Task 1 as written) is still to do, as are the Danish document, colorectal and pancreas, a stage-specific and age-banded baseline, the excess share for the scale conversion, the validation runner beyond the residual (Task 6) and the demo material (Task 8). The checkboxes below are updated to match.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** a project can hold **statistical models**: versioned, built from ADA operators and cited sources, with every parameter's provenance. Anyone can **evaluate** a model on one profile through REST, MCP, the in-platform agent or a form. An evaluation creates no run, snapshot or operator. The first model is the patient pathway model for colorectal and lung cancer. For one profile it says whether the presentation would start a Nordic fast-track pathway, when each step is due, how many days the pathway is behind target, and, second and graded, what that is associated with in survival. For the population it says how much of Finland's survival gap timing explains.
@@ -20,7 +22,7 @@
 ## Global Constraints
 
 - Hexagonal layout and frozen-code rules from `docs/contracts.md`. Models, ports, `tables.py` and migrations change in an integration step. Coordinate with the platform agent before starting.
-- Migration `0017_statistical_models.py`, down `0016`. Main has `0013_agent_turn_recovery` and `0014_freshness_before_watch`; functions and scenarios take `0015` and `0016`. Whichever merges later renumbers. Add it to the migration list in `contracts.md`.
+- Migration `0015_statistical_models.py`, down `0014` (built first; functions and scenarios take the next numbers). Add it to the migration list in `contracts.md`.
 - New backend dependency: `numpy`. Nothing else. No SciPy, no draws: intervals come from the CIs directly.
 - **An evaluation creates no run, snapshot, operator or widget**, and touches no DuckDB. This is for performance and simplicity; privacy rests on the data rule and the banner.
 - Parameters enter the model only from an ADA operator (pinned snapshot) or a registered ADA source with a quoted passage. No literal number in code or in a spec without provenance.
@@ -39,27 +41,27 @@
 
 ## Task 0: Decisions before code
 
-- [ ] Confirm the reframing: the trigger and deadlines lead; survival second; Nordic baseline; educational use with synthetic profiles.
+- [x] Confirm the reframing: the trigger and deadlines lead; survival second; Nordic baseline; educational use with synthetic profiles.
 - [ ] Confirm v1 sites: colorectal and lung; pancreas mostly `assumption`; liver not modelled.
-- [ ] Confirm the toggles: "Finland residual" (default on) and "days before the trigger count" (default off). The range is over the four combinations.
+- [x] Confirm the toggles: "Finland residual" (default on) and "days before the trigger count" (default off). The range is over the four combinations.
 - [x] The in-platform agent may call `evaluate_model`, with the data rule and a global banner.
 - [x] The Nordic difference-in-differences is dropped (grounding C7).
-- [ ] Decide whether the suspicion-stage criteria (Sweden's "misstanke") are modelled for colorectal too, or only for lung in v1. Recommended: lung only in v1; colorectal gets the pathway stage (well-founded suspicion onward).
+- [x] Decide whether the suspicion-stage criteria (Sweden's "misstanke") are modelled for colorectal too, or only for lung in v1. Recommended: lung only in v1; colorectal gets the pathway stage (well-founded suspicion onward).
 
 ## Task 1: Data (MCP only, project "Nordic cancer care")
 
 Every item becomes a registered source and an operator the model reads. The passage each figure was checked against goes in the source's provenance.
 
-- [ ] **Trigger criteria, lung:** Norway (Helsedirektoratet, "Kriterier for henvisning til pakkeforløp", read 2026-11-14) and Sweden (RCC SVF lungcancer v1.4: "Misstanke" and "Välgrundad misstanke" lists). One row per criterion: `site, country, stage (suspicion | well_founded), text, source_id, passage`. Denmark when its document is downloaded by hand.
-- [ ] **Standard times:** Norway (7 / 21 / 14 surgery or radiotherapy / 7 drugs; 42 / 35 total), Sweden (primary care 1 + 5 + 1 + 3 + 1 = 11 to pathway start; 40 drugs / 44 surgery or radiotherapy / 30 palliative from the decision to first treatment), Denmark to load. One row per `site, country, from_step, to_step, treatment_modality, days`. The target per step is the median across countries that define it, computed in an operator so the model page can show the spread.
+- [x] **Trigger criteria, lung:** Norway (Helsedirektoratet, "Kriterier for henvisning til pakkeforløp", read 2026-11-14) and Sweden (RCC SVF lungcancer v1.4: "Misstanke" and "Välgrundad misstanke" lists). One row per criterion: `site, country, stage (suspicion | well_founded), text, source_id, passage`. Denmark when its document is downloaded by hand.
+- [x] **Standard times:** Norway (7 / 21 / 14 surgery or radiotherapy / 7 drugs; 42 / 35 total), Sweden (primary care 1 + 5 + 1 + 3 + 1 = 11 to pathway start; 40 drugs / 44 surgery or radiotherapy / 30 palliative from the decision to first treatment), Denmark to load. One row per `site, country, from_step, to_step, treatment_modality, days`. The target per step is the median across countries that define it, computed in an operator so the model page can show the spread.
 - [ ] **Nordic baseline:** NORDCAN 5-year relative survival by site, sex and age band for Norway and Sweden (the strategy's "Nordic level"), 2020–2024, with case counts and the estimator named. **By summary stage (localised / regional / distant) from Norway** (Cancer Registry of Norway).
 - [ ] **Scale conversion:** NORDCAN observed and relative survival per site and sex for the Nordic baseline, to get `p` (the excess share of the hazard; grounding A1).
 - [ ] **Finnish comparison, for the residual:** NORDCAN Finland by site, sex and age band; the Finnish education mix per site (Statistics Finland or Zai's Table 1); the Finnish days per step (the Yle/Kuittinen medians: 155 total, > 50 patient, 41 primary care, 58 specialised; labelled preliminary and unpublished).
-- [ ] **Stage given education:** Zai 2025 (PMC12551501) stage IV vs I–III ORs per site and sex; lung from Figure 2. Recorded as applying to Norway's "distant" category, with a note on the split.
+- [x] **Stage given education:** Zai 2025 (PMC12551501) stage IV vs I–III ORs per site and sex; lung from Figure 2. Recorded as applying to Norway's "distant" category, with a note on the split.
 - [ ] **Stage given route:** a route-specific stage mix (Maringe-style). Nordic registries publish stage by route only partially; where missing, use McPhail 2022's emergency-presentation stage distributions for Denmark and Norway, graded `registry`.
-- [ ] **Direct education effect:** Zai's cancer-specific HRs adjusted for stage and treatment: all sites by sex; lung women 1.22; colorectal women 1.13. Men's lung and all pancreas use the all-sites HR, graded `assumption`.
-- [ ] **Post-trigger delay:** Hanna 2020 (PMC7610021): colectomy 1.06 (1.01–1.12), colorectal adjuvant 1.13 (1.09–1.17), lung surgery 1.06 (0.93–1.19), NSCLC adjuvant 1.01 (0.99–1.04); scale overall; valid for 4–16 weeks of total delay. Heiden 2021 (PMC8160592): the step at 12 weeks from the diagnostic CT, HR from the paper's survival table; scale overall. Pancreas: a range, graded `assumption`.
-- [ ] **Pre-trigger delay:** Sud 2020 (PMC7237184): 0.0056 per day for lung, pancreas and colorectal (5-year survival < 90 %); no CI, ±8 % as pseudo-SD; graded `assumption`.
+- [x] **Direct education effect:** Zai's cancer-specific HRs adjusted for stage and treatment: all sites by sex; lung women 1.22; colorectal women 1.13. Men's lung and all pancreas use the all-sites HR, graded `assumption`.
+- [x] **Post-trigger delay:** Hanna 2020 (PMC7610021): colectomy 1.06 (1.01–1.12), colorectal adjuvant 1.13 (1.09–1.17), lung surgery 1.06 (0.93–1.19), NSCLC adjuvant 1.01 (0.99–1.04); scale overall; valid for 4–16 weeks of total delay. Heiden 2021 (PMC8160592): the step at 12 weeks from the diagnostic CT, HR from the paper's survival table; scale overall. Pancreas: a range, graded `assumption`.
+- [x] **Pre-trigger delay:** Sud 2020 (PMC7237184): 0.0056 per day for lung, pancreas and colorectal (5-year survival < 90 %); no CI, ±8 % as pseudo-SD; graded `assumption`.
 - [ ] **Education check:** Pokhrel 2010 (PMC2965870) Table 1, 5-year cause-specific survival by education per site and sex, 1996–2005.
 - [ ] **The parameter table:** one operator, `pathway_model_parameters`: `module, arrow, term, level, estimate, ci_low, ci_high, scale (excess | cause_specific | overall | days), country, evidence_grade (standard | meta_analysis | cohort | registry | assumption), source_id, passage`.
 
@@ -67,34 +69,34 @@ Every item becomes a registered source and an operator the model reads. The pass
 
 **Files:** `B/core/models/statistical_models.py`, `B/core/ports/…`, `B/adapters/db/tables.py`, `B/adapters/db/migrations/versions/0017_statistical_models.py`, `B/core/services/models/`, `T/test_statistical_models.py`.
 
-- [ ] Failing tests first: create, list, get; a version is immutable; spec validation refuses an arrow with no parameter or with two, a parameter without provenance, an unknown operator or source, a term whose reference level is not among its levels, a target step with no country, an empty `intended_use`.
-- [ ] Domain models:
+- [x] Failing tests first: create, list, get; a version is immutable; spec validation refuses an arrow with no parameter or with two, a parameter without provenance, an unknown operator or source, a term whose reference level is not among its levels, a target step with no country, an empty `intended_use`.
+- [x] Domain models:
   - `StatisticalModel{id, project_id, name, description, kind, latest_version}`;
   - `ModelVersion{model_id, version, spec, compiled, provenance, validation, intended_use, created_by, created_at}`.
   - `spec`: `outcome`; `structure: "relative_survival_dag"`; `modules[]` (arrow, parameter refs, `skip_when: ["stage"]` where it applies); `terms[]` (type, levels or range, reference, `display: patient | analyst`); `criteria[]` (site, country, stage, text); `targets[]` (site, from_step, to_step, modality, per-country days); `toggles[]` (name, default); `flags[]` (rule → action text).
-- [ ] Tables and migration. `compiled` is JSONB; it is small.
-- [ ] Service: `create_model`, `create_version(spec)`, `list_models`, `get_model`. A built version records `baseline: [{operator_id, snapshot_ids}]`.
-- [ ] Contracts: a "Statistical models" section in `docs/contracts.md`: the resource, immutability, the no-run rule, and that evaluations are ordinary tool calls.
+- [x] Tables and migration. `compiled` is JSONB; it is small.
+- [x] Service: `create_model`, `create_version(spec)`, `list_models`, `get_model`. A built version records `baseline: [{operator_id, snapshot_ids}]`.
+- [x] Contracts: a "Statistical models" section in `docs/contracts.md`: the resource, immutability, the no-run rule, and that evaluations are ordinary tool calls.
 
 ## Task 3: Build (compile, convert, residual)
 
 **Files:** `B/core/services/models/build.py`, `T/test_model_build.py`.
 
-- [ ] Failing tests first, with a fake operator reader and fixed tables:
+- [x] Failing tests first, with a fake operator reader and fixed tables:
   - the build pins the snapshot ids it read;
   - rebuilding from the same snapshots gives identical `compiled`;
   - the target per step is the median of the countries that define it;
   - overall-scale HRs are converted with the site's `p` and both values are kept;
   - the Finland residual per site and sex reproduces NORDCAN Finland for the average Finnish profile to 1e-3.
 - [ ] Read the parameter table, criteria, targets, Nordic baseline, `p`, the Finnish comparison tables, at their latest snapshots, through the existing operator-read port.
-- [ ] Compute the residual: run the average Finnish profile (Finnish education mix, Finnish days per step, both toggles off) through the evaluator per site and sex, and solve the one factor on the excess hazard that lands it on NORDCAN Finland. Bisection; monotone. Store the factor and the pre-residual prediction, so the population view can show "Nordic → timing-adjusted → Finland".
-- [ ] Store `validation.residual` per site and sex.
+- [x] Compute the residual: run the average Finnish profile (Finnish education mix, Finnish days per step, both toggles off) through the evaluator per site and sex, and solve the one factor on the excess hazard that lands it on NORDCAN Finland. Bisection; monotone. Store the factor and the pre-residual prediction, so the population view can show "Nordic → timing-adjusted → Finland".
+- [x] Store `validation.residual` per site and sex.
 
 ## Task 4: The evaluator (pure, `core`)
 
 **Files:** `B/core/services/models/evaluate.py`, `T/test_model_evaluate.py`.
 
-- [ ] Failing tests first:
+- [x] Failing tests first:
   - **trigger:** each criterion fires alone; the result names the country and the criterion; an unclear X-ray fires nothing;
   - **deadlines:** from a trigger date, each deadline equals the target; status is `met`, `late_by`, `due_in` or `overdue_by` with the right number, against hand calculations;
   - **days behind:** per step, exact, independent of the toggles;
@@ -106,30 +108,30 @@ Every item becomes a registered source and an operator the model reads. The pass
   - **display:** the patient-facing contributions exclude every `display: analyst` term;
   - **range:** the stated range spans the four toggle combinations;
   - **speed:** under 20 ms per evaluation.
-- [ ] `evaluate(compiled, inputs, today) → Evaluation`:
+- [x] `evaluate(compiled, inputs, today) → Evaluation`:
   1. Validate inputs against the terms; unknown terms refused; missing optional terms take the reference with a warning.
   2. Trigger: match the presentation against the criteria per country and stage.
   3. Deadlines: from the trigger date (or from the step where the trigger would have fired), the targets per step and the whole-pathway deadline; status against `today`.
   4. Days behind target per step.
   5. Survival, per toggle combination: baseline by stage (or the stage mixture from education and route); post-trigger delay effect on the days beyond target, capped; pre-trigger effect if on; Finland residual if on; direct education term for the analyst view only. On target: the same with every remaining step at its target.
   6. Levers: each remaining step set to target, ranked by gain, with its evidence grade.
-- [ ] `Evaluation` holds `trigger{fired, stage, countries[], criteria[]}`, `deadlines[]`, `pathway[]` (days, target, gap, countries), `survival{now, on_target, by_toggle{}, range}`, `levers[]`, `flags[]`, `warnings[]`, `analyst.contributions[]`.
-- [ ] Round patient-facing figures to whole people out of 100; the analyst view keeps one decimal.
+- [x] `Evaluation` holds `trigger{fired, stage, countries[], criteria[]}`, `deadlines[]`, `pathway[]` (days, target, gap, countries), `survival{now, on_target, by_toggle{}, range}`, `levers[]`, `flags[]`, `warnings[]`, `analyst.contributions[]`.
+- [x] Round patient-facing figures to whole people out of 100; the analyst view keeps one decimal.
 
 ## Task 5: Evaluation endpoints (REST, MCP and the agent)
 
 **Files:** `B/entrypoints/http/routers/models.py`, `B/entrypoints/mcp/tools/models.py`, `T/test_model_evaluation.py`.
 
-- [ ] Failing tests first: evaluate through REST, MCP and the in-platform agent's toolbox; no `runs`, `run_snapshots` or `operators` rows appear and DuckDB is not opened (a fake that fails when touched); the MCP call is an ordinary `tool_call` entry; the agent's toolbox lists `evaluate_model`, `list_models`, `get_model`; an invalid input is refused with the term and its allowed values.
-- [ ] REST: `POST /api/models/{id}/versions/{v}/evaluate` with `{inputs, today?, toggles?}`; `GET /api/models`, `GET /api/models/{id}`, `GET /api/models/{id}/versions/{v}`, and `GET …/population` for the per-site "Nordic → timing-adjusted → Finland" figures stored at build.
-- [ ] MCP and agent: `evaluate_model(model_id, version?, inputs, session_id)`, `create_model`, `list_models`, `get_model`. The `evaluate_model` description states the intended use: "educational; synthetic example profiles only, never patient data".
+- [x] Failing tests first: evaluate through REST, MCP and the in-platform agent's toolbox; no `runs`, `run_snapshots` or `operators` rows appear and DuckDB is not opened (a fake that fails when touched); the MCP call is an ordinary `tool_call` entry; the agent's toolbox lists `evaluate_model`, `list_models`, `get_model`; an invalid input is refused with the term and its allowed values.
+- [x] REST: `POST /api/models/{id}/versions/{v}/evaluate` with `{inputs, today?, toggles?}`; `GET /api/models`, `GET /api/models/{id}`, `GET /api/models/{id}/versions/{v}`, and `GET …/population` for the per-site "Nordic → timing-adjusted → Finland" figures stored at build.
+- [x] MCP and agent: `evaluate_model(model_id, version?, inputs, session_id)`, `create_model`, `list_models`, `get_model`. The `evaluate_model` description states the intended use: "educational; synthetic example profiles only, never patient data".
 - [ ] Agent instructions: one line: use synthetic profiles; lead with the trigger and the deadlines; name each lever's evidence grade.
 
 ## Task 6: Validation runner
 
 **Files:** `B/core/services/models/validate.py`, `T/test_model_validate.py`.
 
-- [ ] Residual check (from Task 3): per site and sex, the pre-residual prediction, NORDCAN Finland, and the residual factor.
+- [x] Residual check (from Task 3): per site and sex, the pre-residual prediction, NORDCAN Finland, and the residual factor.
 - [ ] Education check: the model's survival gap by education per site and sex (toggles default) against Pokhrel 2010's cause-specific survival by education.
 - [ ] Cross-model check: the delay-only effect against Hanna's worked examples (8 and 12 weeks of colectomy delay).
 - [ ] Results go into `version.validation`, each figure with the operator it came from, so a widget can show it.
@@ -138,11 +140,11 @@ Every item becomes a registered source and an operator the model reads. The pass
 
 **Files:** `F/routes/__root.tsx` (or the app shell), `F/routes/models/…`, `F/components/models/…`.
 
-- [ ] **Global banner:** a slim red bar at the top of every route, not dismissible: "Educational use only. Do not enter patient data." In the root layout, with a test that it renders on the root, a dashboard and the models page. Check contrast in both themes.
-- [ ] **Model page, three tabs under the title, a full-width underline bar:** Model card, Evaluation, Population.
-- [ ] **Model card:** the DAG; the criteria lists per country; the targets per country and the median; the parameters with source, CI, scale and evidence grade; the validation (residual, education check, Hanna check); the intended-use statement; the TRIPOD+AI items that apply; "not validated on individual data".
-- [ ] **Evaluation form:** profile fields; the presentation as checkboxes grouped by stage (suspicion, well-founded suspicion), each naming its countries; stage and intent if known; the pathway as dates or days per step. State in React only, not in the URL.
-- [ ] **Evaluation result, in this order:**
+- [x] **Global banner:** a slim red bar at the top of every route, not dismissible: "Educational use only. Do not enter patient data." In the root layout, with a test that it renders on the root, a dashboard and the models page. Check contrast in both themes.
+- [x] **Model page, three tabs under the title, a full-width underline bar:** Model card, Evaluation, Population.
+- [x] **Model card:** the DAG; the criteria lists per country; the targets per country and the median; the parameters with source, CI, scale and evidence grade; the validation (residual, education check, Hanna check); the intended-use statement; the TRIPOD+AI items that apply; "not validated on individual data".
+- [x] **Evaluation form:** profile fields; the presentation as checkboxes grouped by stage (suspicion, well-founded suspicion), each naming its countries; stage and intent if known; the pathway as dates or days per step. State in React only, not in the URL.
+- [x] **Evaluation result, in this order:**
   1. the trigger card: which stage fired, in which countries, which criteria; "Finland has no national trigger";
   2. the deadlines: clock start, each deadline with status, the next action;
   3. the pathway timeline: days per step against target, the gap, the patient interval greyed;
@@ -150,8 +152,8 @@ Every item becomes a registered source and an operator the model reads. The pass
   5. support to offer; read with care.
 
   The analyst toggle shows the log-hazard contributions, including education, with a note on why it is hidden by default.
-- [ ] **Population:** per site and sex, three bars: Nordic level, timing-adjusted, Finland, with the residual named; the days-per-step comparison Finland vs Sweden vs Denmark.
-- [ ] No widget for evaluations: widgets persist. A widget may show a model's structure, validation or population figures.
+- [x] **Population:** per site and sex, three bars: Nordic level, timing-adjusted, Finland, with the residual named; the days-per-step comparison Finland vs Sweden vs Denmark.
+- [x] No widget for evaluations: widgets persist. A widget may show a model's structure, validation or population figures.
 
 ## Task 8: Demo and presentation
 

@@ -1003,6 +1003,29 @@ the web and adds it as sources, in a **research session**: a child session
   composer's "Research" button sends the draft as a brief (its first line, cut at 80
   characters, as the title), enabled when a research or session agent is set.
 
+## Statistical models
+
+A versioned model built from published figures, each with its citation, the passage it was
+checked against and an evidence grade, evaluated on one profile at a time
+(`core/models/statistical_models.py`; the first is the patient pathway model,
+`core/services/statistical_models/pathway.py`). `StatisticalModel{id, project_id, name,
+description, kind, latest_version}` and `ModelVersion{id, model_id, version, spec,
+compiled}`: a version is immutable, a change makes a new one, and `compiled` is what the
+build derived from the spec (the median target per step, converted parameters, the
+population view with the residual per site and sex). `StatisticalModelRepository`
+(`get`, `list`, `add`, `add_version`, `version`); `StatisticalModelService` (`create`,
+`create_pathway_model`, `add_version`, `list`, `get`, `version`, `evaluate`, `population`).
+
+**An evaluation is computed and returned, never stored**: no run, snapshot, operator or
+widget, and no DuckDB. The platform is not for patient data: the frontend carries a banner
+on every page saying so, and evaluations are therefore ordinary tool calls, recorded in the
+session like any other. REST: `GET /projects/{id}/models`, `POST
+/projects/{id}/models` (a spec) and `/models/pathway` (the shipped one), `GET
+/models/{id}`, `/versions/latest`, `/versions/{n}`, `/population`, `POST
+/models/{id}/versions`, `POST /models/{id}/evaluate`. MCP: `create_pathway_model`,
+`list_models`, `get_model`, `evaluate_model`. Migration `0015`: `statistical_models`,
+`statistical_model_versions`.
+
 ## REST
 
 All routes are under `/api`. Bodies are the domain models' JSON forms; request bodies

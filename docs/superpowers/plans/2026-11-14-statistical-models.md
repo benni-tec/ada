@@ -1,6 +1,6 @@
 # Statistical models and the patient pathway model: plan and brief for scientific grounding
 
-> **Status (2026-11-14): planned, not started. Part 4 is answered in `2026-11-14-statistical-models-grounding.md`, which revises the model in Part 2 (a DAG instead of a product of HRs; education and mother tongue as action flags only; screening dropped). Part 3's tasks are replaced by `2026-11-14-statistical-models-implementation.md`.** This document has two readers:
+> **Status (2026-11-14): built for lung cancer, v1, on the branch `pathway-model`; see the implementation plan's status. Part 4 is answered in `2026-11-14-statistical-models-grounding.md`, which revises the model in Part 2 (a DAG instead of a product of HRs; education and mother tongue as action flags only; screening dropped). Part 3's tasks are replaced by `2026-11-14-statistical-models-implementation.md`.** This document has two readers:
 > 1. **A scientist (Fable)**, who grounds the model scientifically: read Parts 1, 2 and 4, and answer the questions in Part 4.
 > 2. **The engineers**, who build the platform part: Part 3.
 >
