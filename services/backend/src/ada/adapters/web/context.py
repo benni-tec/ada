@@ -7,9 +7,9 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from ada.adapters.web import ProviderAnswered, send_json
+from ada.adapters.web import ProviderAnswered, error_code, send_json
 from ada.core.models.base import JsonObject
-from ada.core.models.errors import Unavailable
+from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.web import Monitor, PageText, reading_not_configured
 from ada.core.ports.web import PageReader
 
@@ -34,7 +34,7 @@ class ContextPages(PageReader):
                 "markdownParams": {"includeLinks": False},
             },
         )
-        text = _result(answer, "markdown", url)
+        text = self._result(answer, "markdown", url)
         return PageText(url=url, title=(answer.get("metadata") or {}).get("title"), text=text)
 
     async def extract(self, url: str, instruction: str, columns: Sequence[str]) -> list[JsonObject]:
@@ -63,7 +63,13 @@ class ContextPages(PageReader):
                 "jsonParams": {"schema": schema, "instructions": instruction},
             },
         )
-        data = _result(answer, "json", url)
+        if (answer.get("json") or {}).get("isTruncated"):
+            # Rows from the cut-off part would be missing without a trace.
+            raise Invalid(
+                f"{url} is too long for Context.dev to read whole, so the extracted rows would"
+                " be incomplete; extract from a shorter page"
+            )
+        data = self._result(answer, "json", url)
         rows: list[JsonObject] = data.get("rows", []) if isinstance(data, dict) else []
         return rows
 
@@ -95,13 +101,14 @@ class ContextPages(PageReader):
             self.client, method, BASE_URL + path, self.api_key.get_secret_value(), body
         )
 
-
-def _result(answer: dict[str, Any], name: str, url: str) -> Any:
-    """The data of one requested format. A page that cannot be read still answers HTTP 200,
-    with success false and an error code."""
-    part = answer.get(name) or {}
-    if part.get("success") and part.get("data") is not None:
-        return part["data"]
-    code = part.get("error_code") or answer.get("error_code") or "no content"
-    message = part.get("message") or answer.get("message") or ""
-    raise Unavailable(f"Context.dev could not read {url}: {code} {message}".strip())
+    def _result(self, answer: dict[str, Any], name: str, url: str) -> Any:
+        """The data of one requested format. A page that cannot be read still answers HTTP
+        200, with success false and an error code; as for an error status, only the code
+        is quoted."""
+        part = answer.get(name) or {}
+        if part.get("success") and part.get("data") is not None:
+            return part["data"]
+        assert self.api_key is not None  # it answered, so the key was sent
+        key = self.api_key.get_secret_value()
+        code = error_code(part, key) or error_code(answer, key) or "no content"
+        raise Unavailable(f"Context.dev could not read {url}: {code}")
