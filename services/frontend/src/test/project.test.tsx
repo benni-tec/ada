@@ -105,7 +105,7 @@ test('the overview counts the project’s items, and the sidebar lists them unde
   const folded = within(group('Data sources')).getByRole('button', { name: 'Data sources' })
   expect(folded).toHaveAttribute('aria-expanded', 'false')
   fireEvent.click(folded)
-  expect(await within(group('Data sources')).findByRole('link', { name: /Sotkanet screening/ })).toHaveAttribute('href', '/projects/p1#source-ds1')
+  expect(await within(group('Data sources')).findByRole('link', { name: /Sotkanet screening/ })).toHaveAttribute('href', '/projects/p1/settings#source-ds1')
 })
 
 test('the sidebar collapses to icons and opens again, and creates sessions and dashboards, marking the current one', async () => {

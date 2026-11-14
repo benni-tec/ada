@@ -26,7 +26,7 @@ export type AgentTurn = Omit<Schemas['AgentTurn'], 'parts'> & {
 
 export type LlmModel = Schemas['ModelInfo']
 
-/** The models of `llms.yml`; `session_agent` is null when none drives sessions. */
+/** The models set up in Settings; `session_agent` is null when none drives sessions. */
 export type LlmModels = Schemas['ModelList']
 
 /** An operator no other operator reads: the end of a pipeline, what a widget can show. */

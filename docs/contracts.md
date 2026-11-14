@@ -829,8 +829,9 @@ receives data from an agent; it asks the server for the output of its operator.
   opens a menu of the projects and "All projects". Then Overview; Sessions (with a new
   session dialog), Dashboards (a new dashboard dialog) and Reports (a link to
   `/reports/new`), each a collapsible item listing its items; Alerts, one link with the
-  firing count; and Data sources, folded at first (each links to its card on the overview,
-  `#source-<id>`, marked when its last refresh failed). Sessions and reports newest first.
+  firing count; and Data sources, folded at first (each links to its entry on the settings
+  page, `settings#source-<id>`, marked when its last refresh failed). Sessions and reports
+  newest first. The footer holds Settings (a gear), active on the settings route.
   The current item is marked (`data-active`, and the router's `aria-current="page"`).
   Collapsed, the icons have tooltips and a type's icon opens the sidebar again. Toggled by
   the top bar's button, the rail or Ctrl/Cmd+B; a sheet on phones.
@@ -881,15 +882,44 @@ receives data from an agent; it asks the server for the output of its operator.
   reason; `model` is sent when the models are known. While the latest turn is queued or
   running, a stop button posts `POST /turns/{id}/cancel`. Without an agent
   (`session_agent` null or unavailable, or a post answered with `turn: null`) the message
-  is still recorded and a note says nobody will answer and how to configure
-  `session_agent` in `llms.yml`. If the models route fails, the picker and the note are
-  left out and the message is sent without `model`.
+  is still recorded and a note says nobody will answer, with a link to Settings to add a
+  provider and pick the session agent. If the models route fails, the picker and the note
+  are left out and the message is sent without `model`.
 - **Add widget** (`components/chat/add-widget.tsx`): a Popover with a Command over the
   pipelines list, searchable by name, source names and column names. Choosing one adds a
   chip. One chip may carry several contexts (`chat-draft.ts`): on a dashboard the
   pipeline and `{kind: "dashboard", dashboard_id, slot?}` together, removed together; no
   slot means a new one. The draft lives on the page, so "Add widget" elsewhere on the page
   fills the composer, which then takes the focus.
+
+### Settings
+
+`/projects/{id}/settings` (`components/settings/`), type label "Settings" (a gear), in two
+sections:
+
+- **Agents**, shared by all projects (`GET /settings/agent`): a notice when
+  `secrets_available` is false (`ADA_SECRET_KEY` is not set; key fields are disabled); the
+  session agent picker (a select of the catalog, "None" first, unavailable models disabled
+  with their reason), saved at once with `PUT /settings/session-agent` and the settings'
+  revision; the providers as cards (name, kind, base URL, "Key stored" / "No key", a
+  pencil to edit, a trash can to delete after an inline confirmation), each with its
+  models (matched by `provider` name; delete with a trash can, add by name); "Add
+  provider" opens the same form as edit: name, kind, base URL, API key. The key is a
+  password field that always starts empty and is emptied after every save; in an edit,
+  empty keeps the stored key and "Remove the stored key" sends `api_key: null`. A 409 on
+  an edit or on the picker reads the settings again and says so. Every change also
+  invalidates `GET /llm/models`, which the composers read.
+- **Data sources**, this project's: each with name, access kind, format, address,
+  freshness, last check and last error, an icon to refresh now (`POST
+  /sources/{id}/refresh {force: true}`) and a pencil to edit (name, address, freshness;
+  the access kind and format stay as registered, since `SourceChange` has neither). "Add
+  data source" registers one (name, access kind, format, address, freshness). An edit
+  carries `expected_revision`; a 409 reads the list again and says so, and saving again
+  replaces it. Each entry is `#source-<id>`, scrolled to and marked when the address
+  names it.
+
+The agent settings' calls are hand-written in `lib/api/settings.ts` (TEMPORARY, until the
+schema is regenerated with the settings routes).
 
 ### Dashboards and the panel beside a session
 
@@ -932,13 +962,14 @@ receives data from an agent; it asks the server for the output of its operator.
 | Path | Shows |
 | --- | --- |
 | `/` | Projects |
-| `/projects/{id}` | A project's overview: counts per kind, the five newest sessions with the dashboard beside them, and the data sources with their state (`#source-<id>`). The lists of dashboards, reports and alerts are in the sidebar; widgets are not listed on their own |
+| `/projects/{id}` | A project's overview: counts per kind, the five newest sessions with the dashboard beside them, and the data sources with their state, read only (a link to Settings manages them). The lists of dashboards, reports and alerts are in the sidebar; widgets are not listed on their own |
 | `/projects/{id}/sessions/{session_id}` | A session: its record as a chat with its widget cards, all at one run of the page (each can be added to a dashboard), the composer, and its panel dashboard beside it at the dashboard's run, which can be detached; `?widget=<id>` scrolls to one. MCP tools return this address for widgets made in a session |
 | `/projects/{id}/widgets/{widget_id}` | One widget on its own page, at `?run=` when given, else at one run of the page; the address MCP tools return for widgets made outside a session. In-app links open widgets full size instead (`?open=`) |
 | `/projects/{id}/dashboards/{dashboard_id}` | The slots on the grid, all on one run; firing alert badges; the time range control (whole years; "Show" starts a run, "Save as default"); "Edit layout"; "Add widget" and the agent panel; "Generate report"; version history with view (`?version=n`) and restore; start a session from it |
 | `/projects/{id}/reports/{report_id}` | A report version (`?version=1.2.0`, default the latest): its tree with each widget at the version's run (opening full size at that run), the run, range, dashboard version, the sources list; each card's pipeline view previews the version's run |
 | `/projects/{id}/reports/new` | Generate a report from a dashboard (`?dashboard=<id>` preselects it) |
 | `/projects/{id}/alerts` | The alert feed (all, firing, resolved; each alert opens its alerting rows) and the rules by dashboard, with the rule editor and its formula builder |
+| `/projects/{id}/settings` | The agent shared by all projects (providers and their keys, models, the session agent) and this project's data sources (add, edit, refresh now; `#source-<id>` for one). See "Settings" above |
 | `?open=<widget id>`, on any of the project's pages | The widget full size in a modal over the page (see Widgets) |
 
 A write the page makes carries the revision it last showed; a 409 reads the record again
@@ -948,7 +979,9 @@ makes stale, except `agent.turn_part`, which goes into the cached turn. Every wi
 has the footer and pipeline view of "Widgets" above, at its page's run.
 
 The API types are generated from the backend's OpenAPI schema (`Schemas[...]`, the typed
-`api` client in `lib/api/client.ts`); the agent's calls are in `lib/api/agent.ts`. Only
+`api` client in `lib/api/client.ts`); the agent's calls are in `lib/api/agent.ts`, the
+agent settings' in `lib/api/settings.ts` (hand-written until the schema has them, with
+their key `settingsKeys`). Only
 the live stream's types are written by hand (`lib/api/models.ts`), since the schema does
 not describe it.
 

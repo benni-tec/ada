@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useParams } from '@tanstack/react-router'
 import { ArrowUp, Info, Square } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
@@ -48,6 +49,7 @@ export function Composer({
   tools?: ReactNode
 }) {
   const queryClient = useQueryClient()
+  const { projectId } = useParams({ strict: false })
   const inputId = useId()
   const noteId = useId()
   const input = useRef<HTMLTextAreaElement>(null)
@@ -98,9 +100,16 @@ export function Composer({
           <Info aria-hidden="true" className="mt-px size-3.5 shrink-0" />
           <span>
             No agent is configured, so nobody will answer here: your messages are recorded in the session, and an agent
-            connected over MCP can read them. To have the platform’s agent answer, name a model as{' '}
-            <code className="font-mono">session_agent</code> in <code className="font-mono">llms.yml</code> (see{' '}
-            <code className="font-mono">llms.example.yml</code>) with its key’s variable set, and restart the backend.
+            connected over MCP can read them. To have the platform’s agent answer, add a provider with its key and pick
+            the session agent in{' '}
+            {projectId ? (
+              <Link to="/projects/$projectId/settings" params={{ projectId }} className="underline underline-offset-2">
+                Settings
+              </Link>
+            ) : (
+              'Settings'
+            )}
+            .
           </span>
         </p>
       )}

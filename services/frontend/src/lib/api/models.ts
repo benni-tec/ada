@@ -25,6 +25,8 @@ export type Operator = Schemas['Operator']
 export type AccessKind = Schemas['AccessKind']
 export type DataFormat = Schemas['DataFormat']
 export type DataSource = Schemas['DataSource']
+export type FreshnessKind = Schemas['FreshnessKind']
+export type FreshnessPolicy = Schemas['FreshnessPolicy']
 export type Widget = Schemas['Widget']
 export type WidgetData = Schemas['WidgetData']
 
