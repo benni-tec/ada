@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link, Outlet } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet, useMatches } from '@tanstack/react-router'
 
 import { ConnectionIndicator, ProjectLive } from '@/components/live'
 import { projectQuery } from '@/lib/api'
+import { pageOf } from '@/lib/page'
 
 // The layout of everything inside a project. It holds the project's live stream, so
 // moving between the project, its sessions and its widgets keeps one connection.
@@ -13,6 +14,8 @@ export const Route = createFileRoute('/projects/$projectId')({
 function ProjectLayout() {
   const { projectId } = Route.useParams()
   const { data: project } = useQuery(projectQuery(projectId))
+  // Each page names its own steps of the trail, and says whether its data is frozen.
+  const { Crumb, frozen } = pageOf(useMatches())
 
   return (
     <ProjectLive projectId={projectId}>
@@ -37,9 +40,11 @@ function ProjectLayout() {
                   {project?.name ?? 'Project'}
                 </Link>
               </li>
+              {Crumb && <Crumb />}
             </ol>
           </nav>
-          <ConnectionIndicator />
+          {/* A frozen page never changes, so it says so itself instead of claiming "Live". */}
+          {!frozen && <ConnectionIndicator />}
         </div>
         <Outlet />
       </div>

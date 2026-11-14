@@ -9,7 +9,7 @@ type Widgets = Map<Id, Widget>
 function SlotContent({ slot, widgets, runId }: { slot: DashboardSlot; widgets: Widgets; runId: Id | null }) {
   const widget = slot.widget_id ? widgets.get(slot.widget_id) : undefined
   // The dashboard starts a new run when data changes; the new run reloads the frame.
-  if (widget) return <WidgetCard widget={widget} runId={runId} runFollowsData />
+  if (widget) return <WidgetCard widget={widget} runId={runId} reloadOnData={false} />
   return (
     <div className="flex min-h-32 flex-col justify-center gap-1 rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700">
       {slot.widget_id ? (

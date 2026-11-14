@@ -147,6 +147,28 @@ test('shows the latest version with its widgets pinned to its run', async () => 
   )
 })
 
+test('a report says its numbers are frozen instead of claiming to be live', async () => {
+  serveReport()
+  renderAt('/projects/p1/reports/rep1')
+
+  expect(await screen.findByText(/Frozen at version 1\.1\.0: these numbers never change\./)).toBeInTheDocument()
+  expect(await screen.findByText(/Data fetched/)).toBeInTheDocument()
+  expect(screen.queryByLabelText(/Live updates/)).not.toBeInTheDocument()
+
+  // The trail says this is a report, and which one.
+  const trail = screen.getByRole('navigation', { name: 'Breadcrumb' })
+  expect(within(trail).getByText('Report')).toBeInTheDocument()
+  expect(await within(trail).findByText('Screening findings')).toHaveAttribute('aria-current', 'page')
+})
+
+test('opening a report names its latest version in the address', async () => {
+  // So a version created while someone reads does not swap the numbers under them.
+  serveReport()
+  const { router } = renderAt('/projects/p1/reports/rep1')
+
+  await waitFor(() => expect(router.state.location.search).toEqual({ version: '1.1.0' }))
+})
+
 test('shows an older version and points to the latest', async () => {
   serveReport()
   const { router } = renderAt('/projects/p1/reports/rep1?version=1.0.0')

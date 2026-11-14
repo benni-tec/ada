@@ -1,6 +1,6 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useId, type ReactNode } from 'react'
+import { useEffect, useId, type ReactNode } from 'react'
 
 import { ErrorNotice, Loading } from '@/components/notices'
 import { Provenance } from '@/components/provenance'
@@ -20,6 +20,7 @@ import {
   type Report,
   type ReportVersion,
 } from '@/lib/api'
+import { ReportCrumb } from '@/components/breadcrumbs'
 
 type Search = {
   /** The version shown, as its number, e.g. "1.2.0"; the latest without it. */
@@ -27,23 +28,40 @@ type Search = {
 }
 
 export const Route = createFileRoute('/projects/$projectId/reports/$reportId')({
+  staticData: { crumb: ReportCrumb, frozen: true },
   validateSearch: (search: Record<string, unknown>): Search =>
     typeof search.version === 'string' && search.version !== '' ? { version: search.version } : {},
   component: ReportPage,
 })
 
 function ReportPage() {
-  const { reportId } = Route.useParams()
+  const { projectId, reportId } = Route.useParams()
   const { version: asked } = Route.useSearch()
+  const navigate = useNavigate()
   const report = useQuery(reportQuery(reportId))
   const versions = useQuery(reportVersionsQuery(reportId))
+  const latestNumber = latestOf(report.data, versions.data)?.version
+
+  // Opening the report without a version shows the latest, and the address then names it:
+  // a version created while someone reads must not swap the numbers under them. They get
+  // the notice below instead.
+  useEffect(() => {
+    if (!asked && latestNumber) {
+      void navigate({
+        to: '/projects/$projectId/reports/$reportId',
+        params: { projectId, reportId },
+        search: { version: latestNumber },
+        replace: true,
+      })
+    }
+  }, [asked, latestNumber, navigate, projectId, reportId])
 
   if (report.isPending || versions.isPending) return <Loading what="the report" />
   if (report.error) return <ErrorNotice error={report.error} prefix="The report cannot be loaded:" />
   if (versions.error) return <ErrorNotice error={versions.error} prefix="The versions cannot be loaded:" />
 
   const sorted = [...versions.data].sort((a, b) => compareVersions(b.version, a.version))
-  const latest = sorted.find((version) => version.id === report.data.latest_version_id) ?? sorted[0]
+  const latest = latestOf(report.data, versions.data)
   const shown = asked ? sorted.find((version) => version.version === asked) : latest
 
   return (
@@ -56,6 +74,7 @@ function ReportPage() {
           {sorted.length > 0 && <VersionPicker versions={sorted} shown={shown} latest={latest} />}
         </div>
         <Owner report={report.data} />
+        {shown && <Frozen version={shown} />}
       </header>
       {!shown ? (
         <p role="alert" className="text-sm text-red-700 dark:text-red-400">
@@ -81,6 +100,41 @@ function ReportPage() {
         </>
       )}
     </article>
+  )
+}
+
+function latestOf(report: Report | undefined, versions: ReportVersion[] | undefined) {
+  if (!report || !versions?.length) return undefined
+  const sorted = [...versions].sort((a, b) => compareVersions(b.version, a.version))
+  return sorted.find((version) => version.id === report.latest_version_id) ?? sorted[0]
+}
+
+/**
+ * Takes the place of the project's "Live" indicator: a version's numbers come from one
+ * run and never change, however the data changes later.
+ */
+function Frozen({ version }: { version: ReportVersion }) {
+  const sources = useQuery(reportSourcesQuery(version.id))
+  const fetched = (sources.data ?? [])
+    .map((source) => source.fetched_at)
+    .filter((at): at is string => Boolean(at))
+    .sort()
+  const day = (at: string) => new Date(at).toLocaleDateString(undefined, { dateStyle: 'medium' })
+  const when =
+    fetched.length === 0
+      ? null
+      : day(fetched[0]) === day(fetched.at(-1)!)
+        ? day(fetched[0])
+        : `${day(fetched[0])} to ${day(fetched.at(-1)!)}`
+  return (
+    <p
+      role="status"
+      className="inline-flex w-fit items-center gap-2 rounded-md border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+    >
+      <span aria-hidden="true" className="size-2 rounded-full bg-neutral-500 dark:bg-neutral-400" />
+      Frozen at version {version.version}: these numbers never change.
+      {when && <> Data fetched {when}.</>}
+    </p>
   )
 }
 

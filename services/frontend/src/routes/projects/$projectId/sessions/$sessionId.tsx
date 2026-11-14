@@ -9,6 +9,7 @@ import { ErrorNotice, Loading } from '@/components/notices'
 import { MessageForm, SessionRecord } from '@/components/session-record'
 import { entriesQuery, getSession, keys, renameSession, sessionQuery, sessionWidgetsQuery } from '@/lib/api'
 import { useRevisedUpdate } from '@/lib/revisions'
+import { SessionCrumb } from '@/components/breadcrumbs'
 
 type Search = {
   /** A widget to scroll to and highlight; the MCP tools link to it this way. */
@@ -16,6 +17,7 @@ type Search = {
 }
 
 export const Route = createFileRoute('/projects/$projectId/sessions/$sessionId')({
+  staticData: { crumb: SessionCrumb },
   validateSearch: (search: Record<string, unknown>): Search =>
     typeof search.widget === 'string' && search.widget !== '' ? { widget: search.widget } : {},
   component: SessionPage,

@@ -4,6 +4,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { WidgetCard } from '@/components/widget-card'
 import { widgetQuery } from '@/lib/api'
+import { WidgetCrumb } from '@/components/breadcrumbs'
 
 type Search = {
   /** Show the widget at this run instead of starting a new one. */
@@ -11,6 +12,7 @@ type Search = {
 }
 
 export const Route = createFileRoute('/projects/$projectId/widgets/$widgetId')({
+  staticData: { crumb: WidgetCrumb },
   validateSearch: (search: Record<string, unknown>): Search =>
     typeof search.run === 'string' && search.run !== '' ? { run: search.run } : {},
   component: WidgetPage,

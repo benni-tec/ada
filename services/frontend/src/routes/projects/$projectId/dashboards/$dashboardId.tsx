@@ -20,6 +20,7 @@ import {
   type DashboardTimeRange,
   type DashboardVersion,
 } from '@/lib/api'
+import { DashboardCrumb } from '@/components/breadcrumbs'
 
 type Search = {
   /** Look at this version number instead of the current one. */
@@ -27,6 +28,7 @@ type Search = {
 }
 
 export const Route = createFileRoute('/projects/$projectId/dashboards/$dashboardId')({
+  staticData: { crumb: DashboardCrumb },
   validateSearch: (search: Record<string, unknown>): Search => {
     const version = Number(search.version)
     return Number.isInteger(version) && version > 0 ? { version } : {}

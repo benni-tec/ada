@@ -2,8 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { AlertFeed } from '@/components/alerts/alert-feed'
 import { AlertRules } from '@/components/alerts/alert-rules'
+import { AlertsCrumb } from '@/components/breadcrumbs'
 
 export const Route = createFileRoute('/projects/$projectId/alerts/')({
+  staticData: { crumb: AlertsCrumb },
   component: AlertsPage,
 })
 

@@ -109,7 +109,7 @@ function WidgetBlockView({ widgetId, caption, pinned }: { widgetId: Id; caption:
   if (error) return <ErrorNotice error={error} prefix="A widget cannot be loaded:" />
   return (
     <figure className="flex flex-col gap-1">
-      <WidgetCard widget={widget} runId={pinned.runId} linkToWidget={false} />
+      <WidgetCard widget={widget} runId={pinned.runId} linkToWidget={false} reloadOnData={false} />
       <div className="rounded-lg border border-neutral-200 dark:border-neutral-800">
         {caption && (
           <figcaption className="px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300">{caption}</figcaption>

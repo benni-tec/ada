@@ -18,19 +18,20 @@ const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 
  * `allow-same-origin` is needed for the widget's same-origin request to /api; without
  * it the frame's origin is opaque and the request becomes cross-origin.
  *
- * `runFollowsData`: the page starts a new run when data changes (a dashboard), so the
- * frame reloads by its new address and must not also reload on the live epoch.
+ * `reloadOnData`: whether the frame reloads when the project's data changes. Off where
+ * the run is decided by the page: a dashboard starts a new run when data changes, so the
+ * frame reloads by its new address; a report pins one run whose numbers never change.
  */
 export function WidgetFrame({
   widget,
   runId,
   tall,
-  runFollowsData = false,
+  reloadOnData = true,
 }: {
   widget: Widget
   runId?: string | null
   tall?: boolean
-  runFollowsData?: boolean
+  reloadOnData?: boolean
 }) {
   // Changing key remounts the frame, which reloads the widget and its data.
   const { widgetEpoch } = useLive()
@@ -38,7 +39,7 @@ export function WidgetFrame({
   return (
     <div className="resize-y overflow-hidden" style={{ height }}>
       <iframe
-        key={runFollowsData ? 0 : widgetEpoch}
+        key={reloadOnData ? widgetEpoch : 0}
         src={widgetSrc(widget, runId)}
         title={`Widget: ${widget.title || widget.type}`}
         sandbox="allow-scripts allow-same-origin"
@@ -59,7 +60,7 @@ export function WidgetCard({
   highlighted = false,
   tall = false,
   linkToWidget = true,
-  runFollowsData = false,
+  reloadOnData = true,
   actions,
 }: {
   widget: Widget
@@ -68,7 +69,7 @@ export function WidgetCard({
   tall?: boolean
   linkToWidget?: boolean
   /** See WidgetFrame. */
-  runFollowsData?: boolean
+  reloadOnData?: boolean
   /** Shown in a strip under the widget; defaults to what WidgetCardActions gives. */
   actions?: ReactNode
 }) {
@@ -116,7 +117,7 @@ export function WidgetCard({
           {widget.type}
         </span>
       </header>
-      <WidgetFrame widget={widget} runId={runId} tall={tall} runFollowsData={runFollowsData} />
+      <WidgetFrame widget={widget} runId={runId} tall={tall} reloadOnData={reloadOnData} />
       {strip && <footer className="border-t border-neutral-200 px-4 py-2 dark:border-neutral-800">{strip}</footer>}
     </article>
   )
