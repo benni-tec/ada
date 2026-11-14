@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from ada.adapters.db.support import (
     add_row,
@@ -38,6 +38,7 @@ from ada.core.ports.repositories import (
     SessionRepository,
     WidgetRepository,
 )
+from ada.core.ports.sources import SourceCheckLog
 
 
 def _project(row: ProjectRow) -> Project:
@@ -282,3 +283,20 @@ class SqlWidgetRepository(WidgetRepository):
     async def list_by_session(self, session_id: Id) -> Sequence[Widget]:
         statement = oldest_first(WidgetRow, WidgetRow.session_id == session_id)
         return [_widget(row) for row in await rows(self.session, statement)]
+
+
+class SqlSourceCheckLog(SourceCheckLog):
+    """Records a failed refresh in a short transaction on a connection of its own.
+
+    The request's session is not used, so the record survives its rollback. It cannot wait
+    on that session's locks either: a refresh only reads the data source row before it
+    fails, and nothing else in a refresh writes it."""
+
+    def __init__(self, engine: AsyncEngine) -> None:
+        self.engine = engine
+
+    async def record_failure(
+        self, id: Id, at: datetime, probe_token: str | None, error: str
+    ) -> None:
+        async with AsyncSession(self.engine) as session, session.begin():
+            await SqlDataSourceRepository(session).record_check(id, at, probe_token, error)

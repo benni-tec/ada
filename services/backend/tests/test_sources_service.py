@@ -12,6 +12,7 @@ from ada.adapters.memory.repositories import (
     MemoryOperatorRepository,
     MemoryProjectRepository,
     MemorySnapshotRepository,
+    MemorySourceCheckLog,
     MemoryStore,
 )
 from ada.core.models.actors import ActorKind
@@ -76,6 +77,7 @@ async def world() -> World:
         operators=MemoryOperatorRepository(memory),
         snapshots=MemorySnapshotRepository(memory),
         readers=FakeSourceReaders({AccessKind.URL: reader, AccessKind.REQUEST: reader}),
+        checks=MemorySourceCheckLog(memory),
         store=store,
         events=events,
         clock=clock,

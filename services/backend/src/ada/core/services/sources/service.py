@@ -25,7 +25,7 @@ from ada.core.ports.repositories import (
     ProjectRepository,
     SnapshotRepository,
 )
-from ada.core.ports.sources import SourceReader, SourceReaders
+from ada.core.ports.sources import SourceCheckLog, SourceReader, SourceReaders
 from ada.core.ports.system import Clock
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.sources.freshness import check_policy, is_due, wants_check
@@ -58,6 +58,7 @@ class DataSources(SourceService):
         operators: OperatorRepository,
         snapshots: SnapshotRepository,
         readers: SourceReaders,
+        checks: SourceCheckLog,
         store: AnalysisStore,
         events: EventPublisher,
         clock: Clock,
@@ -67,6 +68,7 @@ class DataSources(SourceService):
         self.operators = operators
         self.snapshots = snapshots
         self.readers = readers
+        self.checks = checks
         self.store = store
         self.events = events
         self.clock = clock
@@ -173,7 +175,13 @@ class DataSources(SourceService):
             snapshot = await self._fetch(reader, source, operator_id, current)
         except Exception as error:
             message = str(error) or type(error).__name__
-            await self.sources.record_check(source.id, now, source.last_probe_token, message)
+            # Recorded apart from the caller's transaction: the error is raised on, and a
+            # caller that fails with it (a run whose source has no data yet) rolls back.
+            # A success is recorded in the caller's transaction, with the snapshot it
+            # wrote, so the token never says "fetched" without the data to show for it.
+            await self.checks.record_failure(source.id, now, source.last_probe_token, message)
+            # Goes out with the caller's transaction, like every event: a caller that
+            # handles the error (the worker) announces it; one that fails does not.
             await self._publish(
                 source, EventType.SOURCE_REFRESH_FAILED, changed=False, error=message
             )

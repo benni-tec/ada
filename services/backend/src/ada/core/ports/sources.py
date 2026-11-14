@@ -1,6 +1,8 @@
+from datetime import datetime
 from typing import Protocol
 
 from ada.core.models.analysis import FetchedData
+from ada.core.models.base import Id
 from ada.core.models.sources import AccessKind, DataSource
 from ada.core.models.time import TimeRange
 
@@ -22,4 +24,17 @@ class SourceReader(Protocol):
 class SourceReaders(Protocol):
     def for_kind(self, kind: AccessKind) -> SourceReader:
         """The reader for an access kind. Raises Invalid when none is installed."""
+        ...
+
+
+class SourceCheckLog(Protocol):
+    """Where failed refreshes are recorded, apart from the caller's transaction."""
+
+    async def record_failure(
+        self, id: Id, at: datetime, probe_token: str | None, error: str
+    ) -> None:
+        """Store the outcome on the data source as DataSourceRepository.record_check does,
+        in a transaction of its own that has committed when this returns. The caller's
+        transaction may still roll back, since the error is raised on to it; the record
+        must stay, so the source shows the error and its widgets show stale data."""
         ...

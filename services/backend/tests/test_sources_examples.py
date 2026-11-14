@@ -17,6 +17,7 @@ from ada.adapters.memory.repositories import (
     MemoryOperatorRepository,
     MemoryProjectRepository,
     MemorySnapshotRepository,
+    MemorySourceCheckLog,
     MemoryStore,
 )
 from ada.adapters.sources.examples import (
@@ -104,6 +105,7 @@ async def world() -> World:
         operators=MemoryOperatorRepository(memory),
         snapshots=MemorySnapshotRepository(memory),
         readers=HttpSourceReaders(create_client(httpx.MockTransport(replay)), clock),
+        checks=MemorySourceCheckLog(memory),
         store=store,
         events=MemoryEventBus(),
         clock=clock,

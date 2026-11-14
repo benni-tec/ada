@@ -15,6 +15,7 @@ from ada.adapters.db.workspace_repositories import (
     SqlDataSourceRepository,
     SqlProjectRepository,
     SqlSessionRepository,
+    SqlSourceCheckLog,
     SqlWidgetRepository,
 )
 from ada.core.ports.repositories import (
@@ -31,6 +32,7 @@ from ada.core.ports.repositories import (
     TemplateRepository,
     WidgetRepository,
 )
+from ada.core.ports.sources import SourceCheckLog
 
 
 class RepositoryProvider(Provider):
@@ -52,6 +54,9 @@ class RepositoryProvider(Provider):
     reports = provide(SqlReportRepository, provides=ReportRepository)
     alert_rules = provide(SqlAlertRuleRepository, provides=AlertRuleRepository)
     alerts = provide(SqlAlertRepository, provides=AlertRepository)
+
+    # Its own connection per record, from the engine, not the request's session.
+    source_checks = provide(SqlSourceCheckLog, provides=SourceCheckLog, scope=Scope.APP)
 
 
 provider = RepositoryProvider()

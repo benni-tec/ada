@@ -34,6 +34,7 @@ from ada.core.ports.repositories import (
     TemplateRepository,
     WidgetRepository,
 )
+from ada.core.ports.sources import SourceCheckLog
 
 
 class MemoryStore:
@@ -379,3 +380,15 @@ class MemoryAlertRepository(AlertRepository):
             if state is None or alert.state is state
         ]
         return sorted(alerts, key=lambda alert: alert.started_at, reverse=True)
+
+
+class MemorySourceCheckLog(SourceCheckLog):
+    """Memory has no transactions; recording goes straight to the store."""
+
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def record_failure(
+        self, id: Id, at: datetime, probe_token: str | None, error: str
+    ) -> None:
+        await MemoryDataSourceRepository(self.store).record_check(id, at, probe_token, error)
