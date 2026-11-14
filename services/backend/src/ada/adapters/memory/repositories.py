@@ -84,6 +84,8 @@ class MemoryStore:
         self.research_agent: tuple[Id, str] | None = None
         # Source id -> the sealed secret of its monitor.
         self.monitor_secrets: dict[Id, str] = {}
+        # Session id -> its paid web calls.
+        self.web_calls: dict[Id, int] = {}
 
     def forget_model(self, key: tuple[Id, str]) -> None:
         """Remove a model and clear the selections naming it, as ON DELETE SET NULL does."""
@@ -198,6 +200,14 @@ class MemorySessionRepository(SessionRepository):
     async def add_entry(self, entry: SessionEntry) -> None:
         await self.get(entry.session_id)
         self.store.session_entries.append(entry)
+
+    async def use_web_call(self, id: Id, cap: int) -> bool:
+        await self.get(id)
+        used = self.store.web_calls.get(id, 0)
+        if used >= cap:
+            return False
+        self.store.web_calls[id] = used + 1
+        return True
 
     async def entries(self, session_id: Id) -> Sequence[SessionEntry]:
         return [e for e in self.store.session_entries if e.session_id == session_id]

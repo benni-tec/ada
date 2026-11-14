@@ -16,7 +16,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, SecretStr
 
 from ada.core.models.base import DomainModel, Id, JsonObject
-from ada.core.models.sessions import SessionEntry
+from ada.core.models.sessions import SessionAgent, SessionEntry
 
 # What a configured model is for. One for now; the operators of later waves add theirs.
 SESSION_AGENT = "session_agent"
@@ -92,6 +92,13 @@ class ModelList(DomainModel):
     session_agent: str | None = None
     research_agent: str | None = None
 
+    def agent_for(self, agent: SessionAgent) -> str | None:
+        """The model that answers in a session `agent` works in. Research sessions fall
+        back to the session agent's model."""
+        if agent is SessionAgent.RESEARCH:
+            return self.research_agent or self.session_agent
+        return self.session_agent
+
 
 class AgentSettingsView(DomainModel):
     """Everything the settings page shows about the agent, in one read."""
@@ -104,6 +111,11 @@ class AgentSettingsView(DomainModel):
     secrets_available: bool
     # The revision of AgentSettings, for setting the session agent.
     revision: int
+
+
+class ResearchLimits(DomainModel):
+    # Paid web tool calls a research session may make, over all its turns.
+    web_calls: int = 40
 
 
 class ModelTarget(DomainModel):

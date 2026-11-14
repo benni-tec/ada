@@ -50,3 +50,12 @@ class SessionService(Protocol):
     async def record_agent_turn(self, session_id: Id, turn_id: Id, actor: Actor) -> SessionEntry:
         """Where the agent's answer to the latest message goes in the record."""
         ...
+
+    async def create_research(self, parent_session_id: Id, title: str, actor: Actor) -> Session:
+        """A research session under the parent, in its project, and a delegation entry in
+        the parent that names it. A research session does not delegate further."""
+        ...
+
+    async def record_report(self, child_session_id: Id, text: str, actor: Actor) -> SessionEntry:
+        """What a research session came back with, as a report entry in its parent."""
+        ...

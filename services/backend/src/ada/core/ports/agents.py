@@ -18,6 +18,7 @@ from ada.core.models.agents import (
     TurnStatus,
 )
 from ada.core.models.base import Id, JsonObject
+from ada.core.models.sessions import SessionAgent
 
 
 class AgentFailed(Exception):
@@ -35,6 +36,11 @@ class LanguageModels(Protocol):
 
     async def catalog(self) -> ModelList:
         """Every configured model, whether each can be used, and the session agent."""
+        ...
+
+    async def research_agent(self) -> str | None:
+        """The model that runs research sessions: the research agent, else the session
+        agent; None without either."""
         ...
 
     async def target(self, model_id: str) -> ModelTarget:
@@ -57,9 +63,12 @@ class AgentToolbox(Protocol):
     """Opens the tools for a turn. The caller of a turn provides it: the tools are the
     platform's own MCP tools, which only an entrypoint can serve."""
 
-    def connect(self, agent: Actor, session_id: Id) -> AbstractAsyncContextManager[AgentTools]:
+    def connect(
+        self, agent: Actor, session_id: Id, profile: SessionAgent = SessionAgent.SESSION
+    ) -> AbstractAsyncContextManager[AgentTools]:
         """Tools that record what they do as `agent`, and that default to `session_id`
-        where they take a session."""
+        where they take a session. `profile` picks the tools: the research agent gets
+        fewer than the session agent."""
         ...
 
 

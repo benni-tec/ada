@@ -60,13 +60,14 @@ from ada.core.ports.repositories import (
 )
 from ada.core.ports.system import Clock
 from ada.core.ports.tasks import TaskDispatcher
+from ada.core.ports.web import PageReader, WebSearch
 from ada.core.services.pipelines import listing
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.http.app import create_app
 from ada.entrypoints.mcp.server import create_mcp
-from fakes import FixedClock
+from fakes import FakePageReader, FakeWebSearch, FixedClock
 from memory import memory_adapters
 
 COLUMNS = (
@@ -300,6 +301,22 @@ class Overrides(Provider):
     pipelines = provide(FakePipelines, provides=PipelineService)
     runs = provide(FakeRuns, provides=RunService)
     sources = provide(FakeSources, provides=SourceService)
+
+
+class FakeWeb(Provider):
+    """The web tools' ports on fakes."""
+
+    def __init__(self, search: FakeWebSearch, pages: FakePageReader) -> None:
+        super().__init__()
+        self.search, self.pages = search, pages
+
+    @provide(scope=Scope.APP)
+    def search_(self) -> WebSearch:
+        return self.search
+
+    @provide(scope=Scope.APP)
+    def pages_(self) -> PageReader:
+        return self.pages
 
 
 @dataclass

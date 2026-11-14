@@ -1,5 +1,6 @@
-"""The settings page's routes for the agent: providers, their models and the session
-agent. Instance-wide, shared by all projects. No response ever carries an API key."""
+"""The settings page's routes for the agent: providers, their models, the session agent
+and the research agent. Instance-wide, shared by all projects. No response ever carries
+an API key."""
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
@@ -44,7 +45,8 @@ class NewModel(Request):
 
 
 class SessionAgentChoice(Request):
-    # A model id ("<provider>/<model>"), or null for no session agent.
+    # A model id ("<provider>/<model>"), or null: no session agent, or, for the research
+    # agent, the session agent's model.
     model_id: str | None
     expected_revision: int
 
@@ -99,3 +101,11 @@ async def set_session_agent(
     body: SessionAgentChoice, service: FromDishka[AgentSettingsService]
 ) -> AgentSettingsView:
     return await service.set_session_agent(body.model_id, body.expected_revision)
+
+
+@router.put("/settings/research-agent")
+async def set_research_agent(
+    body: SessionAgentChoice, service: FromDishka[AgentSettingsService]
+) -> AgentSettingsView:
+    """The model of research sessions; null falls back to the session agent's."""
+    return await service.set_research_agent(body.model_id, body.expected_revision)

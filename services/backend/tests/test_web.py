@@ -5,7 +5,6 @@ from uuid import uuid7
 
 import httpx
 import pytest
-from dishka import Provider, Scope, provide
 from pydantic import SecretStr
 
 from ada.adapters.sources.http import create_client
@@ -15,9 +14,8 @@ from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.web import SearchHit, SearchScope
-from ada.core.ports.web import PageReader, WebSearch
 from ada.entrypoints.mcp.agent import InProcessToolbox
-from api_support import call, mcp_client
+from api_support import FakeWeb, call, mcp_client
 from fakes import FakePageReader, FakeWebSearch, WebReplay
 
 pytestmark = pytest.mark.anyio
@@ -123,20 +121,6 @@ async def test_error_answers_never_quote_the_body() -> None:
         with pytest.raises(Unavailable, match="other than JSON"):
             await ContextPages(http, secret).unwatch("mon_1")
     assert "synthetic-secret-key" not in str(search.value) + str(scrape.value)
-
-
-class FakeWeb(Provider):
-    def __init__(self, search: FakeWebSearch, pages: FakePageReader) -> None:
-        super().__init__()
-        self.search, self.pages = search, pages
-
-    @provide(scope=Scope.APP)
-    def search_(self) -> WebSearch:
-        return self.search
-
-    @provide(scope=Scope.APP)
-    def pages_(self) -> PageReader:
-        return self.pages
 
 
 WEB_TOOLS = {"search_web", "read_page", "extract_table"}

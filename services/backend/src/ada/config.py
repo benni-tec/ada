@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     context_api_key: SecretStr | None = None
     # Where Context.dev can reach this platform, for page monitor webhooks.
     ada_public_url: str | None = None
+    # Paid web tool calls (Exa and Context.dev) a research session may make.
+    research_web_calls: int = 40
 
     def master_key(self) -> str | None:
         """ADA_SECRET_KEY, else the contents of ADA_SECRET_KEY_FILE; None when neither is

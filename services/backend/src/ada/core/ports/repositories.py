@@ -81,6 +81,11 @@ class SessionRepository(Protocol):
     async def add_entry(self, entry: SessionEntry) -> None: ...
     async def entries(self, session_id: Id) -> Sequence[SessionEntry]: ...
 
+    async def use_web_call(self, id: Id, cap: int) -> bool:
+        """Count one paid web call against the session, atomically; False, counting
+        nothing, when it has made `cap` already."""
+        ...
+
 
 class AgentTurnRepository(Protocol):
     """The in-platform agent's turns. A turn has no revision: the worker running it is its

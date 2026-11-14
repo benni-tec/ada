@@ -26,6 +26,7 @@ from ada.core.models.sessions import (
     EntryKind,
     PipelineContext,
     Session,
+    SessionAgent,
     SessionEntry,
     WidgetContext,
 )
@@ -44,7 +45,16 @@ MAX_HISTORY = 40
 ABOUT_ADA = """\
 You are the analysis agent of ADA, a platform for traceable data analysis. You work with \
 people inside the platform, in a session, using ADA's tools.
+"""
 
+ABOUT_RESEARCH = """\
+You are the research agent of ADA, a platform for traceable data analysis. A person or \
+the analysis agent delegated a research brief to you; this session is yours. You find \
+data on the web that answers the brief, add it to the project as data sources, and \
+report back. You do not build dashboards, reports or alerts.
+"""
+
+HOW_ADA_WORKS = """\
 How ADA works:
 - A project holds data sources, pipelines, sessions, dashboards, reports and alerts.
 - A data source is registered once per project (address, format, freshness policy).
@@ -73,7 +83,34 @@ session (it is filled in when you leave it out).
 expected_revision; on a conflict read again.
 - When a tool refuses a call, read its message and correct the call; do not repeat it \
 unchanged.
+- When the project lacks the data a question needs, delegate_research hands a brief to \
+the research agent, which finds and adds sources. It returns at once; its report comes \
+back later as a message, and you continue from it.
 - Answer briefly, in the language of the message. Say what you built and where it is.
+"""
+
+RESEARCH_RULES = """\
+Rules:
+- Answer the brief with data: datasets that hold the numbers it asks for. Prefer official \
+statistics (statistics offices, public health institutes, Eurostat, OECD, WHO) to \
+articles that quote them.
+- search_web, read_page and extract_table are paid calls, and this session may make only \
+a limited number of them. Search with scope "data" first; read a page only when it is a \
+likely source.
+- Look at list_sources first, so you do not add a source twice. Add each usable dataset \
+with register_source and full provenance: the publisher, the licence ("unknown", with \
+the reason, when it cannot be established), found_by (the query and scope that found \
+it), and extracted_by_model when a model read the values out of a page.
+- Check that each source loads before you report it: refresh_source, then \
+add_source_operator and preview_operator on it. Fix a source that fails with \
+update_source, or leave it out of the report.
+- Never invent a number, a dataset or a URL. Never state a number you did not read from \
+a tool result in this conversation.
+- Say openly what does not exist or could not be found, and where you looked.
+- Finish with report_back: a short summary of what you found, the ids of the sources you \
+added, and what is missing. Whoever delegated reads only that report.
+- Pass the session id to tools that take a session_id (it is filled in when you leave it \
+out). When a tool refuses a call, read its message and correct the call.
 """
 
 
@@ -105,10 +142,12 @@ class Briefing:
         # The record is in order, so what came before the message is what precedes it.
         position = next(i for i, entry in enumerate(entries) if entry.id == turn.prompt_entry_id)
         prompt_entry, earlier = entries[position], entries[:position]
+        research = session.agent is SessionAgent.RESEARCH
         sections = [
-            ABOUT_ADA,
+            ABOUT_RESEARCH if research else ABOUT_ADA,
+            HOW_ADA_WORKS,
             await self._session(project, session),
-            RULES,
+            RESEARCH_RULES if research else RULES,
             await self._context(prompt_entry.context),
         ]
         return TurnRequest(
@@ -116,7 +155,9 @@ class Briefing:
             target=target,
             instructions="\n".join(section for section in sections if section),
             history=tuple(history(earlier, {t.id: t for t in turns})[-MAX_HISTORY:]),
-            prompt=prompt_entry.text,
+            prompt=_report(prompt_entry)
+            if prompt_entry.kind is EntryKind.REPORT
+            else prompt_entry.text,
             max_steps=max_steps,
         )
 
@@ -129,6 +170,11 @@ class Briefing:
         if session.origin_dashboard_id is not None:
             origin = await self._dashboard_name(session.origin_dashboard_id)
             lines.append(f"- It was started from the dashboard {origin}.")
+        if session.parent_session_id is not None:
+            lines.append(
+                f"- It was delegated from the session {session.parent_session_id}; "
+                "report_back posts your report there."
+            )
         if session.panel_dashboard_id is not None:
             lines.append(
                 f"- The dashboard {await self._dashboard_name(session.panel_dashboard_id)} "
@@ -204,6 +250,8 @@ def history(entries: Sequence[SessionEntry], turns: Mapping[Id, AgentTurn]) -> l
         match entry.kind:
             case EntryKind.MESSAGE:
                 messages.append(HistoryMessage(role="user", text=entry.text))
+            case EntryKind.REPORT:
+                messages.append(HistoryMessage(role="user", text=_report(entry)))
             case EntryKind.AGENT_TURN:
                 turn = turns.get(_id(entry.ref)) if entry.ref else None
                 if turn is not None and (answer := summary(turn)):
@@ -221,6 +269,10 @@ def history(entries: Sequence[SessionEntry], turns: Mapping[Id, AgentTurn]) -> l
             case _:
                 pass
     return messages
+
+
+def _report(entry: SessionEntry) -> str:
+    return f"[The research session {entry.ref} reported back]\n{entry.text}"
 
 
 def summary(turn: AgentTurn) -> str:

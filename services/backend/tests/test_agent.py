@@ -5,6 +5,7 @@ tools in process, and their parts stored and streamed. No provider is ever calle
 The REST routes run in a TestClient; a turn runs as the worker's task would, on the app's
 container, in the client's event loop."""
 
+import asyncio
 from collections.abc import Iterator
 from typing import Any
 from uuid import UUID, uuid7
@@ -24,15 +25,17 @@ from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import MemoryStore
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
-from ada.core.models.agents import AgentTurn, ProviderKind
+from ada.core.models.agents import AgentTurn, ProviderKind, ToolPart
+from ada.core.models.web import SearchHit
 from ada.core.ports.agents import ToolCallFailed
 from ada.core.services.agents import service as agent_service
 from ada.core.services.ports.agents import AgentTurnService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sessions import SessionService
-from ada.entrypoints.mcp.agent import CLIENT, LEFT_OUT, InProcessToolbox
+from ada.entrypoints.mcp.agent import CLIENT, LEFT_OUT, RESEARCH_TOOLS, InProcessToolbox
 from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.worker import create_broker
+from ada.entrypoints.worker.tasks import agent as agent_task
 from agent_support import (
     AGENT,
     MODEL,
@@ -46,12 +49,17 @@ from agent_support import (
     run_turn,
     say,
 )
-from api_support import Overrides, dispatcher, events, new_project, send, serve
+from api_support import FakeWeb, Overrides, dispatcher, events, new_project, send, serve
+from fakes import FakePageReader, FakeWebSearch
 from memory import memory_adapters
 
 pytestmark = pytest.mark.anyio
 
 WEB = {"kind": "user", "name": "web"}
+RESEARCHER = "test/researcher"
+RESEARCH_AGENT = {"kind": "agent", "name": RESEARCHER}
+# The research sessions' web call cap in this module's app.
+WEB_CALLS = 3
 
 
 # Turns, through the REST routes
@@ -63,11 +71,39 @@ def agent() -> AgentOverrides:
 
 
 @pytest.fixture(scope="module")
-def client(unreachable_settings: Settings, agent: AgentOverrides) -> Iterator[TestClient]:
-    with serve(unreachable_settings, Overrides(), agent) as client:
+def web() -> tuple[FakeWebSearch, FakePageReader]:
+    hit = SearchHit(url="https://stat.fi/a", title="A", snippet="s")
+    return FakeWebSearch(hits=[hit]), FakePageReader(text="page")
+
+
+@pytest.fixture(scope="module")
+def client(
+    unreachable_settings: Settings,
+    agent: AgentOverrides,
+    web: tuple[FakeWebSearch, FakePageReader],
+) -> Iterator[TestClient]:
+    settings = unreachable_settings.model_copy(update={"research_web_calls": WEB_CALLS})
+    with serve(settings, Overrides(), agent, FakeWeb(*web)) as client:
         # One provider with its key, one model, the session agent: as the Settings page sets.
         assert client.portal is not None
         client.portal.call(configure, container(client), config())
+        # A second model of it runs research sessions.
+        [provider] = send(client, "GET", "/settings/agent")["providers"]
+        send(
+            client,
+            "POST",
+            "/settings/llm-models",
+            {"provider_id": provider["id"], "model": "researcher"},
+            201,
+        )
+        revision = send(client, "GET", "/settings/agent")["revision"]
+        chosen = send(
+            client,
+            "PUT",
+            "/settings/research-agent",
+            {"model_id": RESEARCHER, "expected_revision": revision},
+        )
+        assert chosen["research_agent"] == RESEARCHER
         yield client
 
 
@@ -190,6 +226,13 @@ def test_a_turn_needs_a_session_agent_with_its_key(unreachable_settings: Setting
             else:
                 assert turn is None
                 assert models == {"models": [], "session_agent": None, "research_agent": None}
+                refused = app.post(
+                    f"/api/sessions/{session['id']}/research", json={"brief": "b", "title": "t"}
+                )
+                assert (refused.status_code, refused.json()["detail"]) == (
+                    422,
+                    "No research agent model is configured",
+                )
 
 
 def test_context_is_checked_stored_with_the_message_and_reaches_the_prompt(
@@ -456,6 +499,250 @@ def test_a_turn_that_cannot_finish_fails(
     )
 
 
+# The research agent, in child sessions
+
+
+BRIEF = "Find five-year cancer survival by hospital district in Finland"
+
+
+def delegate(client: TestClient, session: dict[str, Any], title: str = "Survival") -> Any:
+    return send(
+        client, "POST", f"/sessions/{session['id']}/research", {"brief": BRIEF, "title": title}, 201
+    )
+
+
+def entries(client: TestClient, session: dict[str, Any]) -> list[Any]:
+    return send(client, "GET", f"/sessions/{session['id']}/entries")  # type: ignore[no-any-return]
+
+
+def latest_turn(client: TestClient, session: dict[str, Any]) -> str:
+    return send(client, "GET", f"/sessions/{session['id']}/turns")[-1]["id"]  # type: ignore[no-any-return]
+
+
+def tool_names(info: Any) -> set[str]:
+    return {tool.name for tool in info.function_tools}
+
+
+def last_prompt(script: Script) -> str:
+    messages = script.calls[-1][0]
+    return [
+        part.content
+        for m in messages
+        if isinstance(m, ModelRequest)
+        for part in m.parts
+        if isinstance(part, UserPromptPart)
+    ][-1]
+
+
+async def every_tool(app: Any) -> set[str]:
+    async with Client(create_mcp(app)) as mcp:
+        return {tool.name for tool in await mcp.list_tools()}
+
+
+def test_delegate_creates_child_and_queues_research_turn(
+    client: TestClient, session: dict[str, Any], script: Script
+) -> None:
+    child = delegate(client, session)
+
+    assert (child["agent"], child["parent_session_id"], child["project_id"], child["title"]) == (
+        "research",
+        session["id"],
+        session["project_id"],
+        "Survival",
+    )
+    [delegation] = entries(client, session)
+    assert (delegation["kind"], delegation["actor"], delegation["ref"], delegation["text"]) == (
+        "delegation",
+        WEB,
+        child["id"],
+        "Survival",
+    )
+    brief, queued = entries(client, child)
+    [turn] = send(client, "GET", f"/sessions/{child['id']}/turns")
+    assert (brief["kind"], brief["actor"], brief["text"]) == ("message", WEB, BRIEF)
+    assert (turn["status"], turn["model"], turn["prompt_entry_id"]) == (
+        "queued",
+        RESEARCHER,
+        brief["id"],
+    )
+    assert (queued["kind"], queued["ref"]) == ("agent_turn", turn["id"])
+    assert UUID(turn["id"]) in dispatcher(client).turns
+
+
+def test_research_turn_gets_only_research_tools(
+    client: TestClient, session: dict[str, Any], script: Script
+) -> None:
+    script.then(say("Hello."))
+    run(client, message(client, session, "Hi")["turn"]["id"])
+    child = delegate(client, session)
+    script.then(say("Nothing found."))
+    run(client, latest_turn(client, child))
+
+    assert client.portal is not None
+    everything = client.portal.call(every_tool, container(client))
+    (_, session_info), (_, research_info) = script.calls
+    assert tool_names(research_info) == RESEARCH_TOOLS & everything
+    assert tool_names(session_info) == everything - LEFT_OUT - {"report_back"}
+    assert "delegate_research" in tool_names(session_info)
+    assert "report_back" in (research_info.instructions or "")
+    assert f'Session "Survival", id {child["id"]}' in (research_info.instructions or "")
+
+
+def test_person_follow_up_in_research_session_uses_research_model(
+    client: TestClient, session: dict[str, Any], script: Script
+) -> None:
+    child = delegate(client, session)
+    script.then(
+        call("report_back", {"summary": "Found it.", "source_ids": [], "missing": []}),
+        say("Reported."),
+    )
+    run(client, latest_turn(client, child))
+    follow_up = message(client, child, "And the 2023 figures?")["turn"]
+    script.then(say("Looking."))
+    run(client, follow_up["id"])
+
+    assert follow_up["model"] == RESEARCHER
+    (_, first), (_, _), (_, second) = script.calls
+    assert tool_names(second) == tool_names(first)
+    assert second.instructions == first.instructions
+
+
+def test_report_back_posts_into_parent_without_turn_when_person_delegated(
+    client: TestClient,
+    source: dict[str, Any],
+    session: dict[str, Any],
+    script: Script,
+) -> None:
+    child = delegate(client, session)
+    script.then(
+        call(
+            "report_back",
+            {
+                "summary": "Five-year survival by district, 2019-2023.",
+                "source_ids": [source["id"]],
+                "missing": ["Figures for 2024"],
+            },
+        ),
+        say("Done."),
+    )
+    finished = run(client, latest_turn(client, child))
+
+    delegation, report = entries(client, session)
+    assert finished.status == "done"
+    assert (report["kind"], report["ref"], report["actor"]) == (
+        "report",
+        child["id"],
+        RESEARCH_AGENT,
+    )
+    assert report["text"] == (
+        "Five-year survival by district, 2019-2023.\n\n"
+        f"Sources added:\n- Sotkanet, source {source['id']}\n\n"
+        "Not found:\n- Figures for 2024"
+    )
+    assert send(client, "GET", f"/sessions/{session['id']}/turns") == []
+
+
+def test_report_back_queues_parent_turn_when_agent_delegated(
+    client: TestClient, session: dict[str, Any], script: Script
+) -> None:
+    script.then(
+        call("delegate_research", {"brief": BRIEF, "title": "Survival"}),
+        say("I asked for research."),
+    )
+    run(client, message(client, session, "How does survival differ by district?")["turn"]["id"])
+    *_, delegation = entries(client, session)
+    child = send(client, "GET", f"/sessions/{delegation['ref']}")
+    script.then(
+        call(
+            "report_back",
+            {"summary": "No district figures exist.", "source_ids": [], "missing": ["Districts"]},
+        ),
+        say("Done."),
+    )
+    run(client, latest_turn(client, child))
+
+    *_, report, queued = entries(client, session)
+    _, second = send(client, "GET", f"/sessions/{session['id']}/turns")
+    assert (delegation["kind"], delegation["actor"], child["agent"]) == (
+        "delegation",
+        AGENT,
+        "research",
+    )
+    assert entries(client, child)[0]["actor"] == AGENT
+    assert (report["kind"], queued["kind"], queued["ref"]) == ("report", "agent_turn", second["id"])
+    assert (second["status"], second["model"], second["prompt_entry_id"]) == (
+        "queued",
+        MODEL,
+        report["id"],
+    )
+    assert UUID(second["id"]) in dispatcher(client).turns
+    # The session agent reads the report as its prompt.
+    script.then(say("I will build on that."))
+    run(client, second["id"])
+    assert "No district figures exist." in last_prompt(script)
+
+
+def test_research_turn_without_report_posts_incomplete_report_once(
+    client: TestClient, session: dict[str, Any], script: Script
+) -> None:
+    child = delegate(client, session)
+    turn_id = latest_turn(client, child)
+    script.then(say("Statistics Finland ", "has no such table."))
+    run(client, turn_id)
+    run(client, turn_id)
+
+    _, report = entries(client, session)
+    assert report["text"] == (
+        "Statistics Finland has no such table.\n\n(incomplete: ended without a report)"
+    )
+    assert report["actor"] == RESEARCH_AGENT
+
+
+def test_failed_research_turn_reports_failure(
+    client: TestClient, session: dict[str, Any], script: Script
+) -> None:
+    child = delegate(client, session)
+    script.then(fail(ModelHTTPError(503, "scripted", "overloaded")))
+    failed = run(client, latest_turn(client, child))
+
+    _, report = entries(client, session)
+    assert failed.status == "failed"
+    assert report["text"] == f"Research failed: {failed.error}"
+
+
+def test_web_call_cap(
+    client: TestClient,
+    session: dict[str, Any],
+    script: Script,
+    web: tuple[FakeWebSearch, FakePageReader],
+) -> None:
+    search, pages = web
+    search.searches.clear()
+    pages.calls.clear()
+    child = delegate(client, session)
+    script.then(
+        *[call("search_web", {"query": f"survival {i}"}) for i in range(WEB_CALLS)],
+        call("read_page", {"url": "https://stat.fi/a"}),
+        say("Out of calls."),
+    )
+    capped = run(client, latest_turn(client, child))
+    script.then(call("search_web", {"query": "one more"}), say("Still out."))
+    again = run(client, message(client, child, "Try once more")["turn"]["id"])
+
+    refusal = (
+        f"This research session has used its {WEB_CALLS} web calls; "
+        "call report_back with what you have"
+    )
+    tools = [p for p in capped.parts if isinstance(p, ToolPart)]
+    assert [(p.tool_name, p.state) for p in tools] == [
+        *[("search_web", "output-available")] * WEB_CALLS,
+        ("read_page", "output-error"),
+    ]
+    assert tools[-1].error_text == refusal
+    assert again.parts[0].error_text == refusal  # type: ignore[union-attr]
+    assert (len(search.searches), pages.calls) == (WEB_CALLS, [])
+
+
 # The agent's tools: the MCP server in process, acting as the agent
 
 
@@ -488,7 +775,7 @@ async def test_the_agent_gets_every_tool_it_can_use_and_acts_in_its_session(
         with pytest.raises(ToolCallFailed, match="no tool"):
             await tools.call("get_widget_data", {"widget_id": str(uuid7())})
 
-    assert names == everything - LEFT_OUT
+    assert names == everything - LEFT_OUT - {"report_back"}
     assert {"list_pipelines", "create_widget", "pin_widget"} <= names
     [entry] = send(client, "GET", f"/sessions/{session['id']}/entries")
     assert (entry["kind"], entry["ref"], entry["text"]) == ("operator", operator["id"], "why")
@@ -534,7 +821,10 @@ async def test_an_outside_client_cannot_pass_for_the_agent(
 # The worker
 
 
-async def test_the_worker_task_runs_a_turn(unreachable_settings: Settings) -> None:
+async def test_the_worker_task_runs_a_turn_after_the_earlier_turns_of_its_session(
+    unreachable_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(agent_task, "WAIT_POLL", 0.01)
     script = Script()
     broker = create_broker(
         unreachable_settings,
@@ -551,21 +841,33 @@ async def test_the_worker_task_runs_a_turn(unreachable_settings: Settings) -> No
         async with app_container() as request:
             project = await (await request.get(ProjectService)).create("P")
             session = await (await request.get(SessionService)).create(project.id, "S")
-        async with app_container() as request:
-            posted = await (await request.get(AgentTurnService)).post_message(
-                session.id, "Hi", Actor(kind=ActorKind.USER, name="web")
-            )
-        assert posted.turn is not None
-        script.then(say("Hello from the worker."))
+        turns = []
+        for text in ("Hi", "Hello?"):
+            async with app_container() as request:
+                posted = await (await request.get(AgentTurnService)).post_message(
+                    session.id, text, Actor(kind=ActorKind.USER, name="web")
+                )
+            assert posted.turn is not None
+            turns.append(posted.turn.id)
+        script.then(say("Hello from the worker."), say("Still here."))
 
         task = broker.find_task("ada.entrypoints.worker.tasks.agent:run_turn")
         assert task is not None
-        result = await (await task.kiq(turn_id=str(posted.turn.id))).wait_result(timeout=5)
-        assert not result.is_err, result.error
+        # Two turns of one session can run at once in the worker: the second waits.
+        second = await task.kiq(turn_id=str(turns[1]))
+        await asyncio.sleep(0.1)
+        async with app_container() as request:
+            waiting = await (await request.get(AgentTurnService)).get(turns[1])
+        first = await (await task.kiq(turn_id=str(turns[0]))).wait_result(timeout=5)
+        result = await second.wait_result(timeout=5)
+        assert not first.is_err and not result.is_err, (first.error, result.error)
 
         async with app_container() as request:
-            turn = await (await request.get(AgentTurnService)).get(posted.turn.id)
-        assert turn.status == "done"
-        assert turn.parts[0].text == "Hello from the worker."  # type: ignore[union-attr]
+            done = [await (await request.get(AgentTurnService)).get(id) for id in turns]
+        assert (waiting.status, [turn.status for turn in done]) == ("queued", ["done", "done"])
+        assert [turn.parts[0].text for turn in done] == [  # type: ignore[union-attr]
+            "Hello from the worker.",
+            "Still here.",
+        ]
     finally:
         await broker.shutdown()

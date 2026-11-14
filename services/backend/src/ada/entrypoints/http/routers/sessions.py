@@ -9,7 +9,7 @@ from ada.core.models.agents import PostedMessage
 from ada.core.models.base import Id
 from ada.core.models.sessions import Context, Session, SessionEntry
 from ada.core.models.widgets import Widget
-from ada.core.services.ports.agents import AgentTurnService
+from ada.core.services.ports.agents import AgentTurnService, ResearchService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.widgets import WidgetService
@@ -45,6 +45,13 @@ class NewMessage(Request):
     context: tuple[Context, ...] = ()
     # Another configured model than the session agent, by its id.
     model: str | None = None
+
+
+class NewResearch(Request):
+    # What the research agent should find.
+    brief: str
+    # The research session's title.
+    title: str
 
 
 @router.get("/projects/{project_id}/sessions")
@@ -94,6 +101,16 @@ async def add_message(
     """Add a message. With a session agent configured, its answer is queued as a turn,
     which the response carries; `turn` is null without one."""
     return await service.post_message(session_id, body.text, WEB, body.context, body.model)
+
+
+@router.post("/sessions/{session_id}/research", status_code=status.HTTP_201_CREATED)
+async def delegate_research(
+    session_id: Id, body: NewResearch, service: FromDishka[ResearchService]
+) -> Session:
+    """Delegate research to the research agent, as the person: a research session under
+    this one, with the brief as its first message and its turn queued. Its report is added
+    to this session's record; it does not start a turn here."""
+    return await service.delegate(session_id, body.brief, body.title, WEB)
 
 
 @router.get("/sessions/{session_id}/widgets")

@@ -3,11 +3,17 @@ from dishka import AnyOf, Provider, Scope, provide
 from ada.adapters.llm.runtime import PydanticAiRuntime
 from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.config import Settings
+from ada.core.models.agents import ResearchLimits
 from ada.core.ports.agents import AgentRuntime, LanguageModels
 from ada.core.ports.secrets import SecretBox
+from ada.core.services.agents.research import Research
 from ada.core.services.agents.service import AgentTurns
 from ada.core.services.agents.settings import AgentConfiguration
-from ada.core.services.ports.agents import AgentSettingsService, AgentTurnService
+from ada.core.services.ports.agents import (
+    AgentSettingsService,
+    AgentTurnService,
+    ResearchService,
+)
 
 
 class AgentProvider(Provider):
@@ -32,6 +38,12 @@ class AgentProvider(Provider):
     )
 
     turns = provide(AgentTurns, provides=AgentTurnService, scope=Scope.REQUEST)
+
+    @provide(scope=Scope.APP)
+    def research_limits(self, settings: Settings) -> ResearchLimits:
+        return ResearchLimits(web_calls=settings.research_web_calls)
+
+    research = provide(Research, provides=ResearchService, scope=Scope.REQUEST)
 
 
 provider = AgentProvider()

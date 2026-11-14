@@ -30,6 +30,9 @@ def upgrade() -> None:
         sa.Column("agent", sa.String(length=16), server_default="session", nullable=False),
     )
     op.add_column("sessions", sa.Column("parent_session_id", sa.Uuid(), nullable=True))
+    op.add_column(
+        "sessions", sa.Column("web_calls", sa.Integer(), server_default="0", nullable=False)
+    )
     op.create_index(
         op.f("ix_sessions_parent_session_id"), "sessions", ["parent_session_id"], unique=False
     )
@@ -59,6 +62,7 @@ def downgrade() -> None:
     op.drop_column("agent_settings", "research_agent_model_id")
     op.drop_constraint("fk_sessions_parent_session_id", "sessions", type_="foreignkey")
     op.drop_index(op.f("ix_sessions_parent_session_id"), table_name="sessions")
+    op.drop_column("sessions", "web_calls")
     op.drop_column("sessions", "parent_session_id")
     op.drop_column("sessions", "agent")
     op.drop_column("snapshots", "origin")

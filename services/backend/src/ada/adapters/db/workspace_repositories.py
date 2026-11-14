@@ -254,6 +254,21 @@ class SqlSessionRepository(SessionRepository):
         )
         return _session(row)
 
+    async def use_web_call(self, id: Id, cap: int) -> bool:
+        # One statement, so concurrent calls cannot both take the last one. The table, not
+        # the mapped class: a counter does not change the session's revision.
+        table = SessionRow.__table__
+        counted = await self.session.execute(
+            update(table)
+            .where(table.c.id == id, table.c.web_calls < cap)
+            .values(web_calls=table.c.web_calls + 1)
+            .returning(table.c.id)
+        )
+        if counted.first() is not None:
+            return True
+        await require(self.session, SessionRow, id, "session")
+        return False
+
     async def add_entry(self, entry: SessionEntry) -> None:
         await require(self.session, SessionRow, entry.session_id, "session")
         row = SessionEntryRow(

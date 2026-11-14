@@ -1,5 +1,5 @@
-"""The agent's configuration: model providers, their models, the session agent. Shared by
-all projects.
+"""The agent's configuration: model providers, their models, the session agent and the
+research agent. Shared by all projects.
 
 API keys are encrypted with the SecretBox before they are stored and decrypted only to
 build a ModelTarget for a turn that runs. Nothing returned here carries one.
@@ -24,6 +24,7 @@ from ada.core.models.agents import (
 )
 from ada.core.models.base import UNCHANGED, Change, Id
 from ada.core.models.errors import Invalid, NotConfigured, NotFound
+from ada.core.models.sessions import SessionAgent
 from ada.core.ports.agents import LanguageModels
 from ada.core.ports.repositories import (
     AgentSettingsRepository,
@@ -132,6 +133,16 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
     async def set_session_agent(
         self, model_id: str | None, expected_revision: int
     ) -> AgentSettingsView:
+        return await self._choose(SESSION_AGENT, model_id, expected_revision)
+
+    async def set_research_agent(
+        self, model_id: str | None, expected_revision: int
+    ) -> AgentSettingsView:
+        return await self._choose(RESEARCH_AGENT, model_id, expected_revision)
+
+    async def _choose(
+        self, purpose: str, model_id: str | None, expected_revision: int
+    ) -> AgentSettingsView:
         if model_id is not None:
             try:
                 await self.models.get(model_id)
@@ -139,7 +150,7 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
                 raise Invalid(f"No model {model_id!r} is configured") from None
         settings = await self.settings.get()
         await self.settings.update(
-            settings.model_copy(update={"session_agent": model_id}), expected_revision
+            settings.model_copy(update={purpose: model_id}), expected_revision
         )
         return await self.view()
 
@@ -148,6 +159,12 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
     async def catalog(self) -> ModelList:
         settings = await self.settings.get()
         return await self._catalog(await self.providers.list(), settings)
+
+    async def research_agent(self) -> str | None:
+        settings = await self.settings.get()
+        return ModelList(
+            session_agent=settings.session_agent, research_agent=settings.research_agent
+        ).agent_for(SessionAgent.RESEARCH)
 
     async def target(self, model_id: str) -> ModelTarget:
         try:

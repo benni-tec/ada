@@ -146,6 +146,8 @@ class SessionRow(Base):
     parent_session_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("sessions.id", ondelete="SET NULL"), index=True
     )
+    # Paid web calls of a research session; outside the revision, like a counter.
+    web_calls: Mapped[int] = mapped_column(Integer, server_default="0")
     revision: Mapped[int] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}

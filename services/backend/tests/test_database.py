@@ -110,13 +110,13 @@ def test_migration_0006_keeps_existing_rows(database_url: str) -> None:
                 text("SELECT provenance, monitor_id, monitor_secret_encrypted FROM data_sources")
             ).one()
             session_row = connection.execute(
-                text("SELECT agent, parent_session_id FROM sessions")
+                text("SELECT agent, parent_session_id, web_calls FROM sessions")
             ).one()
             settings = connection.execute(
                 text("SELECT research_agent_model_id FROM agent_settings")
             ).one()
         assert tuple(source_row) == (None, None, None)
-        assert tuple(session_row) == ("session", None)
+        assert tuple(session_row) == ("session", None, 0)
         assert tuple(settings) == (None,)
     finally:
         engine.dispose()
@@ -339,6 +339,11 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         assert await repos.data_sources.list(world.project.id) == [world.source, source]
         assert await repos.sessions.get(session.id) == session
         assert await repos.sessions.get(child.id) == child
+        assert [await repos.sessions.use_web_call(child.id, 2) for _ in range(3)] == [
+            True,
+            True,
+            False,
+        ]
         # A monitor is written outside the revision; its secret never leaves the repository.
         await repos.data_sources.set_monitor(source.id, "mon_1", "sealed")
         watched = await repos.data_sources.get(source.id)

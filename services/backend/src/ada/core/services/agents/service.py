@@ -9,6 +9,7 @@ from ada.core.models.agents import (
     ModelList,
     PostedMessage,
     SourcePart,
+    TextPart,
     ToolPart,
     ToolState,
     TurnPart,
@@ -18,7 +19,7 @@ from ada.core.models.base import Id
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import Event, EventType
 from ada.core.models.operators import OperatorKind
-from ada.core.models.sessions import Context
+from ada.core.models.sessions import Context, EntryKind, Session, SessionAgent, SessionEntry
 from ada.core.ports.agents import (
     AgentFailed,
     AgentRuntime,
@@ -49,6 +50,12 @@ logger = logging.getLogger(__name__)
 # Model requests per turn. Enough to look around, build a pipeline and a widget, and pin
 # it; a turn that needs more is going in circles.
 MAX_STEPS = 24
+# A research turn searches, reads pages and checks each source it adds.
+MAX_RESEARCH_STEPS = 60
+
+# The tool that ends a research turn with its report.
+REPORT_BACK = "report_back"
+INCOMPLETE = "(incomplete: ended without a report)"
 
 
 class AgentTurns(AgentTurnService):
@@ -111,10 +118,46 @@ class AgentTurns(AgentTurnService):
             known = ", ".join(info.id for info in catalog.models) or "none"
             raise Invalid(f"No model {model!r} is configured (configured: {known})")
         entry = await self.session_records.add_message(session_id, text, actor, context)
-        chosen = model or catalog.session_agent
-        if chosen is None:
-            return PostedMessage(entry=entry)
         session = await self.sessions.get(session_id)
+        return PostedMessage(entry=entry, turn=await self._queue(session, entry, catalog, model))
+
+    async def post_report(self, child_session_id: Id, text: str, actor: Actor) -> PostedMessage:
+        entry = await self.session_records.record_report(child_session_id, text, actor)
+        parent = await self.sessions.get(entry.session_id)
+        delegation = next(
+            (
+                other
+                for other in await self.sessions.entries(parent.id)
+                if other.kind is EntryKind.DELEGATION and other.ref == str(child_session_id)
+            ),
+            None,
+        )
+        # The session agent delegated and acts on the report; a person reads it.
+        if delegation is None or delegation.actor.kind is not ActorKind.AGENT:
+            return PostedMessage(entry=entry)
+        catalog = await self.language_models.catalog()
+        return PostedMessage(entry=entry, turn=await self._queue(parent, entry, catalog))
+
+    async def queued_behind(self, id: Id) -> bool:
+        turn = await self.turn_records.get(id)
+        if turn.status is not TurnStatus.QUEUED:
+            return False
+        for other in await self.turn_records.list(turn.session_id):
+            if other.id == turn.id:
+                return False
+            if other.status in (TurnStatus.QUEUED, TurnStatus.RUNNING):
+                return True
+        return False
+
+    async def _queue(
+        self, session: Session, entry: SessionEntry, catalog: ModelList, model: str | None = None
+    ) -> AgentTurn | None:
+        """The agent's turn on an entry of the session's record, queued once this commits.
+        None when no model answers in the session."""
+        chosen = model or catalog.agent_for(session.agent)
+        if chosen is None:
+            return None
+        session_id = session.id
         info = next(info for info in catalog.models if info.id == chosen)
         turn = AgentTurn(
             id=uuid7(),
@@ -136,7 +179,8 @@ class AgentTurns(AgentTurnService):
         await self.session_records.record_agent_turn(session_id, turn.id, _agent(chosen))
         if turn.status is TurnStatus.FAILED:
             await self.events.publish(self._finished(session.project_id, turn))
-            return PostedMessage(entry=entry, turn=turn)
+            await self._report_end(session, turn)
+            return turn
         await self.events.publish(
             self._event(EventType.AGENT_TURN_STARTED, session.project_id, turn)
         )
@@ -157,7 +201,7 @@ class AgentTurns(AgentTurnService):
                 await self.broadcaster.publish(self._finished(session.project_id, failed))
 
         self.after_commit.add(queue)
-        return PostedMessage(entry=entry, turn=turn)
+        return turn
 
     async def turns(self, session_id: Id) -> Sequence[AgentTurn]:
         await self.sessions.get(session_id)
@@ -189,6 +233,7 @@ class AgentTurns(AgentTurnService):
         try:
             # The key is read now, so a key entered after the message was posted is used.
             target = await self.language_models.target(turn.model)
+            research = session.agent is SessionAgent.RESEARCH
             request = await self.briefing.request(
                 turn,
                 target,
@@ -196,9 +241,9 @@ class AgentTurns(AgentTurnService):
                 session,
                 await self.sessions.entries(session.id),
                 await self.turn_records.list(session.id),
-                MAX_STEPS,
+                MAX_RESEARCH_STEPS if research else MAX_STEPS,
             )
-            async with toolbox.connect(_agent(turn.model), session.id) as tools:
+            async with toolbox.connect(_agent(turn.model), session.id, session.agent) as tools:
                 status = await self.runtime.run(request, tools, recorder)
         except (AgentFailed, Invalid) as failure:
             # Invalid: the model was removed, or became unusable, since the message.
@@ -210,7 +255,26 @@ class AgentTurns(AgentTurnService):
             error = f"The turn failed unexpectedly: {type(failure).__name__}: {failure}"
         finished = await self.progress.finish(id, status, recorder.parts, error, self.clock.now())
         await self.broadcaster.publish(self._finished(session.project_id, finished))
+        await self._report_end(session, finished)
         return finished
+
+    async def _report_end(self, session: Session, turn: AgentTurn) -> None:
+        """A research turn that did not report back reports how it ended: its final text,
+        marked incomplete, or its failure. Each turn ends once, so this happens once."""
+        if session.agent is not SessionAgent.RESEARCH or _reported(turn):
+            return
+        if turn.status is TurnStatus.DONE:
+            text = f"{_final_text(turn) or 'It gave no answer.'}\n\n{INCOMPLETE}"
+        elif turn.status is TurnStatus.FAILED:
+            text = f"Research failed: {turn.error}"
+        else:
+            # Cancelled by a person, who knows.
+            return
+        try:
+            await self.post_report(session.id, text, _agent(turn.model))
+        except Exception:
+            # The turn has ended either way; a lost report must not undo that.
+            logger.exception("Reporting the end of research turn %s failed", turn.id)
 
     def _finished(self, project_id: Id, turn: AgentTurn) -> Event:
         return self._event(
@@ -291,6 +355,20 @@ class _Recorder(TurnSink):
 
 def _agent(model: str) -> Actor:
     return Actor(kind=ActorKind.AGENT, name=model)
+
+
+def _reported(turn: AgentTurn) -> bool:
+    return any(
+        isinstance(part, ToolPart)
+        and part.tool_name == REPORT_BACK
+        and part.state is ToolState.OUTPUT_AVAILABLE
+        for part in turn.parts
+    )
+
+
+def _final_text(turn: AgentTurn) -> str:
+    texts = [part.text.strip() for part in turn.parts if isinstance(part, TextPart)]
+    return next((text for text in reversed(texts) if text), "")
 
 
 def _operators(output: Any) -> list[dict[str, Any]]:

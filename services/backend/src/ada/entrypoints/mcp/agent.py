@@ -13,6 +13,7 @@ from mcp.types import Implementation, TextContent
 from ada.core.models.actors import Actor
 from ada.core.models.agents import ToolSpec
 from ada.core.models.base import Id, JsonObject
+from ada.core.models.sessions import SessionAgent
 from ada.core.ports.agents import AgentToolbox, AgentTools, ToolCallFailed
 from ada.entrypoints.mcp.actor import acting_as
 from ada.entrypoints.mcp.server import create_mcp
@@ -20,6 +21,26 @@ from ada.entrypoints.mcp.server import create_mcp
 # Tools that make no sense inside a session the agent already works in: the widget's own
 # data call, and creating projects or sessions.
 LEFT_OUT = frozenset({"get_widget_data", "create_project", "create_session"})
+
+# The research agent works with these only: it looks for data and adds it as sources, then
+# reports back. Dashboards, reports and alerts are the session agent's.
+RESEARCH_TOOLS = frozenset(
+    {
+        "search_web",
+        "read_page",
+        "extract_table",
+        "register_source",
+        "refresh_source",
+        "list_sources",
+        "update_source",
+        "add_source_operator",
+        "preview_operator",
+        "watch_source",
+        "report_back",
+    }
+)
+# Only the research agent reports back.
+RESEARCH_ONLY = frozenset({"report_back"})
 
 # Only for the server's logs: the actor comes from acting_as, never from this name.
 CLIENT = Implementation(name="ada-in-platform-agent", version="1")
@@ -31,7 +52,9 @@ class InProcessToolbox(AgentToolbox):
         self.container = application(container)
 
     @asynccontextmanager
-    async def connect(self, agent: Actor, session_id: Id) -> AsyncIterator[AgentTools]:
+    async def connect(
+        self, agent: Actor, session_id: Id, profile: SessionAgent = SessionAgent.SESSION
+    ) -> AsyncIterator[AgentTools]:
         # Set before the client starts the in-memory server, whose tasks copy the context.
         with acting_as(agent):
             async with Client(create_mcp(self.container), client_info=CLIENT) as client:
@@ -43,9 +66,15 @@ class InProcessToolbox(AgentToolbox):
                         input_schema=tool.input_schema,
                     )
                     for tool in listed
-                    if tool.name not in LEFT_OUT
+                    if _offered(tool.name, profile)
                 ]
                 yield _McpTools(client, specs, session_id)
+
+
+def _offered(name: str, profile: SessionAgent) -> bool:
+    if profile is SessionAgent.RESEARCH:
+        return name in RESEARCH_TOOLS
+    return name not in LEFT_OUT and name not in RESEARCH_ONLY
 
 
 def application(container: AsyncContainer) -> AsyncContainer:
