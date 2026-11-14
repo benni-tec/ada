@@ -1,6 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query'
 
-import { dashboardKeys, keys, reportKeys, type EventType, type LiveEvent } from '@/lib/api'
+import { alertKeys, dashboardKeys, keys, reportKeys, type EventType, type LiveEvent } from '@/lib/api'
 
 /** What the page does about one live event. */
 export type Effects = {
@@ -88,9 +88,11 @@ export function effectsOf(event: LiveEvent): Effects {
       if (report) invalidate.push(reportKeys.report(report))
       break
     }
-    // Alerts have no views yet (wave 2).
+    // The payload names the alert and rule only, so every alert view refetches (feed,
+    // badges); rules show when they were last checked.
     case 'alert.firing':
     case 'alert.resolved':
+      invalidate.push(alertKeys.all(), alertKeys.rules())
       break
   }
   return { invalidate, reloadWidgets }

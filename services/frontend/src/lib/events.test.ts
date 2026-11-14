@@ -64,5 +64,4 @@ test('a refresh reloads widgets only when data changed or became stale', () => {
 
 test('payloads without ids invalidate nothing they cannot name', () => {
   expect(event('session.entry_added', {}).invalidate).toEqual([])
-  expect(event('alert.firing', { alert_id: 'a1' }).invalidate).toEqual([])
 })

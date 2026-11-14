@@ -1,6 +1,6 @@
 from dishka import Provider, Scope, provide
 
-from ada.composition.unbuilt import unbuilt
+from ada.core.services.alerts.service import Alerts
 from ada.core.services.ports.alerts import AlertService
 
 
@@ -9,7 +9,7 @@ class AlertProvider(Provider):
 
     scope = Scope.REQUEST
 
-    alerts = provide(unbuilt(AlertService))
+    alerts = provide(Alerts, provides=AlertService)
 
 
 provider = AlertProvider()
