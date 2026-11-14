@@ -28,20 +28,20 @@ import {
 } from '@/lib/api'
 import { displayValue, triggerLabel, when } from '@/lib/cases'
 
-const views = ['cases', 'card', 'evaluation', 'population'] as const
+const views = ['card', 'cases', 'evaluation', 'population'] as const
 type View = (typeof views)[number]
 
 export const Route = createFileRoute('/projects/$projectId/models/$modelId')({
   validateSearch: (search: Record<string, unknown>): { view?: View } =>
-    views.includes(search.view as View) && search.view !== 'cases' ? { view: search.view as View } : {},
+    views.includes(search.view as View) && search.view !== 'card' ? { view: search.view as View } : {},
   component: ModelPage,
 })
 
-/** One model: its cases (every case of its case type, with the model's latest result),
- * and beside them its card, the evaluation of a synthetic profile and the population view. */
+/** One model: its card first, then its cases (every case of its case type, with the
+ * model's latest result), the evaluation of a synthetic profile and the population view. */
 function ModelPage() {
   const { projectId, modelId } = Route.useParams()
-  const { view = 'cases' } = Route.useSearch()
+  const { view = 'card' } = Route.useSearch()
   const navigate = Route.useNavigate()
   const { data: model } = useQuery(statisticalModelQuery(modelId))
   const { data: version } = useQuery(latestVersionQuery(modelId))
@@ -69,10 +69,10 @@ function ModelPage() {
           </p>
         }
       />
-      <Tabs value={view} onValueChange={(next) => void navigate({ search: next === 'cases' ? {} : { view: next as View }, replace: true })}>
+      <Tabs value={view} onValueChange={(next) => void navigate({ search: next === 'card' ? {} : { view: next as View }, replace: true })}>
         <TabsList variant="line" className="w-full justify-start">
-          <TabsTrigger value="cases">Cases</TabsTrigger>
           <TabsTrigger value="card">Model card</TabsTrigger>
+          <TabsTrigger value="cases">Cases</TabsTrigger>
           <TabsTrigger value="evaluation">Evaluation</TabsTrigger>
           <TabsTrigger value="population">Population</TabsTrigger>
         </TabsList>

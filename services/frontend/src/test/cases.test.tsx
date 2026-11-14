@@ -260,7 +260,7 @@ test('the model page lists every eligible case, with "Not run" where there is no
     'GET /api/models/m1/cases': rows,
     'GET /api/case-types/ct1': caseType,
   })
-  renderAt('/projects/p1/models/m1')
+  renderAt('/projects/p1/models/m1?view=cases')
   const table = await screen.findByRole('region', { name: 'Cases' })
   const first = (await within(table).findByRole('link', { name: 'SYN-0042' })).closest('tr') as HTMLElement
   const second = within(table).getByRole('link', { name: 'SYN-0117' }).closest('tr') as HTMLElement
