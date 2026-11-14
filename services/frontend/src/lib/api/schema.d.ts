@@ -4,6 +4,88 @@
  */
 
 export interface paths {
+    "/api/alert-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Alert Rule */
+        get: operations["get_alert_rule_api_alert_rules__rule_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Alert Rule */
+        patch: operations["update_alert_rule_api_alert_rules__rule_id__patch"];
+        trace?: never;
+    };
+    "/api/alert-rules/{rule_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Alert Rule
+         * @description Check the rule now, in this request, on a new run of its measure. A person who
+         *     asks wants the answer; scheduled checks go through the worker.
+         */
+        post: operations["check_alert_rule_api_alert_rules__rule_id__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboards/{dashboard_id}/alert-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Alert Rules */
+        get: operations["list_alert_rules_api_dashboards__dashboard_id__alert_rules_get"];
+        put?: never;
+        /**
+         * Create Alert Rule
+         * @description Add a rule to a dashboard. A formula that does not fit the measure's columns is a
+         *     422 whose detail names the node at fault: `Formula node '<id>': ...`.
+         */
+        post: operations["create_alert_rule_api_dashboards__dashboard_id__alert_rules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboards/{dashboard_id}/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Dashboard Alerts
+         * @description The alerts of the dashboard's rules, ordered like the project's feed; for the badges
+         *     on a dashboard.
+         */
+        get: operations["list_dashboard_alerts_api_dashboards__dashboard_id__alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -112,6 +194,46 @@ export interface paths {
         head?: never;
         /** Rename Project */
         patch: operations["rename_project_api_projects__project_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{project_id}/alert-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Alert Rules
+         * @description Every dashboard of the project with its rules, dashboards oldest first.
+         */
+        get: operations["list_project_alert_rules_api_projects__project_id__alert_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Alerts
+         * @description The project's alert feed: firing alerts first, newest first within each state.
+         */
+        get: operations["list_alerts_api_projects__project_id__alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/projects/{project_id}/events": {
@@ -458,6 +580,102 @@ export interface components {
          * @enum {string}
          */
         ActorKind: "user" | "agent" | "external_agent" | "system";
+        /**
+         * Alert
+         * @description One instance per rule and key. A region that stays below target alerts once.
+         */
+        Alert: {
+            id: components["schemas"]["Id"];
+            key: components["schemas"]["JsonObject"];
+            last_run_id: components["schemas"]["Id"];
+            project_id: components["schemas"]["Id"];
+            /** Resolved At */
+            resolved_at?: string | null;
+            rule_id: components["schemas"]["Id"];
+            since_run_id: components["schemas"]["Id"];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            state: components["schemas"]["AlertState"];
+        };
+        /**
+         * AlertRule
+         * @description A condition on the output of a measure pipeline, checked on its own interval.
+         */
+        AlertRule: {
+            alert_pipeline_id?: components["schemas"]["OperatorId"] | null;
+            /** Check Interval Seconds */
+            check_interval_seconds?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            dashboard_id: components["schemas"]["Id"];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            formula: components["schemas"]["JsonObject"];
+            id: components["schemas"]["Id"];
+            /** Key Columns */
+            key_columns: string[];
+            /** Last Checked At */
+            last_checked_at?: string | null;
+            /** Max Data Age Seconds */
+            max_data_age_seconds?: number | null;
+            /** Name */
+            name: string;
+            operator_id: components["schemas"]["OperatorId"];
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+            /** @default warning */
+            severity: components["schemas"]["Severity"];
+        };
+        /**
+         * AlertRuleChange
+         * @description Fields left out stay as they are.
+         */
+        AlertRuleChange: {
+            /** Check Interval Seconds */
+            check_interval_seconds?: number | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Expected Revision */
+            expected_revision: number;
+            formula?: components["schemas"]["JsonObject"] | null;
+            /** Name */
+            name?: string | null;
+            severity?: components["schemas"]["Severity"] | null;
+        };
+        /**
+         * AlertState
+         * @enum {string}
+         */
+        AlertState: "firing" | "resolved";
+        /**
+         * AlertView
+         * @description An alert with the rule that raised it, so a feed needs no request per rule.
+         */
+        AlertView: {
+            alert: components["schemas"]["Alert"];
+            rule: components["schemas"]["AlertRule"];
+        };
+        /** CheckResult */
+        CheckResult: {
+            /** Changed */
+            changed: components["schemas"]["Alert"][];
+            /** Firing */
+            firing: components["schemas"]["Alert"][];
+            rule: components["schemas"]["AlertRule"];
+        };
         /** Column */
         Column: {
             /** Name */
@@ -474,6 +692,36 @@ export interface components {
          * @enum {string}
          */
         ColumnType: "text" | "integer" | "number" | "boolean" | "date" | "timestamp" | "json";
+        /**
+         * Dashboard
+         * @description A live view that follows the latest run. Its content lives in its versions; this
+         *     record only points at the current one.
+         */
+        Dashboard: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            current_version_id?: components["schemas"]["Id"] | null;
+            /** @default {} */
+            default_time_range: components["schemas"]["TimeRange"];
+            id: components["schemas"]["Id"];
+            /** Name */
+            name: string;
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+        };
+        /** DashboardRules */
+        DashboardRules: {
+            dashboard: components["schemas"]["Dashboard"];
+            /** Rules */
+            rules: components["schemas"]["AlertRule"][];
+        };
         /**
          * DataFormat
          * @enum {string}
@@ -622,6 +870,22 @@ export interface components {
             upper?: string | null;
             /** Value */
             value: string;
+        };
+        /** NewAlertRule */
+        NewAlertRule: {
+            alert_pipeline_id?: components["schemas"]["OperatorId"] | null;
+            /** Check Interval Seconds */
+            check_interval_seconds?: number | null;
+            formula: components["schemas"]["JsonObject"];
+            /** Key Columns */
+            key_columns: string[];
+            /** Max Data Age Seconds */
+            max_data_age_seconds?: number | null;
+            /** Name */
+            name: string;
+            operator_id: components["schemas"]["OperatorId"];
+            /** @default warning */
+            severity: components["schemas"]["Severity"];
         };
         /** NewInput */
         NewInput: {
@@ -948,6 +1212,11 @@ export interface components {
             text: string;
         };
         /**
+         * Severity
+         * @enum {string}
+         */
+        Severity: "info" | "warning" | "critical";
+        /**
          * SourceChange
          * @description Fields left out stay as they are.
          */
@@ -1060,6 +1329,202 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_alert_rule_api_alert_rules__rule_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_alert_rule_api_alert_rules__rule_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_alert_rule_api_alert_rules__rule_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_alert_rules_api_dashboards__dashboard_id__alert_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_alert_rule_api_dashboards__dashboard_id__alert_rules_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewAlertRule"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dashboard_alerts_api_dashboards__dashboard_id__alerts_get: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["AlertState"] | null;
+            };
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -1268,6 +1733,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_alert_rules_api_projects__project_id__alert_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardRules"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_alerts_api_projects__project_id__alerts_get: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["AlertState"] | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertView"][];
                 };
             };
             /** @description Validation Error */

@@ -39,6 +39,288 @@
         "title": "ActorKind",
         "type": "string"
       },
+      "Alert": {
+        "description": "One instance per rule and key. A region that stays below target alerts once.",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "key": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "last_run_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "rule_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "since_run_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AlertState"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "rule_id",
+          "key",
+          "state",
+          "since_run_id",
+          "last_run_id",
+          "started_at"
+        ],
+        "title": "Alert",
+        "type": "object"
+      },
+      "AlertRule": {
+        "description": "A condition on the output of a measure pipeline, checked on its own interval.",
+        "properties": {
+          "alert_pipeline_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatorId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "check_interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Interval Seconds"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dashboard_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "formula": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "key_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Key Columns",
+            "type": "array"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "max_data_age_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Data Age Seconds"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "operator_id": {
+            "$ref": "#/components/schemas/OperatorId"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "revision": {
+            "default": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity",
+            "default": "warning"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "dashboard_id",
+          "name",
+          "operator_id",
+          "formula",
+          "key_columns",
+          "created_at"
+        ],
+        "title": "AlertRule",
+        "type": "object"
+      },
+      "AlertRuleChange": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are.",
+        "properties": {
+          "check_interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Interval Seconds"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "formula": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "AlertRuleChange",
+        "type": "object"
+      },
+      "AlertState": {
+        "enum": [
+          "firing",
+          "resolved"
+        ],
+        "title": "AlertState",
+        "type": "string"
+      },
+      "AlertView": {
+        "description": "An alert with the rule that raised it, so a feed needs no request per rule.",
+        "properties": {
+          "alert": {
+            "$ref": "#/components/schemas/Alert"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/AlertRule"
+          }
+        },
+        "required": [
+          "alert",
+          "rule"
+        ],
+        "title": "AlertView",
+        "type": "object"
+      },
+      "CheckResult": {
+        "properties": {
+          "changed": {
+            "items": {
+              "$ref": "#/components/schemas/Alert"
+            },
+            "title": "Changed",
+            "type": "array"
+          },
+          "firing": {
+            "items": {
+              "$ref": "#/components/schemas/Alert"
+            },
+            "title": "Firing",
+            "type": "array"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/AlertRule"
+          }
+        },
+        "required": [
+          "rule",
+          "changed",
+          "firing"
+        ],
+        "title": "CheckResult",
+        "type": "object"
+      },
       "Column": {
         "properties": {
           "name": {
@@ -73,6 +355,73 @@
         ],
         "title": "ColumnType",
         "type": "string"
+      },
+      "Dashboard": {
+        "description": "A live view that follows the latest run. Its content lives in its versions; this\nrecord only points at the current one.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_version_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "default_time_range": {
+            "$ref": "#/components/schemas/TimeRange",
+            "default": {}
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "revision": {
+            "default": 1,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "created_at"
+        ],
+        "title": "Dashboard",
+        "type": "object"
+      },
+      "DashboardRules": {
+        "properties": {
+          "dashboard": {
+            "$ref": "#/components/schemas/Dashboard"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/AlertRule"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dashboard",
+          "rules"
+        ],
+        "title": "DashboardRules",
+        "type": "object"
       },
       "DataFormat": {
         "enum": [
@@ -414,6 +763,72 @@
           "value"
         ],
         "title": "MeasureRole",
+        "type": "object"
+      },
+      "NewAlertRule": {
+        "additionalProperties": false,
+        "properties": {
+          "alert_pipeline_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatorId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "check_interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Interval Seconds"
+          },
+          "formula": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "key_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Key Columns",
+            "type": "array"
+          },
+          "max_data_age_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Data Age Seconds"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "operator_id": {
+            "$ref": "#/components/schemas/OperatorId"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity",
+            "default": "warning"
+          }
+        },
+        "required": [
+          "name",
+          "operator_id",
+          "formula",
+          "key_columns"
+        ],
+        "title": "NewAlertRule",
         "type": "object"
       },
       "NewInput": {
@@ -1173,6 +1588,15 @@
         "title": "SessionEntry",
         "type": "object"
       },
+      "Severity": {
+        "enum": [
+          "info",
+          "warning",
+          "critical"
+        ],
+        "title": "Severity",
+        "type": "string"
+      },
       "SourceChange": {
         "additionalProperties": false,
         "description": "Fields left out stay as they are.",
@@ -1451,6 +1875,307 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/alert-rules/{rule_id}": {
+      "get": {
+        "operationId": "get_alert_rule_api_alert_rules__rule_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertRule"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Alert Rule",
+        "tags": [
+          "alerts"
+        ]
+      },
+      "patch": {
+        "operationId": "update_alert_rule_api_alert_rules__rule_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertRuleChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertRule"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Alert Rule",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/alert-rules/{rule_id}/check": {
+      "post": {
+        "description": "Check the rule now, in this request, on a new run of its measure. A person who\nasks wants the answer; scheduled checks go through the worker.",
+        "operationId": "check_alert_rule_api_alert_rules__rule_id__check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Alert Rule",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/dashboards/{dashboard_id}/alert-rules": {
+      "get": {
+        "operationId": "list_alert_rules_api_dashboards__dashboard_id__alert_rules_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlertRule"
+                  },
+                  "title": "Response List Alert Rules Api Dashboards  Dashboard Id  Alert Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Alert Rules",
+        "tags": [
+          "alerts"
+        ]
+      },
+      "post": {
+        "description": "Add a rule to a dashboard. A formula that does not fit the measure's columns is a\n422 whose detail names the node at fault: `Formula node '<id>': ...`.",
+        "operationId": "create_alert_rule_api_dashboards__dashboard_id__alert_rules_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAlertRule"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertRule"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Alert Rule",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/dashboards/{dashboard_id}/alerts": {
+      "get": {
+        "description": "The alerts of the dashboard's rules, ordered like the project's feed; for the badges\non a dashboard.",
+        "operationId": "list_dashboard_alerts_api_dashboards__dashboard_id__alerts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlertView"
+                  },
+                  "title": "Response List Dashboard Alerts Api Dashboards  Dashboard Id  Alerts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Dashboard Alerts",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "health_api_health_get",
@@ -1738,6 +2463,118 @@
         "summary": "Rename Project",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/alert-rules": {
+      "get": {
+        "description": "Every dashboard of the project with its rules, dashboards oldest first.",
+        "operationId": "list_project_alert_rules_api_projects__project_id__alert_rules_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DashboardRules"
+                  },
+                  "title": "Response List Project Alert Rules Api Projects  Project Id  Alert Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Project Alert Rules",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/alerts": {
+      "get": {
+        "description": "The project's alert feed: firing alerts first, newest first within each state.",
+        "operationId": "list_alerts_api_projects__project_id__alerts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlertView"
+                  },
+                  "title": "Response List Alerts Api Projects  Project Id  Alerts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Alerts",
+        "tags": [
+          "alerts"
         ]
       }
     },
