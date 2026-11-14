@@ -508,6 +508,11 @@ body,
   overflow: visible;
 }
 
+/* Streamdown writes bold as a span with a Tailwind class, which widgets do not load. */
+.ada-text [data-streamdown='strong'] {
+  font-weight: 600;
+}
+
 .ada-text > div > :first-child {
   margin-top: 0;
 }
