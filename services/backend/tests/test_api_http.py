@@ -14,6 +14,7 @@ from ada.config import Settings
 from ada.core.models.dashboards import Dashboard
 from ada.core.models.errors import Unavailable
 from ada.core.models.events import Event
+from ada.core.models.runs import Snapshot
 from ada.core.ports.tasks import TaskDispatcher
 from ada.entrypoints.http.app import create_app
 from factories import NOW
@@ -549,6 +550,30 @@ def test_row_limits_out_of_range_are_rejected(
     run = post(client, f"/projects/{project['id']}/runs")
     response = client.get(f"/api/runs/{run['id']}/operators/op_x/rows?limit={limit}")
     assert response.status_code == 422
+
+
+def test_a_snapshot_is_read_by_the_id_a_run_names(
+    client: TestClient, project: dict[str, Any], source_operator: dict[str, Any]
+) -> None:
+    snapshot = Snapshot(
+        id=uuid7(),
+        project_id=UUID(project["id"]),
+        operator_id=source_operator["id"],
+        parameters_key="",
+        content_hash="sha256:abc",
+        location="snapshots/abc.parquet",
+        row_count=21,
+        fetched_at=NOW,
+    )
+    store(client).snapshots[snapshot.id] = snapshot
+
+    read = get(client, f"/snapshots/{snapshot.id}")
+
+    assert read["operator_id"] == source_operator["id"]
+    assert read["content_hash"] == "sha256:abc"
+    assert read["row_count"] == 21
+    assert read["fetched_at"] == NOW.isoformat().replace("+00:00", "Z")
+    assert client.get(f"/api/snapshots/{uuid7()}").status_code == 404
 
 
 # Widgets

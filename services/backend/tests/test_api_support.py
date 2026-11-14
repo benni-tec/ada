@@ -26,7 +26,7 @@ from ada.core.models.operators import (
     SourceParams,
     operator_identity,
 )
-from ada.core.models.runs import Run
+from ada.core.models.runs import Run, Snapshot
 from ada.core.models.schema import Column, ColumnType, Roles, Schema
 from ada.core.models.sessions import SessionEntry
 from ada.core.models.sources import (
@@ -42,6 +42,7 @@ from ada.core.ports.repositories import (
     OperatorRepository,
     RunRepository,
     SessionRepository,
+    SnapshotRepository,
 )
 from ada.core.ports.system import Clock
 from ada.core.ports.tasks import TaskDispatcher
@@ -136,8 +137,15 @@ class FakePipelines(PipelineService):
 
 
 class FakeRuns(RunService):
-    def __init__(self, runs: RunRepository, results: Results, clock: Clock) -> None:
+    def __init__(
+        self,
+        runs: RunRepository,
+        snapshots: SnapshotRepository,
+        results: Results,
+        clock: Clock,
+    ) -> None:
         self.runs = runs
+        self.snapshots = snapshots
         self.results = results
         self.clock = clock
 
@@ -164,6 +172,9 @@ class FakeRuns(RunService):
 
     async def list(self, project_id: Id, limit: int = 50) -> Sequence[Run]:
         return await self.runs.list(project_id, limit)
+
+    async def snapshot(self, id: Id) -> Snapshot:
+        return await self.snapshots.get(id)
 
     async def execute(self, run_id: Id, operator_id: OperatorId) -> Run:
         return await self.runs.get(run_id)

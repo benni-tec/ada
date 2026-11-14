@@ -130,9 +130,8 @@ class FixingRuns(FakeRuns):
         snapshots: SnapshotRepository,
         executed: Executed,
     ) -> None:
-        super().__init__(runs, results, clock)
+        super().__init__(runs, snapshots, results, clock)
         self.operators = operators
-        self.snapshots = snapshots
         self.executed = executed
 
     async def execute(self, run_id: Id, operator_id: OperatorId) -> Run:

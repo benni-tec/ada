@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, status
 from ada.core.models.analysis import Rows
 from ada.core.models.base import Id
 from ada.core.models.operators import OperatorId
-from ada.core.models.runs import Run
+from ada.core.models.runs import Run, Snapshot
 from ada.core.models.time import TimeRange
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
@@ -49,3 +49,9 @@ async def read_rows(
     limit: Annotated[int, Query(ge=1, le=MAX_ROWS)] = 1000,
 ) -> Rows:
     return await service.read(run_id, operator_id, limit)
+
+
+@router.get("/snapshots/{snapshot_id}")
+async def get_snapshot(snapshot_id: Id, service: FromDishka[RunService]) -> Snapshot:
+    """A snapshot a run fixed (`Run.snapshots`): its fetch time, content hash and rows."""
+    return await service.snapshot(snapshot_id)

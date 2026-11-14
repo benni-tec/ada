@@ -5,7 +5,7 @@ from ada.core.models.actors import Actor
 from ada.core.models.analysis import Rows
 from ada.core.models.base import Id
 from ada.core.models.operators import OperatorId
-from ada.core.models.runs import Run
+from ada.core.models.runs import Run, Snapshot
 from ada.core.models.time import TimeRange
 
 
@@ -34,4 +34,9 @@ class RunService(Protocol):
     async def read(self, run_id: Id, operator_id: OperatorId, limit: int = 1000) -> Rows:
         """The operator's output in the run, executing it first if needed. Chains of
         pass-through operators are answered by one query over the snapshots below them."""
+        ...
+
+    async def snapshot(self, id: Id) -> Snapshot:
+        """A stored snapshot: when it was fetched, its content hash and row count. A run's
+        `snapshots` names the ones it fixed, by id only; this is how a client shows them."""
         ...
