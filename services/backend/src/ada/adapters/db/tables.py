@@ -52,6 +52,8 @@ class ProjectRow(Base):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     name: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(_timestamp)
+    # Instructions for the session agent in this project; "" for none (migration 0008).
+    agent_instructions: Mapped[str] = mapped_column(Text, default="", server_default="")
     revision: Mapped[int] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
@@ -223,6 +225,8 @@ class AgentSettingsRow(Base):
     session_agent_model_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("llm_models.id", ondelete="SET NULL")
     )
+    # Instructions for the session agent in every project; "" for none (migration 0008).
+    instructions: Mapped[str] = mapped_column(Text, default="", server_default="")
     revision: Mapped[int] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}

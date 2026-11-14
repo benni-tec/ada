@@ -1,24 +1,16 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { PageHeader } from '@/components/page-header'
-import { AgentSettingsSection } from '@/components/settings/agents'
-import { DataSourcesSection } from '@/components/settings/data-sources'
-
+// The settings are a modal over the project's pages now (`?settings=<section>`); the old
+// address opens it over the overview, at the data sources when it names one.
 export const Route = createFileRoute('/projects/$projectId/settings')({
-  component: SettingsPage,
+  beforeLoad: ({ params, location }) => {
+    const source = location.hash.startsWith('source-')
+    throw redirect({
+      to: '/projects/$projectId',
+      params,
+      search: { settings: source ? 'data-sources' : 'models' },
+      hash: source ? location.hash : undefined,
+      replace: true,
+    })
+  },
 })
-
-/**
- * The agent, shared by all projects (providers, keys, models, the session agent), and this
- * project's data sources. Reached from the gear at the bottom of the sidebar.
- */
-function SettingsPage() {
-  const { projectId } = Route.useParams()
-  return (
-    <div className="flex max-w-5xl flex-col gap-10 p-4 md:p-6">
-      <PageHeader type="settings" title="Settings" />
-      <AgentSettingsSection />
-      <DataSourcesSection projectId={projectId} />
-    </div>
-  )
-}

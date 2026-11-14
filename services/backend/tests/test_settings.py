@@ -158,6 +158,19 @@ async def test_the_session_agent_is_set_and_cleared_with_its_provider() -> None:
 
 
 @pytest.mark.anyio
+async def test_the_instructions_for_every_project_are_stored_with_the_revision() -> None:
+    settings = service(MemoryStore())
+
+    view = await settings.set_instructions("  Cite the page.  ", 1)
+
+    assert (view.instructions, view.revision) == ("Cite the page.", 2)
+    assert (await settings.view()).instructions == "Cite the page."
+    with pytest.raises(Conflict):
+        await settings.set_instructions("Stale", 1)
+    assert (await settings.view()).instructions == "Cite the page."
+
+
+@pytest.mark.anyio
 async def test_a_cleared_provider_renames_its_models_and_the_session_agent() -> None:
     settings = service(MemoryStore())
     provider = await settings.add_provider("gemini", ProviderKind.GEMINI, api_key=API_KEY)
@@ -254,6 +267,38 @@ def test_the_settings_routes_configure_the_agent_and_never_return_a_key(
     assert client.get("/api/settings/agent").json()["session_agent"] is None
     assert client.delete(f"/api/settings/llm-providers/{provider['id']}").status_code == 204
     assert client.get("/api/settings/agent").json()["providers"] == []
+
+
+def test_instructions_are_revision_checked_and_the_web_settings_read_the_configuration(
+    client: TestClient,
+) -> None:
+    revision = client.get("/api/settings/agent").json()["revision"]
+    saved = client.put(
+        "/api/settings/agent-instructions",
+        json={"instructions": "Answer in English.", "expected_revision": revision},
+    )
+    stale = client.put(
+        "/api/settings/agent-instructions",
+        json={"instructions": "Lost", "expected_revision": revision},
+    )
+    project = client.post("/api/projects", json={"name": "Equal Care"}).json()
+    told = client.patch(
+        f"/api/projects/{project['id']}",
+        json={"agent_instructions": "Cite the page.", "expected_revision": project["revision"]},
+    )
+    stale_project = client.patch(
+        f"/api/projects/{project['id']}",
+        json={"agent_instructions": "Lost", "expected_revision": project["revision"]},
+    )
+    web = client.get("/api/settings/web")
+
+    codes = [r.status_code for r in (saved, stale, told, stale_project, web)]
+    assert codes == [200, 409, 200, 409, 200]
+    assert client.get("/api/settings/agent").json()["instructions"] == "Answer in English."
+    assert project["agent_instructions"] == ""
+    assert told.json()["agent_instructions"] == "Cite the page."
+    assert told.json()["name"] == "Equal Care"
+    assert web.json() == {"context_dev_configured": False, "daily_credit_limit": 300}
 
 
 def test_without_a_master_key_storing_a_key_is_a_conflict(unreachable_settings: Settings) -> None:

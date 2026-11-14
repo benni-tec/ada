@@ -23,6 +23,7 @@ import {
 import { pageTypes, type PageTypeName } from '@/lib/page-types'
 import { accessLabels, describeFreshness } from '@/lib/sources'
 import { useRevisedUpdate } from '@/lib/revisions'
+import { withSettings } from '@/lib/settings-sections'
 
 export const Route = createFileRoute('/projects/$projectId/')({
   component: ProjectPage,
@@ -182,7 +183,7 @@ function Sources({ projectId }: { projectId: Id }) {
     <Section
       title="Data sources"
       action={
-        <Link to="/projects/$projectId/settings" params={{ projectId }} className="text-sm underline underline-offset-2">
+        <Link to="." search={withSettings('data-sources')} resetScroll={false} className="text-sm underline underline-offset-2">
           Manage in Settings
         </Link>
       }

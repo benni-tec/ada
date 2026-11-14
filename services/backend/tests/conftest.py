@@ -18,6 +18,9 @@ os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://ada:ada-dev@localhos
 # API keys bring their own.
 os.environ.pop("ADA_SECRET_KEY", None)
 os.environ.pop("ADA_SECRET_KEY_FILE", None)
+# Nor the developer's Context.dev key: no test calls it.
+os.environ.pop("CONTEXT_DEV_API_KEY", None)
+os.environ.pop("CONTEXT_API_KEY", None)
 
 
 @pytest.fixture(scope="session")

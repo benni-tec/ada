@@ -95,3 +95,10 @@ class AgentSettingsService(Protocol):
     ) -> AgentSettingsView:
         """None leaves sessions without an agent. The model must be configured."""
         ...
+
+    async def set_instructions(
+        self, instructions: str, expected_revision: int
+    ) -> AgentSettingsView:
+        """The session agent's instructions for every project, added to its system prompt
+        after ADA's own rules; "" for none. Shares the revision with the session agent."""
+        ...

@@ -160,7 +160,7 @@ class SqlAgentSettingsRepository(AgentSettingsRepository):
             "agent settings",
             SETTINGS_ID,
             expected_revision,
-            {"session_agent_model_id": model_id},
+            {"session_agent_model_id": model_id, "instructions": settings.instructions},
         )
         return await self._settings(row)
 
@@ -171,4 +171,6 @@ class SqlAgentSettingsRepository(AgentSettingsRepository):
             found = (await self.session.execute(statement)).first()
             if found is not None:
                 session_agent = _model(found[0], found[1]).id
-        return AgentSettings(session_agent=session_agent, revision=row.revision)
+        return AgentSettings(
+            session_agent=session_agent, instructions=row.instructions, revision=row.revision
+        )

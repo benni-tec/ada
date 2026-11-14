@@ -100,6 +100,18 @@ async def test_a_model_is_addressed_by_its_provider_s_current_name(repos: Repos)
         await repos.models.get("gemini/flash/2")
 
 
+async def test_the_instructions_are_stored_beside_the_session_agent(repos: Repos) -> None:
+    _, model = await with_model(repos)
+    settings = await repos.settings.get()
+    assert settings.instructions == ""
+
+    told = await repos.settings.update(settings.model_copy(update={"instructions": "Be brief"}), 1)
+    chosen = await repos.settings.update(told.model_copy(update={"session_agent": model.id}), 2)
+
+    assert (chosen.instructions, chosen.session_agent, chosen.revision) == ("Be brief", model.id, 3)
+    assert (await repos.settings.get()).instructions == "Be brief"
+
+
 async def test_the_session_agent_is_cleared_with_its_model_or_provider(repos: Repos) -> None:
     stored, model = await with_model(repos)
     _, other = await with_model(repos, "other")

@@ -245,6 +245,46 @@ def test_context_is_checked_stored_with_the_message_and_reaches_the_prompt(
     assert "Never state a number you did not read from a tool" in instructions
 
 
+def test_people_s_instructions_follow_ada_s_rules_in_order_and_are_cut(
+    client: TestClient, project: dict[str, Any], session: dict[str, Any], script: Script
+) -> None:
+    settings = send(client, "GET", "/settings/agent")
+    pasted = "Context.dev skill: " + "x" * 25_000
+    send(
+        client,
+        "PUT",
+        "/settings/agent-instructions",
+        {"instructions": pasted, "expected_revision": settings["revision"]},
+    )
+    send(
+        client,
+        "PATCH",
+        f"/projects/{project['id']}",
+        {"agent_instructions": "Answer in English.", "expected_revision": project["revision"]},
+    )
+    script.then(say("Noted."))
+    try:
+        run(client, message(client, session, "Hello")["turn"]["id"])
+    finally:
+        # The client is shared by the module's tests.
+        cleared = send(client, "GET", "/settings/agent")
+        send(
+            client,
+            "PUT",
+            "/settings/agent-instructions",
+            {"instructions": "", "expected_revision": cleared["revision"]},
+        )
+
+    instructions = script.calls[0][1].instructions or ""
+    rules = instructions.index("Never state a number you did not read from a tool")
+    every = instructions.index("Instructions for every project:")
+    this = instructions.index("Instructions for this project:")
+    assert rules < every < this
+    assert pasted[:20_000] + "\n[Cut at 20,000 characters.]" in instructions
+    assert pasted[:20_001] not in instructions
+    assert instructions[this:].rstrip().endswith("Answer in English.")
+
+
 def test_a_turn_builds_with_the_tools_and_streams_its_parts(
     client: TestClient,
     project: dict[str, Any],

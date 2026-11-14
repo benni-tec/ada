@@ -29,6 +29,7 @@ from ada.core.ports.agents import (
 )
 from ada.core.ports.events import EventBroadcaster, EventPublisher
 from ada.core.ports.repositories import (
+    AgentSettingsRepository,
     AgentTurnRepository,
     DashboardRepository,
     DataSourceRepository,
@@ -74,6 +75,7 @@ class AgentTurns(AgentTurnService):
         data_sources: DataSourceRepository,
         runtime: AgentRuntime,
         language_models: LanguageModels,
+        agent_settings: AgentSettingsRepository,
         events: EventPublisher,
         broadcaster: EventBroadcaster,
         after_commit: AfterCommit,
@@ -88,6 +90,7 @@ class AgentTurns(AgentTurnService):
         self.data_sources = data_sources
         self.runtime = runtime
         self.language_models = language_models
+        self.agent_settings = agent_settings
         self.events = events
         self.broadcaster = broadcaster
         self.after_commit = after_commit
@@ -197,6 +200,7 @@ class AgentTurns(AgentTurnService):
                 await self.sessions.entries(session.id),
                 await self.turn_records.list(session.id),
                 MAX_STEPS,
+                (await self.agent_settings.get()).instructions,
             )
             async with toolbox.connect(_agent(turn.model), session.id) as tools:
                 status = await self.runtime.run(request, tools, recorder)

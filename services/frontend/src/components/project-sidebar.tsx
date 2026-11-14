@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { Check, ChevronRight, ChevronsUpDown, LayoutGrid, Plus } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
 
@@ -44,6 +44,7 @@ import {
 } from '@/lib/api'
 import { severityPillClasses, worstActive } from '@/components/alerts/labels'
 import { pageTypes, type PageTypeName } from '@/lib/page-types'
+import { defaultSettingsSection, withSettings } from '@/lib/settings-sections'
 
 import { CreateDialog } from './create-dialog'
 import { Hint } from './icon-action'
@@ -87,7 +88,7 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
         </nav>
       </SidebarContent>
       <SidebarFooter>
-        <SettingsLink projectId={projectId} />
+        <SettingsLink />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
@@ -357,18 +358,21 @@ function Alerts({ projectId }: { projectId: Id }) {
   )
 }
 
-/** Shared settings and the project's data sources, at the bottom of the sidebar. */
-function SettingsLink({ projectId }: { projectId: Id }) {
+/** Shared settings and the project's, at the bottom of the sidebar: a modal over the page
+ * (`?settings=`), marked while it is open. */
+function SettingsLink() {
   const Icon = pageTypes.settings.icon
+  const open = useSearch({ strict: false, select: (search) => search.settings !== undefined })
   return (
     <SidebarMenu>
       <SidebarMenuItem>
         <SidebarMenuButton asChild tooltip="Settings">
           <Link
-            to="/projects/$projectId/settings"
-            params={{ projectId }}
-            activeOptions={{ includeHash: false }}
-            activeProps={{ 'data-active': true }}
+            to="."
+            search={withSettings(defaultSettingsSection)}
+            resetScroll={false}
+            activeOptions={{ exact: true, includeSearch: true }}
+            data-active={open || undefined}
           >
             <Icon aria-hidden="true" />
             <span>Settings</span>

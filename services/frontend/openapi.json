@@ -40,9 +40,33 @@
         "title": "ActorKind",
         "type": "string"
       },
+      "AgentInstructions": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instructions",
+          "expected_revision"
+        ],
+        "title": "AgentInstructions",
+        "type": "object"
+      },
       "AgentSettingsView": {
         "description": "Everything the settings page shows about the agent, in one read.",
         "properties": {
+          "instructions": {
+            "default": "",
+            "title": "Instructions",
+            "type": "string"
+          },
           "models": {
             "$ref": "#/components/schemas/ModelList",
             "default": {
@@ -2135,6 +2159,11 @@
       "Project": {
         "description": "The top-level container. Everything else belongs to exactly one project.",
         "properties": {
+          "agent_instructions": {
+            "default": "",
+            "title": "Agent Instructions",
+            "type": "string"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2161,23 +2190,41 @@
         "title": "Project",
         "type": "object"
       },
-      "ProjectRename": {
+      "ProjectChange": {
         "additionalProperties": false,
+        "description": "Fields left out stay as they are.",
         "properties": {
+          "agent_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Instructions"
+          },
           "expected_revision": {
             "title": "Expected Revision",
             "type": "integer"
           },
           "name": {
-            "title": "Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           }
         },
         "required": [
-          "name",
           "expected_revision"
         ],
-        "title": "ProjectRename",
+        "title": "ProjectChange",
         "type": "object"
       },
       "ProviderChange": {
@@ -3501,6 +3548,25 @@
         "title": "VersionBump",
         "type": "string"
       },
+      "WebSettings": {
+        "description": "What the web tools may do, from the platform's configuration (read only).",
+        "properties": {
+          "context_dev_configured": {
+            "title": "Context Dev Configured",
+            "type": "boolean"
+          },
+          "daily_credit_limit": {
+            "title": "Daily Credit Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "context_dev_configured",
+          "daily_credit_limit"
+        ],
+        "title": "WebSettings",
+        "type": "object"
+      },
       "Widget": {
         "description": "A display of one operator's output. It never holds data: it fetches the output of\nits operator from the server, for the run it is shown in.",
         "properties": {
@@ -4781,7 +4847,8 @@
         ]
       },
       "patch": {
-        "operationId": "rename_project_api_projects__project_id__patch",
+        "description": "Rename it or set the session agent's instructions for it.",
+        "operationId": "update_project_api_projects__project_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -4798,7 +4865,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProjectRename"
+                "$ref": "#/components/schemas/ProjectChange"
               }
             }
           },
@@ -4826,7 +4893,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Rename Project",
+        "summary": "Update Project",
         "tags": [
           "projects"
         ]
@@ -6511,6 +6578,48 @@
         ]
       }
     },
+    "/api/settings/agent-instructions": {
+      "put": {
+        "description": "The session agent's instructions for every project; 409 on a stale revision (the\nsettings' revision, shared with the session agent).",
+        "operationId": "set_agent_instructions_api_settings_agent_instructions_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentInstructions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Agent Instructions",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/settings/llm-models": {
       "post": {
         "operationId": "add_model_api_settings_llm_models_post",
@@ -6753,6 +6862,27 @@
           }
         },
         "summary": "Set Session Agent",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/web": {
+      "get": {
+        "operationId": "get_web_settings_api_settings_web_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Web Settings",
         "tags": [
           "settings"
         ]

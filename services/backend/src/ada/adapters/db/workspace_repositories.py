@@ -43,7 +43,13 @@ from ada.core.ports.sources import SourceCheckLog, SourceLocks
 
 
 def _project(row: ProjectRow) -> Project:
-    return Project(id=row.id, name=row.name, created_at=row.created_at, revision=row.revision)
+    return Project(
+        id=row.id,
+        name=row.name,
+        created_at=row.created_at,
+        agent_instructions=row.agent_instructions,
+        revision=row.revision,
+    )
 
 
 class SqlProjectRepository(ProjectRepository):
@@ -57,7 +63,12 @@ class SqlProjectRepository(ProjectRepository):
         return [_project(row) for row in await rows(self.session, oldest_first(ProjectRow))]
 
     async def add(self, project: Project) -> None:
-        row = ProjectRow(id=project.id, name=project.name, created_at=project.created_at)
+        row = ProjectRow(
+            id=project.id,
+            name=project.name,
+            created_at=project.created_at,
+            agent_instructions=project.agent_instructions,
+        )
         await add_row(self.session, row)
 
     async def update(self, project: Project, expected_revision: int) -> Project:
@@ -67,7 +78,7 @@ class SqlProjectRepository(ProjectRepository):
             "project",
             project.id,
             expected_revision,
-            {"name": project.name},
+            {"name": project.name, "agent_instructions": project.agent_instructions},
         )
         return _project(row)
 

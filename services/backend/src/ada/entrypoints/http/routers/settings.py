@@ -1,10 +1,13 @@
-"""The settings page's routes for the agent: providers, their models and the session
-agent. Instance-wide, shared by all projects. No response ever carries an API key."""
+"""The settings' routes for the agent: providers, their models, the session agent and its
+instructions; and what the web tools may do. Instance-wide, shared by all projects. No
+response ever carries an API key."""
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, status
+from pydantic import BaseModel
 
+from ada.config import Settings
 from ada.core.models.agents import AgentSettingsView, LlmProvider, ModelInfo, ProviderKind
 from ada.core.models.base import UNCHANGED, Change, Id
 from ada.core.services.ports.agents import AgentSettingsService
@@ -47,6 +50,21 @@ class SessionAgentChoice(Request):
     # A model id ("<provider>/<model>"), or null for no session agent.
     model_id: str | None
     expected_revision: int
+
+
+class AgentInstructions(Request):
+    # Free text for the session agent in every project, after ADA's own rules; "" for none.
+    instructions: str
+    expected_revision: int
+
+
+class WebSettings(BaseModel):
+    """What the web tools may do, from the platform's configuration (read only)."""
+
+    # Whether a Context.dev key is set (CONTEXT_DEV_API_KEY or CONTEXT_API_KEY).
+    context_dev_configured: bool
+    # Context.dev credits per project and day (WEB_DAILY_CREDIT_LIMIT).
+    daily_credit_limit: int
 
 
 @router.get("/settings/agent")
@@ -99,3 +117,21 @@ async def set_session_agent(
     body: SessionAgentChoice, service: FromDishka[AgentSettingsService]
 ) -> AgentSettingsView:
     return await service.set_session_agent(body.model_id, body.expected_revision)
+
+
+@router.put("/settings/agent-instructions")
+async def set_agent_instructions(
+    body: AgentInstructions, service: FromDishka[AgentSettingsService]
+) -> AgentSettingsView:
+    """The session agent's instructions for every project; 409 on a stale revision (the
+    settings' revision, shared with the session agent)."""
+    return await service.set_instructions(body.instructions, body.expected_revision)
+
+
+@router.get("/settings/web")
+async def get_web_settings(settings: FromDishka[Settings]) -> WebSettings:
+    key = settings.context_dev_api_key
+    return WebSettings(
+        context_dev_configured=key is not None and bool(key.get_secret_value().strip()),
+        daily_credit_limit=settings.web_daily_credit_limit,
+    )

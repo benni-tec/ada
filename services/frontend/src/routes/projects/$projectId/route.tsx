@@ -3,23 +3,30 @@ import { createFileRoute, Link, Outlet, useMatches } from '@tanstack/react-route
 import { Hint } from '@/components/icon-action'
 import { ConnectionIndicator, ProjectLive } from '@/components/live'
 import { ProjectSidebar } from '@/components/project-sidebar'
+import { SettingsModal } from '@/components/settings/settings-modal'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AdaMark } from '@/components/vahti/vahti'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { WidgetModal } from '@/components/widget-modal'
 import { pageOf } from '@/lib/page'
+import { isSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 
 type Search = {
   /** A widget shown full size in a modal over the page (WidgetModal). */
   open?: string
+  /** The settings, open at this section in a modal over the page (SettingsModal). */
+  settings?: SettingsSectionId
 }
 
 // The layout of everything inside a project. It holds the project's live stream, so
 // moving between the project, its sessions and its widgets keeps one connection.
 export const Route = createFileRoute('/projects/$projectId')({
-  // Every page of the project takes `?open=`, so a widget opens over whatever page it is on.
-  validateSearch: (search: Record<string, unknown>): Search =>
-    typeof search.open === 'string' && search.open !== '' ? { open: search.open } : {},
+  // Every page of the project takes `?open=` and `?settings=`, so a widget or the settings
+  // open over whatever page they are on. An unknown section is dropped.
+  validateSearch: (search: Record<string, unknown>): Search => ({
+    ...(typeof search.open === 'string' && search.open !== '' ? { open: search.open } : {}),
+    ...(isSettingsSection(search.settings) ? { settings: search.settings } : {}),
+  }),
   component: ProjectLayout,
 })
 
@@ -51,6 +58,7 @@ function ProjectLayout() {
           </div>
         </SidebarInset>
         <WidgetModal projectId={projectId} />
+        <SettingsModal projectId={projectId} />
       </SidebarProvider>
     </ProjectLive>
   )

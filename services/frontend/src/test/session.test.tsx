@@ -345,7 +345,7 @@ test('without an agent a message is still recorded and the composer says nobody 
 
   const note = await within(await screen.findByRole('form', { name: 'Write a message' })).findByRole('note')
   expect(note).toHaveTextContent('No agent is configured, so nobody will answer here')
-  expect(within(note).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/projects/p1/settings')
+  expect(within(note).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/projects/p1/sessions/s1?settings=models')
   expect(within(composer()).queryByRole('button', { name: /^Model:/ })).not.toBeInTheDocument()
   const input = within(composer()).getByLabelText('Message')
   expect(input).toHaveAccessibleDescription(/No agent is configured/)
