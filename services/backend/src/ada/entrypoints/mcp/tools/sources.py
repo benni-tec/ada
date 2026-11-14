@@ -43,7 +43,11 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     ) -> DataSource:
         """Register a data source in a project, once, so that pipelines can read it. Use it
         for a stable URL that returns CSV, JSON or Parquet (access_kind "url"), or one HTTP
-        request with method, headers and body in `options` (access_kind "request").
+        request with method, headers and body in `options` (access_kind "request"). A web page
+        is access_kind "document" with format json: it yields one row with the page text, or
+        the table a model extracts when `options.extract` is {"instruction": ..., "columns":
+        [...]}. A document refreshes only by hand or when its monitor fires (freshness manual
+        or push).
         `freshness` says when the data counts as outdated; without it the source is only
         refreshed on request. `declared_schema` states column types and what columns mean,
         which the platform cannot work out by itself. Fill `provenance` with the

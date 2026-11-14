@@ -25,6 +25,7 @@ from ada.adapters.memory.repositories import (
     MemorySourceLocks,
     MemoryStore,
 )
+from ada.adapters.sources.document import DocumentReader
 from ada.adapters.sources.examples import (
     EXAMPLES,
     NORDCAN_LUNG_SURVIVAL,
@@ -65,6 +66,7 @@ from conftest import settings_in
 from fakes import (
     RECORDINGS,
     FakeAnalysisStore,
+    FakePageReader,
     FakeSourceReader,
     FakeSourceReaders,
     FixedClock,
@@ -204,6 +206,93 @@ async def test_an_update_changes_only_the_given_fields_from_the_current_revision
     with pytest.raises(Conflict):
         await world.service.update(source.id, 1, name="Second")
     assert (await world.service.get(source.id)).name == "Renamed"
+
+
+# Document sources
+
+
+PAGE = "https://example.test/page"
+
+
+@pytest.fixture
+def pages() -> FakePageReader:
+    return FakePageReader(text="Indicator 3625", rows=[{"county": "Uusimaa", "rate": 74.3}])
+
+
+@pytest.fixture
+async def documents(world: World, pages: FakePageReader) -> World:
+    readers = FakeSourceReaders({AccessKind.DOCUMENT: DocumentReader(pages, world.clock)})
+    world.service, world.events = data_sources(world.memory, readers, world.store, world.clock)
+    return world
+
+
+async def test_document_source_extracts_rows(documents: World, pages: FakePageReader) -> None:
+    extract = {"instruction": "the rate per county", "columns": ["county", "rate"]}
+    source = await documents.register(
+        access_kind=AccessKind.DOCUMENT,
+        address=PAGE,
+        format=DataFormat.JSON,
+        options={"extract": extract},
+    )
+
+    await documents.service.refresh(source.id)
+
+    [written] = documents.store.written
+    assert json.loads(written.content) == [{"county": "Uusimaa", "rate": 74.3}]
+    assert pages.calls == [("extract", (PAGE, "the rate per county", ("county", "rate")))]
+    assert [s.origin for s in documents.current(source)] == [PAGE]
+
+
+async def test_document_source_without_extract_is_one_page_row(documents: World) -> None:
+    source = await documents.register(
+        access_kind=AccessKind.DOCUMENT, address=PAGE, format=DataFormat.JSON
+    )
+
+    await documents.service.refresh(source.id)
+
+    [written] = documents.store.written
+    assert json.loads(written.content) == [{"url": PAGE, "title": None, "text": "Indicator 3625"}]
+
+
+@pytest.mark.parametrize("kind", [FreshnessKind.TTL, FreshnessKind.PROBE])
+async def test_document_source_rejects_ttl(documents: World, kind: FreshnessKind) -> None:
+    message = (
+        "A document source refreshes only by hand or when its monitor fires"
+        " (freshness manual or push)"
+    )
+    policy = FreshnessPolicy(kind=kind, ttl_seconds=60)
+    arguments: dict[str, Any] = {
+        "access_kind": AccessKind.DOCUMENT,
+        "address": PAGE,
+        "format": DataFormat.JSON,
+    }
+    with pytest.raises(Invalid) as error:
+        await documents.register(**arguments, freshness=policy)
+    assert str(error.value) == message
+
+    source = await documents.register(**arguments)
+    with pytest.raises(Invalid) as error:
+        await documents.service.update(source.id, source.revision, freshness=policy)
+    assert str(error.value) == message
+
+
+async def test_document_source_cannot_become_ttl_by_update(documents: World) -> None:
+    source = await documents.register(
+        access_kind=AccessKind.DOCUMENT,
+        address=PAGE,
+        format=DataFormat.JSON,
+        freshness=FreshnessPolicy(kind=FreshnessKind.PUSH),
+    )
+
+    with pytest.raises(Invalid, match="freshness manual or push"):
+        await documents.service.update(source.id, source.revision, freshness=probing())
+
+    assert (await documents.service.get(source.id)).freshness.kind is FreshnessKind.PUSH
+
+
+async def test_document_source_must_be_json(documents: World) -> None:
+    with pytest.raises(Invalid, match="json"):
+        await documents.register(access_kind=AccessKind.DOCUMENT, address=PAGE)
 
 
 # Refreshing

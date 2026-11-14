@@ -36,6 +36,7 @@ from typing import Any, Literal
 import httpx
 from pydantic import Field, ValidationError
 
+from ada.adapters.sources.document import DocumentReader
 from ada.core.models.analysis import FetchedData
 from ada.core.models.base import DomainModel
 from ada.core.models.errors import Invalid, Unavailable
@@ -43,6 +44,7 @@ from ada.core.models.sources import AccessKind, DataSource
 from ada.core.models.time import TimeRange
 from ada.core.ports.sources import SourceReader, SourceReaders
 from ada.core.ports.system import Clock
+from ada.core.ports.web import PageReader
 
 # Names us to the services we read, as their terms usually ask.
 USER_AGENT = "ADA/0.1 (traceable data analysis; +https://github.com/benni-tec/ada)"
@@ -173,10 +175,17 @@ class HttpReader(SourceReader):
 
 
 class HttpSourceReaders(SourceReaders):
-    """The installed readers. Browser and document sources come later."""
+    """The installed readers. Browser sources come later. Document sources are read when
+    a page reader is given."""
 
-    def __init__(self, client: httpx.AsyncClient, clock: Clock) -> None:
-        self.readers = {kind: HttpReader(client, clock, kind) for kind in HTTP_KINDS}
+    def __init__(
+        self, client: httpx.AsyncClient, clock: Clock, pages: PageReader | None = None
+    ) -> None:
+        self.readers: dict[AccessKind, SourceReader] = {
+            kind: HttpReader(client, clock, kind) for kind in HTTP_KINDS
+        }
+        if pages is not None:
+            self.readers[AccessKind.DOCUMENT] = DocumentReader(pages, clock)
 
     def for_kind(self, kind: AccessKind) -> SourceReader:
         try:

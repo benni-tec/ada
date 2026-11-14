@@ -495,12 +495,24 @@ def _check(source: DataSource) -> None:
     if not source.address:
         raise Invalid("A data source needs an address")
     check_policy(source.freshness)
+    if source.access_kind is AccessKind.DOCUMENT:
+        _check_document(source)
     shape_options(source.options)
     declared = source.declared_schema
     if declared is not None and declared.columns:
         check_unique(declared.columns)
         check_roles(declared.roles, declared.columns)
     check_pushdown(source)
+
+
+def _check_document(source: DataSource) -> None:
+    if source.freshness.kind not in (FreshnessKind.MANUAL, FreshnessKind.PUSH):
+        raise Invalid(
+            "A document source refreshes only by hand or when its monitor fires"
+            " (freshness manual or push)"
+        )
+    if source.format is not DataFormat.JSON:
+        raise Invalid("A document source has format json")
 
 
 def _digest(value: object) -> str:
