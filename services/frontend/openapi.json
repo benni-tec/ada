@@ -7,7 +7,8 @@
           "request",
           "browser",
           "document",
-          "web"
+          "web",
+          "cases"
         ],
         "title": "AccessKind",
         "type": "string"
