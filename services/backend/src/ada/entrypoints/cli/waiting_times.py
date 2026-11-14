@@ -115,8 +115,10 @@ cells AS (
     SELECT list_transform(
         -- One outer pipe each side, so an empty last cell stays a cell.
         string_split(regexp_replace(trim(line), '^\|\s*|\s*\|$', '', 'g'), '|'),
-        lambda c: trim(regexp_replace(regexp_replace(regexp_replace(
-            c, '\[([^\]]*)\]\([^)]*\)', '\1', 'g'), '\*\*', '', 'g'), '\s+', ' ', 'g'))
+        -- A link keeps its text; its title may hold parentheses ("(opens in a new window)").
+        lambda c: trim(regexp_replace(regexp_replace(regexp_replace(regexp_replace(
+            c, '\[([^\]]*)\]\(\s*[^)\s]*(?:\s+''[^'']*''|\s+"[^"]*")?\s*\)', '\1', 'g'),
+            '<br\s*/?>', ' ', 'gi'), '\*\*', '', 'g'), '\s+', ' ', 'g'))
     ) AS c
     FROM (SELECT unnest(string_split(text, chr(10))) AS line FROM page)
     WHERE starts_with(trim(line), '|')
