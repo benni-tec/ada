@@ -15,6 +15,7 @@ from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.cli.trials import steps
+from ada.entrypoints.cli.trials.dashboards import create_dashboards
 from ada.entrypoints.cli.trials.sources import CTGOV, CTIS, SOURCES
 
 PROJECT = "Nordic cancer trials"
@@ -62,7 +63,19 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
         project_id = project.id
     async with container() as request:
         built = await _build(request, project_id, registered)
-        # Dashboard and monitoring builders receive project_id and this TrialSteps contract here.
+        sessions = await request.get(SessionService)
+        session = next((s for s in await sessions.list(project_id) if s.title == SESSION), None)
+        if session is None:
+            session = await sessions.create(project_id, SESSION)
+            for field in fields(built):
+                await sessions.record_operator(
+                    session.id,
+                    getattr(built, field.name).id,
+                    f"{field.name}: registry data transformed with SQL",
+                    SEED,
+                )
+        dashboards = await create_dashboards(request, project_id, session.id, built, SEED)
+        # Monitoring can attach here with project_id, session.id and built.
     if refresh:
         for source in SOURCES:
             async with container() as request:
@@ -78,12 +91,13 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                 )
             print(f"  {field.name}: {data.rows[0][0]} rows")
     print(f"Project {PROJECT!r}: {project_id}")
+    for dashboard in dashboards:
+        print(f"  dashboard {dashboard.id}  {dashboard.name}")
     return project_id
 
 
 async def _build(request: AsyncContainer, project_id: Id, sources: dict[str, Id]) -> TrialSteps:
     pipelines = await request.get(PipelineService)
-    sessions = await request.get(SessionService)
     ctgov = [await pipelines.add_source(project_id, sources[s.name], SEED) for s in CTGOV]
     ctis = [await pipelines.add_source(project_id, sources[s.name], SEED) for s in CTIS]
 
@@ -103,15 +117,4 @@ async def _build(request: AsyncContainer, project_id: Id, sources: dict[str, Id]
         Roles(measures=(MeasureRole(value="per_million"),)),
     )
     cases = await transform(steps.CASE_TRIALS, [trials, sites])
-    built = TrialSteps(trials, sites, doors, ctis_trials, pending, rates, cases)
-    session = next((s for s in await sessions.list(project_id) if s.title == SESSION), None)
-    if session is None:
-        session = await sessions.create(project_id, SESSION)
-        for field in fields(built):
-            await sessions.record_operator(
-                session.id,
-                getattr(built, field.name).id,
-                f"{field.name}: registry data transformed with SQL",
-                SEED,
-            )
-    return built
+    return TrialSteps(trials, sites, doors, ctis_trials, pending, rates, cases)

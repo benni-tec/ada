@@ -16,7 +16,7 @@ from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.widgets import WidgetService
 
 if TYPE_CHECKING:
-    from ada.entrypoints.cli.trials.steps import TrialSteps
+    from ada.entrypoints.cli.trials.seed import TrialSteps
 
 DOORS = "Trial doors: Nordic cancer trials Finland lacks"
 NEAR_YOU = "Open cancer trials near you"

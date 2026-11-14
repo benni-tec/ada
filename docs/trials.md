@@ -6,6 +6,12 @@ are needed. `ada seed-trials --refresh` forces all sources to fetch, then prints
 exact row counts per step through a run. A failure is reported by the command;
 successfully refreshed snapshots remain stored. Rerun to recover.
 
+**Trial doors: Nordic cancer trials Finland lacks** shows registry trial rates,
+recruiting Nordic sites, trials without Finnish sites and pending Finnish CTIS
+listings. **Open cancer trials near you** lists recruiting trials and sites with
+distances and registry eligibility text to discuss with an oncologist. Both
+dashboards attach to the seed session; the command prints their IDs.
+
 ## Sources
 
 One ClinicalTrials.gov URL source per Finland, Sweden, Norway and Denmark uses
@@ -105,4 +111,4 @@ row's site, not the trial's nearest site.
 Find the project and its **Nordic cancer trials** session, then the recorded
 operator whose note starts `case_trials:`. All seven notes start with their contract
 name. In the seed integration, `TrialSteps` exposes every operator by that same name;
-the marked hand-over in `seed.py` is where dashboard and monitoring builders attach.
+`seed.py` attaches dashboards and leaves a hand-over for monitoring.

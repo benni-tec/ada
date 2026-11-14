@@ -12,11 +12,16 @@ from ada.adapters.clock import SystemClock
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.models.sessions import EntryKind
 from ada.core.ports.sources import SourceReaders
+from ada.core.services.ports.attachments import AttachmentService
+from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
+from ada.core.services.ports.widgets import WidgetService
+from ada.entrypoints.cli.trials.dashboards import DOORS, NEAR_YOU
 from ada.entrypoints.cli.trials.seed import _build, seed_trials
 from ada.entrypoints.cli.trials.sources import COUNTRIES
 from memory import MemoryBackground
@@ -75,7 +80,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
         sessions = await request.get(SessionService)
         [session] = await sessions.list(project_id)
         entries = await sessions.entries(session.id)
-        assert {e.text.split(":")[0] for e in entries} == {
+        assert {e.text.split(":")[0] for e in entries if e.kind == EntryKind.OPERATOR} == {
             "trials",
             "trial_sites",
             "trial_doors",
@@ -91,7 +96,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             for o in await pipelines.lineage(p.operator_id)
         }
     assert before == after
-    assert len(after) == 15
+    assert len(after) == 18
 
 
 async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
@@ -131,3 +136,35 @@ async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
     )
     assert fi_rate["trials"] == 2
     assert fi_rate["per_million"] == pytest.approx(2 / 5.64)
+
+    async with container() as request:
+        dashboards = await request.get(DashboardService)
+        widgets = await request.get(WidgetService)
+        first = {d.name: d.id for d in await dashboards.list(project_id)}
+        assert set(first) == {DOORS, NEAR_YOU}
+        before = {w.id for w in await widgets.list(project_id)}
+        [session] = await (await request.get(SessionService)).list(project_id)
+        attachments = await (await request.get(AttachmentService)).list(session.id)
+        assert {a.ref for a in attachments} == {str(d) for d in first.values()}
+        for name, dashboard_id in first.items():
+            version = await dashboards.current(dashboard_id)
+            assert version is not None
+            assert len(version.slots) == (6 if name == DOORS else 2)
+            for slot in version.slots:
+                data = await widgets.data(slot.widget_id)
+                assert data.rows
+                widget = await widgets.get(slot.widget_id)
+                columns = [c.name for c in data.columns]
+                if widget.title == "Recruiting abroad, no Finnish site":
+                    distances = [row[columns.index("km_helsinki")] for row in data.rows]
+                    assert distances == sorted(distances, key=lambda d: (d is None, d or 0))
+                if widget.title == "Recruiting cancer trials per million":
+                    assert widget.spec["transform"] == [{"filter": "datum.cancer_group === 'all'"}]
+                    assert any(row[columns.index("cancer_group")] == "all" for row in data.rows)
+
+    assert await seed_trials(container) == project_id
+    async with container() as request:
+        assert {
+            d.name: d.id for d in await (await request.get(DashboardService)).list(project_id)
+        } == first
+        assert {w.id for w in await (await request.get(WidgetService)).list(project_id)} == before
