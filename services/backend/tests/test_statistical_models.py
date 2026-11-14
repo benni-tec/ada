@@ -26,6 +26,7 @@ from ada.core.models.statistical_models import (
     Intent,
     ModelVersion,
     PathwayStep,
+    Scale,
 )
 from ada.core.services.ports.exploration import Clauses, Explored
 from ada.core.services.statistical_models.build import (
@@ -96,8 +97,12 @@ def test_build_takes_the_median_target_and_computes_the_residual(version: ModelV
     assert men.baseline > men.timing_adjusted > men.observed == 18
     assert men.residual > 1
     assert "upper bound" in men.note
-    # The overall-mortality HRs are used unconverted until an excess share is loaded.
-    assert any("unconverted" in w for w in version.compiled.warnings)
+    # Every baseline cell carries its excess share, so the overall-mortality HRs are
+    # converted: other-cause deaths dilute an overall HR towards 1, the conversion undoes it.
+    assert not any("unconverted" in w for w in version.compiled.warnings)
+    assert all(0 < c.excess_share < 1 for c in version.spec.baseline if c.excess_share)
+    colectomy = version.compiled.parameters["hanna_colectomy@colorectal"]
+    assert colectomy.scale is Scale.EXCESS and colectomy.estimate > 1.06
 
 
 def test_the_build_checks_itself_against_figures_it_was_not_built_from(
@@ -152,6 +157,19 @@ def test_the_baseline_has_age_bands_and_the_evaluation_uses_them(version: ModelV
     assert "age group" in baseline.note
     with pytest.raises(Invalid, match="age_band must be"):
         evaluate(version, EXAMPLE.model_copy(update={"age_band": "60_69"}))
+
+
+def test_a_known_stage_uses_norways_survival_by_stage(version: ModelVersion) -> None:
+    def at(stage: str):
+        return evaluate(version, EXAMPLE.model_copy(update={"stage": stage}))
+
+    localised, distant = at("localised"), at("distant")
+    assert localised.survival.now > distant.survival.now
+    baseline = next(c for c in distant.contributions if c.term == "baseline")
+    assert "Cancer in Norway 2025" in baseline.note
+    assert not any("No stage-specific baseline" in w for w in distant.warnings)
+    education = next(c for c in distant.contributions if c.term == "stage_education")
+    assert education.note == "skipped: the stage is given"
 
 
 def test_the_spec_must_hold_together() -> None:

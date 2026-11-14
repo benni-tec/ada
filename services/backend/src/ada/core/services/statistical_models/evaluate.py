@@ -58,10 +58,10 @@ def per100(survival: float) -> Per100:
 def baseline_cell(
     spec: ModelSpec, site: str, sex: str, age_band: str | None, stage: str | None
 ) -> BaselineCell | None:
-    """The most specific cell for the profile: by age band and stage, then by one of them,
-    then the site and sex alone."""
+    """The most specific cell for the profile: by age band and stage, then by stage (which
+    says more about survival than age), then by age band, then the site and sex alone."""
     cells = [c for c in spec.baseline if c.site == site and c.sex == sex]
-    for age, stg in ((age_band, stage), (age_band, None), (None, stage), (None, None)):
+    for age, stg in ((age_band, stage), (None, stage), (age_band, None), (None, None)):
         for cell in cells:
             if cell.age_band == age and cell.stage == stg:
                 return cell

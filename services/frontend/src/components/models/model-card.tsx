@@ -142,7 +142,9 @@ export function ModelCard({ version }: { version: ModelVersion }) {
               })}
               {spec.baseline.map((cell, i) => (
                 <tr key={`baseline-${i}`} className="border-t align-top">
-                  <td className="py-2 pr-2 font-medium">baseline · {cell.site} · {cell.sex}</td>
+                  <td className="py-2 pr-2 font-medium">
+                    baseline · {[cell.site, cell.sex, cell.age_band, cell.stage].filter(Boolean).join(' · ')}
+                  </td>
                   <td className="py-2 pr-2">{Math.round(cell.survival * 100)} of 100 alive at 5 years</td>
                   <td className="py-2 pr-2 text-muted-foreground">{cell.provenance.source}</td>
                   <td className="py-2 pr-2 text-muted-foreground">survival</td>

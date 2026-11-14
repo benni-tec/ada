@@ -27,7 +27,7 @@ physician two weeks later, chest X-ray two weeks after that showing a suspicious
 
 What the page shows: the pathway would have started in Denmark, Norway and Sweden on day
 27; treatment start was due on day 71 and today is day 74 (overdue by three days); 20 days
-behind target so far, most of them before the X-ray. Survival second: 34 of 100 as it stands
+behind target so far, most of them before the X-ray. Survival second: 35 of 100 as it stands
 and on target (the remaining wait is under Heiden's twelve weeks), 32–39 across the
 settings. Support: a navigator, and a
 check that every treatment option was discussed.
@@ -54,8 +54,9 @@ pathway.
 A woman of 81, emergency presentation with jaundice and an imaging finding, stage
 distant, palliative intent. Shows the model switching the delay effects off (they were estimated
 for curative treatment), the deadlines still shown (the drug-treatment target stands in for Sweden's
-22-day palliative time, which is not a step of the model), and the warning that no
-stage-specific baseline is loaded.
+22-day palliative time, which is not a step of the model), and the baseline taken from
+Norway's survival for distant pancreatic cancer (Cancer in Norway 2025), since the stage is
+known.
 
 ```json
 {"site": "pancreas", "sex": "female", "age_band": "80-89", "education": "secondary",
@@ -86,7 +87,7 @@ source is `2026-11-14-pathway-model-slides.html` beside this file. The outline:
    caveat the authors give themselves.
 5. **The tool at the point of care.** Live demo, profile 1: the trigger fires, the
    deadlines show, treatment start overdue by three days. The exact part: no hazard ratio needed.
-6. **Then survival, second and graded.** 34 of 100, 32–39 across two settings; every lever
+6. **Then survival, second and graded.** 35 of 100, 32–39 across two settings; every lever
    names its evidence (national standard, meta-analysis, one cohort, assumption).
 7. **How it is built.** One parameter per arrow, so nothing counts twice (Westreich &
    Greenland 2013); Nordic baseline, Finnish education gradient (Zai 2025), international
@@ -101,5 +102,5 @@ source is `2026-11-14-pathway-model-slides.html` beside this file. The outline:
 10. **What it is not.** Lead time, the waiting-time paradox, no Finnish patient-level
     validation. Educational use, synthetic profiles, a banner on every page. A clinical
     version would be a medical device (MDR Rule 11) and need Findata.
-11. **Next.** A stage-specific baseline; Finland's days per step for colorectal and
-    pancreas; every parameter read from an operator, as the baseline already is.
+11. **Next.** Finland's days per step for colorectal and pancreas; Sweden's and Denmark's
+    survival by stage beside Norway's; the fast-track times Finland would need.

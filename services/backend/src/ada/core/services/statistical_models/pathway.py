@@ -4,6 +4,8 @@ carries the passage it was checked against on 2026-11-14 (docs/superpowers/plans
 the NORDCAN survival operator in the "Nordic cancer care" project, cited by operator and
 run."""
 
+import math
+
 from ada.core.models.statistical_models import (
     BaselineCell,
     Citation,
@@ -674,6 +676,83 @@ NORDIC_BY_AGE = (
 )
 
 
+EXPECTED = Citation(
+    source="Eurostat life tables (demo_mlifetable), probability of dying by single year of age, "
+    "Norway and Sweden, 2023, read from ADA's operator op_dd316aef48492f45b723dae5485635b7 "
+    "(source 01a1dc1c-d97e-7164-bedd-3ed945fd9f88)",
+    passage="5-year expected survival from the product of (1 - q) over five single years from "
+    "the start age (45, 55, 65, 75 and 85 for the age groups; 70 for all ages), the mean of "
+    "Norway and Sweden. The excess share of the hazard is ln R / ln(R x E), with R the "
+    "relative survival: exact when both hazards are constant over the five years, which "
+    "they are not (the excess hazard is front-loaded), so it is an approximation.",
+    grade=EvidenceGrade.REGISTRY,
+    url="https://ec.europa.eu/eurostat/databrowser/view/demo_mlifetable/default/table",
+    operator_id="op_dd316aef48492f45b723dae5485635b7",
+    run_id="01a1dc1c-f122-767c-a671-032582bb77f7",
+    source_id="01a1dc1c-d97e-7164-bedd-3ed945fd9f88",
+)
+
+# 5-year expected survival by sex and age group, the mean of Norway and Sweden (EXPECTED).
+EXPECTED_5Y = {
+    (FEMALE, "00-49"): 0.9948,
+    (FEMALE, "50-59"): 0.9861,
+    (FEMALE, "60-69"): 0.9614,
+    (FEMALE, "70-79"): 0.8867,
+    (FEMALE, "80-89"): 0.6360,
+    (FEMALE, None): 0.9366,
+    (MALE, "00-49"): 0.9925,
+    (MALE, "50-59"): 0.9803,
+    (MALE, "60-69"): 0.9434,
+    (MALE, "70-79"): 0.8437,
+    (MALE, "80-89"): 0.5405,
+    (MALE, None): 0.9074,
+}
+
+
+NORWAY_BY_STAGE = Citation(
+    source="Cancer in Norway 2025, Tables 7.3 and 7.4: five-year relative survival by site, stage "
+    "and period, 2021-25 (period approach), read from ADA's operator "
+    "op_b5a128ed84a5077376a87b274ce7de56 (source 01a1dc1e-0fda-75f3-a3a0-1e28d921f5ee)",
+    passage="C33-34 Lung, trachea, C18-20 Colorectal and C25 Pancreas: the Localised, Regional and "
+    "Distant rows, last column (2021-25), men and women. Norway's own figures stand in for the "
+    "Nordic level by stage: Sweden publishes none in this form. Age-standardised by the "
+    "registry, so they apply to every age group.",
+    grade=EvidenceGrade.REGISTRY,
+    url="https://www.fhi.no/Content/cancer-in-norway-2025.pdf",
+    country="Norway",
+    operator_id="op_b5a128ed84a5077376a87b274ce7de56",
+    run_id="01a1dc22-e630-717c-abdd-f6382f78c468",
+    source_id="01a1dc1e-0fda-75f3-a3a0-1e28d921f5ee",
+)
+
+# (site, sex, stage, 5-year relative survival %), from NORWAY_BY_STAGE.
+NORWAY_STAGE = (
+    (LUNG, MALE, "localised", 65.7),
+    (LUNG, MALE, "regional", 33.9),
+    (LUNG, MALE, "distant", 8.6),
+    (LUNG, FEMALE, "localised", 72.3),
+    (LUNG, FEMALE, "regional", 42.1),
+    (LUNG, FEMALE, "distant", 10.4),
+    (COLORECTAL, MALE, "localised", 95.5),
+    (COLORECTAL, MALE, "regional", 83.6),
+    (COLORECTAL, MALE, "distant", 21.5),
+    (COLORECTAL, FEMALE, "localised", 97.4),
+    (COLORECTAL, FEMALE, "regional", 86.1),
+    (COLORECTAL, FEMALE, "distant", 22.5),
+    (PANCREAS, MALE, "localised", 45.8),
+    (PANCREAS, MALE, "regional", 23.9),
+    (PANCREAS, MALE, "distant", 3.9),
+    (PANCREAS, FEMALE, "localised", 47.7),
+    (PANCREAS, FEMALE, "regional", 22.8),
+    (PANCREAS, FEMALE, "distant", 3.8),
+)
+
+
+def excess_share(relative: float, expected: float) -> float:
+    """The share of the hazard over five years that is excess: ln R / ln(R x E)."""
+    return round(math.log(relative) / math.log(relative * expected), 4)
+
+
 def _baseline() -> tuple[BaselineCell, ...]:
     # The mean of Sweden and Norway, 2020-2024, from the NORDCAN operator (NORDCAN citation).
     nordic = {
@@ -685,14 +764,38 @@ def _baseline() -> tuple[BaselineCell, ...]:
         (PANCREAS, FEMALE): (20.0 + 17.9) / 2,
     }
     all_ages = tuple(
-        BaselineCell(site=site, sex=sex, survival=round(pct / 100, 4), provenance=NORDCAN)
+        BaselineCell(
+            site=site,
+            sex=sex,
+            survival=round(pct / 100, 4),
+            excess_share=excess_share(pct / 100, EXPECTED_5Y[sex, None]),
+            provenance=NORDCAN,
+        )
         for (site, sex), pct in nordic.items()
     )
     by_age = tuple(
-        BaselineCell(site=site, sex=sex, age_band=age, survival=survival, provenance=NORDCAN_BY_AGE)
+        BaselineCell(
+            site=site,
+            sex=sex,
+            age_band=age,
+            survival=survival,
+            excess_share=excess_share(survival, EXPECTED_5Y[sex, age]),
+            provenance=NORDCAN_BY_AGE,
+        )
         for site, sex, age, survival in NORDIC_BY_AGE
     )
-    return all_ages + by_age
+    by_stage = tuple(
+        BaselineCell(
+            site=site,
+            sex=sex,
+            stage=stage,
+            survival=round(pct / 100, 4),
+            excess_share=excess_share(pct / 100, EXPECTED_5Y[sex, None]),
+            provenance=NORWAY_BY_STAGE,
+        )
+        for site, sex, stage, pct in NORWAY_STAGE
+    )
+    return all_ages + by_age + by_stage
 
 
 def _parameter(name, estimate, lo, hi, scale, form, provenance):
