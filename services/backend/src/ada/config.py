@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     secret_key: SecretStr | None = Field(None, validation_alias="ADA_SECRET_KEY")
     secret_key_file: Path | None = Field(None, validation_alias="ADA_SECRET_KEY_FILE")
 
+    # Web tools, from the environment only. A tool without its setting fails with a message
+    # naming it; nothing else is affected.
+    exa_api_key: SecretStr | None = None
+    context_api_key: SecretStr | None = None
+    # Where Context.dev can reach this platform, for page monitor webhooks.
+    ada_public_url: str | None = None
+
     def master_key(self) -> str | None:
         """ADA_SECRET_KEY, else the contents of ADA_SECRET_KEY_FILE; None when neither is
         set. A file that is named but cannot be read is an error, not a missing key."""

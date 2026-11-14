@@ -3,21 +3,25 @@ bus and the task dispatcher have in-memory implementations in ada.adapters.memor
 those directly."""
 
 import json
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import SecretStr
 
 from ada.core.models.analysis import FetchedData, Query, Rows, StoredSnapshot
-from ada.core.models.base import Id
+from ada.core.models.base import Id, JsonObject
 from ada.core.models.errors import Invalid
 from ada.core.models.schema import Column, Schema
 from ada.core.models.sources import AccessKind, DataFormat, DataSource
 from ada.core.models.time import TimeRange
+from ada.core.models.web import Monitor, PageText, SearchHit, SearchScope
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.sources import SourceReader, SourceReaders
 from ada.core.ports.system import Clock
+from ada.core.ports.web import PageReader, WebSearch
 
 
 class FixedClock(Clock):
@@ -153,3 +157,80 @@ def _same(recorded: str, url: httpx.URL) -> bool:
         url.path,
         sorted(url.params.multi_items()),
     )
+
+
+class WebReplay:
+    """An HTTP handler for the web tools: answers the exchanges of tests/recordings/web.json
+    and fails every other request. Two exchanges share POST /web/scrape, so the recorded
+    request body picks the answer. The "name" of a monitor is our label, not compared."""
+
+    def __init__(self) -> None:
+        index = json.loads((RECORDINGS / "web.json").read_text())
+        self.exchanges: list[dict[str, Any]] = index["exchanges"]
+        self.requests: list[httpx.Request] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        body = json.loads(request.content) if request.content else None
+        for exchange in self.exchanges:
+            if exchange["method"] != request.method or not _same(exchange["url"], request.url):
+                continue
+            if "request" in exchange:
+                expected = json.loads((RECORDINGS / exchange["request"]).read_bytes())
+                if _without_name(body) != _without_name(expected):
+                    continue
+            return httpx.Response(
+                exchange["status"],
+                headers={"Content-Type": exchange["content_type"]},
+                content=(RECORDINGS / exchange["body"]).read_bytes(),
+            )
+        raise AssertionError(f"No recording for {request.method} {request.url}: {body}")
+
+
+def _without_name(body: Any) -> Any:
+    return {k: v for k, v in body.items() if k != "name"} if isinstance(body, dict) else body
+
+
+class FakeWebSearch(WebSearch):
+    """Returns the given hits and pages; records every search."""
+
+    def __init__(self, hits: Sequence[SearchHit] = (), pages: Sequence[PageText] = ()) -> None:
+        self.hits = hits
+        self.pages = pages
+        self.searches: list[tuple[str, SearchScope, int]] = []
+        self.fetched: list[Sequence[str]] = []
+
+    async def search(self, query: str, scope: SearchScope, limit: int) -> Sequence[SearchHit]:
+        self.searches.append((query, scope, limit))
+        return self.hits[:limit]
+
+    async def contents(self, urls: Sequence[str]) -> Sequence[PageText]:
+        self.fetched.append(urls)
+        return [page for page in self.pages if page.url in urls]
+
+
+class FakePageReader(PageReader):
+    """Returns canned text, rows and monitors; records every call."""
+
+    def __init__(
+        self, text: str = "", rows: Sequence[JsonObject] = (), secret: str = "test-secret"
+    ) -> None:
+        self.text = text
+        self.rows = list(rows)
+        self.secret = secret
+        self.calls: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def read(self, url: str) -> PageText:
+        self.calls.append(("read", (url,)))
+        return PageText(url=url, text=self.text)
+
+    async def extract(self, url: str, instruction: str, columns: Sequence[str]) -> list[JsonObject]:
+        self.calls.append(("extract", (url, instruction, tuple(columns))))
+        return self.rows
+
+    async def watch(self, url: str, webhook_url: str) -> Monitor:
+        self.calls.append(("watch", (url, webhook_url)))
+        return Monitor(id=f"mon_{len(self.calls)}", secret=SecretStr(self.secret))
+
+    async def unwatch(self, monitor_id: str) -> None:
+        self.calls.append(("unwatch", (monitor_id,)))
