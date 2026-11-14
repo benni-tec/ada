@@ -1369,10 +1369,7 @@ def test_hook_unknown_source_is_404(watched: tuple[TestClient, str]) -> None:
     assert dispatcher(client).refreshes == []
 
 
-async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str) -> None:
-    explorer = FakeExplorer()
-    secrets = FernetSecretBox(KEY)
-
+def postgres_sources(explorer: FakeExplorer) -> Callable[[Repos], DataSources]:
     def service(repos: Repos) -> DataSources:
         session = repos.data_sources.session  # type: ignore[attr-defined]
         readers = FakeSourceReaders({AccessKind.WEB: FakeSourceReader()})
@@ -1388,9 +1385,17 @@ async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str)
             FixedClock(),
             SqlSourceLocks(session),
             explorer,
-            secrets,
+            FernetSecretBox(KEY),
             PUBLIC_URL,
         )
+
+    return service
+
+
+async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str) -> None:
+    explorer = FakeExplorer()
+    secrets = FernetSecretBox(KEY)
+    service = postgres_sources(explorer)
 
     async with engine_for(migrated_database_url) as engine:
         async with unit_of_work(engine) as repos:
@@ -1414,3 +1419,46 @@ async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str)
     assert verified
     assert (watched.monitor_id, watched.freshness.kind) == ("mon_1", FreshnessKind.PUSH)
     assert "test-secret" not in watched.model_dump_json()
+
+
+async def test_a_policy_edit_waits_for_unwatch_in_postgres(migrated_database_url: str) -> None:
+    explorer = FakeExplorer()
+    service = postgres_sources(explorer)
+    weekly = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=WEEK)
+    deleting, deleted = asyncio.Event(), asyncio.Event()
+
+    async def unwatch(monitor_id: str) -> None:
+        deleting.set()
+        await deleted.wait()
+
+    async with engine_for(migrated_database_url) as engine:
+        async with unit_of_work(engine) as repos:
+            project = factories.project()
+            await repos.projects.add(project)
+            source = await service(repos).register(
+                project.id, "Page", AccessKind.WEB, PAGE, DataFormat.HTML, freshness=weekly
+            )
+            watched = await service(repos).watch(source.id)
+        explorer.unwatch = unwatch  # type: ignore[method-assign]
+
+        async def unwatch_source() -> DataSource:
+            async with unit_of_work(engine) as repos:
+                return await service(repos).unwatch(source.id)
+
+        async def edit() -> DataSource:
+            async with unit_of_work(engine) as repos:
+                daily = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=86_400)
+                return await service(repos).update(source.id, watched.revision, freshness=daily)
+
+        unwatching = asyncio.create_task(unwatch_source())
+        await deleting.wait()
+        editing = asyncio.create_task(edit())
+        done, _ = await asyncio.wait({editing}, timeout=0.3)
+        deleted.set()
+        unwatched = await unwatching
+        # It waited for unwatch, then found the source changed instead of being undone.
+        with pytest.raises(Conflict):
+            await editing
+
+    assert not done
+    assert unwatched.freshness == weekly
