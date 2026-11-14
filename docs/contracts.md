@@ -71,6 +71,14 @@ What wave 4's MCP workstream added to them (`docs/contracts/wave4.md`, A, B, E):
 | `core/services/ports/refreshes.py` | `RefreshService.refresh_now` (refresh and wait), with `RefreshOutcome`, `RefreshStatus`, `SnapshotSummary`; `MAX_WAIT_SECONDS` (60) |
 | `core/services/ports/dashboards.py` | `DashboardService.pin_widget(..., layout=None)`; `edit` copies a widget new to the dashboard (see Dashboards) |
 
+What wave 5's Sessions workstream added to them (`docs/contracts/wave5.md`, C, D):
+
+| Where | Change |
+| --- | --- |
+| `core/models/sessions.py` | `EntryKind.TOOL_CALL`, `ToolCall` (`tool`, `arguments`, `status`, `error`, `duration_ms`), `ToolCallStatus`; `SessionEntry.tool_call` |
+| `core/services/ports/sessions.py` | `SessionService.record_tool_call(session_id, call, actor)` (shortens the arguments), `check(session_id, project_id=None)` |
+| Migration `0007` (down revision `0006`) | `session_entries.tool_call` (JSONB, nullable); its downgrade deletes the `tool_call` entries |
+
 ## Adding a feature without touching shared files
 
 Four packages are scanned at startup. A feature adds a module; no list is edited.
@@ -120,7 +128,11 @@ ends normally and rolls back when it raises.
   answer from inside the scope and commit a failing request's writes; do not add any for
   the core's errors.
 - **MCP.** `make_inject` (`entrypoints/mcp/injection.py`) opens the scope per call and
-  turns the core's errors into `ToolError`s outside it.
+  turns the core's errors into `ToolError`s outside it (`tool_errors()`). Around it, the
+  middleware `SessionToolCalls` (`entrypoints/mcp/sessions.py`) checks the call's session
+  in a short unit of work before the call, and records an external agent's call in
+  another after it, so a failed call is recorded although its own unit rolled back (see
+  MCP tools).
 - **Worker.** `ContainerMiddleware` (`entrypoints/worker/factory.py`) ends a failed
   task's scope with its exception; dishka's own taskiq middleware ended it as a success.
 - **After the commit.** `AfterCommit.add(action)` runs an action once the unit's
@@ -636,7 +648,8 @@ its entry (`SessionEntry.context`, empty by default) and checked when it is post
    client on the platform's MCP server. Every tool call is a unit of work of its own, as
    over HTTP, so entries and widgets appear in the session as they are made.
    `get_widget_data`, `create_project` and `create_session` are left out. A tool that
-   takes `session_id` gets the turn's session when the model leaves it out. A tool error
+   takes `session_id` gets the turn's session when the model leaves it out (its schema
+   does not require it); its calls are not recorded as `tool_call` entries. A tool error
    comes back as `ToolCallFailed`, which the runtime hands to the model as a retry.
 5. **Running.** `PydanticAiRuntime` (`adapters/llm/runtime.py`) builds a pydantic-ai
    `Agent` per turn, on the model of the request's target (it holds no configuration; a
@@ -720,7 +733,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `POST /sources/{id}/refresh {force?, wait?, timeout_seconds?}` | Queue a refresh; answers 202 `{data_source_id, force}`. With `wait` the fetch runs in the request (at most `timeout_seconds`, default 30, up to 60) and answers 200 `RefreshOutcome {data_source_id, status, snapshot, error}` (see Sources) |
 | `GET /projects/{id}/sessions`, `POST /projects/{id}/sessions {title, origin_dashboard_id?}` | List; create |
 | `GET /sessions/{id}`, `PATCH /sessions/{id} {expected_revision, title?, panel_dashboard_id?}` | Read; rename or set the panel dashboard |
-| `GET /sessions/{id}/entries` | The session's record, oldest first |
+| `GET /sessions/{id}/entries` | The session's record, oldest first. Entry kinds: `message` (with `context`), `operator` and `widget` (`ref` the id, `text` the note), `agent_turn` (`ref` the turn), `tool_call` (an external agent's MCP call, in `tool_call`; see MCP tools) |
 | `POST /sessions/{id}/messages {text, context?, model?}` | Add a message (see The agent); 201 `PostedMessage {entry, turn}`, `turn` null when no session agent is configured. An unknown `model` is 422 |
 | `GET /sessions/{id}/turns`, `GET /turns/{id}` | The session's agent turns, oldest first; one turn |
 | `POST /turns/{id}/cancel` | Ask a queued or running turn to stop; 202 with the turn |
@@ -781,13 +794,45 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 
 Tool names are snake case and start with a verb (`list create register update refresh
 add get preview system pin edit set show generate check build query`; `tests/test_api.py`). Tools
-that create something in a session take an optional `session_id` and a `note`: one line
-on why the agent is doing this, shown in the session. The acting `Actor` is
+that create something take a `note`: one line on why the agent is doing this, shown in
+the session. The acting `Actor` is
 `external_agent` with the client name the MCP host reported when it connected; a client
 that reports none, or only its library's default (`fastmcp`, `mcp`, …:
 `LIBRARY_DEFAULTS` in `entrypoints/mcp/actor.py`), is recorded with an empty name, and the
 frontend then shows no creator. The in-platform agent's calls act as `agent` with its
 model id (see The agent).
+
+**Every call works in a session.** Every tool takes a required `session_id` (`SessionId`
+in `entrypoints/mcp/sessions.py`, described in the schema), except `list_projects`,
+`create_project`, `create_session`, `system_status` and the widget's `get_widget_data`
+(`SESSIONLESS`). The middleware `SessionToolCalls` (FastMCP `on_call_tool`, added by
+`create_mcp`) does the rest, so no tool repeats it:
+
+- **The check**, before the call, in a short unit of work of its own: without
+  `session_id` the call is refused ("Pass `session_id`: every ADA tool works in a session
+  … Start one with create_session."); an unknown session is `NotFound`; a call with a
+  `project_id` whose session is in another project is `Invalid` ("The session belongs to
+  another project than the one given"); a call without one only needs the session to
+  exist. A refused call is not recorded and changes nothing.
+- **The record**, after the call, in another short unit of work: a `tool_call` entry
+  (`SessionService.record_tool_call`) with the calling actor and
+  `{tool, arguments, status: "ok" | "error", error, duration_ms}`. A failed call is
+  recorded with the tool error's message, after its own unit of work rolled back.
+  `session.entry_added` follows that commit. Arguments are shortened at any depth
+  (`shortened` in `core/services/sessions/service.py`): strings over 200 characters, and
+  SQL (the keys `sql`, `select`, `where`, `group_by`, `having`, `order_by`) over 2,000,
+  are cut with "…"; lists over 10 items keep 10 and end with "… n more"; the error is cut
+  at 2,000. A record that cannot be written is logged and the call's answer or error goes
+  back unchanged. A widget's hashed app-tool name (`__<hash>_get_widget_data`) counts as
+  its tool's.
+- **The in-platform agent's calls are checked, not recorded**: its turn shows each one.
+  `InProcessToolbox` fills in the turn's session when the model leaves `session_id` out,
+  and the schemas it hands the model do not list `session_id` as required.
+- Tools that already record what they made with its note (`add_source_operator`,
+  `add_transform`, `create_widget`, `build_pipeline`) keep doing so; their call is
+  recorded after those entries. `create_report` makes the report the session's unless
+  `dashboard_id` names a dashboard to own it; `list_reports` lists the project's reports,
+  or with `only_this_session` the session's.
 
 | Group | Tools |
 | --- | --- |
@@ -805,7 +850,8 @@ the `expected_revision` the agent read; a mismatch is a tool error naming both r
 The core's errors come back as tool errors with their message; `Unavailable` adds that it
 is temporary and to try again later.
 
-**Server instructions** (`INSTRUCTIONS` in `entrypoints/mcp/server.py`): batch first
+**Server instructions** (`INSTRUCTIONS` in `entrypoints/mcp/server.py`): work in a
+session (`list_projects`, `create_session`, then its id as `session_id` everywhere), batch first
 (`build_pipeline`, `edit_dashboard`), explore with `query_operator` and never show its
 rows, present only through widgets and reports.
 
@@ -820,14 +866,14 @@ or in a new run with no bindings and an open range. Nothing is stored. It return
 agent's exploration only and must not be shown or quoted to the person, and so does the
 tool's description.
 
-**`build_pipeline(project_id, steps, session_id?)`**: each step is
+**`build_pipeline(project_id, session_id, steps)`**: each step is
 `{ref?, note?, <kind>: {...}}` with exactly one kind: `register_source` (the fields of
 `register_source`, plus `refresh`), `source_operator {data_source_id}`, `input {name,
 output, default}`, `transform {sql, inputs, roles?, materialize?}`, `widget {operator,
 type, title, spec?}`. `"$ref"` names an earlier step's result (a registered source also
 stands for its source operator); other values are existing ids; an unknown or later
 reference is `Invalid` naming the step. A registered source is not fetched in the batch:
-the steps after it are checked against its `declared_schema`. With `session_id` each
+the steps after it are checked against its `declared_schema`. Each
 operator and widget step gets its session entry with its note (registration has none, as
 with the single tool), unless the session already shows it. A re-run makes nothing new:
 operators by identity, a source of the same project, name and address is reused, and a
@@ -872,7 +918,7 @@ connection open. Events are broadcast after the unit of work that caused them co
 | Event | Payload |
 | --- | --- |
 | `session.created` | `session_id` |
-| `session.entry_added` | `session_id`, `entry_id` |
+| `session.entry_added` | `session_id`, `entry_id`. Also for each recorded tool call, after the commit of its own unit of work (also when the call failed) |
 | `widget.created` | `widget_id`, `session_id` if any |
 | `widget.updated` | `widget_id`, `session_id` if any; the frontend reloads its widget frames, which read the spec when they load |
 | `run.started`, `run.finished`, `run.failed` | `run_id`, `operator_id`; `error` on failure |
@@ -1021,6 +1067,16 @@ receives data from an agent; it asks the server for the output of its operator.
   widget cards as before. It follows the bottom while the person is there (new entries,
   streaming text) and stays put when they scrolled up; `?widget=` scrolls to a widget and
   marks it.
+- **Tool calls** (`tool_call` entries; `groupRecord` in `lib/session-record.ts`,
+  `components/tool-calls.tsx`): consecutive calls of one actor are one compact group,
+  drawn with Trace like an agent turn's steps and collapsed: "<client> used n tools[, m
+  failed]" with the time of the first. Opened, each call is a line with its tool, status
+  (failed in red as "Failed: <tool>", its error under it) and duration, and opens to its
+  arguments as JSON. Exploration calls (`query_operator`, `web_*`) are marked "explored,
+  not shown". A call whose effect has its own entry is not drawn twice: a successful
+  `add_source_operator`, `add_transform`, `create_widget` or `build_pipeline` right after
+  an operator or widget entry of the same actor is left out (the call is recorded after
+  what it made), and does not split the group around it.
 - **An agent turn** (`components/chat/agent-turn.tsx`) is read with `GET /turns/{id}`.
   Consecutive parts that are not text form one shadcn Trace: reasoning ("Thinking" open
   while it streams, "Thought" folded after), tool calls ("Calling / Called / Failed:
@@ -1157,7 +1213,11 @@ not describe it.
   workspace, health, widget bundles, the composition root), `test_database` (migrations,
   transactions, concurrent writers, the SQL repositories' queries), `test_worker_events`
   (tasks, the dispatcher, events after the commit, the event stream, Valkey) and
-  `test_end_to_end`. A feature is tested through its service, then one transport for
+  `test_end_to_end`. Every MCP call but the sessionless ones passes a `session_id`; the
+  session's own checks and records are in `test_api` (a call without a session, a
+  session of another project, the recorded outcome and shortened arguments),
+  `test_worker_events` (on PostgreSQL: a failed call recorded while its own writes roll
+  back) and `test_agent` (the in-platform agent's calls not recorded). A feature is tested through its service, then one transport for
   what the routes add (REST or MCP, not both), then PostgreSQL for what only it does.
   `CI=1 moon run backend:test` takes well under a minute.
 - Backend tests run without services, except those that take the `database_url` or
