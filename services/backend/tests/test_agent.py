@@ -651,6 +651,27 @@ def test_research_turn_gets_only_research_tools(
     assert f'Session "Survival", id {child["id"]}' in (research_info.instructions or "")
 
 
+def test_the_research_agent_reads_people_s_instructions_after_its_own_rules(
+    client: TestClient, session: dict[str, Any], script: Script
+) -> None:
+    project = send(client, "GET", f"/projects/{session['project_id']}")
+    send(
+        client,
+        "PATCH",
+        f"/projects/{project['id']}",
+        {"agent_instructions": "Prefer THL.", "expected_revision": project["revision"]},
+    )
+    child = delegate(client, session)
+    script.then(say("Nothing found."))
+    run(client, latest_turn(client, child))
+
+    instructions = script.calls[-1][1].instructions or ""
+    assert "You are the research agent of ADA" in instructions
+    rules = instructions.index("Finish with report_back")
+    assert rules < instructions.index("Instructions for this project:")
+    assert instructions.rstrip().endswith("Prefer THL.")
+
+
 def test_person_follow_up_in_research_session_uses_research_model(
     client: TestClient, session: dict[str, Any], script: Script
 ) -> None:
