@@ -7,6 +7,7 @@ from typing import Protocol
 from ada.core.models.base import JsonObject
 from ada.core.models.cases import Field, FieldType, Section
 from ada.core.models.errors import Invalid
+from ada.core.models.schema import Column, ColumnType
 from ada.core.models.statistical_models import (
     Deadline,
     DeadlineStatus,
@@ -29,6 +30,11 @@ class CaseModel(Protocol):
         """The version's result for a case's values (only the fields it requires)."""
         ...
 
+    def columns(self, version: ModelVersion) -> tuple[Column, ...]:
+        """Every column a section of this version can have (`Section.columns`), with its
+        type, unprefixed: the cases source declares them for its results table."""
+        ...
+
 
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
@@ -38,9 +44,32 @@ def _days(n: int) -> str:
     return f"{n} day" if n == 1 else f"{n} days"
 
 
+# The deadlines an evaluation can have, as evaluate labels them.
+DEADLINES = (
+    "Imaging after suspicion",
+    "First specialist visit",
+    "Work-up complete",
+    "Treatment start",
+)
+
+
 class PathwayModel:
     """The patient pathway model on a case: the fields come from its spec's terms,
     criteria and steps; the section leads with the most pressing deadline."""
+
+    def columns(self, version: ModelVersion) -> tuple[Column, ...]:
+        columns = [
+            Column(name="trigger", type=ColumnType.TEXT),
+            Column(name="clock_start", type=ColumnType.INTEGER),
+            Column(name="days_behind", type=ColumnType.INTEGER),
+            Column(name="survival_now", type=ColumnType.INTEGER),
+            Column(name="survival_on_target", type=ColumnType.INTEGER),
+        ]
+        for label in DEADLINES:
+            slug = _slug(label)
+            columns.append(Column(name=f"{slug}_status", type=ColumnType.TEXT))
+            columns.append(Column(name=f"{slug}_by", type=ColumnType.INTEGER))
+        return tuple(columns)
 
     def requires(self, version: ModelVersion) -> tuple[Field, ...]:
         spec = version.spec

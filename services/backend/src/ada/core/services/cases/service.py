@@ -1,6 +1,7 @@
 """Case types and cases, and running the models on a case's type."""
 
 from collections.abc import Sequence
+from functools import partial
 from uuid import uuid7
 
 from ada.core.models.actors import Actor
@@ -20,9 +21,16 @@ from ada.core.models.cases import (
     Section,
 )
 from ada.core.models.errors import Invalid, NotFound
+from ada.core.models.sources import AccessKind, FreshnessKind
 from ada.core.models.statistical_models import StatisticalModel
-from ada.core.ports.repositories import CaseRepository, StatisticalModelRepository
+from ada.core.ports.repositories import (
+    CaseRepository,
+    DataSourceRepository,
+    StatisticalModelRepository,
+)
 from ada.core.ports.system import Clock
+from ada.core.ports.tasks import TaskDispatcher
+from ada.core.ports.transactions import AfterCommit
 from ada.core.services.cases.fields import (
     check_fields,
     check_key,
@@ -41,11 +49,22 @@ URGENCY = {"urgent": 0, "warn": 1, "info": 2, "ok": 3}
 
 class Cases(CaseService):
     def __init__(
-        self, cases: CaseRepository, models: StatisticalModelRepository, clock: Clock
+        self,
+        cases: CaseRepository,
+        models: StatisticalModelRepository,
+        clock: Clock,
+        sources: DataSourceRepository,
+        dispatcher: TaskDispatcher,
+        after_commit: AfterCommit,
     ) -> None:
         self.cases = cases
         self.statistical = models
         self.clock = clock
+        self.sources = sources
+        self.dispatcher = dispatcher
+        self.after_commit = after_commit
+        # The case types whose sources this unit of work has marked stale already.
+        self._changed: set[Id] = set()
 
     async def create_type(
         self, project_id: Id, name: str, description: str, fields: tuple[Field, ...], actor: Actor
@@ -138,6 +157,7 @@ class Cases(CaseService):
         await self.cases.add_events(
             _changed_steps(case_type, before.values if before else {}, case)
         )
+        await self._stale(case_type.id)
         ran: list[Id] = []
         for model in await self._on_type(case_type):
             if model.auto_run:
@@ -249,7 +269,25 @@ class Cases(CaseService):
             created_at=self.clock.now(),
         )
         await self.cases.add_result(result)
+        await self._stale(case.case_type_id)
         return result
+
+    async def _stale(self, case_type_id: Id) -> None:
+        """Mark the cases sources on the type stale: each one kept fresh by push gets a
+        forced refresh once this unit of work has committed, as a watched page's webhook
+        queues one. Once per type and unit of work, however many cases or results it
+        stores."""
+        if case_type_id in self._changed:
+            return
+        self._changed.add(case_type_id)
+        case_type = await self.cases.get_type(case_type_id)
+        for source in await self.sources.list(case_type.project_id):
+            if (
+                source.access_kind is AccessKind.CASES
+                and source.address == str(case_type_id)
+                and source.freshness.kind is FreshnessKind.PUSH
+            ):
+                self.after_commit.add(partial(self.dispatcher.refresh_source, source.id, True))
 
 
 def _changed_steps(case_type: CaseType, before: JsonObject, case: Case) -> list[CaseEvent]:

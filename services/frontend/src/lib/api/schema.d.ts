@@ -1825,7 +1825,7 @@ export interface components {
          * AccessKind
          * @enum {string}
          */
-        AccessKind: "url" | "request" | "browser" | "document" | "web";
+        AccessKind: "url" | "request" | "browser" | "document" | "web" | "cases";
         /**
          * Actor
          * @description Who did something. There are no users yet, so this is a label, not an identity.

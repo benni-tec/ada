@@ -19,6 +19,9 @@ class AccessKind(StrEnum):
     # A web page through Context.dev (format html): its Markdown, a table a model reads off
     # it, the pages of a site, or a researched answer (WebOperation).
     WEB = "web"
+    # A case type's cases, step events or results, read inside ADA (no network). The
+    # address is the case type's id; `options.table` says which table (CaseTable).
+    CASES = "cases"
 
 
 class DataFormat(StrEnum):

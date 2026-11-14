@@ -8,10 +8,13 @@ data only: the platform is not for patient data."""
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
+from uuid import UUID
 
 from ada.core.models.actors import Actor
 from ada.core.models.base import DomainModel, Id, JsonObject
+from ada.core.models.errors import Invalid
+from ada.core.models.schema import Column, ColumnType
 
 
 class FieldType(StrEnum):
@@ -141,3 +144,125 @@ class CaseWithResult(DomainModel):
 
     case: Case
     latest: CaseResult | None
+
+
+# The cases source (AccessKind.CASES): one table of a case type, read inside ADA. Its
+# address is the case type's id, `options.table` the table. The column rules are here, so
+# the registration, which declares the columns, and the reader, which fills them, agree.
+
+
+class CaseTable(StrEnum):
+    # One row per case: its key, revision and times, and every field of the case type.
+    CASES = "cases"
+    # One row per step event.
+    EVENTS = "events"
+    # One row per result, with its section's columns prefixed by the model kind.
+    RESULTS = "results"
+
+
+def case_table(options: JsonObject) -> CaseTable:
+    """The table a cases source's options ask for; cases by default."""
+    value = options.get("table", CaseTable.CASES.value)
+    try:
+        return CaseTable(value)
+    except ValueError:
+        tables = ", ".join(repr(table.value) for table in CaseTable)
+        raise Invalid(f"options.table must be one of {tables}, not {value!r}") from None
+
+
+def case_type_address(address: str) -> Id:
+    """The case type a cases source's address names."""
+    try:
+        return UUID(address.strip())
+    except ValueError:
+        raise Invalid(
+            f"The address of a cases source is a case type's id, not {address!r}"
+        ) from None
+
+
+def _required(name: str, type: ColumnType) -> Column:
+    return Column(name=name, type=type, nullable=False)
+
+
+# The columns every row of a table has, before the case type's fields (cases) or the
+# models' columns (results).
+CASE_TABLE_COLUMNS: dict[CaseTable, tuple[Column, ...]] = {
+    CaseTable.CASES: (
+        _required("key", ColumnType.TEXT),
+        _required("revision", ColumnType.INTEGER),
+        _required("created_at", ColumnType.TIMESTAMP),
+        _required("updated_at", ColumnType.TIMESTAMP),
+    ),
+    CaseTable.EVENTS: (
+        _required("key", ColumnType.TEXT),
+        _required("field", ColumnType.TEXT),
+        _required("step", ColumnType.TEXT),
+        _required("days", ColumnType.INTEGER),
+        _required("recorded_at", ColumnType.TIMESTAMP),
+    ),
+    CaseTable.RESULTS: (
+        _required("key", ColumnType.TEXT),
+        _required("model_id", ColumnType.TEXT),
+        # None for a model that no longer exists.
+        Column(name="model", type=ColumnType.TEXT),
+        _required("version", ColumnType.INTEGER),
+        _required("case_revision", ColumnType.INTEGER),
+        _required("trigger", ColumnType.TEXT),
+        _required("created_at", ColumnType.TIMESTAMP),
+        _required("summary", ColumnType.TEXT),
+        _required("status", ColumnType.TEXT),
+    ),
+}
+
+# The column each table's time role names, as its start and its end.
+CASE_TIME_COLUMN: dict[CaseTable, str] = {
+    CaseTable.CASES: "updated_at",
+    CaseTable.EVENTS: "recorded_at",
+    CaseTable.RESULTS: "created_at",
+}
+
+_FIELD_COLUMN_TYPES: dict[FieldType, ColumnType] = {
+    FieldType.TEXT: ColumnType.TEXT,
+    FieldType.NUMBER: ColumnType.NUMBER,
+    FieldType.INTEGER: ColumnType.INTEGER,
+    FieldType.DATE: ColumnType.DATE,
+    FieldType.BOOLEAN: ColumnType.BOOLEAN,
+    FieldType.ENUM: ColumnType.TEXT,
+    # The values joined with commas.
+    FieldType.ENUM_LIST: ColumnType.TEXT,
+}
+
+
+def field_columns(fields: tuple[Field, ...]) -> tuple[Column, ...]:
+    """A nullable column per field; a day map is one integer column per level, named
+    `<field>_<level>`."""
+    columns: list[Column] = []
+    for f in fields:
+        if f.type is FieldType.DAY_MAP:
+            columns.extend(
+                Column(name=f"{f.name}_{level}", type=ColumnType.INTEGER) for level in f.levels
+            )
+        else:
+            columns.append(Column(name=f.name, type=_FIELD_COLUMN_TYPES[f.type]))
+    return tuple(columns)
+
+
+def field_cells(fields: tuple[Field, ...], values: JsonObject) -> dict[str, Any]:
+    """A case's values in the columns of `field_columns`; None where one is absent."""
+    cells: dict[str, Any] = {}
+    for f in fields:
+        value = values.get(f.name)
+        if f.type is FieldType.DAY_MAP:
+            days = value if isinstance(value, dict) else {}
+            cells.update({f"{f.name}_{level}": days.get(level) for level in f.levels})
+        elif f.type is FieldType.ENUM_LIST:
+            cells[f.name] = ",".join(value) if isinstance(value, list | tuple) else None
+        else:
+            cells[f.name] = value
+    return cells
+
+
+def result_column(kind: str, name: str) -> str:
+    """The column of a section's column in the results table: prefixed by the model kind,
+    e.g. patient_pathway_days_behind."""
+    return f"{kind}_{name}"
