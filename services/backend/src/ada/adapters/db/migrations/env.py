@@ -4,9 +4,9 @@
 from alembic import context
 from sqlalchemy import create_engine
 
-from ada.adapters.db.base import Base
-
 # Import every module that defines tables here, so autogenerate sees them.
+from ada.adapters.db import tables  # noqa: E402, F401
+from ada.adapters.db.base import Base
 
 target_metadata = Base.metadata
 

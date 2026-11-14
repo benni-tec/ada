@@ -1,13 +1,12 @@
-"""The worker's tasks. Each calls one use case and returns its result; create_broker
-registers them on a broker, with their schedules."""
+"""How tasks are declared. A module under ada.entrypoints.worker.tasks decorates its
+functions with @task; create_broker imports every such module and registers what they
+declared, with their schedules."""
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from dishka.integrations.taskiq import FromDishka, inject
-
-from ada.core.services.ports.system import SystemStatusService
+from dishka.integrations.taskiq import inject
 
 type Schedule = list[dict[str, object]]
 
@@ -25,15 +24,12 @@ TASKS: list[Task] = []
 
 
 def task[F: Callable[..., Awaitable[Any]]](schedule: Schedule | None = None) -> Callable[[F], F]:
+    """Declare a task. Its parameters marked FromDishka are injected per call. Its name is
+    `<module>:<function>`, which is what a dispatcher uses to enqueue it."""
+
     def register(function: F) -> F:
         name = f"{function.__module__}:{function.__name__}"
         TASKS.append(Task(name, inject(function, patch_module=True), schedule or []))
         return function
 
     return register
-
-
-@task(schedule=[{"cron": "* * * * *"}])
-async def record_heartbeat(service: FromDishka[SystemStatusService]) -> None:
-    """Runs every minute, so a fresh heartbeat proves scheduler, queue and worker all work."""
-    await service.record_heartbeat()

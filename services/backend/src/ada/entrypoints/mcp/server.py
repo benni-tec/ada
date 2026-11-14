@@ -2,7 +2,8 @@ from dishka import AsyncContainer
 from fastmcp import FastMCP
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from ada.entrypoints.mcp import system
+from ada.discovery import modules
+from ada.entrypoints.mcp import tools
 from ada.entrypoints.mcp.injection import make_inject
 
 
@@ -16,7 +17,7 @@ def create_mcp(container: AsyncContainer) -> FastMCP:
         ),
     )
     inject = make_inject(container)
-    for module in (system,):
+    for module in modules(tools):
         module.register(mcp, inject)
     return mcp
 

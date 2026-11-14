@@ -7,7 +7,9 @@ from taskiq_redis import RedisStreamBroker
 from ada.composition import create_container
 from ada.config import Settings
 from ada.core.services.ports.system import SystemStatusService
-from ada.entrypoints.worker.tasks import TASKS
+from ada.discovery import modules
+from ada.entrypoints.worker import tasks
+from ada.entrypoints.worker.registry import TASKS
 
 
 def create_broker(settings: Settings, *providers: Provider, in_memory: bool = False) -> AsyncBroker:
@@ -19,6 +21,8 @@ def create_broker(settings: Settings, *providers: Provider, in_memory: bool = Fa
     container = create_container(settings, TaskiqProvider(), *providers)
     broker = InMemoryBroker() if in_memory else RedisStreamBroker(settings.valkey_url)
     setup_dishka(container, broker)
+    # Importing the task modules is what declares their tasks.
+    modules(tasks)
     for task in TASKS:
         broker.register_task(task.function, task.name, schedule=task.schedule)
 

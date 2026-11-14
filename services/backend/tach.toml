@@ -18,7 +18,7 @@ depends_on = []
 # Outbound ports: what the core needs; implemented by adapters.
 [[modules]]
 path = "ada.core.ports"
-depends_on = []
+depends_on = ["ada.core.models"]
 
 # Inbound ports: the use cases; called by entrypoints.
 [[modules]]
@@ -31,7 +31,7 @@ depends_on = ["ada.core.models", "ada.core.ports", "ada.core.services.ports"]
 
 [[modules]]
 path = "ada.adapters"
-depends_on = ["ada.core.ports"]
+depends_on = ["ada.core.ports", "ada.core.models"]
 
 # Entrypoints reach services and adapters only through the container.
 [[modules]]
@@ -42,16 +42,16 @@ depends_on = [
     "ada.core.models",
     "ada.core.services.ports",
     # The MCP app is mounted into the HTTP app.
-    "ada.entrypoints.mcp",
+    "ada.entrypoints.mcp", "ada.discovery",
 ]
 
 [[modules]]
 path = "ada.entrypoints.mcp"
-depends_on = ["ada.core.models", "ada.core.services.ports"]
+depends_on = ["ada.core.models", "ada.core.services.ports", "ada.discovery"]
 
 [[modules]]
 path = "ada.entrypoints.worker"
-depends_on = ["ada.composition", "ada.config", "ada.core.services.ports"]
+depends_on = ["ada.composition", "ada.config", "ada.core.services.ports", "ada.discovery"]
 
 [[modules]]
 path = "ada.entrypoints.cli"
@@ -66,9 +66,14 @@ depends_on = [
     "ada.config",
     "ada.core.ports",
     "ada.core.services",
-    "ada.core.services.ports",
+    "ada.core.services.ports", "ada.discovery",
 ]
 
 [[modules]]
 path = "ada.config"
+depends_on = []
+
+# Finds the modules of a package, so features register themselves by adding a file.
+[[modules]]
+path = "ada.discovery"
 depends_on = []

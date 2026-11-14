@@ -1,0 +1,45 @@
+from collections.abc import Sequence
+from typing import Protocol
+
+from ada.core.models.actors import Actor
+from ada.core.models.base import Id
+from ada.core.models.operators import Operator, OperatorId
+from ada.core.models.schema import Roles, Schema
+
+
+class PipelineService(Protocol):
+    """Builds pipelines one operator at a time. Every method that adds an operator works
+    out or checks its output schema before anything runs, and returns the existing
+    operator when the same definition was added before."""
+
+    async def add_source(self, project_id: Id, data_source_id: Id, actor: Actor) -> Operator:
+        """An operator that reads a registered data source. Its schema is the source's
+        declared one, or is read from the data on first use."""
+        ...
+
+    async def add_transform(
+        self,
+        project_id: Id,
+        sql: str,
+        inputs: Sequence[OperatorId],
+        actor: Actor,
+        roles: Roles | None = None,
+        materialize: bool = False,
+    ) -> Operator:
+        """SQL over earlier operators, which it names input_0, input_1, ... Its columns are
+        derived by describing the query; `roles` declares what they mean and must name
+        only columns the query returns. Raises Invalid otherwise."""
+        ...
+
+    async def add_input(
+        self, project_id: Id, name: str, output: Schema, default: OperatorId, actor: Actor
+    ) -> Operator:
+        """A named slot with a declared schema, bound to `default` unless a run binds it
+        to something else."""
+        ...
+
+    async def get(self, id: OperatorId) -> Operator: ...
+
+    async def lineage(self, id: OperatorId) -> Sequence[Operator]:
+        """The operator's pipeline: itself and everything upstream, inputs first."""
+        ...

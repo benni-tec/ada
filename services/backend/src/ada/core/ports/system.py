@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Protocol
 
 
@@ -13,3 +14,9 @@ class TaskQueue(Protocol):
         ...
 
     async def worker_is_alive(self) -> bool: ...
+
+
+class Clock(Protocol):
+    def now(self) -> datetime:
+        """The current time, timezone-aware in UTC."""
+        ...

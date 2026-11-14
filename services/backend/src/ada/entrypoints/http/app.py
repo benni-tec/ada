@@ -8,7 +8,8 @@ from fastmcp.utilities.lifespan import combine_lifespans
 
 from ada.composition import create_container
 from ada.config import Settings
-from ada.entrypoints.http import health
+from ada.discovery import modules
+from ada.entrypoints.http import errors, routers
 from ada.entrypoints.mcp.server import McpPathMiddleware, create_mcp
 
 
@@ -35,9 +36,10 @@ def create_app(settings: Settings | None = None, *providers: Provider) -> FastAP
         openapi_url="/api/openapi.json",
     )
     api = APIRouter(prefix="/api")
-    for module in (health,):
+    for module in modules(routers):
         api.include_router(module.router)
     app.include_router(api)
+    errors.install(app)
     app.mount("/mcp", mcp_app)
     app.add_middleware(McpPathMiddleware)
     setup_dishka(container, app)
