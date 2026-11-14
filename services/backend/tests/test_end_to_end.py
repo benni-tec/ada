@@ -1,14 +1,17 @@
-"""The wave 1 slice, driven the way an external agent drives it: over MCP.
+"""The slices of waves 1 and 2, driven the way an external agent drives them: over MCP.
 
 Everything is real except the outside world: PostgreSQL (migrated), the DuckDB store on
-Parquet files in tmp_path, the HTTP source readers (answering from the recorded NORDCAN
-response), and the worker's tasks, which run in an in-memory taskiq broker with their own
-container, as a worker process would. Valkey is replaced by the in-memory bus, through a
-broadcaster that checks, for every event, that what it names is already committed.
+Parquet files in tmp_path, the HTTP source readers (answering from the recorded responses
+of NORDCAN, Sotkanet and Statistics Finland), and the worker's tasks, which run in an
+in-memory taskiq broker with their own container, as a worker process would. Valkey is
+replaced by the in-memory bus, through a broadcaster that checks, for every event, that
+what it names is already committed.
 """
 
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
+import json
+from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -25,15 +28,23 @@ from taskiq import InMemoryBroker
 
 from ada.adapters.clock import SystemClock
 from ada.adapters.memory.events import MemoryEventBus
-from ada.adapters.sources.examples import NORDCAN_LUNG_SURVIVAL
+from ada.adapters.sources.examples import (
+    NORDCAN_LUNG_SURVIVAL,
+    SOTKANET_BREAST_SCREENING,
+    SOTKANET_REGIONS,
+    WELLBEING_COUNTY_BOUNDARIES,
+)
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.adapters.valkey.tasks import ValkeyTaskDispatcher
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.events import Event, EventType
+from ada.core.models.time import TimeRange
 from ada.core.ports.events import EventBroadcaster
 from ada.core.ports.sources import SourceReaders
 from ada.core.ports.tasks import TaskDispatcher
+from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.worker import create_broker
@@ -51,6 +62,10 @@ COMMITTED = {
     "widget_id": "widgets",
     "run_id": "runs",
     "data_source_id": "data_sources",
+    "dashboard_id": "dashboards",
+    "report_id": "reports",
+    "alert_id": "alerts",
+    "rule_id": "alert_rules",
 }
 
 
@@ -81,12 +96,28 @@ class CommittedBroadcaster:
 
 
 @dataclass
+class Outside:
+    """The public APIs: the recorded answers, each optionally changed by `edit`, which
+    stands for the source publishing something else later."""
+
+    replay: Replay
+    edit: Callable[[httpx.Request, httpx.Response], httpx.Response] | None = None
+    requests: list[httpx.Request] = field(default_factory=list)
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        response = self.replay(request)
+        return self.edit(request, response) if self.edit else response
+
+
+@dataclass
 class Stack:
     mcp: Client
     api: AsyncContainer
     broker: InMemoryBroker
     events: CommittedBroadcaster
     replay: Replay
+    outside: Outside
 
     async def call(self, tool: str, **arguments: Any) -> Any:
         result = await self.mcp.call_tool(tool, arguments)
@@ -105,7 +136,8 @@ async def stack(migrated_database_url: str, tmp_path: Path) -> AsyncIterator[Sta
     engine = create_async_engine(migrated_database_url)
     events = CommittedBroadcaster(engine)
     replay = Replay()
-    readers = HttpSourceReaders(create_client(httpx.MockTransport(replay)), SystemClock())
+    world = Outside(replay)
+    readers = HttpSourceReaders(create_client(httpx.MockTransport(world)), SystemClock())
 
     outside = Provider(scope=Scope.APP)
     outside.provide(lambda: events, provides=EventBroadcaster)
@@ -122,7 +154,7 @@ async def stack(migrated_database_url: str, tmp_path: Path) -> AsyncIterator[Sta
     info = Implementation(name=AGENT, version="1.0")
     try:
         async with Client(create_mcp(api, settings.widgets_dir), client_info=info) as mcp:
-            yield Stack(mcp, api, broker, events, replay)
+            yield Stack(mcp, api, broker, events, replay, world)
     finally:
         await api.close()
         await broker.shutdown()
@@ -225,3 +257,211 @@ async def test_an_agent_builds_a_widget_from_a_public_source(stack: Stack) -> No
     ]
     refreshed_event = stack.events.bus.published[1]
     assert refreshed_event.payload == {"data_source_id": source["id"], "changed": True}
+
+
+# Sotkanet's region ids mapped to the wellbeing services counties and joined with their
+# boundaries (the recipe of ada.core.services.schema.geo). Starting from the boundaries
+# keeps a county without a value (Åland) on the map, as missing.
+TO_COUNTIES = """
+SELECT b.county_code, b.name, d.period_start, d.period_end, d.value, b.geometry
+FROM input_2 AS b
+LEFT JOIN input_1 AS r ON r.code = b.county_code AND r.category = 'HYVINVOINTIALUE'
+LEFT JOIN input_0 AS d ON d.region = r.sotkanet_id
+ORDER BY b.county_code, d.period_start
+"""
+COUNTY_ROLES = {
+    "time": {"start": "period_start", "end": "period_end", "grain": "year"},
+    "geo": {"code": "county_code", "system": "statfin", "level": "wellbeing_services_county"},
+    "measures": [{"value": "value"}],
+}
+BELOW_80 = {
+    "id": "low",
+    "kind": "compare",
+    "op": "<",
+    "args": [
+        {"id": "value", "kind": "column", "column": "value"},
+        {"id": "target", "kind": "constant", "value": 80},
+    ],
+}
+
+
+def years_asked(outside: Outside) -> list[list[str]]:
+    """The years of each request for Sotkanet's data, in order."""
+    return [
+        request.url.params.get_list("years")
+        for request in outside.requests
+        if request.url.path == "/rest/1.1/json"
+    ]
+
+
+def latest(data: dict[str, Any]) -> dict[str, float | None]:
+    """Each county's value at its latest period, as the map shows it."""
+    names = [column["name"] for column in data["columns"]]
+    values: dict[str, tuple[str, float | None]] = {}
+    for row in data["rows"]:
+        record = dict(zip(names, row, strict=True))
+        period = record["period_start"] or ""
+        if record["county_code"] not in values or period > values[record["county_code"]][0]:
+            values[record["county_code"]] = (period, record["value"])
+    return {code: value for code, (_, value) in values.items()}
+
+
+def recovered(request: httpx.Request, response: httpx.Response) -> httpx.Response:
+    """Sotkanet's next answer: the recorded one with every county back at 80 % or more."""
+    if request.url.path != "/rest/1.1/json":
+        return response
+    rows = json.loads(response.content)
+    for row in rows:
+        if row.get("value") is not None:
+            row["value"] = max(row["value"], 80.0)
+    return httpx.Response(200, headers=response.headers, content=json.dumps(rows).encode())
+
+
+async def test_an_agent_maps_a_measure_and_follows_it_with_a_report_and_alerts(
+    stack: Stack,
+) -> None:
+    project = await stack.call("create_project", name="Screening")
+    sources = [
+        await stack.call(
+            "register_source", project_id=project["id"], **example.model_dump(mode="json")
+        )
+        for example in (SOTKANET_BREAST_SCREENING, SOTKANET_REGIONS, WELLBEING_COUNTY_BOUNDARIES)
+    ]
+    inputs = [
+        (
+            await stack.call(
+                "add_source_operator", project_id=project["id"], data_source_id=source["id"]
+            )
+        )["id"]
+        for source in sources
+    ]
+    counties = await stack.call(
+        "add_transform",
+        project_id=project["id"],
+        sql=TO_COUNTIES,
+        inputs=inputs,
+        roles=COUNTY_ROLES,
+    )
+    assert counties["output"]["roles"]["geo"]["level"] == "wellbeing_services_county"
+    widget = (
+        await stack.call(
+            "create_widget",
+            operator_id=counties["id"],
+            type="map",
+            title="Breast cancer screening participation",
+        )
+    )["widget"]
+
+    # A dashboard over 2023-2024 with the map pinned.
+    dashboard = (await stack.call("create_dashboard", project_id=project["id"], name="Screening"))[
+        "dashboard"
+    ]
+    dashboard = await stack.call(
+        "set_dashboard_time_range",
+        dashboard_id=dashboard["id"],
+        expected_revision=dashboard["revision"],
+        start="2023-01-01",
+        end="2024-12-31",
+    )
+    pinned = await stack.call(
+        "pin_widget",
+        dashboard_id=dashboard["id"],
+        widget_id=widget["id"],
+        slot="Participation by county",
+        expected_revision=dashboard["revision"],
+    )
+    assert [slot["widget_id"] for slot in pinned["version"]["slots"]] == [widget["id"]]
+
+    # The dashboard's run, as POST /dashboards/{id}/runs starts it: the range is pushed
+    # down to Sotkanet, which is asked for exactly those two years.
+    async with stack.api() as request:
+        run = await (await request.get(RunService)).start(
+            UUID(project["id"]),
+            Actor(kind=ActorKind.USER, name="web"),
+            TimeRange(start=date(2023, 1, 1), end=date(2024, 12, 31)),
+        )
+    data = await stack.call("get_widget_data", widget_id=widget["id"], run_id=str(run.id))
+    assert years_asked(stack.outside) == [["2023", "2024"]]
+    shown = latest(data)
+    # 21 counties, the City of Helsinki and Åland; the spec's gap: 74.3 % in Helsinki,
+    # 85.6 % in North Ostrobothnia. Åland has no Sotkanet value and shows as missing.
+    assert len(shown) == 23
+    assert (shown["90"], shown["19"], shown["91"]) == (74.3, 85.6, None)
+    assert len(data["rows"]) == 22 * 2 + 1
+    assert (data["is_scenario"], data["is_stale"]) == (False, False)
+
+    # A report of the dashboard: version 1.0.0 with its sources and their fetch times.
+    first = await stack.call(
+        "generate_report_from_dashboard", dashboard_id=dashboard["id"], name="Screening report"
+    )
+    assert first["version"]["version"] == "1.0.0"
+    assert first["version"]["time_range"] == {"start": "2023-01-01", "end": "2024-12-31"}
+    listed = {entry["name"]: entry for entry in first["version"]["content"]["sources"]}
+    assert set(listed) == {
+        SOTKANET_BREAST_SCREENING.name,
+        SOTKANET_REGIONS.name,
+        WELLBEING_COUNTY_BOUNDARIES.name,
+    }
+    sotkanet = listed[SOTKANET_BREAST_SCREENING.name]
+    assert sotkanet["fetched_at"] is not None
+    assert sotkanet["address"] == SOTKANET_BREAST_SCREENING.address
+    assert sotkanet["widget_ids"] == [widget["id"]]
+    # The stored periods are fresh: freezing the version fetched nothing more.
+    assert years_asked(stack.outside) == [["2023", "2024"]]
+
+    # A wider range is a minor version; only the missing year is fetched.
+    dashboard = (await stack.call("get_dashboard", dashboard_id=dashboard["id"]))["dashboard"]
+    await stack.call(
+        "set_dashboard_time_range",
+        dashboard_id=dashboard["id"],
+        expected_revision=dashboard["revision"],
+        start="2022-01-01",
+        end="2024-12-31",
+    )
+    second = await stack.call(
+        "generate_report_from_dashboard", dashboard_id=dashboard["id"], name="Screening report"
+    )
+    assert second["report"]["id"] == first["report"]["id"]
+    assert second["version"]["version"] == "1.1.0"
+    assert second["versions"] == ["1.0.0", "1.1.0"]
+    assert second["version"]["time_range"] == {"start": "2022-01-01", "end": "2024-12-31"}
+    assert years_asked(stack.outside) == [["2023", "2024"], ["2022"]]
+
+    # An alert rule on the dashboard: participation below the strategy's 80 %.
+    rule = await stack.call(
+        "create_alert_rule",
+        dashboard_id=dashboard["id"],
+        name="Participation below 80 %",
+        operator_id=counties["id"],
+        formula=BELOW_80,
+        key_columns=["county_code"],
+    )
+    checked = await stack.call("check_alert_rule", rule_id=rule["id"])
+    firing = {alert["key"]["county_code"] for alert in checked["changed"]}
+    # East Uusimaa 79.8, West Uusimaa 76.1, Vantaa and Kerava 76.7, Helsinki 74.3 in 2024.
+    assert firing == {"01", "03", "04", "90"}
+    assert {alert["state"] for alert in checked["changed"]} == {"firing"}
+    assert all(alert["condition_operator_id"] for alert in checked["changed"])
+    assert stack.events.types.count(EventType.ALERT_FIRING) == 4
+
+    # Sotkanet publishes recovered numbers; a forced refresh fetches them and the next
+    # check resolves every alert.
+    stack.outside.edit = recovered
+    await stack.call("refresh_source", source_id=sources[0]["id"], force=True)
+    await stack.broker.wait_all()
+    refreshed = [
+        event for event in stack.events.bus.published if event.type is EventType.SOURCE_REFRESHED
+    ]
+    assert refreshed[-1].payload == {"data_source_id": sources[0]["id"], "changed": True}
+    checked = await stack.call("check_alert_rule", rule_id=rule["id"])
+    assert {alert["key"]["county_code"] for alert in checked["changed"]} == firing
+    assert {alert["state"] for alert in checked["changed"]} == {"resolved"}
+    assert checked["firing"] == []
+    assert stack.events.types.count(EventType.ALERT_RESOLVED) == 4
+    feed = await stack.call("list_alerts", project_id=project["id"], state="firing")
+    assert feed == []
+
+    # Every event went out after the work it names had been committed.
+    assert stack.events.unseen == []
+    assert EventType.DASHBOARD_CHANGED in stack.events.types
+    assert stack.events.types.count(EventType.REPORT_VERSION_CREATED) == 2
