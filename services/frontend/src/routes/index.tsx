@@ -6,6 +6,7 @@ import { ErrorNotice, Loading } from '@/components/notices'
 import { Time } from '@/components/provenance'
 import { SystemStatus } from '@/components/system-status'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { AdaMark, Vahti } from '@/components/vahti/vahti'
 import { createProject, keys, projectsQuery } from '@/lib/api'
 
 export const Route = createFileRoute('/')({
@@ -18,7 +19,7 @@ function Projects() {
   return (
     <div className="min-h-svh">
       <header className="flex h-12 items-center gap-2 border-b px-4">
-        <span className="text-lg font-semibold">ADA</span>
+        <AdaMark size={26} />
         <span className="flex-1" />
         <ThemeToggle />
       </header>
@@ -41,7 +42,10 @@ function Projects() {
         ) : error ? (
           <ErrorNotice error={error} prefix="The projects cannot be loaded:" />
         ) : projects.length === 0 ? (
-          <p className="text-sm text-neutral-500">No projects yet. Create one above, or ask an agent to over MCP.</p>
+          <div className="flex items-end gap-4">
+            <Vahti pose="watching" size={88} label="" />
+            <p className="pb-3 text-sm text-neutral-500">No projects yet. Create one above, or ask an agent to over MCP.</p>
+          </div>
         ) : (
           <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
             {projects.map((project) => (

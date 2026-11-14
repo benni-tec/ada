@@ -26,6 +26,7 @@ import {
   TraceLine,
   TraceTitle,
 } from '@/components/ui/trace'
+import { Vahti } from '@/components/vahti/vahti'
 import { groupParts, isActive } from '@/lib/agent-turns'
 import { turnQuery, type AgentTurn, type Id, type Part, type ReasoningPart, type SourcePart, type ToolPart } from '@/lib/api'
 
@@ -93,8 +94,8 @@ export function AgentTurnView({ turn }: { turn: AgentTurn }) {
 
 /** What the turn as a whole is doing, when its parts do not say it already. */
 function TurnStatus({ turn, hasParts }: { turn: AgentTurn; hasParts: boolean }) {
-  if (turn.status === 'queued') return <Waiting title="Waiting for the agent" />
-  if (turn.status === 'running' && !hasParts) return <Waiting title="Thinking" />
+  if (turn.status === 'queued') return <Waiting title="Waiting for the agent" vahti />
+  if (turn.status === 'running' && !hasParts) return <Waiting title="Thinking" vahti />
   if (turn.status === 'failed')
     return (
       <Trace>
@@ -120,16 +121,26 @@ function TurnStatus({ turn, hasParts }: { turn: AgentTurn; hasParts: boolean }) 
   return null
 }
 
-function Waiting({ title }: { title: string }) {
-  return (
+/** `vahti`: the agent itself is at work, so Vahti holds its lantern out instead of a spinner. */
+function Waiting({ title, vahti = false }: { title: string; vahti?: boolean }) {
+  const line = (
     <Trace>
       <TraceLine status="running" role="status">
-        <TraceIcon>
-          <LoaderCircle className="animate-spin motion-reduce:animate-none" />
-        </TraceIcon>
+        {!vahti && (
+          <TraceIcon>
+            <LoaderCircle className="animate-spin motion-reduce:animate-none" />
+          </TraceIcon>
+        )}
         <TraceTitle>{title}</TraceTitle>
       </TraceLine>
     </Trace>
+  )
+  if (!vahti) return line
+  return (
+    <div className="flex items-end gap-2">
+      <Vahti pose="searching" size={40} label="" />
+      {line}
+    </div>
   )
 }
 
