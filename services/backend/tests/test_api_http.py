@@ -590,6 +590,18 @@ def test_a_widget_has_no_way_to_carry_data(
     assert get(client, f"/widgets/{widget['id']}/data")["rows"] == [["north", 1.5], ["south", 2.5]]
 
 
+def test_a_project_lists_all_its_widgets(
+    client: TestClient,
+    project: dict[str, Any],
+    session: dict[str, Any],
+    source_operator: dict[str, Any],
+) -> None:
+    in_session = create_widget(client, project, source_operator, session_id=session["id"])
+    loose = create_widget(client, project, source_operator)
+    assert get(client, f"/projects/{project['id']}/widgets") == [in_session, loose]
+    assert client.get(f"/api/projects/{uuid7()}/widgets").status_code == 404
+
+
 def test_a_widget_in_a_session_is_recorded_and_listed(
     client: TestClient,
     project: dict[str, Any],
@@ -661,6 +673,8 @@ def test_widget_data_starts_a_run_without_a_run_id(
     assert [column["name"] for column in data["columns"]] == ["region", "value"]
     assert data["is_scenario"] is False
     assert data["is_stale"] is False
+    # What the columns mean comes along, so the widget needs no request for its operator.
+    assert data["output"] == source_operator["output"]
     run = get(client, f"/runs/{data['run_id']}")
     assert run["bindings"] == {}
     assert run["time_range"] == {"start": None, "end": None}

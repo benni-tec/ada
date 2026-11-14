@@ -36,9 +36,18 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         id: the widget fetches its own data from the platform, so no numbers go through
         you and none can be misquoted.
 
-        `type` picks the display, e.g. "value" (one number), "table" or "line-chart".
-        `spec` holds that type's settings, e.g. which column is the x axis. A widget marks
-        simulated and outdated data by itself.
+        `type` picks the display, and `spec` holds its settings, all optional:
+
+        - "value", one number: `column` (default: the first measure role, else the first
+          numeric column), `label` (default: the column name), `unit` (e.g. "%"),
+          `decimals`. Shows the latest period when the output has a time role, otherwise
+          the last row, so filter or aggregate in SQL first.
+        - "table": `columns`, the column names to show, in order (default: all).
+        - "line-chart": `x` (default: the time role's start, else the first date column),
+          `y`, one column (default: the first measure role, else the first numeric
+          column), `series`, a column whose values split the lines, e.g. a region.
+
+        A widget marks simulated and outdated data by itself.
 
         Pass `session_id` and a one-line `note` on what the widget shows and why, to put it
         in that session, with the note on its card. Returns the widget and its `url`: give

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Annotated
 
 from dishka import FromDishka
@@ -44,6 +45,15 @@ async def create_widget(
         note=body.note,
         session_id=body.session_id,
     )
+
+
+@router.get("/projects/{project_id}/widgets")
+async def list_widgets(
+    project_id: Id, projects: FromDishka[ProjectService], service: FromDishka[WidgetService]
+) -> Sequence[Widget]:
+    """Every widget of the project, in a session or not, oldest first."""
+    await projects.get(project_id)
+    return await service.list(project_id)
 
 
 @router.get("/widgets/{widget_id}")

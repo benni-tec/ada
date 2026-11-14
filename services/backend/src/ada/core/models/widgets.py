@@ -3,7 +3,7 @@ from datetime import datetime
 from ada.core.models.actors import Actor
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.operators import OperatorId
-from ada.core.models.schema import Column
+from ada.core.models.schema import Column, Schema
 
 
 class Widget(DomainModel):
@@ -31,6 +31,9 @@ class WidgetData(DomainModel):
 
     widget_id: Id
     run_id: Id
+    # The operator's declared output: what the columns mean (time, measures and their
+    # bounds), so a widget needs no second request for it.
+    output: Schema
     columns: tuple[Column, ...]
     rows: tuple[tuple[object, ...], ...]
     # More rows exist than were returned.

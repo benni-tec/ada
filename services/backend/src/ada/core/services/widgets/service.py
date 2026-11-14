@@ -112,9 +112,11 @@ class Widgets(WidgetService):
             if run.project_id != widget.project_id:
                 raise Invalid("The run belongs to another project than the widget")
         rows = await self.runs.read(run.id, widget.operator_id, limit)
+        operator = await self.operators.get(widget.operator_id)
         return WidgetData(
             widget_id=widget.id,
             run_id=run.id,
+            output=operator.output,
             columns=rows.columns,
             rows=rows.rows,
             truncated=rows.truncated,
