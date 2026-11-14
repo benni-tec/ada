@@ -11,6 +11,7 @@ export const formatLabels: Record<DataFormat, string> = {
   csv: 'CSV',
   json: 'JSON',
   parquet: 'Parquet',
+  pdf: 'PDF',
 }
 
 export const freshnessLabels: Record<FreshnessKind, string> = {

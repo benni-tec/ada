@@ -737,7 +737,8 @@
         "enum": [
           "csv",
           "json",
-          "parquet"
+          "parquet",
+          "pdf"
         ],
         "title": "DataFormat",
         "type": "string"

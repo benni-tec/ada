@@ -1414,7 +1414,7 @@ export interface components {
          * DataFormat
          * @enum {string}
          */
-        DataFormat: "csv" | "json" | "parquet";
+        DataFormat: "csv" | "json" | "parquet" | "pdf";
         /**
          * DataSource
          * @description Registered once per project and referenced by source operators.
