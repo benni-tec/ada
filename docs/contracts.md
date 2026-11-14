@@ -78,8 +78,8 @@ Four packages are scanned at startup. A feature adds a module; no list is edited
 Every port is bound in exactly one provider module, and since wave 2 every one of them to
 a real implementation. A port added by a later wave is bound to the stand-in
 (`unbuilt(Port)`) until it is built: the application starts, and using the port raises
-`NotImplementedError` naming it. `tests/test_composition.py` checks that no port is left
-on the stand-in.
+`NotImplementedError` naming it. `tests/test_api.py` checks that no port is left on the
+stand-in.
 
 | Provider module | Ports |
 | --- | --- |
@@ -124,9 +124,9 @@ ends normally and rolls back when it raises.
 
 ## Behaviour every implementation of a port must share
 
-The in-memory repositories (`ada/adapters/memory/repositories.py`) are the reference, and
-`tests/test_memory_repositories.py` states the expectations. The database repositories
-pass the same ones (`tests/test_db_repositories.py`).
+The in-memory repositories (`ada/adapters/memory/repositories.py`) are the reference the
+service tests run on. The database repositories are tested on PostgreSQL in
+`tests/test_database.py`, for these expectations and the queries only they have.
 
 - **Not found.** `get` raises `NotFound(kind, id)`.
 - **Revisions.** Mutable records start at revision 1. `update(model, expected_revision)`
@@ -708,7 +708,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 ## MCP tools
 
 Tool names are snake case and start with a verb (`list create register update refresh
-add get preview system pin edit set show generate check`; `tests/test_api_mcp.py`). Tools
+add get preview system pin edit set show generate check`; `tests/test_api.py`). Tools
 that create something in a session take an optional `session_id` and a `note`: one line
 on why the agent is doing this, shown in the session. The acting `Actor` is
 `external_agent` with the client name the MCP host reported when it connected; the
@@ -1020,26 +1020,49 @@ not describe it.
 
 ## Tests
 
+- **Backend tests by feature**, one file each (`services/backend/tests`): `test_sources`
+  (registering, freshness, the HTTP readers, shaping, the recorded examples),
+  `test_pipelines` (building and running pipelines on DuckDB, the store, the pipelines
+  list, roles and geography), `test_time` (periods and pushdown), `test_dashboards`,
+  `test_reports`, `test_alerts` (the formula compiler first), `test_agent` (turns, the
+  in-process toolbox), `test_settings` and `test_settings_db` (the master key, the agent
+  configuration service and routes, its repositories), `test_api` (the REST routes and MCP tools of the
+  workspace, health, widget bundles, the composition root), `test_database` (migrations,
+  transactions, concurrent writers, the SQL repositories' queries), `test_worker_events`
+  (tasks, the dispatcher, events after the commit, the event stream, Valkey) and
+  `test_end_to_end`. A feature is tested through its service, then one transport for
+  what the routes add (REST or MCP, not both), then PostgreSQL for what only it does.
+  `CI=1 moon run backend:test` takes well under a minute.
 - Backend tests run without services, except those that take the `database_url` or
-  `migrated_database_url` fixture (PostgreSQL) or the Valkey fixtures of
-  `tests/test_events_valkey.py` and `tests/test_worker_dispatcher.py`. They need
-  `moon run root:infra` and are skipped locally when it is not running; with `CI` set
-  they fail instead. CI starts both.
+  `migrated_database_url` fixture (PostgreSQL) or the `valkey` fixture of
+  `tests/test_worker_events.py`. They need `moon run root:infra` and are skipped locally
+  when it is not running; with `CI` set they fail instead. CI starts both.
+- **Shared setup, for speed.** One database is migrated per run and emptied (`TRUNCATE`)
+  before each test that takes `migrated_database_url`; only the migration tests get a new
+  database (`database_url`). Building an app or an MCP server takes a while, so a module
+  builds one (`scope="module"`) and its tests share it: each works in a project of its
+  own and reads only that project's events (`events(client, project_id)` in
+  `tests/api_support.py`). Service tests build a container of their own, which is cheap.
 - The composition root binds PostgreSQL and Valkey. A test that builds the app, the MCP
   server, the worker or a container passes the in-memory adapters from `tests/memory.py`
   (`MemoryBackground` for events and tasks, `MemoryRepositories` for the repositories and
-  source locks) unless it means to use the real service.
+  source locks) unless it means to use the real service; a test on PostgreSQL passes
+  `MemoryBackground` only.
 - `tests/factories.py` builds models with defaults. `tests/fakes.py` has a clock that
-  stands still, a source reader that returns what it is told, and an analysis store that
-  runs no SQL. `tests/time_world.py` and `tests/alerts_support.py` set up the pipelines
-  of the time and alert tests.
+  stands still, a source reader that returns what it is told, an analysis store that runs
+  no SQL, and `Replay`. `tests/api_support.py` has fakes of the pipeline, run and source
+  services for the API tests and the helpers to serve the app and an MCP client;
+  `tests/reports_support.py`, `tests/alerts_support.py` and `tests/time_world.py` set up
+  the report, alert and time tests; `tests/db_helpers.py` the SQL repositories on one
+  session.
 - No test calls an external service. Source readers are tested against recorded
-  responses (`tests/recordings`, replayed by `Replay` in `tests/test_sources_examples.py`).
+  responses (`tests/recordings`, replayed by `Replay` in `tests/fakes.py`).
 - `tests/test_end_to_end.py` drives both slices over MCP against PostgreSQL, the DuckDB
   store and recorded answers, with the worker's tasks in an in-memory broker: NORDCAN to a
   table widget; and Sotkanet pushed down to a dashboard's years, mapped to the counties on
   a map, a report and its minor version, and an alert rule that fires for four counties
-  and resolves when the next (recorded, then raised) answer recovers.
+  and resolves when the next (recorded, then raised) answer recovers. It also builds the
+  demo with `ada seed-demo`.
 - **The agent.** Tests never use the developer's master key: `tests/conftest.py` removes
   `ADA_SECRET_KEY` and `ADA_SECRET_KEY_FILE`. The agent tests bind a master key of their
   own and store their configuration through the settings service (`configure` in

@@ -8,6 +8,7 @@ import pytest
 from psycopg import sql
 from sqlalchemy.engine import make_url
 
+from ada.adapters.db.base import Base
 from ada.adapters.db.migrate import migrate
 from ada.config import Settings
 
@@ -19,19 +20,25 @@ os.environ.pop("ADA_SECRET_KEY", None)
 os.environ.pop("ADA_SECRET_KEY_FILE", None)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def anyio_backend() -> str:
+    # Session-wide, so an app or MCP client can be shared by the tests of a module.
     return "asyncio"
 
 
-@pytest.fixture
-def unreachable_settings(tmp_path: Path) -> Settings:
-    # Nothing listens on port 1, so the database and Valkey are always unreachable here.
+def settings_in(
+    data_dir: Path, database_url: str = "postgresql+psycopg://test@127.0.0.1:1/test"
+) -> Settings:
+    """Settings for a test. Nothing listens on port 1, so the database (unless one is
+    given) and Valkey are unreachable."""
     return Settings(
-        database_url="postgresql+psycopg://test@127.0.0.1:1/test",
-        valkey_url="redis://127.0.0.1:1/0",
-        data_dir=tmp_path / "data",
+        database_url=database_url, valkey_url="redis://127.0.0.1:1/0", data_dir=data_dir
     )
+
+
+@pytest.fixture(scope="session")
+def unreachable_settings(tmp_path_factory: pytest.TempPathFactory) -> Settings:
+    return settings_in(tmp_path_factory.mktemp("data"))
 
 
 # The analysis store needs no server, so it works even when everything else is down.
@@ -45,9 +52,9 @@ UNREACHABLE_HEALTH = {
 }
 
 
-@pytest.fixture
-def database_url() -> Iterator[str]:
-    """A new, empty database on the PostgreSQL at DATABASE_URL, dropped afterwards.
+@pytest.fixture(scope="session")
+def postgres() -> Iterator[psycopg.Connection]:
+    """A connection to the PostgreSQL at DATABASE_URL that creates and drops databases.
 
     Skipped when PostgreSQL is not running (start it with `moon run root:infra`), except
     in CI, which always provides it.
@@ -67,17 +74,54 @@ def database_url() -> Iterator[str]:
         if os.environ.get("CI"):
             raise
         pytest.skip(f"PostgreSQL is not reachable: {error}")
-    name = f"test_{uuid.uuid4().hex}"
     with admin:
-        admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
-        try:
-            yield url.set(database=name).render_as_string(hide_password=False)
-        finally:
-            admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
+        yield admin
+
+
+def _create_database(admin: psycopg.Connection) -> tuple[str, str]:
+    name = f"test_{uuid.uuid4().hex}"
+    admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    url = make_url(os.environ["DATABASE_URL"]).set(database=name)
+    return name, url.render_as_string(hide_password=False)
+
+
+def _drop_database(admin: psycopg.Connection, name: str) -> None:
+    admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
 
 
 @pytest.fixture
-def migrated_database_url(database_url: str) -> str:
-    """A database with the current schema, for tests of the database repositories."""
-    migrate(database_url)
-    return database_url
+def database_url(postgres: psycopg.Connection) -> Iterator[str]:
+    """A new, empty database, dropped afterwards: for the tests of the migrations."""
+    name, url = _create_database(postgres)
+    try:
+        yield url
+    finally:
+        _drop_database(postgres, name)
+
+
+@pytest.fixture(scope="session")
+def _migrated(postgres: psycopg.Connection) -> Iterator[tuple[str, psycopg.Connection]]:
+    name, url = _create_database(postgres)
+    migrate(url)
+    conninfo = make_url(url).set(drivername="postgresql").render_as_string(hide_password=False)
+    try:
+        with psycopg.connect(conninfo, autocommit=True) as connection:
+            yield url, connection
+    finally:
+        _drop_database(postgres, name)
+
+
+@pytest.fixture
+def migrated_database_url(_migrated: tuple[str, psycopg.Connection]) -> str:
+    """The one database with the current schema, migrated once per run and emptied before
+    each test: much faster than a database of its own per test."""
+    url, connection = _migrated
+    tables = sql.SQL(", ").join(sql.Identifier(name) for name in Base.metadata.tables)
+    # A test that left a connection open would make this wait; fail instead.
+    connection.execute("SET lock_timeout = '5s'")
+    connection.execute(sql.SQL("TRUNCATE {} CASCADE").format(tables))
+    # What the migrations seed: the one row of the agent settings (0005).
+    connection.execute(
+        "INSERT INTO agent_settings (id, session_agent_model_id, revision) VALUES (1, NULL, 1)"
+    )
+    return url

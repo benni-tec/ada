@@ -216,6 +216,11 @@ implementations; one set of service fakes in `tests/fakes.py`; a shorter long-ch
 markers for the PostgreSQL and Valkey tests; parallel runs with `pytest-xdist`. No change
 in behaviour.
 
+Backend done: 808 tests in 51 files (15,039 lines with the helpers) are now 244 in 11
+files by feature (9,309 lines); the suite takes 34 s instead of 217 s, run back to back on
+the same busy machine (load average about 20), with one migrated database per run and one
+app per module instead of `pytest-xdist`.
+
 Frontend and widgets: done. Frontend 18 files, 132 tests, 33 s on a quiet machine → 12 files, 46 tests, 4 s (route files no longer load the routes lazily inside their first test); widgets 6 files, 33 tests → 5 files, 17 tests.
 
 ## Later, not planned here

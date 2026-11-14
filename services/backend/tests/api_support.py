@@ -1,19 +1,31 @@
 """Shared setup for the tests of the REST routes and MCP tools.
 
-The pipeline, run and source services belong to other workstreams, so these tests stand in
-small fakes for them, bound in place of the real ones, and keep everything else real: the
-services of this workstream, the memory repositories, the event bus and the task
-dispatcher. This module holds helpers only.
+The tests of the API surface stand in small fakes for the pipeline, run and source
+services, which need DuckDB and the network, and keep everything else real: the other
+services, the memory repositories, the event bus and the task dispatcher.
+
+Building an app or an MCP server takes a while (every tool's schema is generated), so a
+module builds one and its tests share it: each test works in a project of its own and
+reads only that project's events. This module holds helpers only.
 """
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
+from typing import Any
 from uuid import uuid7
 
 from dishka import AsyncContainer, Provider, Scope, provide
+from dishka.integrations.fastapi import FastapiProvider
+from fastapi.testclient import TestClient
+from fastmcp import Client
+from mcp.types import Implementation
 
 from ada.adapters.memory.events import MemoryEventBus
+from ada.adapters.memory.repositories import MemoryStore
 from ada.adapters.memory.tasks import RecordingTaskDispatcher
+from ada.composition import create_container
+from ada.config import Settings
 from ada.core.models.actors import Actor
 from ada.core.models.analysis import Rows
 from ada.core.models.base import Id
@@ -51,7 +63,10 @@ from ada.core.services.pipelines import listing
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sources import SourceService
+from ada.entrypoints.http.app import create_app
+from ada.entrypoints.mcp.server import create_mcp
 from fakes import FixedClock
+from memory import memory_adapters
 
 COLUMNS = (
     Column(name="region", type=ColumnType.TEXT),
@@ -299,8 +314,10 @@ class Seen:
     def results(self) -> Results:
         return self.overrides.results
 
-    async def events(self) -> list[Event]:
-        return (await self.container.get(MemoryEventBus)).published
+    async def events(self, project_id: Any = None) -> list[Event]:
+        """What was published, of one project if given."""
+        published = (await self.container.get(MemoryEventBus)).published
+        return [e for e in published if project_id is None or str(e.project_id) == str(project_id)]
 
     async def dispatcher(self) -> RecordingTaskDispatcher:
         dispatcher = await self.container.get(TaskDispatcher)
@@ -310,3 +327,68 @@ class Seen:
     async def entries(self, session_id: Id) -> Sequence[SessionEntry]:
         async with self.container() as request:
             return await (await request.get(SessionRepository)).entries(session_id)
+
+
+@contextmanager
+def serve(settings: Settings, *providers: Provider) -> Iterator[TestClient]:
+    """The app on the memory adapters, with `providers` overriding the composition root's."""
+    with TestClient(create_app(settings, *memory_adapters(), *providers)) as client:
+        yield client
+
+
+def resolve[T](client: TestClient, port: type[T]) -> T:
+    """An application-scoped object of the app under test, e.g. the event bus."""
+    container = client.app.state.dishka_container  # type: ignore[attr-defined]
+    assert client.portal is not None
+    return client.portal.call(container.get, port)
+
+
+def events(client: TestClient, project_id: Any) -> list[Event]:
+    published = resolve(client, MemoryEventBus).published
+    return [e for e in published if str(e.project_id) == str(project_id)]
+
+
+def store(client: TestClient) -> MemoryStore:
+    return resolve(client, MemoryStore)
+
+
+def dispatcher(client: TestClient) -> RecordingTaskDispatcher:
+    found = resolve(client, TaskDispatcher)
+    assert isinstance(found, RecordingTaskDispatcher)
+    return found
+
+
+def send(client: TestClient, method: str, path: str, body: Any = None, ok: int = 200) -> Any:
+    """A request to /api that must answer `ok`; returns the body."""
+    response = client.request(method, f"/api{path}", json=body)
+    assert response.status_code == ok, response.text
+    return response.json()
+
+
+def new_project(client: TestClient, name: str = "Wellbeing") -> dict[str, Any]:
+    return send(client, "POST", "/projects", {"name": name}, 201)
+
+
+@asynccontextmanager
+async def mcp_client(
+    settings: Settings, *providers: Provider, client_name: str = "claude-code"
+) -> AsyncIterator[tuple[Client, Seen]]:
+    """An MCP client of the server on the memory adapters, as a host named `client_name`."""
+    overrides = Overrides()
+    container = create_container(
+        settings, FastapiProvider(), *memory_adapters(), overrides, *providers
+    )
+    info = Implementation(name=client_name, version="2.0")
+    try:
+        async with Client(create_mcp(container), client_info=info) as client:
+            yield client, Seen(container, overrides)
+    finally:
+        await container.close()
+
+
+async def call(client: Client, tool: str, **arguments: Any) -> Any:
+    result = await client.call_tool(tool, arguments)
+    assert result.structured_content is not None
+    content = result.structured_content
+    # Tools that return a list wrap it, since structured content must be an object.
+    return content["result"] if set(content) == {"result"} else content

@@ -1,7 +1,7 @@
 """Shared setup for the report tests; this module holds helpers only.
 
 The dashboard service belongs to another workstream, so it is a small fake here, built on
-the dashboard repository. The run service is the fake of test_api_support with one
+the dashboard repository. The run service is the fake of api_support with one
 addition: executing an operator fixes the current snapshot of every source upstream, as the
 real one does, so a report's sources list has something to show.
 """
@@ -41,7 +41,7 @@ from ada.core.ports.repositories import (
 from ada.core.ports.system import Clock
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.runs import RunService
-from test_api_support import FakeRuns, Results
+from api_support import FakeRuns, Results
 
 YEAR_2024 = TimeRange(start=date(2024, 1, 1), end=date(2024, 12, 31))
 FETCHED_A = datetime(2025, 12, 1, 8, 0, tzinfo=UTC)
@@ -151,7 +151,7 @@ class Executed:
 
 
 class ReportFakes(Provider):
-    """Bind after test_api_support.Overrides, so these replace its run service."""
+    """Bind after api_support.Overrides, so these replace its run service."""
 
     scope = Scope.REQUEST
 

@@ -2,7 +2,12 @@
 bus and the task dispatcher have in-memory implementations in ada.adapters.memory; use
 those directly."""
 
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+import httpx
 
 from ada.core.models.analysis import FetchedData, Query, Rows, StoredSnapshot
 from ada.core.models.base import Id
@@ -112,3 +117,39 @@ class FakeAnalysisStore(AnalysisStore):
     async def run(self, query: Query, limit: int) -> Rows:
         self.queries.append(query)
         return Rows(columns=self.columns, rows=self.rows[:limit], truncated=len(self.rows) > limit)
+
+
+RECORDINGS = Path(__file__).parent / "recordings"
+
+
+class Replay:
+    """An HTTP handler (for httpx.MockTransport) that answers the requests recorded in
+    tests/recordings and fails every other one, so a test can never reach the network."""
+
+    def __init__(self) -> None:
+        index = json.loads((RECORDINGS / "sources.json").read_text())
+        self.exchanges: list[dict[str, Any]] = index["exchanges"]
+        self.requests: list[httpx.Request] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        for exchange in self.exchanges:
+            if exchange["method"] == request.method and _same(exchange["url"], request.url):
+                if "request" in exchange:
+                    expected = json.loads((RECORDINGS / exchange["request"]).read_bytes())
+                    assert json.loads(request.content) == expected
+                return httpx.Response(
+                    exchange["status"],
+                    headers={"Content-Type": exchange["content_type"]},
+                    content=(RECORDINGS / exchange["body"]).read_bytes(),
+                )
+        raise AssertionError(f"No recording for {request.method} {request.url}")
+
+
+def _same(recorded: str, url: httpx.URL) -> bool:
+    expected = httpx.URL(recorded)
+    return (expected.host, expected.path, sorted(expected.params.multi_items())) == (
+        url.host,
+        url.path,
+        sorted(url.params.multi_items()),
+    )
