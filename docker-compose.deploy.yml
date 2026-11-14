@@ -1,0 +1,29 @@
+# Override for the shared Verda VM (see docs/deploy.md); CI runs it as
+#   docker compose -f docker-compose.yml -f docker-compose.deploy.yml
+# The VM's Caddy (another project) owns ports 80/443 and reaches the gateway as
+# ada-gateway:80 over the external network `edge`, which must exist before `up`.
+name: ada
+
+services:
+  # Docker publishes ports past the host firewall, and PostgreSQL ships with a default
+  # password, so nothing is published on the server: Caddy is the only way in.
+  postgres:
+    restart: unless-stopped
+    ports: !reset []
+
+  valkey:
+    restart: unless-stopped
+    ports: !reset []
+
+  gateway:
+    ports: !reset []
+    networks:
+      default:
+      edge:
+        aliases:
+          - ada-gateway
+
+networks:
+  edge:
+    external: true
+    name: edge
