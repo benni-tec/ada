@@ -117,7 +117,7 @@ cells AS (
         string_split(regexp_replace(trim(line), '^\|\s*|\s*\|$', '', 'g'), '|'),
         -- A link keeps its text; its title may hold parentheses ("(opens in a new window)").
         lambda c: trim(regexp_replace(regexp_replace(regexp_replace(regexp_replace(
-            c, '\[([^\]]*)\]\([^)\s]*(?:\s+''[^'']*''|\s+"[^"]*")?\)', '\1', 'g'),
+            c, '\[([^\]]*)\]\(\s*[^)\s]*(?:\s+''[^'']*''|\s+"[^"]*")?\s*\)', '\1', 'g'),
             '<br\s*/?>', ' ', 'gi'), '\*\*', '', 'g'), '\s+', ' ', 'g'))
     ) AS c
     FROM (SELECT unnest(string_split(text, chr(10))) AS line FROM page)

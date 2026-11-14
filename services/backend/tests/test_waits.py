@@ -136,7 +136,7 @@ def test_link_titles_and_line_breaks_stay_out_of_the_station_name() -> None:
     # As the live page wrote the row on 2026-11-14.
     title = " '(opens in a new window)')"
     rows = _station_rows(
-        f"| Kajaani, [poliklinikka](https://k.test/a{title} ja <br>[Vuolijoki](https://k.test/b{title}"
+        f"| Kajaani, [poliklinikka](https://k.test/a{title} ja <br>[Vuolijoki]( https://k.test/b )"
         " | Hoitotakuu ei toteudu, jonoa on,<br>jonotusaika noin 5 kk | 7  tuntia 10 minuuttia |"
     )
     assert [(r["station"], r["queue_months"], r["callback_minutes"]) for r in rows] == [
