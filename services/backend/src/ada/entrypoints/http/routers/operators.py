@@ -31,6 +31,12 @@ class NewSourceOperator(Placement):
     data_source_id: Id
 
 
+class NewHistory(Placement):
+    kind: Literal["history"]
+    source_id: Id
+    last: int = Field(default=10, ge=1)
+
+
 class NewTransform(Placement):
     kind: Literal["transform"]
     sql: str
@@ -46,9 +52,9 @@ class NewInput(Placement):
     default: OperatorId
 
 
-# The kind selects which of the three the body is; any other kind is a 422.
+# The kind selects the request body; any other kind is a 422.
 type NewOperator = Annotated[
-    NewSourceOperator | NewTransform | NewInput, Field(discriminator="kind")
+    NewSourceOperator | NewHistory | NewTransform | NewInput, Field(discriminator="kind")
 ]
 
 
@@ -64,6 +70,8 @@ async def add_operator(
     match body:
         case NewSourceOperator():
             operator = await pipelines.add_source(project_id, body.data_source_id, WEB)
+        case NewHistory():
+            operator = await pipelines.add_history(project_id, body.source_id, WEB, last=body.last)
         case NewTransform():
             operator = await pipelines.add_transform(
                 project_id, body.sql, body.inputs, WEB, body.roles, body.materialize

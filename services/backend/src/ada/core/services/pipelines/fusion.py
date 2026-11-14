@@ -24,6 +24,7 @@ ORDER BY carries through.
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import UTC
 
 from ada.core.models.analysis import Query
 from ada.core.models.operators import OperatorId
@@ -152,6 +153,22 @@ def parameters_key(inputs: tuple[Node, ...]) -> str:
     The run's time range counts only where it changed the data, through a period filter
     or the period snapshots below; an operator whose inputs ignore it keeps its key."""
     return "inputs:" + _digest([content_identity(node) for node in inputs])
+
+
+def history(operator_id: OperatorId, snapshots: list[Snapshot]) -> QueryNode:
+    """Union stored versions by name; metadata participates in downstream cache keys."""
+    parts = [
+        "SELECT *, TIMESTAMP '"
+        f"{snapshot.fetched_at.astimezone(UTC).replace(tzinfo=None).isoformat()}' "
+        f"AS snapshot_at, CAST({rank} AS INTEGER) AS snapshot_rank FROM input_{rank - 1}"
+        for rank, snapshot in enumerate(snapshots, 1)
+    ]
+    identity = _digest([[str(s.id), s.fetched_at.isoformat(), s.content_hash] for s in snapshots])
+    return QueryNode(
+        f"{operator_id}:{identity}",
+        "SELECT * FROM (" + " UNION ALL BY NAME ".join(parts) + ") ORDER BY snapshot_rank",
+        tuple(SnapshotNode(s) for s in snapshots),
+    )
 
 
 def stand_in_sql(columns: tuple[Column, ...]) -> str:

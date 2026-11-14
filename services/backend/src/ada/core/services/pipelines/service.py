@@ -4,6 +4,7 @@ from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.operators import (
+    HistoryParams,
     InputParams,
     Operator,
     OperatorId,
@@ -13,7 +14,7 @@ from ada.core.models.operators import (
     operator_identity,
 )
 from ada.core.models.pipelines import Pipeline
-from ada.core.models.schema import Column, OutputKind, Roles, Schema
+from ada.core.models.schema import Column, ColumnType, OutputKind, Roles, Schema
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.repositories import (
     DataSourceRepository,
@@ -73,6 +74,46 @@ class Pipelines(PipelineService):
             created_at=self.clock.now(),
         )
         return await self.operators.add(operator)
+
+    async def add_history(
+        self, project_id: Id, source_id: Id, actor: Actor, last: int = 10
+    ) -> Operator:
+        if isinstance(last, bool) or not isinstance(last, int) or last < 1:
+            raise Invalid("History last must be a positive integer")
+        source = await self.data_sources.get(source_id)
+        if source.project_id != project_id:
+            raise Invalid(f"Data source {source_id} belongs to another project")
+        if source.options.get("pushdown") is not None:
+            raise Invalid("Source history does not support period (pushdown) sources")
+        upstream = await self.add_source(project_id, source_id, actor)
+        if upstream.output.kind is not OutputKind.TABLE:
+            raise Invalid("Source history needs a source that produces a table")
+        params = HistoryParams(last=last).model_dump(mode="json")
+        id = operator_identity(project_id, OperatorKind.HISTORY, params, (upstream.id,))
+        if existing := await self._find(id):
+            return existing
+        columns = await self.columns.of(upstream)
+        if any(c.name.lower() in {"snapshot_at", "snapshot_rank"} for c in columns):
+            raise Invalid("Source history reserves the columns snapshot_at and snapshot_rank")
+        return await self.operators.add(
+            Operator(
+                id=id,
+                project_id=project_id,
+                kind=OperatorKind.HISTORY,
+                params=params,
+                inputs=(upstream.id,),
+                output=Schema(
+                    columns=columns
+                    + (
+                        Column(name="snapshot_at", type=ColumnType.TIMESTAMP),
+                        Column(name="snapshot_rank", type=ColumnType.INTEGER),
+                    )
+                ),
+                materializing=False,
+                created_by=actor,
+                created_at=self.clock.now(),
+            )
+        )
 
     async def describe(
         self, project_id: Id, sql: str, inputs: Sequence[OperatorId]
