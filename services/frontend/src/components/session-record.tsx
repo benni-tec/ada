@@ -1,15 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
-import { Code } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { CircleAlert, CircleCheck, Code, LoaderCircle, Microscope } from 'lucide-react'
 
-import { operatorQuery, widgetQuery, type Id, type SessionEntry, type Widget } from '@/lib/api'
+import { operatorQuery, sessionTurnsQuery, widgetQuery, type Id, type SessionEntry, type Widget } from '@/lib/api'
+import { delegationState, type DelegationState } from '@/lib/research'
 import type { CardRun } from '@/lib/view-run'
 
 import { AgentTurnEntry } from './chat/agent-turn'
 import { RecordedContext } from './chat/context-chips'
+import { Markdown } from './chat/markdown'
 import { ErrorNotice } from './notices'
-import { Provenance } from './provenance'
+import { Provenance, Time } from './provenance'
 import { Bubble, BubbleContent } from './ui/bubble'
-import { Message, MessageContent } from './ui/message'
+import { Message, MessageContent, MessageHeader } from './ui/message'
 import { WidgetCard } from './widget-card'
 
 /**
@@ -51,6 +54,14 @@ export function SessionRecord({
             ) : null
           ) : entry.kind === 'operator' ? (
             <OperatorEntry entry={entry} />
+          ) : entry.kind === 'delegation' ? (
+            <DelegationEntry
+              entry={entry}
+              projectId={projectId}
+              reported={entries.some((other) => other.kind === 'report' && other.ref === entry.ref)}
+            />
+          ) : entry.kind === 'report' ? (
+            <ReportEntry entry={entry} projectId={projectId} />
           ) : (
             <WidgetEntry
               entry={entry}
@@ -118,6 +129,77 @@ function OperatorEntry({ entry }: { entry: SessionEntry }) {
         </details>
       )}
     </div>
+  )
+}
+
+const delegationStates: Record<DelegationState, { label: string; icon: typeof CircleCheck; className: string }> = {
+  running: { label: 'Running', icon: LoaderCircle, className: 'animate-spin' },
+  done: { label: 'Done', icon: CircleCheck, className: 'text-emerald-700 dark:text-emerald-400' },
+  failed: { label: 'Failed', icon: CircleAlert, className: 'text-destructive' },
+}
+
+/** Work handed to a research agent: a card to its session, with how it is going. */
+function DelegationEntry({ entry, projectId, reported }: { entry: SessionEntry; projectId: Id; reported: boolean }) {
+  const { data: turns } = useQuery({ ...sessionTurnsQuery(entry.ref ?? ''), enabled: !!entry.ref })
+  const state = turns ? delegationStates[delegationState(turns, reported)] : null
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border bg-card px-4 py-3 text-sm">
+      <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <Microscope aria-hidden="true" className="size-3.5" />
+        Handed to the research agent
+      </p>
+      <div className="flex items-center justify-between gap-3">
+        {entry.ref ? (
+          <Link
+            to="/projects/$projectId/sessions/$sessionId"
+            params={{ projectId, sessionId: entry.ref }}
+            className="min-w-0 truncate font-medium underline-offset-2 hover:underline"
+          >
+            {entry.text}
+          </Link>
+        ) : (
+          <span className="font-medium">{entry.text}</span>
+        )}
+        {state && (
+          <span className="flex shrink-0 items-center gap-1 text-xs">
+            <state.icon aria-hidden="true" className={`size-3.5 ${state.className}`} />
+            {state.label}
+          </span>
+        )}
+      </div>
+      <Provenance actor={entry.actor} at={entry.created_at} />
+    </div>
+  )
+}
+
+/** What the research agent found, as a message from it, with the way to its session. */
+function ReportEntry({ entry, projectId }: { entry: SessionEntry; projectId: Id }) {
+  return (
+    <Message>
+      <MessageContent className="gap-1.5">
+        <MessageHeader className="gap-2 px-0">
+          <Microscope aria-hidden="true" className="size-3.5" />
+          <span>Research agent ({entry.actor.name})</span>
+          <span className="font-normal">
+            <Time value={entry.created_at} />
+          </span>
+        </MessageHeader>
+        <Bubble variant="outline">
+          <BubbleContent>
+            <Markdown>{entry.text ?? ''}</Markdown>
+          </BubbleContent>
+        </Bubble>
+        {entry.ref && (
+          <Link
+            to="/projects/$projectId/sessions/$sessionId"
+            params={{ projectId, sessionId: entry.ref }}
+            className="text-xs text-muted-foreground underline underline-offset-2"
+          >
+            Open the research session
+          </Link>
+        )}
+      </MessageContent>
+    </Message>
   )
 }
 

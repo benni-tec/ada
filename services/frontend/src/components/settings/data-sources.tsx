@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from '@tanstack/react-router'
-import { CircleAlert, Pencil, Plus, RefreshCw } from 'lucide-react'
+import { CircleAlert, Eye, EyeOff, Pencil, Plus, RefreshCw } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 
 import { IconButton } from '@/components/icon-action'
 import { ConflictNotice, ErrorNotice, Loading } from '@/components/notices'
-import { Time } from '@/components/provenance'
+import { SourceProvenance, Time } from '@/components/provenance'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -14,7 +15,9 @@ import {
   refreshSource,
   registerSource,
   sourcesQuery,
+  unwatchSource,
   updateSource,
+  watchSource,
   type AccessKind,
   type DataFormat,
   type DataSource,
@@ -74,6 +77,11 @@ function SourceItem({ projectId, source, marked }: { projectId: Id; source: Data
     mutationFn: () => refreshSource(source.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.sources(projectId) }),
   })
+  const watch = useMutation({
+    mutationFn: () => (source.monitor_id ? unwatchSource(source.id) : watchSource(source.id)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.sources(projectId) }),
+  })
+  const watched = !!source.monitor_id
   return (
     <li
       id={`source-${source.id}`}
@@ -87,7 +95,10 @@ function SourceItem({ projectId, source, marked }: { projectId: Id; source: Data
         <>
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 flex-col gap-1">
-              <span className="font-medium">{source.name}</span>
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">{source.name}</span>
+                {watched && <Badge variant="secondary">Watched</Badge>}
+              </span>
               <span className="text-xs text-muted-foreground">
                 {accessLabels[source.access_kind]} · {formatLabels[source.format]}
               </span>
@@ -99,6 +110,13 @@ function SourceItem({ projectId, source, marked }: { projectId: Id; source: Data
                 onClick={() => refresh.mutate()}
               >
                 <RefreshCw className={refresh.isPending ? 'animate-spin' : undefined} />
+              </IconButton>
+              <IconButton
+                label={watched ? `Stop watching ${source.name}` : `Watch ${source.name}`}
+                disabled={watch.isPending}
+                onClick={() => watch.mutate()}
+              >
+                {watched ? <EyeOff /> : <Eye />}
               </IconButton>
               <IconButton label={`Edit ${source.name}`} onClick={() => setEditing(true)}>
                 <Pencil />
@@ -116,6 +134,7 @@ function SourceItem({ projectId, source, marked }: { projectId: Id; source: Data
               </>
             )}
           </p>
+          {source.provenance && <SourceProvenance provenance={source.provenance} />}
           {source.last_error && (
             <p className="flex items-start gap-1 text-xs text-amber-800 dark:text-amber-300">
               <CircleAlert aria-hidden="true" className="mt-px size-3.5 shrink-0" />
@@ -128,6 +147,7 @@ function SourceItem({ projectId, source, marked }: { projectId: Id; source: Data
             </p>
           )}
           {refresh.error && <ErrorNotice error={refresh.error} prefix="Not refreshed:" />}
+          {watch.error && <ErrorNotice error={watch.error} prefix={watched ? 'Not unwatched:' : 'Not watched:'} />}
         </>
       )}
     </li>

@@ -57,6 +57,9 @@ export const getTurn = (id: Id) => unwrap(api.GET('/api/turns/{turn_id}', { para
 export const cancelTurn = (id: Id) =>
   unwrap(api.POST('/api/turns/{turn_id}/cancel', { params: { path: { turn_id: id } } }))
 
+export const listTurns = (sessionId: Id) =>
+  unwrap(api.GET('/api/sessions/{session_id}/turns', { params: { path: { session_id: sessionId } } }))
+
 export const listModels = () => unwrap(api.GET('/api/llm/models'))
 
 export const listPipelines = (projectId: Id) =>
@@ -69,6 +72,8 @@ export const openDashboardAgentSession = (dashboardId: Id) =>
 export const agentKeys = {
   // Not under ['sessions', id]: the record's events would refetch turns mid-stream.
   turn: (id: Id) => ['turns', id] as const,
+  // A session's turns, oldest first: a delegation card reads the research session's latest.
+  sessionTurns: (sessionId: Id) => ['session-turns', sessionId] as const,
   models: () => ['llm-models'] as const,
   pipelines: (projectId: Id) => ['projects', projectId, 'pipelines'] as const,
   // Not under ['dashboards', id]: a dashboard event must not post again.
@@ -78,6 +83,9 @@ export const agentKeys = {
 /** A turn as stored, with the parts the live stream brought since (agent-turns.ts). */
 export const turnQuery = (id: Id) =>
   queryOptions({ queryKey: agentKeys.turn(id), queryFn: async () => withLiveParts(await getTurn(id)) })
+
+export const sessionTurnsQuery = (sessionId: Id) =>
+  queryOptions({ queryKey: agentKeys.sessionTurns(sessionId), queryFn: () => listTurns(sessionId) })
 
 export const modelsQuery = () =>
   queryOptions({ queryKey: agentKeys.models(), queryFn: listModels, staleTime: 60_000, retry: false })

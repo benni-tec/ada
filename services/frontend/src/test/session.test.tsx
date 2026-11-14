@@ -393,3 +393,65 @@ test('a widget is pinned to a dashboard as a copy, on the dashboard’s latest r
   expect(within(done).getByRole('link', { name: 'Screening overview' })).toHaveAttribute('href', '/projects/p1/dashboards/d1')
   expect(pinned).toEqual({ widget_id: 'w1', slot: 'coverage', expected_revision: 7 })
 })
+
+test('a delegation is a card linking to the research session with its state; the report is a message from the research agent', async () => {
+  const researcher = { kind: 'agent', name: 'gemini/pro' } as const
+  serveSession({
+    'GET /api/sessions/s1/entries': [
+      question,
+      entry({ id: 'e5', kind: 'delegation', ref: 's2', text: 'Finnish cancer registry data', actor: answer.actor }),
+      entry({ id: 'e6', kind: 'delegation', ref: 's3', text: 'Wellbeing counties', actor: answer.actor }),
+      entry({ id: 'e7', kind: 'report', ref: 's3', text: 'Found two sources, licence open.', actor: researcher }),
+    ],
+    'GET /api/sessions/s2/turns': [turn({ id: 't8', session_id: 's2', status: 'running' })],
+    'GET /api/sessions/s3/turns': [turn({ id: 't9', session_id: 's3', status: 'done' })],
+  })
+  renderAt('/projects/p1/sessions/s1')
+
+  const [, running, done, report] = await items()
+  expect(await within(running).findByText('Running')).toBeInTheDocument()
+  expect(within(running).getByRole('link', { name: /Finnish cancer registry data/ })).toHaveAttribute('href', '/projects/p1/sessions/s2')
+  expect(await within(done).findByText('Done')).toBeInTheDocument()
+  expect(report).toHaveTextContent('Research agent')
+  expect(report).toHaveTextContent('Found two sources, licence open.')
+  expect(within(report).getByRole('link', { name: 'Open the research session' })).toHaveAttribute('href', '/projects/p1/sessions/s3')
+})
+
+test('the Research action sends the draft as a brief to the research route', async () => {
+  const sent: unknown[] = []
+  serveSession({
+    'GET /api/llm/models': models({ research_agent: 'gemini/pro' }),
+    'POST /api/sessions/s1/research': (body: unknown) => {
+      sent.push(body)
+      return json(session({ id: 's2', agent: 'research', parent_session_id: 's1' }), 201)
+    },
+  })
+  renderAt('/projects/p1/sessions/s1')
+
+  await screen.findByRole('list', { name: 'Session record' })
+  fireEvent.change(within(composer()).getByLabelText('Message'), { target: { value: 'Find Finnish cancer data by hospital district' } })
+  const button = await within(composer()).findByRole('button', { name: 'Research' })
+  await waitFor(() => expect(button).toBeEnabled())
+  fireEvent.click(button)
+
+  await waitFor(() =>
+    expect(sent).toEqual([{ title: 'Find Finnish cancer data by hospital district', brief: 'Find Finnish cancer data by hospital district' }]),
+  )
+  await waitFor(() => expect(within(composer()).getByLabelText('Message')).toHaveValue(''))
+})
+
+test('a research session is listed under its parent in the sidebar, labelled research', async () => {
+  serveSession({
+    'GET /api/projects/p1/sessions': [
+      session({ id: 's2', title: 'Finnish cancer data', agent: 'research', parent_session_id: 's1', created_at: '2026-11-02T09:00:00Z' }),
+      session(),
+    ],
+  })
+  renderAt('/projects/p1/sessions/s1')
+
+  const nav = await screen.findByRole('navigation', { name: 'Project' })
+  const parent = await within(nav).findByRole('link', { name: 'Why did coverage drop?' })
+  const child = within(nav).getByRole('link', { name: /Finnish cancer data/ })
+  expect(parent.closest('li')).toContainElement(child)
+  expect(child).toHaveTextContent('research')
+})

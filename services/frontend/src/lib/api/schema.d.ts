@@ -305,6 +305,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hooks/context/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Context Monitor Fired
+         * @description A Context.dev monitor saw its page change: refresh the source. Only the headers and
+         *     the signature are used; nothing in the body is trusted or read.
+         */
+        post: operations["context_monitor_fired_api_hooks_context__source_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/llm/models": {
         parameters: {
             query?: never;
@@ -801,6 +822,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sessions/{session_id}/research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delegate Research
+         * @description Delegate research to the research agent, as the person: a research session under
+         *     this one, with the brief as its first message and its turn queued. Its report is added
+         *     to this session's record; it does not start a turn here.
+         */
+        post: operations["delegate_research_api_sessions__session_id__research_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions/{session_id}/turns": {
         parameters: {
             query?: never;
@@ -935,6 +978,26 @@ export interface paths {
         patch: operations["update_provider_api_settings_llm_providers__provider_id__patch"];
         trace?: never;
     };
+    "/api/settings/research-agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Research Agent
+         * @description The model of research sessions; null falls back to the session agent's.
+         */
+        put: operations["set_research_agent_api_settings_research_agent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/session-agent": {
         parameters: {
             query?: never;
@@ -1010,6 +1073,30 @@ export interface paths {
          */
         post: operations["refresh_source_api_sources__source_id__refresh_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{source_id}/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Watch Source
+         * @description Have Context.dev watch the source's page and refresh the source when it changes.
+         */
+        post: operations["watch_source_api_sources__source_id__watch_post"];
+        /**
+         * Unwatch Source
+         * @description Stop watching the source's page; it is refreshed by hand again.
+         */
+        delete: operations["unwatch_source_api_sources__source_id__watch_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1172,6 +1259,8 @@ export interface components {
              * @default []
              */
             providers: components["schemas"]["LlmProvider"][];
+            /** Research Agent */
+            research_agent?: string | null;
             /** Revision */
             revision: number;
             /** Secrets Available */
@@ -1443,11 +1532,14 @@ export interface components {
             last_error?: string | null;
             /** Last Probe Token */
             last_probe_token?: string | null;
+            /** Monitor Id */
+            monitor_id?: string | null;
             /** Name */
             name: string;
             /** @default {} */
             options: components["schemas"]["JsonObject"];
             project_id: components["schemas"]["Id"];
+            provenance?: components["schemas"]["Provenance"] | null;
             /**
              * Revision
              * @default 1
@@ -1458,7 +1550,17 @@ export interface components {
          * EntryKind
          * @enum {string}
          */
-        EntryKind: "message" | "operator" | "widget" | "agent_turn";
+        EntryKind: "message" | "operator" | "widget" | "agent_turn" | "delegation" | "report";
+        /**
+         * FoundBy
+         * @description How the research agent came upon a source.
+         */
+        FoundBy: {
+            /** Query */
+            query: string;
+            /** Scope */
+            scope: string;
+        };
         /**
          * FreshnessKind
          * @enum {string}
@@ -1532,6 +1634,11 @@ export interface components {
              */
             database: "ok" | "unavailable";
             /**
+             * Page Reading
+             * @description Page reading is configured (CONTEXT_API_KEY is set)
+             */
+            page_reading: boolean;
+            /**
              * Queue
              * @description Valkey, the task queue broker
              * @enum {string}
@@ -1544,11 +1651,29 @@ export interface components {
              */
             status: "ok" | "degraded";
             /**
+             * Watching
+             * @description Page watching is configured (CONTEXT_API_KEY and ADA_PUBLIC_URL are set)
+             */
+            watching: boolean;
+            /**
+             * Web Search
+             * @description Web search is configured (EXA_API_KEY is set)
+             */
+            web_search: boolean;
+            /**
              * Worker
              * @description Task worker and scheduler, judged by their heartbeat
              * @enum {string}
              */
             worker: "ok" | "unavailable";
+        };
+        /** HookQueued */
+        HookQueued: {
+            /**
+             * Status
+             * @default queued
+             */
+            status: string;
         };
         /** Format: uuid */
         Id: string;
@@ -1652,6 +1777,8 @@ export interface components {
              * @default []
              */
             models: components["schemas"]["ModelInfo"][];
+            /** Research Agent */
+            research_agent?: string | null;
             /** Session Agent */
             session_agent?: string | null;
         };
@@ -1762,6 +1889,13 @@ export interface components {
             run_id?: components["schemas"]["Id"] | null;
             time_range?: components["schemas"]["TimeRange"] | null;
         };
+        /** NewResearch */
+        NewResearch: {
+            /** Brief */
+            brief: string;
+            /** Title */
+            title: string;
+        };
         /** NewRun */
         NewRun: {
             /** Bindings */
@@ -1787,6 +1921,7 @@ export interface components {
             /** Name */
             name: string;
             options?: components["schemas"]["JsonObject"] | null;
+            provenance?: components["schemas"]["Provenance"] | null;
         };
         /** NewSourceOperator */
         NewSourceOperator: {
@@ -1965,6 +2100,27 @@ export interface components {
             expected_revision: number;
             /** Name */
             name: string;
+        };
+        /**
+         * Provenance
+         * @description Where a source's data comes from and on what terms. Filled by whoever registers a
+         *     source; "unknown" in `licence`, with the reason in `note`, when it cannot be told.
+         */
+        Provenance: {
+            /**
+             * Extracted By Model
+             * @default false
+             */
+            extracted_by_model: boolean;
+            found_by?: components["schemas"]["FoundBy"] | null;
+            /** Landing Page */
+            landing_page?: string | null;
+            /** Licence */
+            licence?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Publisher */
+            publisher?: string | null;
         };
         /**
          * ProviderChange
@@ -2166,6 +2322,8 @@ export interface components {
          * @description Exploratory work led by an agent. Belongs to a project, not to a user.
          */
         Session: {
+            /** @default session */
+            agent: components["schemas"]["SessionAgent"];
             /**
              * Created At
              * Format: date-time
@@ -2174,6 +2332,7 @@ export interface components {
             id: components["schemas"]["Id"];
             origin_dashboard_id?: components["schemas"]["Id"] | null;
             panel_dashboard_id?: components["schemas"]["Id"] | null;
+            parent_session_id?: components["schemas"]["Id"] | null;
             project_id: components["schemas"]["Id"];
             /**
              * Revision
@@ -2183,6 +2342,11 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * SessionAgent
+         * @enum {string}
+         */
+        SessionAgent: "session" | "research";
         /** SessionAgentChoice */
         SessionAgentChoice: {
             /** Expected Revision */
@@ -2276,6 +2440,8 @@ export interface components {
             /** Location */
             location: string;
             operator_id: components["schemas"]["OperatorId"];
+            /** Origin */
+            origin?: string | null;
             /** Parameters Key */
             parameters_key: string;
             period?: components["schemas"]["Interval"] | null;
@@ -3077,6 +3243,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Liveness"];
+                };
+            };
+        };
+    };
+    context_monitor_fired_api_hooks_context__source_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-context-signature"?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HookQueued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4233,6 +4432,41 @@ export interface operations {
             };
         };
     };
+    delegate_research_api_sessions__session_id__research_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewResearch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_turns_api_sessions__session_id__turns_get: {
         parameters: {
             query?: never;
@@ -4474,6 +4708,39 @@ export interface operations {
             };
         };
     };
+    set_research_agent_api_settings_research_agent_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionAgentChoice"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSettingsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_session_agent_api_settings_session_agent_put: {
         parameters: {
             query?: never;
@@ -4626,6 +4893,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RefreshQueued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    watch_source_api_sources__source_id__watch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSource"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unwatch_source_api_sources__source_id__watch_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSource"];
                 };
             };
             /** @description Validation Error */

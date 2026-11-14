@@ -1,4 +1,4 @@
-import type { Actor } from '@/lib/api'
+import type { Actor, SourceProvenance as SourceOrigin } from '@/lib/api'
 import { actorLabel } from '@/lib/actors'
 
 export function Time({ value }: { value: string }) {
@@ -37,6 +37,39 @@ export function Provenance({ actor, at, note }: { actor: Actor; at: string; note
           {note}
         </p>
       )}
+    </div>
+  )
+}
+
+/**
+ * Where a data source came from: who publishes it and under what licence ("licence
+ * unknown" when none was established, with the reason), the page it was found on, and
+ * whether a model extracted its rows rather than the file being read as it is.
+ */
+export function SourceProvenance({ provenance }: { provenance: SourceOrigin }) {
+  const licensed = provenance.licence && provenance.licence !== 'unknown'
+  return (
+    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {provenance.publisher && <span>{provenance.publisher}</span>}
+        <span className={licensed ? undefined : 'text-amber-800 dark:text-amber-300'}>
+          {licensed ? provenance.licence : 'Licence unknown'}
+        </span>
+        {provenance.landing_page && (
+          <a href={provenance.landing_page} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            Landing page
+          </a>
+        )}
+        {provenance.extracted_by_model && (
+          <span className="rounded-full border px-2 py-0.5 font-medium">Model-extracted</span>
+        )}
+      </p>
+      {provenance.found_by && (
+        <p>
+          Found by searching “{provenance.found_by.query}” ({provenance.found_by.scope})
+        </p>
+      )}
+      {provenance.note && <p>{provenance.note}</p>}
     </div>
   )
 }

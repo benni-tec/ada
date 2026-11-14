@@ -143,6 +143,7 @@ export function installMockAgent() {
           title: `${view.dashboard.name} (agent)`,
           origin_dashboard_id: dashboardId,
           panel_dashboard_id: dashboardId,
+          agent: 'session',
           created_at: new Date().toISOString(),
           revision: 1,
         }

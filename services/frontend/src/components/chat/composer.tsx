@@ -1,16 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from '@tanstack/react-router'
-import { ArrowUp, Info, Square } from 'lucide-react'
+import { ArrowUp, Info, Microscope, Square } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { IconButton } from '@/components/icon-action'
 import { ErrorNotice } from '@/components/notices'
+import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Vahti } from '@/components/vahti/vahti'
 import { isActive, withLiveParts } from '@/lib/agent-turns'
 import {
   agentKeys,
   cancelTurn,
+  delegateResearch,
   keys,
   modelsQuery,
   postMessage,
@@ -82,6 +84,16 @@ export function Composer({
       // The turn as queued, so the record shows it before its first event arrives.
       if (turn) queryClient.setQueryData(agentKeys.turn(turn.id), withLiveParts(turn))
       await queryClient.invalidateQueries({ queryKey: keys.entries(sessionId) })
+    },
+  })
+
+  // The draft as a brief for the research agent, which works in a session of its own.
+  const research = useMutation({
+    mutationFn: (brief: string) => delegateResearch(sessionId, brief.split('\n')[0].slice(0, 80), brief),
+    onSuccess: async () => {
+      setText('')
+      await queryClient.invalidateQueries({ queryKey: keys.entries(sessionId) })
+      if (projectId) await queryClient.invalidateQueries({ queryKey: keys.sessions(projectId) })
     },
   })
 
@@ -159,6 +171,19 @@ export function Composer({
               <ModelPicker models={models.data} value={model} onChange={setPicked} />
             )}
             <span className="flex-1" />
+            {models.data && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={research.isPending || text.trim() === '' || !models.data.research_agent}
+                title={models.data.research_agent ? undefined : 'Pick a research agent in Settings first'}
+                onClick={() => research.mutate(text.trim())}
+              >
+                <Microscope aria-hidden="true" />
+                Research
+              </Button>
+            )}
             {activeTurn && isActive(activeTurn) && (
               <IconButton
                 label="Stop the agent"
@@ -177,6 +202,7 @@ export function Composer({
         </div>
       </div>
       {send.error && <ErrorNotice error={send.error} prefix="Not sent:" />}
+      {research.error && <ErrorNotice error={research.error} prefix="Not delegated:" />}
       {stop.error && <ErrorNotice error={stop.error} prefix="Not stopped:" />}
     </form>
   )
