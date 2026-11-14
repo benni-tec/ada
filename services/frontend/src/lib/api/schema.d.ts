@@ -1167,7 +1167,7 @@ export interface components {
          * AccessKind
          * @enum {string}
          */
-        AccessKind: "url" | "request" | "browser" | "document";
+        AccessKind: "url" | "request" | "browser" | "document" | "web";
         /**
          * Actor
          * @description Who did something. There are no users yet, so this is a label, not an identity.
@@ -1440,7 +1440,7 @@ export interface components {
          * DataFormat
          * @enum {string}
          */
-        DataFormat: "csv" | "json" | "parquet" | "pdf";
+        DataFormat: "csv" | "json" | "parquet" | "pdf" | "html";
         /**
          * DataSource
          * @description Registered once per project and referenced by source operators.

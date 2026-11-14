@@ -6,7 +6,8 @@
           "url",
           "request",
           "browser",
-          "document"
+          "document",
+          "web"
         ],
         "title": "AccessKind",
         "type": "string"
@@ -738,7 +739,8 @@
           "csv",
           "json",
           "parquet",
-          "pdf"
+          "pdf",
+          "html"
         ],
         "title": "DataFormat",
         "type": "string"

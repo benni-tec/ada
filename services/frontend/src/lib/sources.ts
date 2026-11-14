@@ -5,6 +5,7 @@ export const accessLabels: Record<AccessKind, string> = {
   request: 'Request',
   browser: 'Browser',
   document: 'Document',
+  web: 'Web page',
 }
 
 export const formatLabels: Record<DataFormat, string> = {
@@ -12,6 +13,7 @@ export const formatLabels: Record<DataFormat, string> = {
   json: 'JSON',
   parquet: 'Parquet',
   pdf: 'PDF',
+  html: 'HTML',
 }
 
 export const freshnessLabels: Record<FreshnessKind, string> = {

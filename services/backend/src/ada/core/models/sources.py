@@ -13,8 +13,10 @@ class AccessKind(StrEnum):
     REQUEST = "request"
     # An automated browser session that sets options and takes an export.
     BROWSER = "browser"
-    # A PDF or page that is fetched and parsed.
+    # A PDF that is fetched and parsed.
     DOCUMENT = "document"
+    # A web page, read as Markdown through Context.dev's scrape (format html).
+    WEB = "web"
 
 
 class DataFormat(StrEnum):
@@ -23,10 +25,12 @@ class DataFormat(StrEnum):
     PARQUET = "parquet"
     # Read by document sources only, which extract it into rows (DocumentExtract).
     PDF = "pdf"
+    # Read by web sources only, which extract the page into rows like a document's.
+    HTML = "html"
 
 
 class DocumentExtract(StrEnum):
-    """What a document source makes of its PDF: `options.extract`."""
+    """What a document or web source makes of its PDF or page: `options.extract`."""
 
     # One row per page: its number and its text.
     PAGES = "pages"
@@ -78,6 +82,47 @@ def document_engine(options: JsonObject) -> DocumentEngine:
     except ValueError:
         engines = ", ".join(repr(engine.value) for engine in DocumentEngine)
         raise Invalid(f"options.engine must be one of {engines}, not {value!r}") from None
+
+
+class WebOperation(StrEnum):
+    """What a web source asks Context.dev for: `options.operation`. The dearer ones are
+    sources, never exploration tools, and are kept fresh rarely (WEB_MINIMUM_TTL)."""
+
+    # One page as Markdown (1 credit), made into pages or tables like a document.
+    SCRAPE = "scrape"
+    # The pages of a site, from the address on (1 credit per page): `max_pages` (at most
+    # WEB_CRAWL_MAX_PAGES), `max_depth`, `url_regex`, `exclude_url_regex`.
+    CRAWL = "crawl"
+    # A researched answer (10 credits): `task` and `json_format`, an example object whose
+    # top level has one array of records. Its records are the rows, model-extracted.
+    ANSWERS = "answers"
+
+
+def web_operation(options: JsonObject) -> WebOperation:
+    """The operation a web source's options ask for; scrape by default."""
+    value = options.get("operation", WebOperation.SCRAPE.value)
+    try:
+        return WebOperation(value)
+    except ValueError:
+        operations = ", ".join(repr(operation.value) for operation in WebOperation)
+        raise Invalid(f"options.operation must be one of {operations}, not {value!r}") from None
+
+
+_DAY = 24 * 60 * 60
+# The shortest ttl a web source may have, per operation: their credits are spent rarely.
+# A forced refresh of a crawl or answers source within it is refused as well.
+WEB_MINIMUM_TTL: dict[WebOperation, int] = {
+    WebOperation.SCRAPE: _DAY,
+    WebOperation.CRAWL: 7 * _DAY,
+    WebOperation.ANSWERS: 30 * _DAY,
+}
+WEB_CRAWL_MAX_PAGES = 50
+# Credits per call, as Context.dev charges them; a crawl costs one per page fetched.
+WEB_SCRAPE_CREDITS = 1
+WEB_ANSWERS_CREDITS = 10
+# The column of an answers source with the URLs the answer cites, added to its declared
+# columns.
+WEB_SOURCES_COLUMN = Column(name="sources", type=ColumnType.JSON, nullable=True)
 
 
 # The address of a file uploaded to ADA (POST /projects/{id}/files) instead of fetched:
