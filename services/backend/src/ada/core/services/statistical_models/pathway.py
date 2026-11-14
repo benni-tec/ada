@@ -39,6 +39,7 @@ NORWAY = Citation(
     "strålebehandling 14; fra henvisning mottatt til start behandling: 42 / 35 / 42.",
     grade=EvidenceGrade.STANDARD,
     url="https://www.helsedirektoratet.no/nasjonale-forlop/lungekreft/forlopstider-i-pakkeforlop-for-lungekreft",
+    source_id="01a1dc00-f89d-724d-9207-d11e5b1f70bd",
     country="Norway",
 )
 NORWAY_CRITERIA = NORWAY.model_copy(
@@ -47,6 +48,7 @@ NORWAY_CRITERIA = NORWAY.model_copy(
         "malignitetssuspekt forandring i lunge, eller en biopsi tatt fra annet organ viser "
         "kreft som tyder på origo i lunge.",
         "url": "https://www.helsedirektoratet.no/nasjonale-forlop/lungekreft/inngang-til-pakkeforlop-for-lungekreft/begrunnet-mistanke-kriterier-for-henvisning-til-pakkeforlop",
+        "source_id": "01a1dc00-f91b-748a-8e15-006a70828e14",
     }
 )
 SWEDEN = Citation(
@@ -81,7 +83,8 @@ KHALIFE = Citation(
     passage="Table 2: appointment at health centre for lung cancer symptoms, Finland 14 days; "
     "Sweden, Denmark, Norway, Iceland 2–7 days.",
     grade=EvidenceGrade.ASSUMPTION,
-    url="https://medicaljournalssweden.se/actaoncologica/article/download/42778/50476",
+    url="https://medicaljournalssweden.se/actaoncologica/article/view/42778",
+    source_id="01a1dc01-a016-7643-8c5d-87f8f76a46c9",
 )
 HANNA = Citation(
     source="Hanna et al., BMJ 2020;371:m4087 (PMC7610021)",
@@ -91,6 +94,7 @@ HANNA = Citation(
     "weeks.",
     grade=EvidenceGrade.META_ANALYSIS,
     url="https://doi.org/10.1136/bmj.m4087",
+    source_id="01a1dc00-fa74-75ef-9bff-68dba0cb64dd",
 )
 HEIDEN = Citation(
     source="Heiden et al., JAMA Netw Open 2021 (PMC8160592; VA, 9,904 patients, 96 % men)",
@@ -99,6 +103,7 @@ HEIDEN = Citation(
     "0.943–1.359). Time to surgery was not associated with pathologic upstaging.",
     grade=EvidenceGrade.COHORT,
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC8160592/",
+    source_id="01a1dc00-fac4-764b-8f42-fea3a16e7a5f",
 )
 SUD = Citation(
     source="Sud et al., Ann Oncol 2020;31:1065–74 (PMC7237184)",
@@ -108,6 +113,7 @@ SUD = Citation(
     "assumption.",
     grade=EvidenceGrade.ASSUMPTION,
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC7237184/",
+    source_id="01a1dc00-fb0e-77d1-8503-16d5c3166c22",
 )
 ZAI = Citation(
     source="Zai et al., BMJ Public Health 2025 (PMC12551501; 469,522 cases, 2000–2019)",
@@ -117,6 +123,7 @@ ZAI = Citation(
     "1.14 (1.11–1.17); lung, women 1.22 (1.12–1.33). Surgery: lung, women OR 0.85 (0.78–0.93).",
     grade=EvidenceGrade.REGISTRY,
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC12551501/",
+    source_id="01a1da05-3598-7096-9343-213d624b78c7",
 )
 NORDCAN = Citation(
     source="NORDCAN 5-year relative survival by site, Nordic countries, 2020-2024, read from "
@@ -141,6 +148,7 @@ NORWAY_CRC = Citation(
     "endring av et ellers stabilt avføringsmønster i over fire uker.",
     grade=EvidenceGrade.STANDARD,
     url="https://www.helsedirektoratet.no/nasjonale-forlop/tykk-og-endetarmskreft",
+    source_id="01a1dc00-f98a-70b1-bf3e-5f97c599e2a6",
     country="Norway",
 )
 NORWAY_PANCREAS = Citation(
@@ -151,6 +159,7 @@ NORWAY_PANCREAS = Citation(
     "bildediagnostikk; ikterus uten opplagt forklaring.",
     grade=EvidenceGrade.STANDARD,
     url="https://www.helsedirektoratet.no/nasjonale-forlop/bukspyttkjertelkreft",
+    source_id="01a1dc00-fa01-742a-a14c-29de1a8d4364",
     country="Norway",
 )
 SWEDEN_CRC = Citation(
@@ -209,6 +218,7 @@ YLE = Citation(
     "author's, in proportion to the targets.",
     grade=EvidenceGrade.ASSUMPTION,
     url="https://yle.fi/a/74-20251023",
+    source_id="01a1dc00-fba8-71d5-b822-38ac0e55023b",
 )
 
 POKHREL = Citation(
@@ -217,6 +227,7 @@ POKHREL = Citation(
     "18.8 % (high) / 13.5 % (secondary) / 12.3 % (basic); men 10.6 / 9.5 / 9.2 %.",
     grade=EvidenceGrade.REGISTRY,
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC2965870/",
+    source_id="01a1dc00-fb5c-7686-b8a2-19282fd57961",
 )
 
 LUNG, COLORECTAL, PANCREAS = "lung", "colorectal", "pancreas"
