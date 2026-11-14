@@ -90,7 +90,7 @@ class DocumentReader(SourceReader):
                 if extract is DocumentExtract.PAGES
                 else markdown_tables(markdown)
             )
-            content = await asyncio.to_thread(_parquet, extract, rows)
+            content = await asyncio.to_thread(document_parquet, extract, rows)
         else:
             content = await asyncio.to_thread(extract_pdf, fetched.content, extract, fetched.origin)
         return fetched.model_copy(update={"content": content, "format": DataFormat.PARQUET})
@@ -122,7 +122,7 @@ def extract_pdf(content: bytes, extract: DocumentExtract, origin: str = "the doc
                 rows = list(_table_rows(document.pages))
     except Exception as error:
         raise Invalid(f"{origin} {_reason(error)}") from error
-    return _parquet(extract, rows)
+    return document_parquet(extract, rows)
 
 
 def _table_rows(pages: list[Any]) -> Any:
@@ -143,7 +143,8 @@ def _reason(error: Exception) -> str:
     return f"is not a readable PDF: {detail}"
 
 
-def _parquet(extract: DocumentExtract, rows: list[tuple[Any, ...]]) -> bytes:
+def document_parquet(extract: DocumentExtract, rows: list[tuple[Any, ...]]) -> bytes:
+    """The rows of an extract mode as Parquet with its columns' exact types."""
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "document.parquet"
         with duckdb.connect(":memory:") as connection:

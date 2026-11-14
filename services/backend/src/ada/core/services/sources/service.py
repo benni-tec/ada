@@ -49,6 +49,7 @@ from ada.core.services.sources.pushdown import (
     time_role,
 )
 from ada.core.services.sources.shaping import shape, shape_options, split_periods
+from ada.core.services.sources.web import check_forced_refresh, check_web, web_schema
 
 # The key of the snapshot of the whole source, as `refresh` fetches it. A source that
 # fetches by period (pushdown.py) also keeps one snapshot per period, keyed
@@ -110,6 +111,8 @@ class DataSources(SourceService):
         now = self.clock.now()
         if access_kind is AccessKind.DOCUMENT:
             declared_schema = _document_schema(options or {}, declared_schema)
+        elif access_kind is AccessKind.WEB:
+            declared_schema = web_schema(options or {}, declared_schema)
         source = DataSource(
             id=uuid7(),
             project_id=project_id,
@@ -178,6 +181,9 @@ class DataSources(SourceService):
         operator_id = source_operator_id(source)
         current = await self.snapshots.current(operator_id, WHOLE_SOURCE)
         now = self.clock.now()
+        if force:
+            # Refused before anything is recorded: the source has not failed.
+            check_forced_refresh(source, current, now)
         if not force and not wants_check(source, current, now):
             # The common case when a run starts: nothing to do, and nothing is fetched.
             return RefreshResult(data_source_id=source.id, changed=False)
@@ -497,6 +503,7 @@ def _check(source: DataSource) -> None:
     check_policy(source.freshness)
     shape_options(source.options)
     _check_document(source)
+    check_web(source)
     declared = source.declared_schema
     if declared is not None and declared.columns:
         check_unique(declared.columns)

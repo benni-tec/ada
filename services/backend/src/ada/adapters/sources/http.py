@@ -31,6 +31,7 @@ writes the requested periods into `params` or `body` before it calls the reader
 
 import hashlib
 import json
+from datetime import date
 from typing import Any, Literal
 
 import httpx
@@ -38,6 +39,8 @@ from pydantic import Field, ValidationError
 
 from ada.adapters.sources.context_dev import ContextDevParser
 from ada.adapters.sources.document import DocumentReader
+from ada.adapters.sources.web import WebPageReader
+from ada.adapters.web.context_dev import ContextDevWeb
 from ada.core.models.analysis import FetchedData
 from ada.core.models.base import DomainModel, Id
 from ada.core.models.errors import Invalid, Unavailable
@@ -45,6 +48,7 @@ from ada.core.models.sources import AccessKind, DataSource, StoredFile
 from ada.core.models.time import TimeRange
 from ada.core.ports.sources import FileStore, SourceReader, SourceReaders
 from ada.core.ports.system import Clock
+from ada.core.ports.web import WebBudget
 
 # Names us to the services we read, as their terms usually ask.
 USER_AGENT = "ADA/0.1 (traceable data analysis; +https://github.com/benni-tec/ada)"
@@ -175,8 +179,9 @@ class HttpReader(SourceReader):
 
 
 class HttpSourceReaders(SourceReaders):
-    """The installed readers: URL, request and document sources, which all go over HTTP.
-    Browser sources come later."""
+    """The installed readers: URL, request, document and web sources, which all go over
+    HTTP. Browser sources come later. Web sources spend the project's credits in
+    `web_budget`; without one they cannot be read."""
 
     def __init__(
         self,
@@ -184,6 +189,8 @@ class HttpSourceReaders(SourceReaders):
         clock: Clock,
         files: FileStore | None = None,
         context_dev_key: str | None = None,
+        web_budget: WebBudget | None = None,
+        web_daily_credit_limit: int = 0,
     ) -> None:
         self.readers: dict[AccessKind, SourceReader] = {
             kind: HttpReader(client, clock, kind) for kind in HTTP_KINDS
@@ -193,6 +200,12 @@ class HttpSourceReaders(SourceReaders):
             files or _NoUploads(),
             ContextDevParser(client, context_dev_key),
             clock,
+        )
+        self.readers[AccessKind.WEB] = WebPageReader(
+            ContextDevWeb(client, context_dev_key),
+            web_budget or _NoWebBudget(),
+            clock,
+            web_daily_credit_limit,
         )
 
     def for_kind(self, kind: AccessKind) -> SourceReader:
@@ -210,6 +223,16 @@ class _NoUploads(FileStore):
 
     async def get(self, address: str) -> bytes:
         raise Invalid("Uploaded files are not available here")
+
+
+class _NoWebBudget(WebBudget):
+    """For readers made without a budget, e.g. in tests that read no web source."""
+
+    async def spend(self, project_id: Id, day: date, credits: int, limit: int) -> bool:
+        raise Invalid("Web sources are not available here")
+
+    async def adjust(self, project_id: Id, day: date, credits: int) -> None:
+        return None
 
 
 def _options(source: DataSource) -> HttpOptions:

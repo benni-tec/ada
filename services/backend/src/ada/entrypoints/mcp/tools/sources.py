@@ -46,7 +46,14 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         request with method, headers and body in `options` (access_kind "request").
         For a PDF URL use access_kind "document" with format "pdf": `options.extract`
         "pages" (default) gives rows `page, text`, "tables" gives `page, "table", row,
-        cells` (a list of strings); the columns are declared for you. `freshness` says
+        cells` (a list of strings); the columns are declared for you. For a web page use
+        access_kind "web" with format "html": read as Markdown through Context.dev, with
+        the same `extract` and columns; `options.operation` "scrape" (default, one page,
+        ttl at least 1 day), "crawl" (a site from the address on, `max_pages` up to 50, ttl
+        at least 7 days) or "answers" (`task` and `json_format`, an example object with one
+        array of records; you declare the columns; model-extracted rows plus `sources`;
+        ttl at least 30 days); freshness "ttl" or "manual", and a forced refresh of a crawl
+        or answers source within its minimum is refused. `freshness` says
         when the data counts as outdated; without it the source is only refreshed on
         request. `declared_schema` states column types and what columns mean,
         which the platform cannot work out by itself.
