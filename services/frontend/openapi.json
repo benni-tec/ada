@@ -658,9 +658,31 @@
           "grade": {
             "$ref": "#/components/schemas/EvidenceGrade"
           },
+          "operator_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Id"
+          },
           "passage": {
             "title": "Passage",
             "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           },
           "source": {
             "title": "Source",

@@ -79,7 +79,7 @@ def test_build_takes_the_median_target_and_computes_the_residual(version: ModelV
     figures = {(p.site, p.sex): p for p in version.compiled.population}
     men = figures[("lung", "male")]
     # The Nordic level, lowered by Finland's extra days, then what is left to the observed figure.
-    assert men.baseline == 30
+    assert men.baseline == 31
     assert men.baseline > men.timing_adjusted > men.observed == 18
     assert men.residual > 1
     assert "upper bound" in men.note
@@ -102,6 +102,35 @@ def test_the_build_checks_itself_against_figures_it_was_not_built_from(
     assert "Pokhrel" in women.note
 
 
+def test_colorectal_and_pancreas_have_their_own_triggers_and_targets(version: ModelVersion) -> None:
+    targets = version.compiled.targets
+    # Norway 36 and Sweden 46 for colorectal surgery; Norway 43 and Sweden 36 for pancreas.
+    assert targets["colorectal"]["pathway"]["surgery"] == 41
+    assert targets["pancreas"]["pathway"]["surgery"] == 40
+    crc = evaluate(
+        version,
+        EXAMPLE.model_copy(
+            update={
+                "site": "colorectal",
+                "presentation": ("crc_blood", "crc_iron_deficiency"),
+                "days": {
+                    S.CONTACT_TO_PHYSICIAN: 3,
+                    S.PHYSICIAN_TO_IMAGING: 8,
+                    S.IMAGING_TO_REFERRAL: 2,
+                },
+            }
+        ),
+    )
+    assert crc.trigger.well_founded.countries == ("Sweden",)
+    assert crc.trigger.clock_start == 11
+    assert {p.site for p in version.compiled.population} == {"lung", "colorectal", "pancreas"}
+    pancreas = evaluate(
+        version, EXAMPLE.model_copy(update={"site": "pancreas", "presentation": ("panc_imaging",)})
+    )
+    assert pancreas.trigger.well_founded.countries == ("Norway", "Sweden")
+    assert all(lever.grade is EvidenceGrade.ASSUMPTION for lever in pancreas.levers)
+
+
 def test_the_spec_must_hold_together() -> None:
     spec = pathway_spec()
     with pytest.raises(Invalid, match="intended_use"):
@@ -109,7 +138,7 @@ def test_the_spec_must_hold_together() -> None:
     with pytest.raises(Invalid, match="unknown parameter"):
         compile_spec(spec.model_copy(update={"arrows": {"delay_pre": "nothing"}}))
     with pytest.raises(Invalid, match="no baseline"):
-        compile_spec(spec.model_copy(update={"sites": ("lung", "pancreas")}))
+        compile_spec(spec.model_copy(update={"sites": ("lung", "liver")}))
 
 
 def test_the_trigger_fires_and_the_deadlines_count_from_it(version: ModelVersion) -> None:
@@ -241,7 +270,7 @@ def test_rest_creates_the_pathway_model_and_evaluates_without_storing_anything(
     project = new_project(client, "Nordic cancer care")
     version = send(client, "POST", f"/projects/{project['id']}/models/pathway", None, 201)
     assert version["version"] == 1
-    assert version["spec"]["sites"] == ["lung"]
+    assert version["spec"]["sites"] == ["lung", "colorectal", "pancreas"]
     models = send(client, "GET", f"/projects/{project['id']}/models")
     assert [m["latest_version"] for m in models] == [1]
     store = resolve(client, MemoryStore)

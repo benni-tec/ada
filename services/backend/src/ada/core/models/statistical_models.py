@@ -49,6 +49,9 @@ class Citation(DomainModel):
     grade: EvidenceGrade
     url: str | None = None
     country: str | None = None
+    # When the figure was read from an ADA operator: its id and the run it was read in.
+    operator_id: str | None = None
+    run_id: str | None = None
 
 
 class Form(StrEnum):

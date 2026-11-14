@@ -80,26 +80,24 @@ def _targets(spec: ModelSpec) -> dict[str, dict[str, dict[str, int]]]:
 def _converted(spec: ModelSpec) -> tuple[dict[str, Parameter], list[str]]:
     parameters = dict(spec.parameters)
     warnings: list[str] = []
-    for name, parameter in spec.parameters.items():
-        if parameter.scale is not Scale.OVERALL:
+    for site in spec.sites:
+        shares = [
+            c.excess_share for c in spec.baseline if c.site == site and c.excess_share is not None
+        ]
+        if not shares:
+            warnings.append(
+                f"no excess share is loaded for {site}, so its overall-mortality HRs are used "
+                "unconverted"
+            )
             continue
-        for site in spec.sites:
-            shares = [
-                c.excess_share
-                for c in spec.baseline
-                if c.site == site and c.excess_share is not None
-            ]
-            if not shares:
-                warnings.append(
-                    f"{name}: no excess share for {site}; the overall-mortality HR is used "
-                    f"unconverted"
-                )
+        p = sum(shares) / len(shares)
+
+        def convert(x: float | None, p: float = p) -> float | None:
+            return None if x is None else 1 + (x - 1) / p
+
+        for name, parameter in spec.parameters.items():
+            if parameter.scale is not Scale.OVERALL:
                 continue
-            p = sum(shares) / len(shares)
-
-            def convert(x: float | None, p: float = p) -> float | None:
-                return None if x is None else 1 + (x - 1) / p
-
             parameters[f"{name}@{site}"] = parameter.model_copy(
                 update={
                     "name": f"{name}@{site}",

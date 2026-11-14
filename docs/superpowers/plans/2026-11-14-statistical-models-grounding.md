@@ -168,7 +168,7 @@ No national trigger, no standard times, no cancer-specific waiting-time statisti
 
 ### C8. Stage
 
-- Finland's stage is missing for 30 % of cases (Zai 📖); the 61 % in the IHE dashboard needs its source. Imputation (Falcaro 2015 ✓) needs individual data.
+- Finland's stage is missing for 30 % of cases in Zai 📖 (2000–2019, all sites); the IHE dashboard's 61 % is for all cancers in 2019–2023, with 35 % for breast and 87 % for melanoma (the stage source in ADA, `op_39f97a91…`). Both are right; they count different years and definitions. Imputation (Falcaro 2015 ✓) needs individual data.
 - **Now:** stage is an optional input. Given: Norway's stage-specific baseline. Not given: the stage mix for the profile (education and route), then the mixture. Coding per A3.
 
 ## D. Equity terms

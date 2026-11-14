@@ -1898,8 +1898,12 @@ export interface components {
             /** Country */
             country?: string | null;
             grade: components["schemas"]["EvidenceGrade"];
+            /** Operator Id */
+            operator_id?: string | null;
             /** Passage */
             passage: string;
+            /** Run Id */
+            run_id?: string | null;
             /** Source */
             source: string;
             /** Url */

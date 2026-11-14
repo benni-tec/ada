@@ -1,7 +1,8 @@
-"""The patient pathway model, v1: lung cancer. Every figure carries the passage it was
-checked against on 2026-11-14 (docs/superpowers/plans/2026-11-14-statistical-models-
-grounding.md, "Full-text check"). Colorectal and pancreas follow when their criteria,
-standard times and baseline are loaded as sources."""
+"""The patient pathway model, v1: lung, colorectal and pancreatic cancer. Every figure
+carries the passage it was checked against on 2026-11-14 (docs/superpowers/plans/
+2026-11-14-statistical-models-grounding.md, "Full-text check"). The baseline comes from
+the NORDCAN survival operator in the "Nordic cancer care" project, cited by operator and
+run."""
 
 from ada.core.models.statistical_models import (
     BaselineCell,
@@ -117,13 +118,83 @@ ZAI = Citation(
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC12551501/",
 )
 NORDCAN = Citation(
-    source="NORDCAN 9.6, 5-year relative survival, lung cancer, 2020–2024, as quoted in the plan "
-    "(docs/superpowers/plans/2026-11-14-statistical-models.md, Part 1)",
-    passage="Lung: 17.9 % men / 30.8 % women in Finland, against 28–31 / 37–39 % elsewhere. The "
-    "Nordic level is the mean of Sweden and Norway (National Cancer Strategy); the midpoints "
-    "of the quoted ranges stand in until the per-country tables are loaded.",
+    source="NORDCAN 5-year relative survival by site, Nordic countries, 2020-2024, read from "
+    "ADA's operator op_fbd206c1d7b01ba0e8be5e09598bb74f (source 01a1da4c-1a05-76a4-a931-"
+    "7075fec66d53)",
+    passage="Rows for cancer 160 (lung), 520 (colorectal) and 130 (pancreas), period 2020-2024, "
+    "sex 1 (men) and 2 (women), countries Norway, Sweden and Finland; the Nordic level is "
+    "the mean of Sweden and Norway, as the National Cancer Strategy defines it.",
     grade=EvidenceGrade.REGISTRY,
-    url="https://nordcan.iarc.fr/",
+    url="https://canapi.iarc.who.int/api/nordcan/v2/961/survival/population/5/1_2/208_246",
+    operator_id="op_fbd206c1d7b01ba0e8be5e09598bb74f",
+    run_id="01a1db11-d2fa-7782-95dd-aa41a3277464",
+)
+NORWAY_CRC = Citation(
+    source="Helsedirektoratet, Pakkeforløp for tykk- og endetarmskreft (last revised 3 July 2026)",
+    passage="Fra henvisning mottatt til første fremmøte: 10 kalenderdager; til avsluttet "
+    "utredning: "
+    "12; til start behandling: kirurgisk 14, medikamentell 14, strålebehandling 18; fra "
+    "henvisning mottatt til start behandling: 36 / 36 / 40. Begrunnet mistanke hos pasienter "
+    "over 40 år: uavklart blødning fra tarmen; funn av tumor eller polypp ved ano-/rektoskopi; "
+    "endring av et ellers stabilt avføringsmønster i over fire uker.",
+    grade=EvidenceGrade.STANDARD,
+    url="https://www.helsedirektoratet.no/nasjonale-forlop/tykk-og-endetarmskreft",
+    country="Norway",
+)
+NORWAY_PANCREAS = Citation(
+    source="Helsedirektoratet, Pakkeforløp for bukspyttkjertelkreft (last revised 3 July 2026)",
+    passage="Fra henvisning mottatt til første fremmøte: 8 kalenderdager; til avsluttet utredning: "
+    "21; til start behandling: kirurgisk 14, medikamentell 14; fra henvisning mottatt til start "
+    "behandling: 43. Begrunnet mistanke: malignitetssuspekt lesjon i bukspyttkjertelen ved "
+    "bildediagnostikk; ikterus uten opplagt forklaring.",
+    grade=EvidenceGrade.STANDARD,
+    url="https://www.helsedirektoratet.no/nasjonale-forlop/bukspyttkjertelkreft",
+    country="Norway",
+)
+SWEDEN_CRC = Citation(
+    source="Regionala cancercentrum, SVF tjock- och ändtarmscancer, version 4.3 (2026-05-04)",
+    passage="Misstanke (över 40 år): blod i avföringen; anemi; ändring av avföringsvanor > 4 "
+    "veckor; "
+    "undersökningar inom 10 kalenderdagar. Välgrundad misstanke: synligt blod utan annan "
+    "blödningskälla; järnbristanemi utan annan orsak; ändrade avföringsvanor > 4 veckor med "
+    "positivt FHb; fynd vid prokto-/rektoskopi eller palpation; fynd vid bild-, vävnads- eller "
+    "koloskopidiagnostik. Ledtider: beslut välgrundad misstanke till första behandling 46 "
+    "kalenderdagar (palliativt behandlingsbeslut 25); remiss mottagen 1; första besök 10; "
+    "basutredning till behandlingsbeslut 14; beslut till start 21.",
+    grade=EvidenceGrade.STANDARD,
+    url="https://kunskapsbanken.cancercentrum.se/globalassets/cancerdiagnoser/tjock--och-andtarm-anal/vardforlopp/svf-tjock-andtarmscancer.pdf",
+    country="Sweden",
+)
+SWEDEN_PANCREAS = Citation(
+    source="Regionala cancercentrum, SVF cancer i bukspottkörteln och periampullärt, version 3.2 "
+    "(2024-11-05)",
+    passage="Misstanke: gulsot eller gallstas; palpabel knöl i övre buken; smärta i övre buken "
+    "eller "
+    "ryggen med ofrivillig viktnedgång, särskilt vid nydebuterad diabetes eller steatorré. "
+    "Välgrundad misstanke: bilddiagnostiskt eller endoskopiskt fynd talande för potentiellt "
+    "malign förändring; MR-fynd av sidogångs-IPMN med kirurgikriterier; gallstas ej kopplad till "
+    "gallstens- eller leversjukdom; cyto- eller histopatologiskt fynd; misstanke vid bukoperation. "
+    "Ledtider: beslut välgrundad misstanke till första behandling, kirurgi 36, läkemedel 29, "
+    "palliativ 22 kalenderdagar; remiss mottagen 1; första besök 7; block A till MDK 7; MDK till "
+    "behandlingsbeslut 7-14; beslut till start 7.",
+    grade=EvidenceGrade.STANDARD,
+    url="https://kunskapsbanken.cancercentrum.se/globalassets/cancerdiagnoser/bukspottkortel/vardforlopp/svf-bukspottkortelcancer.pdf",
+    country="Sweden",
+)
+HANNA_CRC = HANNA.model_copy(
+    update={
+        "passage": "Colectomy: hazard ratio 1.06 (95% CI 1.01 to 1.12) per four-week delay from "
+        "diagnosis to surgery, overall survival; log-linearity between four and 16 weeks."
+    }
+)
+PANCREAS_DELAY = Citation(
+    source="No pancreas-specific delay effect exists in Hanna 2020; Sanjeevi et al., Br J Surg "
+    "2016 "
+    "(abstract) found that operating within 32 days of imaging halved progression to "
+    "unresectable disease",
+    passage="The surgical range of Hanna 2020 (1.06-1.08 per four weeks) is borrowed as an "
+    "assumption, with a confidence interval that includes no effect.",
+    grade=EvidenceGrade.ASSUMPTION,
 )
 YLE = Citation(
     source="Yle MOT (2025), reporting an unpublished study by Kuittinen, University of Eastern "
@@ -144,22 +215,261 @@ POKHREL = Citation(
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC2965870/",
 )
 
-LUNG = "lung"
+LUNG, COLORECTAL, PANCREAS = "lung", "colorectal", "pancreas"
 FEMALE, MALE = "female", "male"
 
 
 def _criterion(
-    id: str, stage: TriggerStage, text: str, countries: tuple[str, ...], provenance: Citation
+    site: str,
+    id: str,
+    stage: TriggerStage,
+    text: str,
+    countries: tuple[str, ...],
+    provenance: Citation,
 ) -> Criterion:
     return Criterion(
-        id=id, site=LUNG, stage=stage, text=text, countries=countries, provenance=provenance
+        id=id, site=site, stage=stage, text=text, countries=countries, provenance=provenance
+    )
+
+
+def _lung_criteria() -> tuple[Criterion, ...]:
+    S, W = TriggerStage.SUSPICION, TriggerStage.WELL_FOUNDED
+    c = lambda *a: _criterion(LUNG, *a)  # noqa: E731
+    return (
+        c(
+            "lung_symptoms_smoker",
+            S,
+            "New airway symptoms (cough, breathlessness) for 6 weeks in a smoker or ex-smoker over "
+            "40",
+            ("Sweden",),
+            SWEDEN_SUSPICION,
+        ),
+        c(
+            "lung_chest_pain",
+            S,
+            "Chest or shoulder pain without another explanation",
+            ("Sweden",),
+            SWEDEN_SUSPICION,
+        ),
+        c("lung_haemoptysis", S, "Coughing blood", ("Sweden",), SWEDEN_SUSPICION),
+        c(
+            "lung_imaging",
+            W,
+            "Imaging finding suggesting lung cancer",
+            ("Norway", "Sweden"),
+            SWEDEN_WELL_FOUNDED,
+        ),
+        c(
+            "lung_metastasis",
+            W,
+            "A metastasis or a biopsy from another organ suggesting lung cancer",
+            ("Norway", "Sweden"),
+            NORWAY_CRITERIA,
+        ),
+        c(
+            "lung_repeated_haemoptysis",
+            W,
+            "Repeated haemoptysis without another obvious cause, even with a normal X-ray",
+            ("Sweden",),
+            SWEDEN_WELL_FOUNDED,
+        ),
+        c("lung_svc", W, "Superior vena cava obstruction", ("Sweden",), SWEDEN_WELL_FOUNDED),
+        c(
+            "lung_recurrent_nerve",
+            W,
+            "Recurrent laryngeal nerve palsy",
+            ("Sweden",),
+            SWEDEN_WELL_FOUNDED,
+        ),
+    )
+
+
+def _colorectal_criteria() -> tuple[Criterion, ...]:
+    S, W = TriggerStage.SUSPICION, TriggerStage.WELL_FOUNDED
+    c = lambda *a: _criterion(COLORECTAL, *a)  # noqa: E731
+    return (
+        c("crc_blood", S, "Blood in the stool, over 40", ("Sweden",), SWEDEN_CRC),
+        c("crc_anaemia", S, "Anaemia, over 40", ("Sweden",), SWEDEN_CRC),
+        c(
+            "crc_habit_change",
+            S,
+            "A change of otherwise stable bowel habits for more than 4 weeks, over 40",
+            ("Sweden",),
+            SWEDEN_CRC,
+        ),
+        c(
+            "crc_unexplained_bleeding",
+            W,
+            "Visible blood in the stool with no other source found at rectal examination and "
+            "procto- or rectoscopy",
+            ("Norway", "Sweden"),
+            SWEDEN_CRC,
+        ),
+        c(
+            "crc_iron_deficiency",
+            W,
+            "Iron-deficiency anaemia without another obvious cause",
+            ("Sweden",),
+            SWEDEN_CRC,
+        ),
+        c(
+            "crc_habit_change_fhb",
+            W,
+            "Changed bowel habits for more than 4 weeks, over 40, with a positive faecal blood "
+            "test",
+            ("Norway", "Sweden"),
+            SWEDEN_CRC,
+        ),
+        c(
+            "crc_rectoscopy_finding",
+            W,
+            "A finding at procto- or rectoscopy or rectal palpation suggesting colorectal cancer",
+            ("Norway", "Sweden"),
+            NORWAY_CRC,
+        ),
+        c(
+            "crc_imaging_finding",
+            W,
+            "A finding at imaging, tissue diagnostics or colonoscopy suggesting colorectal cancer",
+            ("Sweden",),
+            SWEDEN_CRC,
+        ),
+    )
+
+
+def _pancreas_criteria() -> tuple[Criterion, ...]:
+    S, W = TriggerStage.SUSPICION, TriggerStage.WELL_FOUNDED
+    c = lambda *a: _criterion(PANCREAS, *a)  # noqa: E731
+    return (
+        c("panc_jaundice", S, "Jaundice or cholestasis", ("Sweden",), SWEDEN_PANCREAS),
+        c("panc_mass", S, "A palpable mass in the upper abdomen", ("Sweden",), SWEDEN_PANCREAS),
+        c(
+            "panc_pain_weight_loss",
+            S,
+            "Upper abdominal or back pain with unintended weight loss, especially with new "
+            "diabetes or steatorrhoea",
+            ("Sweden",),
+            SWEDEN_PANCREAS,
+        ),
+        c(
+            "panc_imaging",
+            W,
+            "An imaging or endoscopic finding of a potentially malignant change in the pancreas or "
+            "periampullary region",
+            ("Norway", "Sweden"),
+            SWEDEN_PANCREAS,
+        ),
+        c(
+            "panc_cholestasis",
+            W,
+            "Cholestasis or jaundice not explained by gallstone or liver disease",
+            ("Norway", "Sweden"),
+            NORWAY_PANCREAS,
+        ),
+        c(
+            "panc_ipmn",
+            W,
+            "MRI finding of a side-branch IPMN meeting the criteria for surgery",
+            ("Sweden",),
+            SWEDEN_PANCREAS,
+        ),
+        c(
+            "panc_pathology",
+            W,
+            "A cytological or histopathological finding of malignancy in the pancreas or "
+            "periampullary region",
+            ("Sweden",),
+            SWEDEN_PANCREAS,
+        ),
+        c(
+            "panc_at_surgery",
+            W,
+            "Suspected malignancy found at abdominal surgery",
+            ("Sweden",),
+            SWEDEN_PANCREAS,
+        ),
+    )
+
+
+def _targets() -> tuple[TargetTime, ...]:
+    P = PathwayStep
+    SU, RT, DR = Modality.SURGERY, Modality.RADIOTHERAPY, Modality.DRUGS
+
+    def t(site, step, days, provenance, modality=None):
+        return TargetTime(
+            site=site, step=step, modality=modality, days_by_country=days, provenance=provenance
+        )
+
+    return (
+        # Lung
+        t(LUNG, P.CONTACT_TO_PHYSICIAN, {"Nordic reference": 7}, KHALIFE),
+        t(LUNG, P.PHYSICIAN_TO_IMAGING, {"Sweden": 6}, SWEDEN),
+        t(LUNG, P.IMAGING_TO_REFERRAL, {"Sweden": 4}, SWEDEN),
+        t(LUNG, P.REFERRAL_TO_SPECIALIST, {"Norway": 7}, NORWAY),
+        t(LUNG, P.SPECIALIST_TO_WORKUP, {"Norway": 21}, NORWAY),
+        t(LUNG, P.WORKUP_TO_TREATMENT, {"Norway": 14}, NORWAY, SU),
+        t(LUNG, P.WORKUP_TO_TREATMENT, {"Norway": 14}, NORWAY, RT),
+        t(LUNG, P.WORKUP_TO_TREATMENT, {"Norway": 7}, NORWAY, DR),
+        t(LUNG, None, {"Norway": 42, "Sweden": 44}, NORWAY, SU),
+        t(LUNG, None, {"Norway": 42, "Sweden": 44}, NORWAY, RT),
+        t(LUNG, None, {"Norway": 35, "Sweden": 40}, NORWAY, DR),
+        # Colorectal: Sweden's investigations within 10 days of suspicion stand for the step to
+        # the finding; the referral is received a day after the decision.
+        t(COLORECTAL, P.PHYSICIAN_TO_IMAGING, {"Sweden": 10}, SWEDEN_CRC),
+        t(COLORECTAL, P.IMAGING_TO_REFERRAL, {"Sweden": 1}, SWEDEN_CRC),
+        t(COLORECTAL, P.REFERRAL_TO_SPECIALIST, {"Norway": 10, "Sweden": 10}, NORWAY_CRC),
+        t(COLORECTAL, P.SPECIALIST_TO_WORKUP, {"Norway": 12, "Sweden": 14}, NORWAY_CRC),
+        t(COLORECTAL, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Sweden": 21}, NORWAY_CRC, SU),
+        t(COLORECTAL, P.WORKUP_TO_TREATMENT, {"Norway": 18, "Sweden": 21}, NORWAY_CRC, RT),
+        t(COLORECTAL, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Sweden": 21}, NORWAY_CRC, DR),
+        t(COLORECTAL, None, {"Norway": 36, "Sweden": 46}, NORWAY_CRC, SU),
+        t(COLORECTAL, None, {"Norway": 40, "Sweden": 46}, NORWAY_CRC, RT),
+        t(COLORECTAL, None, {"Norway": 36, "Sweden": 46}, NORWAY_CRC, DR),
+        # Pancreas
+        t(PANCREAS, P.IMAGING_TO_REFERRAL, {"Sweden": 1}, SWEDEN_PANCREAS),
+        t(PANCREAS, P.REFERRAL_TO_SPECIALIST, {"Norway": 8, "Sweden": 7}, NORWAY_PANCREAS),
+        t(PANCREAS, P.SPECIALIST_TO_WORKUP, {"Norway": 21, "Sweden": 14}, NORWAY_PANCREAS),
+        t(PANCREAS, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Sweden": 7}, NORWAY_PANCREAS, SU),
+        t(PANCREAS, P.WORKUP_TO_TREATMENT, {"Norway": 14, "Sweden": 7}, NORWAY_PANCREAS, DR),
+        t(PANCREAS, None, {"Norway": 43, "Sweden": 36}, NORWAY_PANCREAS, SU),
+        t(PANCREAS, None, {"Norway": 43, "Sweden": 29}, NORWAY_PANCREAS, DR),
+    )
+
+
+def _baseline() -> tuple[BaselineCell, ...]:
+    # The mean of Sweden and Norway, 2020-2024, from the NORDCAN operator (NORDCAN citation).
+    nordic = {
+        (LUNG, MALE): (30.8 + 31.3) / 2,
+        (LUNG, FEMALE): (38.4 + 38.9) / 2,
+        (COLORECTAL, MALE): (72.2 + 71.7) / 2,
+        (COLORECTAL, FEMALE): (73.9 + 72.2) / 2,
+        (PANCREAS, MALE): (18.7 + 17.3) / 2,
+        (PANCREAS, FEMALE): (20.0 + 17.9) / 2,
+    }
+    return tuple(
+        BaselineCell(site=site, sex=sex, survival=round(pct / 100, 4), provenance=NORDCAN)
+        for (site, sex), pct in nordic.items()
+    )
+
+
+def _parameter(name, estimate, lo, hi, scale, form, provenance):
+    return Parameter(
+        name=name,
+        estimate=estimate,
+        ci_low=lo,
+        ci_high=hi,
+        scale=scale,
+        form=form,
+        provenance=provenance,
     )
 
 
 def pathway_spec() -> ModelSpec:
+    OV, CS, OR_ = Scale.OVERALL, Scale.CAUSE_SPECIFIC, Scale.ODDS_RATIO
+    F = Form
     return ModelSpec(
         outcome="5-year relative survival",
-        sites=(LUNG,),
+        sites=(LUNG, COLORECTAL, PANCREAS),
         terms=(
             Term(name="sex", levels=(FEMALE, MALE), reference=FEMALE),
             Term(
@@ -178,220 +488,79 @@ def pathway_spec() -> ModelSpec:
             ),
             Term(name="stage", levels=("localised", "regional", "distant"), reference="localised"),
         ),
-        criteria=(
-            _criterion(
-                "lung_symptoms_smoker",
-                TriggerStage.SUSPICION,
-                "New airway symptoms (cough, breathlessness) for 6 weeks in a smoker or ex-smoker "
-                "over 40",
-                ("Sweden",),
-                SWEDEN_SUSPICION,
-            ),
-            _criterion(
-                "lung_chest_pain",
-                TriggerStage.SUSPICION,
-                "Chest or shoulder pain without another explanation",
-                ("Sweden",),
-                SWEDEN_SUSPICION,
-            ),
-            _criterion(
-                "lung_haemoptysis",
-                TriggerStage.SUSPICION,
-                "Coughing blood",
-                ("Sweden",),
-                SWEDEN_SUSPICION,
-            ),
-            _criterion(
-                "lung_imaging",
-                TriggerStage.WELL_FOUNDED,
-                "Imaging finding suggesting lung cancer",
-                ("Norway", "Sweden"),
-                SWEDEN_WELL_FOUNDED,
-            ),
-            _criterion(
-                "lung_metastasis",
-                TriggerStage.WELL_FOUNDED,
-                "A metastasis or a biopsy from another organ suggesting lung cancer",
-                ("Norway", "Sweden"),
-                NORWAY_CRITERIA,
-            ),
-            _criterion(
-                "lung_repeated_haemoptysis",
-                TriggerStage.WELL_FOUNDED,
-                "Repeated haemoptysis without another obvious cause, even with a normal X-ray",
-                ("Sweden",),
-                SWEDEN_WELL_FOUNDED,
-            ),
-            _criterion(
-                "lung_svc",
-                TriggerStage.WELL_FOUNDED,
-                "Superior vena cava obstruction",
-                ("Sweden",),
-                SWEDEN_WELL_FOUNDED,
-            ),
-            _criterion(
-                "lung_recurrent_nerve",
-                TriggerStage.WELL_FOUNDED,
-                "Recurrent laryngeal nerve palsy",
-                ("Sweden",),
-                SWEDEN_WELL_FOUNDED,
-            ),
-        ),
-        targets=(
-            TargetTime(
-                site=LUNG,
-                step=PathwayStep.CONTACT_TO_PHYSICIAN,
-                days_by_country={"Nordic reference": 7},
-                provenance=KHALIFE,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=PathwayStep.PHYSICIAN_TO_IMAGING,
-                days_by_country={"Sweden": 6},
-                provenance=SWEDEN,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=PathwayStep.IMAGING_TO_REFERRAL,
-                days_by_country={"Sweden": 4},
-                provenance=SWEDEN,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=PathwayStep.REFERRAL_TO_SPECIALIST,
-                days_by_country={"Norway": 7},
-                provenance=NORWAY,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=PathwayStep.SPECIALIST_TO_WORKUP,
-                days_by_country={"Norway": 21},
-                provenance=NORWAY,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=PathwayStep.WORKUP_TO_TREATMENT,
-                modality=Modality.SURGERY,
-                days_by_country={"Norway": 14},
-                provenance=NORWAY,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=PathwayStep.WORKUP_TO_TREATMENT,
-                modality=Modality.RADIOTHERAPY,
-                days_by_country={"Norway": 14},
-                provenance=NORWAY,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=PathwayStep.WORKUP_TO_TREATMENT,
-                modality=Modality.DRUGS,
-                days_by_country={"Norway": 7},
-                provenance=NORWAY,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=None,
-                modality=Modality.SURGERY,
-                days_by_country={"Norway": 42, "Sweden": 44},
-                provenance=NORWAY,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=None,
-                modality=Modality.RADIOTHERAPY,
-                days_by_country={"Norway": 42, "Sweden": 44},
-                provenance=NORWAY,
-            ),
-            TargetTime(
-                site=LUNG,
-                step=None,
-                modality=Modality.DRUGS,
-                days_by_country={"Norway": 35, "Sweden": 40},
-                provenance=NORWAY,
-            ),
-        ),
-        baseline=(
-            BaselineCell(site=LUNG, sex=MALE, survival=0.295, provenance=NORDCAN),
-            BaselineCell(site=LUNG, sex=FEMALE, survival=0.38, provenance=NORDCAN),
-        ),
+        criteria=_lung_criteria() + _colorectal_criteria() + _pancreas_criteria(),
+        targets=_targets(),
+        baseline=_baseline(),
         parameters={
-            "heiden_lung_surgery": Parameter(
-                name="heiden_lung_surgery",
-                estimate=1.132,
-                ci_low=0.943,
-                ci_high=1.359,
-                scale=Scale.OVERALL,
-                form=Form.BEYOND_12_WEEKS,
-                provenance=HEIDEN,
+            "heiden_lung_surgery": _parameter(
+                "heiden_lung_surgery", 1.132, 0.943, 1.359, OV, F.BEYOND_12_WEEKS, HEIDEN
             ),
-            "hanna_lung_surgery": Parameter(
-                name="hanna_lung_surgery",
-                estimate=1.06,
-                ci_low=0.93,
-                ci_high=1.19,
-                scale=Scale.OVERALL,
-                form=Form.PER_4_WEEKS,
-                provenance=HANNA,
+            "hanna_lung_surgery": _parameter(
+                "hanna_lung_surgery", 1.06, 0.93, 1.19, OV, F.PER_4_WEEKS, HANNA
             ),
-            "sud_per_day": Parameter(
-                name="sud_per_day",
-                estimate=0.0056,
-                ci_low=0.0056 * 0.92,
-                ci_high=0.0056 * 1.08,
-                scale=Scale.OVERALL,
-                form=Form.PER_DAY,
-                provenance=SUD,
+            "hanna_colectomy": _parameter(
+                "hanna_colectomy", 1.06, 1.01, 1.12, OV, F.PER_4_WEEKS, HANNA_CRC
             ),
-            "zai_stage_or_men": Parameter(
-                name="zai_stage_or_men",
-                estimate=1.10,
-                ci_low=1.08,
-                ci_high=1.12,
-                scale=Scale.ODDS_RATIO,
-                form=Form.ODDS_RATIO,
-                provenance=ZAI,
+            "pancreas_delay_assumed": _parameter(
+                "pancreas_delay_assumed", 1.06, 1.00, 1.12, OV, F.PER_4_WEEKS, PANCREAS_DELAY
             ),
-            "zai_stage_or_women": Parameter(
-                name="zai_stage_or_women",
-                estimate=1.15,
-                ci_low=1.13,
-                ci_high=1.17,
-                scale=Scale.ODDS_RATIO,
-                form=Form.ODDS_RATIO,
-                provenance=ZAI,
+            "sud_per_day": _parameter(
+                "sud_per_day", 0.0056, 0.0056 * 0.92, 0.0056 * 1.08, OV, F.PER_DAY, SUD
             ),
-            "zai_direct_men": Parameter(
-                name="zai_direct_men",
-                estimate=1.13,
-                ci_low=1.10,
-                ci_high=1.16,
-                scale=Scale.CAUSE_SPECIFIC,
-                form=Form.HAZARD_RATIO,
-                provenance=ZAI,
+            "zai_stage_or_men": _parameter(
+                "zai_stage_or_men", 1.10, 1.08, 1.12, OR_, F.ODDS_RATIO, ZAI
             ),
-            "zai_direct_lung_women": Parameter(
-                name="zai_direct_lung_women",
-                estimate=1.22,
-                ci_low=1.12,
-                ci_high=1.33,
-                scale=Scale.CAUSE_SPECIFIC,
-                form=Form.HAZARD_RATIO,
-                provenance=ZAI,
+            "zai_stage_or_women": _parameter(
+                "zai_stage_or_women", 1.15, 1.13, 1.17, OR_, F.ODDS_RATIO, ZAI
+            ),
+            "zai_stage_or_crc_men": _parameter(
+                "zai_stage_or_crc_men", 1.10, 1.05, 1.15, OR_, F.ODDS_RATIO, ZAI
+            ),
+            "zai_stage_or_crc_women": _parameter(
+                "zai_stage_or_crc_women", 1.09, 1.05, 1.15, OR_, F.ODDS_RATIO, ZAI
+            ),
+            "zai_direct_men": _parameter(
+                "zai_direct_men", 1.13, 1.10, 1.16, CS, F.HAZARD_RATIO, ZAI
+            ),
+            "zai_direct_women": _parameter(
+                "zai_direct_women", 1.14, 1.11, 1.17, CS, F.HAZARD_RATIO, ZAI
+            ),
+            "zai_direct_lung_women": _parameter(
+                "zai_direct_lung_women", 1.22, 1.12, 1.33, CS, F.HAZARD_RATIO, ZAI
+            ),
+            "zai_direct_crc_women": _parameter(
+                "zai_direct_crc_women", 1.13, 1.04, 1.22, CS, F.HAZARD_RATIO, ZAI
             ),
         },
         arrows={
             "delay_post:lung:surgery": "heiden_lung_surgery",
             "delay_post:lung": "hanna_lung_surgery",
+            "delay_post:colorectal": "hanna_colectomy",
+            "delay_post:pancreas": "pancreas_delay_assumed",
             "delay_pre": "sud_per_day",
             "stage_education:lung:male": "zai_stage_or_men",
             "stage_education:lung:female": "zai_stage_or_women",
-            "direct_education:lung:male": "zai_direct_men",
+            "stage_education:colorectal:male": "zai_stage_or_crc_men",
+            "stage_education:colorectal:female": "zai_stage_or_crc_women",
+            "stage_education": "zai_stage_or_women",
             "direct_education:lung:female": "zai_direct_lung_women",
+            "direct_education:colorectal:female": "zai_direct_crc_women",
+            "direct_education:lung:male": "zai_direct_men",
+            "direct_education:colorectal:male": "zai_direct_men",
+            "direct_education:pancreas:male": "zai_direct_men",
+            "direct_education:pancreas:female": "zai_direct_women",
         },
         comparison=ComparisonPopulation(
             country="Finland",
-            survival={f"{LUNG}:{MALE}": 0.179, f"{LUNG}:{FEMALE}": 0.308},
+            # NORDCAN, Finland, 2020-2024, from the same operator and run.
+            survival={
+                f"{LUNG}:{MALE}": 0.179,
+                f"{LUNG}:{FEMALE}": 0.308,
+                f"{COLORECTAL}:{MALE}": 0.696,
+                f"{COLORECTAL}:{FEMALE}": 0.728,
+                f"{PANCREAS}:{MALE}": 0.121,
+                f"{PANCREAS}:{FEMALE}": 0.136,
+            },
             days={
                 LUNG: {
                     PathwayStep.SYMPTOMS_TO_CONTACT: 52,
@@ -426,8 +595,8 @@ def pathway_spec() -> ModelSpec:
                 name="pre_trigger",
                 label="Days before the trigger count",
                 default=False,
-                about="Sud's per-day rate on the days lost before imaging. An assumption: part of "
-                "it is lead time.",
+                about="Sud's per-day rate on the days lost before the trigger. An assumption: part "
+                "of it is lead time.",
             ),
         ),
         flags=(
@@ -453,8 +622,7 @@ def pathway_spec() -> ModelSpec:
             ),
         ),
         intended_use=(
-            "An educational and planning tool that shows how a lung-cancer pathway compares with "
-            "the "
+            "An educational and planning tool that shows how a cancer pathway compares with the "
             "Nordic fast-track standards, using synthetic example profiles. Not for decisions "
             "about "
             "the care of an individual patient."
@@ -466,5 +634,7 @@ def pathway_spec() -> ModelSpec:
             "(confounding by indication).",
             "Nordic baseline, Finnish education gradient, American and English delay effects; not "
             "validated on Finnish patients.",
+            "Finland's typical days per step are known for lung cancer only (a preliminary study); "
+            "for the other sites the targets stand in.",
         ),
     )
