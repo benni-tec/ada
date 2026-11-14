@@ -176,7 +176,11 @@ test('an alert with a recorded condition opens the rows that raised it', async (
   const raised = alert({ condition_operator_id: 'op_condition' })
   alertsApi({
     'GET /api/projects/p1/alerts': [{ alert: raised, rule: rule() }],
-    'GET /api/runs/run-2/operators/op_condition/rows': { ...rows, rows: [['north', '2024-01-01', 70]] },
+    'GET /api/runs/run-2/operators/op_condition/rows': {
+      columns: [...rows.columns, { name: 'geometry', type: 'text', nullable: true }],
+      rows: [['north', '2024-01-01', 70, `{"type":"Polygon","coordinates":[${'[1,2],'.repeat(40)}[1,2]]}`]],
+      truncated: false,
+    },
   })
   renderAt('/projects/p1/alerts')
   const list = await screen.findByRole('list', { name: 'Alerts' })
@@ -186,6 +190,8 @@ test('an alert with a recorded condition opens the rows that raised it', async (
   expect(within(table).getByText(/Alerting rows for region: north in run/)).toBeInTheDocument()
   expect(within(table).getAllByRole('row')).toHaveLength(2)
   expect(within(table).getByText('70')).toBeInTheDocument()
+  // An outline is cut short, whole in its title.
+  expect(within(table).getByText(/^\{"type":"Polygon".*…$/)).toHaveAttribute('title', expect.stringContaining('[1,2]]}'))
 })
 
 test('a live alert event refetches the feed', async () => {

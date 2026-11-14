@@ -111,6 +111,20 @@ function FeedItem({ view }: { view: AlertView }) {
   )
 }
 
+// Region outlines and other long text would push the numbers out of view: cut them short,
+// with the whole value in the cell's title.
+const MAX_CELL = 60
+
+function long(value: unknown): boolean {
+  return value !== null && String(value).length > MAX_CELL
+}
+
+function cell(value: unknown): string {
+  if (value === null) return '—'
+  const text = String(value)
+  return long(value) ? `${text.slice(0, MAX_CELL)}…` : text
+}
+
 /**
  * The rows that raised the alert: the output of the rule's condition (an operator over the
  * measure) for the alert's key, in the run that last showed it. A run is a consistent cut,
@@ -148,8 +162,8 @@ function AlertRows({ view }: { view: AlertView }) {
           {rows.map((row, index) => (
             <tr key={index}>
               {row.map((value, column) => (
-                <td key={column} className="px-2 py-1 tabular-nums">
-                  {value === null ? '—' : String(value)}
+                <td key={column} className="px-2 py-1 tabular-nums" title={long(value) ? String(value) : undefined}>
+                  {cell(value)}
                 </td>
               ))}
             </tr>
