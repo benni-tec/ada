@@ -552,6 +552,67 @@
         "title": "AttachmentKind",
         "type": "string"
       },
+      "BaselineCell": {
+        "description": "5-year relative survival for a profile in the baseline population (the Nordic\nlevel). `age_band` or `stage` None: all of them.",
+        "properties": {
+          "age_band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Band"
+          },
+          "excess_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excess Share"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "sex": {
+            "title": "Sex",
+            "type": "string"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "survival": {
+            "title": "Survival",
+            "type": "number"
+          }
+        },
+        "required": [
+          "site",
+          "sex",
+          "survival",
+          "provenance"
+        ],
+        "title": "BaselineCell",
+        "type": "object"
+      },
       "CheckResult": {
         "properties": {
           "changed": {
@@ -578,6 +639,51 @@
           "firing"
         ],
         "title": "CheckResult",
+        "type": "object"
+      },
+      "Citation": {
+        "description": "Where a figure comes from: the citation, the passage it was checked against, and\nthe evidence grade shown beside it.",
+        "properties": {
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "grade": {
+            "$ref": "#/components/schemas/EvidenceGrade"
+          },
+          "passage": {
+            "title": "Passage",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "source",
+          "passage",
+          "grade"
+        ],
+        "title": "Citation",
         "type": "object"
       },
       "Column": {
@@ -615,6 +721,93 @@
         "title": "ColumnType",
         "type": "string"
       },
+      "ComparisonPopulation": {
+        "description": "What the model is compared with: a country's observed survival per site and sex,\nand its typical days per step, for the residual and the population view.",
+        "properties": {
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "days": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "propertyNames": {
+                "$ref": "#/components/schemas/PathwayStep"
+              },
+              "type": "object"
+            },
+            "title": "Days",
+            "type": "object"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "survival": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Survival",
+            "type": "object"
+          }
+        },
+        "required": [
+          "country",
+          "survival",
+          "days",
+          "provenance"
+        ],
+        "title": "ComparisonPopulation",
+        "type": "object"
+      },
+      "Compiled": {
+        "description": "What the build derived from the spec.",
+        "properties": {
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Parameter"
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "population": {
+            "items": {
+              "$ref": "#/components/schemas/PopulationFigure"
+            },
+            "title": "Population",
+            "type": "array"
+          },
+          "targets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              "type": "object"
+            },
+            "title": "Targets",
+            "type": "object"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "targets",
+          "parameters",
+          "population"
+        ],
+        "title": "Compiled",
+        "type": "object"
+      },
       "Context": {
         "discriminator": {
           "mapping": {
@@ -635,6 +828,75 @@
             "$ref": "#/components/schemas/WidgetContext"
           }
         ]
+      },
+      "Contribution": {
+        "description": "A term's effect on the log cumulative excess hazard, for the analyst view.",
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "log_hazard": {
+            "title": "Log Hazard",
+            "type": "number"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "log_hazard",
+          "applied",
+          "note"
+        ],
+        "title": "Contribution",
+        "type": "object"
+      },
+      "Criterion": {
+        "description": "One entry of a national pathway's criteria; the countries whose standard lists it.",
+        "properties": {
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/TriggerStage"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "site",
+          "stage",
+          "text",
+          "countries",
+          "provenance"
+        ],
+        "title": "Criterion",
+        "type": "object"
       },
       "Dashboard": {
         "description": "A live view that follows the latest run. Its content lives in its versions; this\nrecord only points at the current one.",
@@ -968,6 +1230,64 @@
         "title": "DataSource",
         "type": "object"
       },
+      "Deadline": {
+        "properties": {
+          "by": {
+            "title": "By",
+            "type": "integer"
+          },
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "due_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Day"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeadlineStatus"
+          }
+        },
+        "required": [
+          "label",
+          "rule",
+          "countries",
+          "due_day",
+          "status",
+          "by"
+        ],
+        "title": "Deadline",
+        "type": "object"
+      },
+      "DeadlineStatus": {
+        "enum": [
+          "met",
+          "late",
+          "due",
+          "overdue",
+          "not_applicable"
+        ],
+        "title": "DeadlineStatus",
+        "type": "string"
+      },
       "EntryKind": {
         "enum": [
           "message",
@@ -981,6 +1301,233 @@
         ],
         "title": "EntryKind",
         "type": "string"
+      },
+      "Evaluate": {
+        "additionalProperties": false,
+        "properties": {
+          "inputs": {
+            "$ref": "#/components/schemas/EvaluationInputs"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "inputs"
+        ],
+        "title": "Evaluate",
+        "type": "object"
+      },
+      "Evaluation": {
+        "properties": {
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/Contribution"
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "days_behind": {
+            "title": "Days Behind",
+            "type": "integer"
+          },
+          "deadlines": {
+            "items": {
+              "$ref": "#/components/schemas/Deadline"
+            },
+            "title": "Deadlines",
+            "type": "array"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "levers": {
+            "items": {
+              "$ref": "#/components/schemas/Lever"
+            },
+            "title": "Levers",
+            "type": "array"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "pathway": {
+            "items": {
+              "$ref": "#/components/schemas/PathwayRow"
+            },
+            "title": "Pathway",
+            "type": "array"
+          },
+          "survival": {
+            "$ref": "#/components/schemas/Survival"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/Trigger"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "model_id",
+          "version",
+          "trigger",
+          "deadlines",
+          "pathway",
+          "days_behind",
+          "survival",
+          "levers",
+          "flags",
+          "warnings",
+          "contributions"
+        ],
+        "title": "Evaluation",
+        "type": "object"
+      },
+      "EvaluationInputs": {
+        "description": "One profile. Days are the days spent in each step so far; a step left out has not\nstarted. Synthetic profiles only: the platform is not for patient data.",
+        "properties": {
+          "age_band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Band"
+          },
+          "days": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "propertyNames": {
+              "$ref": "#/components/schemas/PathwayStep"
+            },
+            "title": "Days",
+            "type": "object"
+          },
+          "education": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Education"
+          },
+          "intent": {
+            "$ref": "#/components/schemas/Intent",
+            "default": "unknown"
+          },
+          "modality": {
+            "$ref": "#/components/schemas/Modality",
+            "default": "surgery"
+          },
+          "presentation": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Presentation",
+            "type": "array"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "sex": {
+            "title": "Sex",
+            "type": "string"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "toggles": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "default": {},
+            "title": "Toggles",
+            "type": "object"
+          }
+        },
+        "required": [
+          "site",
+          "sex"
+        ],
+        "title": "EvaluationInputs",
+        "type": "object"
+      },
+      "EvidenceGrade": {
+        "enum": [
+          "standard",
+          "meta_analysis",
+          "cohort",
+          "registry",
+          "assumption"
+        ],
+        "title": "EvidenceGrade",
+        "type": "string"
+      },
+      "Figure": {
+        "properties": {
+          "now": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "on_target": {
+            "$ref": "#/components/schemas/Per100"
+          }
+        },
+        "required": [
+          "now",
+          "on_target"
+        ],
+        "title": "Figure",
+        "type": "object"
       },
       "Finding": {
         "properties": {
@@ -1008,6 +1555,47 @@
         ],
         "title": "Finding",
         "type": "object"
+      },
+      "Flag": {
+        "description": "An offer of support shown when a term has a level, e.g. a navigator after basic\neducation. Never a risk label.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "level",
+          "action",
+          "provenance"
+        ],
+        "title": "Flag",
+        "type": "object"
+      },
+      "Form": {
+        "description": "How a parameter enters the model.",
+        "enum": [
+          "per_4_weeks",
+          "beyond_12_weeks",
+          "per_day",
+          "hazard_ratio",
+          "odds_ratio",
+          "value"
+        ],
+        "title": "Form",
+        "type": "string"
       },
       "FoundBy": {
         "description": "How an agent came upon a source: the web search and its scope.",
@@ -1250,6 +1838,15 @@
         "format": "uuid",
         "type": "string"
       },
+      "Intent": {
+        "enum": [
+          "curative",
+          "palliative",
+          "unknown"
+        ],
+        "title": "Intent",
+        "type": "string"
+      },
       "Interval": {
         "description": "A period of data: both ends inclusive. A year is 1 January to 31 December; a\nmulti-year window such as 2022-2024 is one interval, not three.",
         "properties": {
@@ -1467,6 +2064,36 @@
         "title": "JudgeSettings",
         "type": "object"
       },
+      "Lever": {
+        "properties": {
+          "gain": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "grade": {
+            "$ref": "#/components/schemas/EvidenceGrade"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "step": {
+            "$ref": "#/components/schemas/PathwayStep"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "label",
+          "gain",
+          "grade",
+          "text"
+        ],
+        "title": "Lever",
+        "type": "object"
+      },
       "Liveness": {
         "properties": {
           "status": {
@@ -1588,6 +2215,15 @@
         "title": "MeasureRole",
         "type": "object"
       },
+      "Modality": {
+        "enum": [
+          "surgery",
+          "radiotherapy",
+          "drugs"
+        ],
+        "title": "Modality",
+        "type": "string"
+      },
       "ModelInfo": {
         "description": "A configured model, as the catalog shows it. Its key is never part of it.",
         "properties": {
@@ -1670,6 +2306,155 @@
           }
         },
         "title": "ModelList",
+        "type": "object"
+      },
+      "ModelSpec": {
+        "description": "Everything a version is built from. Validated when a version is created\n(StatisticalModelService.create).",
+        "properties": {
+          "arrows": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Arrows",
+            "type": "object"
+          },
+          "baseline": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineCell"
+            },
+            "title": "Baseline",
+            "type": "array"
+          },
+          "cautions": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Cautions",
+            "type": "array"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/ComparisonPopulation"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/Flag"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "intended_use": {
+            "title": "Intended Use",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Parameter"
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "sites": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sites",
+            "type": "array"
+          },
+          "structure": {
+            "const": "relative_survival_dag",
+            "default": "relative_survival_dag",
+            "title": "Structure",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetTime"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/Term"
+            },
+            "title": "Terms",
+            "type": "array"
+          },
+          "toggles": {
+            "items": {
+              "$ref": "#/components/schemas/Toggle"
+            },
+            "title": "Toggles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outcome",
+          "sites",
+          "terms",
+          "criteria",
+          "targets",
+          "baseline",
+          "parameters",
+          "arrows",
+          "comparison",
+          "toggles",
+          "flags",
+          "intended_use"
+        ],
+        "title": "ModelSpec",
+        "type": "object"
+      },
+      "ModelVersion": {
+        "description": "Immutable; a change makes a new version.",
+        "properties": {
+          "compiled": {
+            "$ref": "#/components/schemas/Compiled"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ModelSpec"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "model_id",
+          "version",
+          "spec",
+          "compiled",
+          "created_by",
+          "created_at"
+        ],
+        "title": "ModelVersion",
         "type": "object"
       },
       "NewAlertRule": {
@@ -1872,24 +2657,6 @@
           "text"
         ],
         "title": "NewMessage",
-        "type": "object"
-      },
-      "NewModel": {
-        "additionalProperties": false,
-        "properties": {
-          "model": {
-            "title": "Model",
-            "type": "string"
-          },
-          "provider_id": {
-            "$ref": "#/components/schemas/Id"
-          }
-        },
-        "required": [
-          "provider_id",
-          "model"
-        ],
-        "title": "NewModel",
         "type": "object"
       },
       "NewProject": {
@@ -2339,6 +3106,19 @@
         "title": "NewTransform",
         "type": "object"
       },
+      "NewVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "spec": {
+            "$ref": "#/components/schemas/ModelSpec"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "title": "NewVersion",
+        "type": "object"
+      },
       "NewWidget": {
         "additionalProperties": false,
         "properties": {
@@ -2505,6 +3285,139 @@
         "title": "OutputKind",
         "type": "string"
       },
+      "Parameter": {
+        "properties": {
+          "ci_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci High"
+          },
+          "ci_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Low"
+          },
+          "estimate": {
+            "title": "Estimate",
+            "type": "number"
+          },
+          "form": {
+            "$ref": "#/components/schemas/Form",
+            "default": "value"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "scale": {
+            "$ref": "#/components/schemas/Scale"
+          }
+        },
+        "required": [
+          "name",
+          "estimate",
+          "scale",
+          "provenance"
+        ],
+        "title": "Parameter",
+        "type": "object"
+      },
+      "PathwayRow": {
+        "properties": {
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "gap": {
+            "title": "Gap",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "patient_interval": {
+            "title": "Patient Interval",
+            "type": "boolean"
+          },
+          "step": {
+            "$ref": "#/components/schemas/PathwayStep"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "step",
+          "label",
+          "days",
+          "target",
+          "gap",
+          "countries",
+          "patient_interval",
+          "current"
+        ],
+        "title": "PathwayRow",
+        "type": "object"
+      },
+      "PathwayStep": {
+        "description": "The seven intervals of a pathway, in order, from the first symptoms to the start of\ntreatment. The first is the patient interval; the trigger (imaging done) ends the\nthird; the clock the deadlines count from starts there.",
+        "enum": [
+          "symptoms_to_contact",
+          "contact_to_physician",
+          "physician_to_imaging",
+          "imaging_to_referral",
+          "referral_to_specialist",
+          "specialist_to_workup",
+          "workup_to_treatment"
+        ],
+        "title": "PathwayStep",
+        "type": "string"
+      },
+      "Per100": {
+        "type": "integer"
+      },
       "Pin": {
         "additionalProperties": false,
         "properties": {
@@ -2612,6 +3525,47 @@
           "name"
         ],
         "title": "PipelineSource",
+        "type": "object"
+      },
+      "PopulationFigure": {
+        "description": "Per site and sex: the baseline, the baseline with the comparison country's days,\nand that country's observed survival. The residual is what the days do not explain.",
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "observed": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "residual": {
+            "title": "Residual",
+            "type": "number"
+          },
+          "sex": {
+            "title": "Sex",
+            "type": "string"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "timing_adjusted": {
+            "$ref": "#/components/schemas/Per100"
+          }
+        },
+        "required": [
+          "site",
+          "sex",
+          "baseline",
+          "timing_adjusted",
+          "observed",
+          "residual",
+          "note"
+        ],
+        "title": "PopulationFigure",
         "type": "object"
       },
       "PostedMessage": {
@@ -2838,6 +3792,22 @@
         ],
         "title": "ProviderKind",
         "type": "string"
+      },
+      "Range": {
+        "properties": {
+          "high": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "low": {
+            "$ref": "#/components/schemas/Per100"
+          }
+        },
+        "required": [
+          "low",
+          "high"
+        ],
+        "title": "Range",
+        "type": "object"
       },
       "ReasoningPart": {
         "properties": {
@@ -3307,6 +4277,20 @@
         ],
         "title": "Run",
         "type": "object"
+      },
+      "Scale": {
+        "description": "What a parameter is measured on. Hazard ratios on overall mortality are converted to\nthe excess scale at build (Compiled.parameters), the others are used as they are.",
+        "enum": [
+          "excess",
+          "cause_specific",
+          "overall",
+          "odds_ratio",
+          "per_day",
+          "days",
+          "survival"
+        ],
+        "title": "Scale",
+        "type": "string"
       },
       "Schema": {
         "description": "What an operator produces. Every operator states it; `derived` says whether the\nplatform worked it out from the inputs or its creator declared it.",
@@ -3799,6 +4783,85 @@
         "title": "SourcePart",
         "type": "object"
       },
+      "StageResult": {
+        "properties": {
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "criteria": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "fired": {
+            "title": "Fired",
+            "type": "boolean"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/TriggerStage"
+          }
+        },
+        "required": [
+          "stage",
+          "fired",
+          "countries",
+          "criteria"
+        ],
+        "title": "StageResult",
+        "type": "object"
+      },
+      "StatisticalModel": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "latest_version": {
+            "title": "Latest Version",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "description",
+          "kind",
+          "latest_version",
+          "created_by",
+          "created_at"
+        ],
+        "title": "StatisticalModel",
+        "type": "object"
+      },
       "StoredFile": {
         "description": "A file uploaded to ADA, to be read by a source at `address`.",
         "properties": {
@@ -3831,6 +4894,93 @@
         ],
         "title": "Strictness",
         "type": "string"
+      },
+      "Survival": {
+        "properties": {
+          "by_setting": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Figure"
+            },
+            "title": "By Setting",
+            "type": "object"
+          },
+          "now": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "on_target": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "range_now": {
+            "$ref": "#/components/schemas/Range"
+          },
+          "range_on_target": {
+            "$ref": "#/components/schemas/Range"
+          },
+          "setting": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Setting",
+            "type": "object"
+          }
+        },
+        "required": [
+          "now",
+          "on_target",
+          "by_setting",
+          "range_now",
+          "range_on_target",
+          "setting"
+        ],
+        "title": "Survival",
+        "type": "object"
+      },
+      "TargetTime": {
+        "description": "A step's standard time in each country that defines it. The target is their median\n(Compiled.targets). `step` None is the whole pathway, trigger to treatment start.",
+        "properties": {
+          "days_by_country": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Days By Country",
+            "type": "object"
+          },
+          "modality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Modality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PathwayStep"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "site",
+          "step",
+          "days_by_country",
+          "provenance"
+        ],
+        "title": "TargetTime",
+        "type": "object"
       },
       "Template": {
         "properties": {
@@ -3887,6 +5037,41 @@
         ],
         "title": "TemplateKind",
         "type": "string"
+      },
+      "Term": {
+        "properties": {
+          "display": {
+            "default": "patient",
+            "enum": [
+              "patient",
+              "analyst"
+            ],
+            "title": "Display",
+            "type": "string"
+          },
+          "levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reference": {
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "levels",
+          "reference"
+        ],
+        "title": "Term",
+        "type": "object"
       },
       "TextPart": {
         "properties": {
@@ -3965,6 +5150,34 @@
           "end"
         ],
         "title": "TimeRole",
+        "type": "object"
+      },
+      "Toggle": {
+        "properties": {
+          "about": {
+            "title": "About",
+            "type": "string"
+          },
+          "default": {
+            "title": "Default",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "default",
+          "about"
+        ],
+        "title": "Toggle",
         "type": "object"
       },
       "ToolCall": {
@@ -4066,6 +5279,47 @@
           "output-error"
         ],
         "title": "ToolState",
+        "type": "string"
+      },
+      "Trigger": {
+        "properties": {
+          "clock_start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Start"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "suspicion": {
+            "$ref": "#/components/schemas/StageResult"
+          },
+          "well_founded": {
+            "$ref": "#/components/schemas/StageResult"
+          }
+        },
+        "required": [
+          "suspicion",
+          "well_founded",
+          "clock_start",
+          "note"
+        ],
+        "title": "Trigger",
+        "type": "object"
+      },
+      "TriggerStage": {
+        "enum": [
+          "suspicion",
+          "well_founded"
+        ],
+        "title": "TriggerStage",
         "type": "string"
       },
       "TurnPart": {
@@ -4511,6 +5765,47 @@
           "rows"
         ],
         "title": "WidgetData",
+        "type": "object"
+      },
+      "ada__entrypoints__http__routers__settings__NewModel": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "provider_id",
+          "model"
+        ],
+        "title": "NewModel",
+        "type": "object"
+      },
+      "ada__entrypoints__http__routers__statistical_models__NewModel": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ModelSpec"
+          }
+        },
+        "required": [
+          "name",
+          "spec"
+        ],
+        "title": "NewModel",
         "type": "object"
       }
     }
@@ -5464,6 +6759,298 @@
         ]
       }
     },
+    "/api/models/{model_id}": {
+      "get": {
+        "operationId": "get_model_api_models__model_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatisticalModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/evaluate": {
+      "post": {
+        "description": "Evaluate one synthetic profile. Nothing is stored: no run, no snapshot, no\noperator.",
+        "operationId": "evaluate_model_api_models__model_id__evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Evaluate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evaluation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/population": {
+      "get": {
+        "operationId": "population_api_models__model_id__population_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PopulationFigure"
+                  },
+                  "title": "Response Population Api Models  Model Id  Population Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Population",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/versions": {
+      "post": {
+        "operationId": "add_version_api_models__model_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Version",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/versions/latest": {
+      "get": {
+        "operationId": "latest_version_api_models__model_id__versions_latest_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Latest Version",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/versions/{number}": {
+      "get": {
+        "operationId": "get_version_api_models__model_id__versions__number__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Version",
+        "tags": [
+          "models"
+        ]
+      }
+    },
     "/api/operators/{operator_id}": {
       "get": {
         "operationId": "get_operator_api_operators__operator_id__get",
@@ -6199,6 +7786,148 @@
         "summary": "Override Project Judge",
         "tags": [
           "judges"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/models": {
+      "get": {
+        "operationId": "list_models_api_projects__project_id__models_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StatisticalModel"
+                  },
+                  "title": "Response List Models Api Projects  Project Id  Models Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "models"
+        ]
+      },
+      "post": {
+        "operationId": "create_model_api_projects__project_id__models_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ada__entrypoints__http__routers__statistical_models__NewModel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/models/pathway": {
+      "post": {
+        "description": "The patient pathway model (lung cancer, v1), built from the figures and provenance\nshipped with the platform.",
+        "operationId": "create_pathway_model_api_projects__project_id__models_pathway_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Pathway Model",
+        "tags": [
+          "models"
         ]
       }
     },
@@ -8024,7 +9753,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NewModel"
+                "$ref": "#/components/schemas/ada__entrypoints__http__routers__settings__NewModel"
               }
             }
           },

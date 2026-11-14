@@ -74,6 +74,7 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
           <SidebarGroup className="pb-0">
             <SidebarMenu>
               <Alerts projectId={projectId} />
+              <Models projectId={projectId} />
             </SidebarMenu>
           </SidebarGroup>
           <SidebarGroup className="pt-4">
@@ -438,6 +439,21 @@ function Alerts({ projectId }: { projectId: Id }) {
           <span className="sr-only"> active</span>
         </SidebarMenuBadge>
       )}
+    </SidebarMenuItem>
+  )
+}
+
+/** One page: the project's statistical models. */
+function Models({ projectId }: { projectId: Id }) {
+  const Icon = pageTypes.model.icon
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild tooltip="Models">
+        <Link to="/projects/$projectId/models" params={{ projectId }} activeProps={{ 'data-active': true }}>
+          <Icon aria-hidden="true" />
+          <span>Models</span>
+        </Link>
+      </SidebarMenuButton>
     </SidebarMenuItem>
   )
 }

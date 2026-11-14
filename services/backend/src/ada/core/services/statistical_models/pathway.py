@@ -5,6 +5,7 @@ standard times and baseline are loaded as sources."""
 
 from ada.core.models.statistical_models import (
     BaselineCell,
+    Citation,
     ComparisonPopulation,
     Criterion,
     EvidenceGrade,
@@ -14,7 +15,6 @@ from ada.core.models.statistical_models import (
     ModelSpec,
     Parameter,
     PathwayStep,
-    Provenance,
     Scale,
     TargetTime,
     Term,
@@ -31,7 +31,7 @@ DESCRIPTION = (
 )
 KIND = "patient_pathway"
 
-NORWAY = Provenance(
+NORWAY = Citation(
     source="Helsedirektoratet, Pakkeforløp for lungekreft (last revised 3 July 2026)",
     passage="Fra henvisning mottatt til første fremmøte utredende avdeling: 7 kalenderdager; til "
     "avsluttet utredning: 21; til start behandling: kirurgisk 14, medikamentell 7, "
@@ -48,7 +48,7 @@ NORWAY_CRITERIA = NORWAY.model_copy(
         "url": "https://www.helsedirektoratet.no/nasjonale-forlop/lungekreft/inngang-til-pakkeforlop-for-lungekreft/begrunnet-mistanke-kriterier-for-henvisning-til-pakkeforlop",
     }
 )
-SWEDEN = Provenance(
+SWEDEN = Citation(
     source="Regionala cancercentrum, Standardiserat vårdförlopp lungcancer, version 1.4 "
     "(2024-11-05)",
     passage="Ledtider för nationell uppföljning: beslut välgrundad misstanke till start av första "
@@ -74,14 +74,14 @@ SWEDEN_WELL_FOUNDED = SWEDEN.model_copy(
         "superior; recurrenspares.",
     }
 )
-KHALIFE = Provenance(
+KHALIFE = Citation(
     source="Khalife et al., Acta Oncol 2025;64:734–41 (a survey of 42 clinicians; MSD-funded)",
     passage="Table 2: appointment at health centre for lung cancer symptoms, Finland 14 days; "
     "Sweden, Denmark, Norway, Iceland 2–7 days.",
     grade=EvidenceGrade.ASSUMPTION,
     url="https://medicaljournalssweden.se/actaoncologica/article/download/42778/50476",
 )
-HANNA = Provenance(
+HANNA = Citation(
     source="Hanna et al., BMJ 2020;371:m4087 (PMC7610021)",
     passage="The results for lung surgery were consistent with other sites, though not "
     "statistically significant (1.06, 0.93 to 1.19). Delay was measured from diagnosis to "
@@ -90,7 +90,7 @@ HANNA = Provenance(
     grade=EvidenceGrade.META_ANALYSIS,
     url="https://doi.org/10.1136/bmj.m4087",
 )
-HEIDEN = Provenance(
+HEIDEN = Citation(
     source="Heiden et al., JAMA Netw Open 2021 (PMC8160592; VA, 9,904 patients, 96 % men)",
     passage="Surgical procedures delayed more than 12 weeks from the diagnostic CT were associated "
     "with increased risk of recurrence and worse overall survival: HR 1.132 (95% CI "
@@ -98,7 +98,7 @@ HEIDEN = Provenance(
     grade=EvidenceGrade.COHORT,
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC8160592/",
 )
-SUD = Provenance(
+SUD = Citation(
     source="Sud et al., Ann Oncol 2020;31:1065–74 (PMC7237184)",
     passage="Per-day hazard ratio for fatality: low progressiveness 0.0030, moderate and high "
     "0.0056 (no data for high; the moderate value applied). Varied by ±8 % in sensitivity "
@@ -107,7 +107,7 @@ SUD = Provenance(
     grade=EvidenceGrade.ASSUMPTION,
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC7237184/",
 )
-ZAI = Provenance(
+ZAI = Citation(
     source="Zai et al., BMJ Public Health 2025 (PMC12551501; 469,522 cases, 2000–2019)",
     passage="Stage IV vs I–III, low vs high education: men OR 1.10 (1.08–1.12), women 1.15 "
     "(1.13–1.17). Cancer-specific mortality, adjusted for age, year, stage, treatment, birth "
@@ -116,7 +116,7 @@ ZAI = Provenance(
     grade=EvidenceGrade.REGISTRY,
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC12551501/",
 )
-NORDCAN = Provenance(
+NORDCAN = Citation(
     source="NORDCAN 9.6, 5-year relative survival, lung cancer, 2020–2024, as quoted in the plan "
     "(docs/superpowers/plans/2026-11-14-statistical-models.md, Part 1)",
     passage="Lung: 17.9 % men / 30.8 % women in Finland, against 28–31 / 37–39 % elsewhere. The "
@@ -125,7 +125,7 @@ NORDCAN = Provenance(
     grade=EvidenceGrade.REGISTRY,
     url="https://nordcan.iarc.fr/",
 )
-YLE = Provenance(
+YLE = Citation(
     source="Yle MOT (2025), reporting an unpublished study by Kuittinen, University of Eastern "
     "Finland",
     passage="Finland, lung cancer, symptom onset to treatment: about 155 days, of which more than "
@@ -141,7 +141,7 @@ FEMALE, MALE = "female", "male"
 
 
 def _criterion(
-    id: str, stage: TriggerStage, text: str, countries: tuple[str, ...], provenance: Provenance
+    id: str, stage: TriggerStage, text: str, countries: tuple[str, ...], provenance: Citation
 ) -> Criterion:
     return Criterion(
         id=id, site=LUNG, stage=stage, text=text, countries=countries, provenance=provenance

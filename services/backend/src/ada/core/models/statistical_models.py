@@ -40,7 +40,7 @@ class Scale(StrEnum):
     SURVIVAL = "survival"
 
 
-class Provenance(DomainModel):
+class Citation(DomainModel):
     """Where a figure comes from: the citation, the passage it was checked against, and
     the evidence grade shown beside it."""
 
@@ -72,7 +72,7 @@ class Parameter(DomainModel):
     ci_high: float | None = None
     scale: Scale
     form: Form = Form.VALUE
-    provenance: Provenance
+    provenance: Citation
 
 
 class PathwayStep(StrEnum):
@@ -125,7 +125,7 @@ class Criterion(DomainModel):
     stage: TriggerStage
     text: str
     countries: tuple[str, ...]
-    provenance: Provenance
+    provenance: Citation
 
 
 class Modality(StrEnum):
@@ -143,7 +143,7 @@ class TargetTime(DomainModel):
     # None: every modality.
     modality: Modality | None = None
     days_by_country: dict[str, int]
-    provenance: Provenance
+    provenance: Citation
 
 
 class BaselineCell(DomainModel):
@@ -159,7 +159,7 @@ class BaselineCell(DomainModel):
     # The share of the hazard that is excess hazard, for converting overall-mortality HRs;
     # None: not loaded, so overall HRs are used unconverted, with a warning.
     excess_share: float | None = None
-    provenance: Provenance
+    provenance: Citation
 
 
 class ComparisonPopulation(DomainModel):
@@ -171,7 +171,7 @@ class ComparisonPopulation(DomainModel):
     survival: dict[str, float]
     # site -> step -> typical days.
     days: dict[str, dict[PathwayStep, int]]
-    provenance: Provenance
+    provenance: Citation
 
 
 class Toggle(DomainModel):
@@ -188,7 +188,7 @@ class Flag(DomainModel):
     term: str
     level: str
     action: str
-    provenance: Provenance
+    provenance: Citation
 
 
 class Term(DomainModel):
@@ -350,13 +350,18 @@ class Figure(DomainModel):
     on_target: Per100
 
 
+class Range(DomainModel):
+    low: Per100
+    high: Per100
+
+
 class Survival(DomainModel):
     now: Per100
     on_target: Per100
     # Every combination of the toggles, keyed "name=on,name=off".
     by_setting: dict[str, Figure]
-    range_now: tuple[Per100, Per100]
-    range_on_target: tuple[Per100, Per100]
+    range_now: Range
+    range_on_target: Range
     # The setting the headline figures are for.
     setting: dict[str, bool]
 

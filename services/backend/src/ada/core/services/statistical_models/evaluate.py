@@ -33,6 +33,7 @@ from ada.core.models.statistical_models import (
     PathwayRow,
     PathwayStep,
     Per100,
+    Range,
     Scale,
     StageResult,
     Survival,
@@ -426,8 +427,8 @@ def evaluate(version: ModelVersion, inputs: EvaluationInputs) -> Evaluation:
         now=per100(now_value),
         on_target=per100(on_value),
         by_setting=by_setting,
-        range_now=(min(nows), max(nows)),
-        range_on_target=(min(ons), max(ons)),
+        range_now=Range(low=min(nows), high=max(nows)),
+        range_on_target=Range(low=min(ons), high=max(ons)),
         setting=headline,
     )
 

@@ -15,6 +15,8 @@ import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$p
 import { Route as ProjectsProjectIdSettingsRouteImport } from './routes/projects/$projectId/settings'
 import { Route as ProjectsProjectIdAlertsIndexRouteImport } from './routes/projects/$projectId/alerts/index'
 import { Route as ProjectsProjectIdDashboardsDashboardIdRouteImport } from './routes/projects/$projectId/dashboards/$dashboardId'
+import { Route as ProjectsProjectIdModelsIndexRouteImport } from './routes/projects/$projectId/models/index'
+import { Route as ProjectsProjectIdModelsModelIdRouteImport } from './routes/projects/$projectId/models/$modelId'
 import { Route as ProjectsProjectIdReportsReportIdRouteImport } from './routes/projects/$projectId/reports/$reportId'
 import { Route as ProjectsProjectIdReportsNewRouteImport } from './routes/projects/$projectId/reports/new'
 import { Route as ProjectsProjectIdSessionsSessionIdRouteImport } from './routes/projects/$projectId/sessions/$sessionId'
@@ -53,6 +55,18 @@ const ProjectsProjectIdDashboardsDashboardIdRoute =
     path: '/dashboards/$dashboardId',
     getParentRoute: () => ProjectsProjectIdRouteRoute,
   } as any)
+const ProjectsProjectIdModelsIndexRoute =
+  ProjectsProjectIdModelsIndexRouteImport.update({
+    id: '/models/',
+    path: '/models/',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdModelsModelIdRoute =
+  ProjectsProjectIdModelsModelIdRouteImport.update({
+    id: '/models/$modelId',
+    path: '/models/$modelId',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
 const ProjectsProjectIdReportsReportIdRoute =
   ProjectsProjectIdReportsReportIdRouteImport.update({
     id: '/reports/$reportId',
@@ -84,22 +98,26 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/dashboards/$dashboardId': typeof ProjectsProjectIdDashboardsDashboardIdRoute
+  '/projects/$projectId/models/$modelId': typeof ProjectsProjectIdModelsModelIdRoute
   '/projects/$projectId/reports/$reportId': typeof ProjectsProjectIdReportsReportIdRoute
   '/projects/$projectId/reports/new': typeof ProjectsProjectIdReportsNewRoute
   '/projects/$projectId/sessions/$sessionId': typeof ProjectsProjectIdSessionsSessionIdRoute
   '/projects/$projectId/widgets/$widgetId': typeof ProjectsProjectIdWidgetsWidgetIdRoute
   '/projects/$projectId/alerts/': typeof ProjectsProjectIdAlertsIndexRoute
+  '/projects/$projectId/models/': typeof ProjectsProjectIdModelsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/dashboards/$dashboardId': typeof ProjectsProjectIdDashboardsDashboardIdRoute
+  '/projects/$projectId/models/$modelId': typeof ProjectsProjectIdModelsModelIdRoute
   '/projects/$projectId/reports/$reportId': typeof ProjectsProjectIdReportsReportIdRoute
   '/projects/$projectId/reports/new': typeof ProjectsProjectIdReportsNewRoute
   '/projects/$projectId/sessions/$sessionId': typeof ProjectsProjectIdSessionsSessionIdRoute
   '/projects/$projectId/widgets/$widgetId': typeof ProjectsProjectIdWidgetsWidgetIdRoute
   '/projects/$projectId/alerts': typeof ProjectsProjectIdAlertsIndexRoute
+  '/projects/$projectId/models': typeof ProjectsProjectIdModelsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -108,11 +126,13 @@ export interface FileRoutesById {
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/dashboards/$dashboardId': typeof ProjectsProjectIdDashboardsDashboardIdRoute
+  '/projects/$projectId/models/$modelId': typeof ProjectsProjectIdModelsModelIdRoute
   '/projects/$projectId/reports/$reportId': typeof ProjectsProjectIdReportsReportIdRoute
   '/projects/$projectId/reports/new': typeof ProjectsProjectIdReportsNewRoute
   '/projects/$projectId/sessions/$sessionId': typeof ProjectsProjectIdSessionsSessionIdRoute
   '/projects/$projectId/widgets/$widgetId': typeof ProjectsProjectIdWidgetsWidgetIdRoute
   '/projects/$projectId/alerts/': typeof ProjectsProjectIdAlertsIndexRoute
+  '/projects/$projectId/models/': typeof ProjectsProjectIdModelsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -122,22 +142,26 @@ export interface FileRouteTypes {
     | '/projects/$projectId/settings'
     | '/projects/$projectId/'
     | '/projects/$projectId/dashboards/$dashboardId'
+    | '/projects/$projectId/models/$modelId'
     | '/projects/$projectId/reports/$reportId'
     | '/projects/$projectId/reports/new'
     | '/projects/$projectId/sessions/$sessionId'
     | '/projects/$projectId/widgets/$widgetId'
     | '/projects/$projectId/alerts/'
+    | '/projects/$projectId/models/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/projects/$projectId/settings'
     | '/projects/$projectId'
     | '/projects/$projectId/dashboards/$dashboardId'
+    | '/projects/$projectId/models/$modelId'
     | '/projects/$projectId/reports/$reportId'
     | '/projects/$projectId/reports/new'
     | '/projects/$projectId/sessions/$sessionId'
     | '/projects/$projectId/widgets/$widgetId'
     | '/projects/$projectId/alerts'
+    | '/projects/$projectId/models'
   id:
     | '__root__'
     | '/'
@@ -145,11 +169,13 @@ export interface FileRouteTypes {
     | '/projects/$projectId/settings'
     | '/projects/$projectId/'
     | '/projects/$projectId/dashboards/$dashboardId'
+    | '/projects/$projectId/models/$modelId'
     | '/projects/$projectId/reports/$reportId'
     | '/projects/$projectId/reports/new'
     | '/projects/$projectId/sessions/$sessionId'
     | '/projects/$projectId/widgets/$widgetId'
     | '/projects/$projectId/alerts/'
+    | '/projects/$projectId/models/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -201,6 +227,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdDashboardsDashboardIdRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
+    '/projects/$projectId/models/': {
+      id: '/projects/$projectId/models/'
+      path: '/models'
+      fullPath: '/projects/$projectId/models/'
+      preLoaderRoute: typeof ProjectsProjectIdModelsIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/models/$modelId': {
+      id: '/projects/$projectId/models/$modelId'
+      path: '/models/$modelId'
+      fullPath: '/projects/$projectId/models/$modelId'
+      preLoaderRoute: typeof ProjectsProjectIdModelsModelIdRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
     '/projects/$projectId/reports/$reportId': {
       id: '/projects/$projectId/reports/$reportId'
       path: '/reports/$reportId'
@@ -236,11 +276,13 @@ interface ProjectsProjectIdRouteRouteChildren {
   ProjectsProjectIdSettingsRoute: typeof ProjectsProjectIdSettingsRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
   ProjectsProjectIdDashboardsDashboardIdRoute: typeof ProjectsProjectIdDashboardsDashboardIdRoute
+  ProjectsProjectIdModelsModelIdRoute: typeof ProjectsProjectIdModelsModelIdRoute
   ProjectsProjectIdReportsReportIdRoute: typeof ProjectsProjectIdReportsReportIdRoute
   ProjectsProjectIdReportsNewRoute: typeof ProjectsProjectIdReportsNewRoute
   ProjectsProjectIdSessionsSessionIdRoute: typeof ProjectsProjectIdSessionsSessionIdRoute
   ProjectsProjectIdWidgetsWidgetIdRoute: typeof ProjectsProjectIdWidgetsWidgetIdRoute
   ProjectsProjectIdAlertsIndexRoute: typeof ProjectsProjectIdAlertsIndexRoute
+  ProjectsProjectIdModelsIndexRoute: typeof ProjectsProjectIdModelsIndexRoute
 }
 
 const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
@@ -249,6 +291,7 @@ const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
     ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
     ProjectsProjectIdDashboardsDashboardIdRoute:
       ProjectsProjectIdDashboardsDashboardIdRoute,
+    ProjectsProjectIdModelsModelIdRoute: ProjectsProjectIdModelsModelIdRoute,
     ProjectsProjectIdReportsReportIdRoute:
       ProjectsProjectIdReportsReportIdRoute,
     ProjectsProjectIdReportsNewRoute: ProjectsProjectIdReportsNewRoute,
@@ -257,6 +300,7 @@ const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
     ProjectsProjectIdWidgetsWidgetIdRoute:
       ProjectsProjectIdWidgetsWidgetIdRoute,
     ProjectsProjectIdAlertsIndexRoute: ProjectsProjectIdAlertsIndexRoute,
+    ProjectsProjectIdModelsIndexRoute: ProjectsProjectIdModelsIndexRoute,
   }
 
 const ProjectsProjectIdRouteRouteWithChildren =

@@ -151,7 +151,7 @@ def test_survival_is_second_graded_and_bounded_by_the_settings(version: ModelVer
     }
     # Without the residual the figures are the Nordic ones, higher.
     assert survival.by_setting["finland_residual=off,pre_trigger=off"].now > survival.now
-    assert survival.range_now[0] <= survival.now <= survival.range_now[1]
+    assert survival.range_now.low <= survival.now <= survival.range_now.high
     # The days before the trigger count only when asked.
     assert survival.by_setting["finland_residual=on,pre_trigger=on"].now <= survival.now
     grades = {lever.step: lever.grade for lever in result.levers}

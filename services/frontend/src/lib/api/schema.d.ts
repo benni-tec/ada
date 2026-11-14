@@ -349,6 +349,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{model_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Model */
+        get: operations["get_model_api_models__model_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evaluate Model
+         * @description Evaluate one synthetic profile. Nothing is stored: no run, no snapshot, no
+         *     operator.
+         */
+        post: operations["evaluate_model_api_models__model_id__evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/population": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Population */
+        get: operations["population_api_models__model_id__population_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Version */
+        post: operations["add_version_api_models__model_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/versions/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Latest Version */
+        get: operations["latest_version_api_models__model_id__versions_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Version */
+        get: operations["get_version_api_models__model_id__versions__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/operators/{operator_id}": {
         parameters: {
             query?: never;
@@ -581,6 +687,45 @@ export interface paths {
         /** Override Project Judge */
         put: operations["override_project_judge_api_projects__project_id__judges__kind__put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Models */
+        get: operations["list_models_api_projects__project_id__models_get"];
+        put?: never;
+        /** Create Model */
+        post: operations["create_model_api_projects__project_id__models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/models/pathway": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Pathway Model
+         * @description The patient pathway model (lung cancer, v1), built from the figures and provenance
+         *     shipped with the platform.
+         */
+        post: operations["create_pathway_model_api_projects__project_id__models_pathway_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1716,6 +1861,26 @@ export interface components {
          * @enum {string}
          */
         AttachmentKind: "dashboard" | "report" | "alert_rule" | "source" | "operator" | "session" | "widget" | "web_page";
+        /**
+         * BaselineCell
+         * @description 5-year relative survival for a profile in the baseline population (the Nordic
+         *     level). `age_band` or `stage` None: all of them.
+         */
+        BaselineCell: {
+            /** Age Band */
+            age_band?: string | null;
+            /** Excess Share */
+            excess_share?: number | null;
+            provenance: components["schemas"]["Citation"];
+            /** Sex */
+            sex: string;
+            /** Site */
+            site: string;
+            /** Stage */
+            stage?: string | null;
+            /** Survival */
+            survival: number;
+        };
         /** CheckResult */
         CheckResult: {
             /** Changed */
@@ -1723,6 +1888,22 @@ export interface components {
             /** Firing */
             firing: components["schemas"]["Alert"][];
             rule: components["schemas"]["AlertRule"];
+        };
+        /**
+         * Citation
+         * @description Where a figure comes from: the citation, the passage it was checked against, and
+         *     the evidence grade shown beside it.
+         */
+        Citation: {
+            /** Country */
+            country?: string | null;
+            grade: components["schemas"]["EvidenceGrade"];
+            /** Passage */
+            passage: string;
+            /** Source */
+            source: string;
+            /** Url */
+            url?: string | null;
         };
         /** Column */
         Column: {
@@ -1740,7 +1921,82 @@ export interface components {
          * @enum {string}
          */
         ColumnType: "text" | "integer" | "number" | "boolean" | "date" | "timestamp" | "json";
+        /**
+         * ComparisonPopulation
+         * @description What the model is compared with: a country's observed survival per site and sex,
+         *     and its typical days per step, for the residual and the population view.
+         */
+        ComparisonPopulation: {
+            /** Country */
+            country: string;
+            /** Days */
+            days: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            provenance: components["schemas"]["Citation"];
+            /** Survival */
+            survival: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * Compiled
+         * @description What the build derived from the spec.
+         */
+        Compiled: {
+            /** Parameters */
+            parameters: {
+                [key: string]: components["schemas"]["Parameter"];
+            };
+            /** Population */
+            population: components["schemas"]["PopulationFigure"][];
+            /** Targets */
+            targets: {
+                [key: string]: {
+                    [key: string]: {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
         Context: components["schemas"]["PipelineContext"] | components["schemas"]["DashboardContext"] | components["schemas"]["WidgetContext"];
+        /**
+         * Contribution
+         * @description A term's effect on the log cumulative excess hazard, for the analyst view.
+         */
+        Contribution: {
+            /** Applied */
+            applied: boolean;
+            /** Log Hazard */
+            log_hazard: number;
+            /** Note */
+            note: string;
+            /** Term */
+            term: string;
+        };
+        /**
+         * Criterion
+         * @description One entry of a national pathway's criteria; the countries whose standard lists it.
+         */
+        Criterion: {
+            /** Countries */
+            countries: string[];
+            /** Id */
+            id: string;
+            provenance: components["schemas"]["Citation"];
+            /** Site */
+            site: string;
+            stage: components["schemas"]["TriggerStage"];
+            /** Text */
+            text: string;
+        };
         /**
          * Dashboard
          * @description A live view that follows the latest run. Its content lives in its versions; this
@@ -1871,11 +2127,110 @@ export interface components {
              */
             revision: number;
         };
+        /** Deadline */
+        Deadline: {
+            /** By */
+            by: number;
+            /** Countries */
+            countries: string[];
+            /** Due Day */
+            due_day: number | null;
+            /** Label */
+            label: string;
+            /** Rule */
+            rule: string;
+            status: components["schemas"]["DeadlineStatus"];
+        };
+        /**
+         * DeadlineStatus
+         * @enum {string}
+         */
+        DeadlineStatus: "met" | "late" | "due" | "overdue" | "not_applicable";
         /**
          * EntryKind
          * @enum {string}
          */
         EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report" | "alert";
+        /** Evaluate */
+        Evaluate: {
+            inputs: components["schemas"]["EvaluationInputs"];
+            /** Version */
+            version?: number | null;
+        };
+        /** Evaluation */
+        Evaluation: {
+            /** Contributions */
+            contributions: components["schemas"]["Contribution"][];
+            /** Days Behind */
+            days_behind: number;
+            /** Deadlines */
+            deadlines: components["schemas"]["Deadline"][];
+            /** Flags */
+            flags: string[];
+            /** Levers */
+            levers: components["schemas"]["Lever"][];
+            model_id: components["schemas"]["Id"];
+            /** Pathway */
+            pathway: components["schemas"]["PathwayRow"][];
+            survival: components["schemas"]["Survival"];
+            trigger: components["schemas"]["Trigger"];
+            /** Version */
+            version: number;
+            /** Warnings */
+            warnings: string[];
+        };
+        /**
+         * EvaluationInputs
+         * @description One profile. Days are the days spent in each step so far; a step left out has not
+         *     started. Synthetic profiles only: the platform is not for patient data.
+         */
+        EvaluationInputs: {
+            /** Age Band */
+            age_band?: string | null;
+            /**
+             * Days
+             * @default {}
+             */
+            days: {
+                [key: string]: number;
+            };
+            /** Education */
+            education?: string | null;
+            /** @default unknown */
+            intent: components["schemas"]["Intent"];
+            /** @default surgery */
+            modality: components["schemas"]["Modality"];
+            /**
+             * Presentation
+             * @default []
+             */
+            presentation: string[];
+            /** Route */
+            route?: string | null;
+            /** Sex */
+            sex: string;
+            /** Site */
+            site: string;
+            /** Stage */
+            stage?: string | null;
+            /**
+             * Toggles
+             * @default {}
+             */
+            toggles: {
+                [key: string]: boolean;
+            };
+        };
+        /**
+         * EvidenceGrade
+         * @enum {string}
+         */
+        EvidenceGrade: "standard" | "meta_analysis" | "cohort" | "registry" | "assumption";
+        /** Figure */
+        Figure: {
+            now: components["schemas"]["Per100"];
+            on_target: components["schemas"]["Per100"];
+        };
         /** Finding */
         Finding: {
             /** Excerpt */
@@ -1889,6 +2244,26 @@ export interface components {
              */
             severity: "error" | "warning";
         };
+        /**
+         * Flag
+         * @description An offer of support shown when a term has a level, e.g. a navigator after basic
+         *     education. Never a risk label.
+         */
+        Flag: {
+            /** Action */
+            action: string;
+            /** Level */
+            level: string;
+            provenance: components["schemas"]["Citation"];
+            /** Term */
+            term: string;
+        };
+        /**
+         * Form
+         * @description How a parameter enters the model.
+         * @enum {string}
+         */
+        Form: "per_4_weeks" | "beyond_12_weeks" | "per_day" | "hazard_ratio" | "odds_ratio" | "value";
         /**
          * FoundBy
          * @description How an agent came upon a source: the web search and its scope.
@@ -2016,6 +2391,11 @@ export interface components {
         /** Format: uuid */
         Id: string;
         /**
+         * Intent
+         * @enum {string}
+         */
+        Intent: "curative" | "palliative" | "unknown";
+        /**
          * Interval
          * @description A period of data: both ends inclusive. A year is 1 January to 31 December; a
          *     multi-year window such as 2022-2024 is one interval, not three.
@@ -2111,6 +2491,16 @@ export interface components {
             revision: number;
             strictness: components["schemas"]["Strictness"];
         };
+        /** Lever */
+        Lever: {
+            gain: components["schemas"]["Per100"];
+            grade: components["schemas"]["EvidenceGrade"];
+            /** Label */
+            label: string;
+            step: components["schemas"]["PathwayStep"];
+            /** Text */
+            text: string;
+        };
         /** Liveness */
         Liveness: {
             /**
@@ -2164,6 +2554,11 @@ export interface components {
             value: string;
         };
         /**
+         * Modality
+         * @enum {string}
+         */
+        Modality: "surgery" | "radiotherapy" | "drugs";
+        /**
          * ModelInfo
          * @description A configured model, as the catalog shows it. Its key is never part of it.
          */
@@ -2195,6 +2590,69 @@ export interface components {
             research_agent?: string | null;
             /** Session Agent */
             session_agent?: string | null;
+        };
+        /**
+         * ModelSpec
+         * @description Everything a version is built from. Validated when a version is created
+         *     (StatisticalModelService.create).
+         */
+        ModelSpec: {
+            /** Arrows */
+            arrows: {
+                [key: string]: string;
+            };
+            /** Baseline */
+            baseline: components["schemas"]["BaselineCell"][];
+            /**
+             * Cautions
+             * @default []
+             */
+            cautions: string[];
+            comparison: components["schemas"]["ComparisonPopulation"];
+            /** Criteria */
+            criteria: components["schemas"]["Criterion"][];
+            /** Flags */
+            flags: components["schemas"]["Flag"][];
+            /** Intended Use */
+            intended_use: string;
+            /** Outcome */
+            outcome: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: components["schemas"]["Parameter"];
+            };
+            /** Sites */
+            sites: string[];
+            /**
+             * Structure
+             * @default relative_survival_dag
+             * @constant
+             */
+            structure: "relative_survival_dag";
+            /** Targets */
+            targets: components["schemas"]["TargetTime"][];
+            /** Terms */
+            terms: components["schemas"]["Term"][];
+            /** Toggles */
+            toggles: components["schemas"]["Toggle"][];
+        };
+        /**
+         * ModelVersion
+         * @description Immutable; a change makes a new version.
+         */
+        ModelVersion: {
+            compiled: components["schemas"]["Compiled"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            id: components["schemas"]["Id"];
+            model_id: components["schemas"]["Id"];
+            spec: components["schemas"]["ModelSpec"];
+            /** Version */
+            version: number;
         };
         /** NewAlertRule */
         NewAlertRule: {
@@ -2258,12 +2716,6 @@ export interface components {
             model?: string | null;
             /** Text */
             text: string;
-        };
-        /** NewModel */
-        NewModel: {
-            /** Model */
-            model: string;
-            provider_id: components["schemas"]["Id"];
         };
         /** NewProject */
         NewProject: {
@@ -2393,6 +2845,10 @@ export interface components {
             /** Sql */
             sql: string;
         };
+        /** NewVersion */
+        NewVersion: {
+            spec: components["schemas"]["ModelSpec"];
+        };
         /** NewWidget */
         NewWidget: {
             /** Inputs */
@@ -2461,6 +2917,48 @@ export interface components {
          * @enum {string}
          */
         OutputKind: "table" | "document" | "result";
+        /** Parameter */
+        Parameter: {
+            /** Ci High */
+            ci_high?: number | null;
+            /** Ci Low */
+            ci_low?: number | null;
+            /** Estimate */
+            estimate: number;
+            /** @default value */
+            form: components["schemas"]["Form"];
+            /** Name */
+            name: string;
+            provenance: components["schemas"]["Citation"];
+            scale: components["schemas"]["Scale"];
+        };
+        /** PathwayRow */
+        PathwayRow: {
+            /** Countries */
+            countries: string[];
+            /** Current */
+            current: boolean;
+            /** Days */
+            days: number | null;
+            /** Gap */
+            gap: number;
+            /** Label */
+            label: string;
+            /** Patient Interval */
+            patient_interval: boolean;
+            step: components["schemas"]["PathwayStep"];
+            /** Target */
+            target: number | null;
+        };
+        /**
+         * PathwayStep
+         * @description The seven intervals of a pathway, in order, from the first symptoms to the start of
+         *     treatment. The first is the patient interval; the trigger (imaging done) ends the
+         *     third; the clock the deadlines count from starts there.
+         * @enum {string}
+         */
+        PathwayStep: "symptoms_to_contact" | "contact_to_physician" | "physician_to_imaging" | "imaging_to_referral" | "referral_to_specialist" | "specialist_to_workup" | "workup_to_treatment";
+        Per100: number;
         /** Pin */
         Pin: {
             /** Expected Revision */
@@ -2509,6 +3007,24 @@ export interface components {
             data_source_id: components["schemas"]["Id"];
             /** Name */
             name: string;
+        };
+        /**
+         * PopulationFigure
+         * @description Per site and sex: the baseline, the baseline with the comparison country's days,
+         *     and that country's observed survival. The residual is what the days do not explain.
+         */
+        PopulationFigure: {
+            baseline: components["schemas"]["Per100"];
+            /** Note */
+            note: string;
+            observed: components["schemas"]["Per100"];
+            /** Residual */
+            residual: number;
+            /** Sex */
+            sex: string;
+            /** Site */
+            site: string;
+            timing_adjusted: components["schemas"]["Per100"];
         };
         /** PostedMessage */
         PostedMessage: {
@@ -2593,6 +3109,11 @@ export interface components {
          * @enum {string}
          */
         ProviderKind: "openai-compatible" | "gemini";
+        /** Range */
+        Range: {
+            high: components["schemas"]["Per100"];
+            low: components["schemas"]["Per100"];
+        };
         /** ReasoningPart */
         ReasoningPart: {
             /** Text */
@@ -2769,6 +3290,13 @@ export interface components {
             /** @default {} */
             time_range: components["schemas"]["TimeRange"];
         };
+        /**
+         * Scale
+         * @description What a parameter is measured on. Hazard ratios on overall mortality are converted to
+         *     the excess scale at build (Compiled.parameters), the others are used as they are.
+         * @enum {string}
+         */
+        Scale: "excess" | "cause_specific" | "overall" | "odds_ratio" | "per_day" | "days" | "survival";
         /**
          * Schema
          * @description What an operator produces. Every operator states it; `derived` says whether the
@@ -2970,6 +3498,35 @@ export interface components {
             /** Url */
             url?: string | null;
         };
+        /** StageResult */
+        StageResult: {
+            /** Countries */
+            countries: string[];
+            /** Criteria */
+            criteria: string[];
+            /** Fired */
+            fired: boolean;
+            stage: components["schemas"]["TriggerStage"];
+        };
+        /** StatisticalModel */
+        StatisticalModel: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            /** Description */
+            description: string;
+            id: components["schemas"]["Id"];
+            /** Kind */
+            kind: string;
+            /** Latest Version */
+            latest_version: number;
+            /** Name */
+            name: string;
+            project_id: components["schemas"]["Id"];
+        };
         /**
          * StoredFile
          * @description A file uploaded to ADA, to be read by a source at `address`.
@@ -2987,6 +3544,37 @@ export interface components {
          * @enum {string}
          */
         Strictness: "off" | "warn" | "block";
+        /** Survival */
+        Survival: {
+            /** By Setting */
+            by_setting: {
+                [key: string]: components["schemas"]["Figure"];
+            };
+            now: components["schemas"]["Per100"];
+            on_target: components["schemas"]["Per100"];
+            range_now: components["schemas"]["Range"];
+            range_on_target: components["schemas"]["Range"];
+            /** Setting */
+            setting: {
+                [key: string]: boolean;
+            };
+        };
+        /**
+         * TargetTime
+         * @description A step's standard time in each country that defines it. The target is their median
+         *     (Compiled.targets). `step` None is the whole pathway, trigger to treatment start.
+         */
+        TargetTime: {
+            /** Days By Country */
+            days_by_country: {
+                [key: string]: number;
+            };
+            modality?: components["schemas"]["Modality"] | null;
+            provenance: components["schemas"]["Citation"];
+            /** Site */
+            site: string;
+            step: components["schemas"]["PathwayStep"] | null;
+        };
         /** Template */
         Template: {
             /** @default {} */
@@ -3017,6 +3605,21 @@ export interface components {
          * @enum {string}
          */
         TemplateKind: "report" | "dashboard";
+        /** Term */
+        Term: {
+            /**
+             * Display
+             * @default patient
+             * @enum {string}
+             */
+            display: "patient" | "analyst";
+            /** Levels */
+            levels: string[];
+            /** Name */
+            name: string;
+            /** Reference */
+            reference: string;
+        };
         /** TextPart */
         TextPart: {
             /** Text */
@@ -3048,6 +3651,17 @@ export interface components {
             grain?: components["schemas"]["Grain"] | null;
             /** Start */
             start: string;
+        };
+        /** Toggle */
+        Toggle: {
+            /** About */
+            about: string;
+            /** Default */
+            default: boolean;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
         };
         /**
          * ToolCall
@@ -3093,6 +3707,20 @@ export interface components {
          * @enum {string}
          */
         ToolState: "input-available" | "output-available" | "output-error";
+        /** Trigger */
+        Trigger: {
+            /** Clock Start */
+            clock_start: number | null;
+            /** Note */
+            note: string;
+            suspicion: components["schemas"]["StageResult"];
+            well_founded: components["schemas"]["StageResult"];
+        };
+        /**
+         * TriggerStage
+         * @enum {string}
+         */
+        TriggerStage: "suspicion" | "well_founded";
         TurnPart: components["schemas"]["ReasoningPart"] | components["schemas"]["ToolPart"] | components["schemas"]["TextPart"] | components["schemas"]["SourcePart"];
         /**
          * TurnStatus
@@ -3269,6 +3897,23 @@ export interface components {
              */
             truncated: boolean;
             widget_id: components["schemas"]["Id"];
+        };
+        /** NewModel */
+        ada__entrypoints__http__routers__settings__NewModel: {
+            /** Model */
+            model: string;
+            provider_id: components["schemas"]["Id"];
+        };
+        /** NewModel */
+        ada__entrypoints__http__routers__statistical_models__NewModel: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Name */
+            name: string;
+            spec: components["schemas"]["ModelSpec"];
         };
     };
     responses: never;
@@ -3909,6 +4554,201 @@ export interface operations {
             };
         };
     };
+    get_model_api_models__model_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatisticalModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_model_api_models__model_id__evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Evaluate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Evaluation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    population_api_models__model_id__population_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PopulationFigure"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_version_api_models__model_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    latest_version_api_models__model_id__versions_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_version_api_models__model_id__versions__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_operator_api_operators__operator_id__get: {
         parameters: {
             query?: never;
@@ -4373,6 +5213,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JudgeSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_models_api_projects__project_id__models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatisticalModel"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_model_api_projects__project_id__models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ada__entrypoints__http__routers__statistical_models__NewModel"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_pathway_model_api_projects__project_id__models_pathway_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
                 };
             };
             /** @description Validation Error */
@@ -5555,7 +6492,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewModel"];
+                "application/json": components["schemas"]["ada__entrypoints__http__routers__settings__NewModel"];
             };
         };
         responses: {
