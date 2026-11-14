@@ -9,5 +9,5 @@ class AlertNotifier(Protocol):
     def configured(self) -> bool: ...
 
     async def firing(self, rule: AlertRule, alert: Alert, rows: list[JsonObject]) -> None:
-        """Deliver a committed alert. Delivery failures must not raise."""
+        """Schedule a committed alert for background delivery without waiting or raising."""
         ...
