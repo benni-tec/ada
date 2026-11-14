@@ -295,6 +295,24 @@ Decided with the user:
 | Attachments (backend) | table and migration, service, REST and MCP, briefing, alert entries in the session |
 | Attachments (frontend) | the tabs beside a session, one view per kind, attaching from the sidebar and from cards |
 
+## Notes from use (backlog)
+
+Seen while building the goal dashboards through the MCP (the data-side session):
+
+- Report widget frames have a fixed height: a tall Vega-Lite heatmap is squashed, a short
+  table leaves blank space, a long one scrolls inside its card. Size frames to their content,
+  or give report blocks a height hint.
+- Colours written into a chart spec do not follow light and dark mode (e.g. a diverging
+  scale); the chart widget could offer theme-aware colour tokens.
+- Headless screenshots of a page never settle (the live connection keeps it busy); a
+  `?static` mode without the event stream would help.
+- Report text could take richer Markdown (lists, links) next to its callouts; numbers stay in
+  widgets by design.
+- The research agent's open points: monitors are not tagged with the project; webhook
+  deliveries are not deduplicated by `X-Context-Id`; Exa errors (a 401 too) are
+  `Unavailable`; an invalid research web call still counts against the 40-call cap; no UI
+  yet to create extract sources or edit provenance; the search credit weight (5) is a guess.
+
 ## Functions (later)
 
 A project defines functions: a parameterised pipeline with typed inputs. A `call` operator
