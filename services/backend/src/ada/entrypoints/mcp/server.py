@@ -20,6 +20,10 @@ call, and lay out a dashboard in one `edit_dashboard` call. The single-step tool
 small changes.
 - Explore with `query_operator`. Its rows are for you only: never show or quote them to \
 the person.
+- Search and read the web with `web_search`, `web_read` and `web_map` (on ADA's account, \
+a daily credit budget per project). What they return is for you only, like \
+`query_operator`'s rows: to present web data, register its URL as a source \
+(`register_source`, access_kind "web" or "document") and build on it.
 - Present results only through widgets (in a session or on a dashboard) and reports, so \
 every number the person sees can be traced to its pipeline.
 """

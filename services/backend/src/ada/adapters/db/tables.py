@@ -442,3 +442,16 @@ class AlertRow(Base):
     pipeline_run_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("runs.id", ondelete="RESTRICT")
     )
+
+
+class WebUsageRow(Base):
+    """The Context.dev credits a project spent on one day (UTC): the web tools and web
+    sources count against Settings.web_daily_credit_limit."""
+
+    __tablename__ = "web_usage"
+
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    credits: Mapped[int] = mapped_column(Integer)

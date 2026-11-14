@@ -34,10 +34,14 @@ class Settings(BaseSettings):
     # key can be stored.
     secret_key: SecretStr | None = Field(None, validation_alias="ADA_SECRET_KEY")
     secret_key_file: Path | None = Field(None, validation_alias="ADA_SECRET_KEY_FILE")
-    # Context.dev's API key, for document sources with `options.engine: "context.dev"`.
+    # Context.dev's API key, for document sources with `options.engine: "context.dev"`,
+    # web sources and the web tools (web_search, web_read, web_map), all on ADA's account.
     context_dev_api_key: SecretStr | None = Field(
         None, validation_alias=AliasChoices("CONTEXT_DEV_API_KEY", "CONTEXT_API_KEY")
     )
+    # Context.dev credits each project may spend per day (UTC), web tools and web sources
+    # together.
+    web_daily_credit_limit: int = Field(300, ge=0)
 
     def master_key(self) -> str | None:
         """ADA_SECRET_KEY, else the contents of ADA_SECRET_KEY_FILE; None when neither is

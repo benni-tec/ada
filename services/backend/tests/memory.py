@@ -36,6 +36,7 @@ from ada.adapters.memory.repositories import (
     MemoryWidgetRepository,
 )
 from ada.adapters.memory.tasks import RecordingTaskDispatcher
+from ada.adapters.memory.web import MemoryWebBudget
 from ada.core.ports.agents import TurnProgress
 from ada.core.ports.events import EventBroadcaster, EventStream
 from ada.core.ports.repositories import (
@@ -58,6 +59,7 @@ from ada.core.ports.repositories import (
 )
 from ada.core.ports.sources import SourceCheckLog, SourceLocks
 from ada.core.ports.tasks import TaskDispatcher
+from ada.core.ports.web import WebBudget
 
 
 class MemoryBackground(Provider):
@@ -103,6 +105,7 @@ class MemoryRepositories(Provider):
     source_checks = provide(MemorySourceCheckLog, provides=SourceCheckLog, scope=Scope.APP)
     source_locks = provide(MemorySourceLocks, provides=SourceLocks, scope=Scope.APP)
     turn_progress = provide(MemoryTurnProgress, provides=TurnProgress, scope=Scope.APP)
+    web_budget = provide(MemoryWebBudget, provides=WebBudget, scope=Scope.APP)
 
 
 def memory_adapters() -> tuple[Provider, Provider]:
