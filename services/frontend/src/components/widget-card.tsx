@@ -1,24 +1,20 @@
-import { TriangleAlert } from 'lucide-react'
-import { useContext, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import type { Widget } from '@/lib/api'
 import { useLive } from '@/lib/live'
 import { useTheme } from '@/lib/theme-context'
 import { cn } from '@/lib/utils'
 import type { CardRun } from '@/lib/view-run'
-import { widgetSrc } from '@/lib/widgets'
+import { JUDGED_TYPES } from '@/lib/verdicts'
+import { heights, pipelineRequest, postedHeight, widgetSrc } from '@/lib/widgets'
 
 import { PinToDashboard } from './dashboards/pin-to-dashboard'
-import { Hint } from './icon-action'
 import { OpenWidgetLink } from './open-widget-link'
 import { PipelineAccess } from './pipeline/pipeline-access'
 import { Provenance } from './provenance'
+import { VerdictBadge } from './verdict-badge'
 import { WidgetCardActions } from './widget-card-actions'
-
-// Starting heights per type; the frame can be resized by dragging its lower edge.
-const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 320, chart: 320, map: 420, custom: 320 }
 
 function frameHeight(widget: Widget, tall?: boolean) {
   return (heights[widget.type] ?? 280) * (tall ? 1.75 : 1)
@@ -36,8 +32,17 @@ function frameHeight(widget: Widget, tall?: boolean) {
  * changes, so the frame reloads by its new address; a report pins one run whose numbers
  * never change.
  *
- * `fill`: as tall as its container (a dashboard cell, the full-size modal) instead of a
- * height of its own.
+ * How tall it is:
+ * - `fill`: as tall as its container (a dashboard cell, the full-size modal); the widget
+ *   fills it and scrolls inside.
+ * - `tall`: a fixed height of its own (a widget's page), which can be dragged taller.
+ * - otherwise (reports, the session column) as tall as its content: the widget is told
+ *   `fit=content` and posts its height (`ada:resize`), which the frame follows within
+ *   MIN_FRAME_HEIGHT and MAX_FRAME_HEIGHT (lib/widgets.ts). Until then it has its type's
+ *   usual height.
+ *
+ * The widget may ask for one of its inputs' pipeline (`ada:open-pipeline`, a click on a
+ * text widget's value): `onOpenPipeline`. Only messages from this frame's window count.
  */
 export function WidgetFrame({
   widget,
@@ -45,24 +50,51 @@ export function WidgetFrame({
   tall,
   fill = false,
   reloadOnData = true,
+  onOpenPipeline,
 }: {
   widget: Widget
   runId?: string | null
   tall?: boolean
   fill?: boolean
   reloadOnData?: boolean
+  onOpenPipeline?: (input: string) => void
 }) {
   // Changing key remounts the frame, which reloads the widget and its data.
   const { widgetEpoch } = useLive()
   const { theme, resolved } = useTheme()
+  const frame = useRef<HTMLIFrameElement>(null)
+  const fitContent = !fill && !tall
+  const [posted, setPosted] = useState<number | null>(null)
+  const openPipeline = useRef(onOpenPipeline)
+  useEffect(() => {
+    openPipeline.current = onOpenPipeline
+  })
+
+  useEffect(() => {
+    const listen = (event: MessageEvent) => {
+      if (!event.source || event.source !== frame.current?.contentWindow) return
+      const height = postedHeight(event.data)
+      if (height !== null) {
+        if (fitContent) setPosted(height)
+        return
+      }
+      const input = pipelineRequest(event.data)
+      if (input !== null) openPipeline.current?.(input)
+    }
+    window.addEventListener('message', listen)
+    return () => window.removeEventListener('message', listen)
+  }, [fitContent])
+
   return (
     <div
-      className={fill ? 'min-h-0 flex-1 overflow-hidden' : 'resize-y overflow-hidden'}
-      style={fill ? undefined : { height: frameHeight(widget, tall) }}
+      className={fill ? 'min-h-0 flex-1 overflow-hidden' : fitContent ? 'overflow-hidden' : 'resize-y overflow-hidden'}
+      style={fill ? undefined : { height: fitContent ? (posted ?? frameHeight(widget)) : frameHeight(widget, tall) }}
+      data-fit={fitContent ? 'content' : undefined}
     >
       <iframe
+        ref={frame}
         key={reloadOnData ? widgetEpoch : 0}
-        src={widgetSrc(widget, runId, theme === 'system' ? undefined : resolved)}
+        src={widgetSrc(widget, runId, theme === 'system' ? undefined : resolved, fitContent)}
         title={`Widget: ${widget.title || widget.type}`}
         sandbox="allow-scripts allow-same-origin"
         loading="lazy"
@@ -70,38 +102,6 @@ export function WidgetFrame({
         className="block h-full w-full border-0"
       />
     </div>
-  )
-}
-
-/**
- * What a judge found in a custom widget's code, as a warning icon whose tooltip lists the
- * findings. Only a review that warned or failed shows; one that passed, or was not made
- * (unchecked), shows nothing.
- */
-function VerdictWarning({ verdict }: { verdict: Widget['verdict'] }) {
-  if (verdict?.outcome !== 'warn' && verdict?.outcome !== 'fail') return null
-  const count = verdict.findings.length
-  const label = `The code review ${verdict.outcome === 'fail' ? 'failed' : 'warns'}: ${count} ${count === 1 ? 'finding' : 'findings'}`
-  return (
-    <Hint
-      label={
-        <div className="flex flex-col gap-1">
-          <span className="font-medium">{label}</span>
-          <ul className="flex list-disc flex-col gap-1 pl-4">
-            {verdict.findings.map((finding, index) => (
-              <li key={index}>
-                {finding.message}
-                {finding.excerpt && <code className="mt-0.5 block font-mono break-all opacity-80">{finding.excerpt}</code>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      }
-    >
-      <Button type="button" variant="ghost" size="icon-sm" aria-label={label} className="text-amber-600 dark:text-amber-400">
-        <TriangleAlert />
-      </Button>
-    </Hint>
   )
 }
 
@@ -141,6 +141,8 @@ export function WidgetCard({
   const fromContext = useContext(WidgetCardActions)
   const icons = actions ?? (fromContext ? fromContext(widget) : <PinToDashboard widget={widget} />)
   const external = widget.created_by.kind === 'external_agent'
+  // The input whose pipeline is open: "main" from the footer, another from a click in the frame.
+  const [pipeline, setPipeline] = useState<string | null>(null)
   const border = highlighted
     ? 'border-amber-400 ring-2 ring-amber-400 dark:border-amber-500 dark:ring-amber-500'
     : external
@@ -169,9 +171,12 @@ export function WidgetCard({
           <h3 className="truncate text-sm font-semibold">{widget.title || 'Untitled widget'}</h3>
           <Provenance actor={widget.created_by} at={widget.created_at} note={widget.note} />
         </div>
-        <Badge variant="secondary" className="shrink-0 font-mono">
-          {widget.type}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {(JUDGED_TYPES.has(widget.type) || widget.verdict) && <VerdictBadge widget={widget} runId={run.id} />}
+          <Badge variant="secondary" className="shrink-0 font-mono">
+            {widget.type}
+          </Badge>
+        </div>
       </header>
       {run.id === null ? (
         <div
@@ -184,7 +189,14 @@ export function WidgetCard({
           Starting the page’s run…
         </div>
       ) : (
-        <WidgetFrame widget={widget} runId={run.id} tall={tall} fill={fill} reloadOnData={false} />
+        <WidgetFrame
+          widget={widget}
+          runId={run.id}
+          tall={tall}
+          fill={fill}
+          reloadOnData={false}
+          onOpenPipeline={setPipeline}
+        />
       )}
       {/* What went wrong the last time it was drawn, as its frame reported it. */}
       {widget.render_error && (
@@ -194,8 +206,7 @@ export function WidgetCard({
       )}
       {/* One line; an action's own rows (a chooser, an outcome) wrap below it. */}
       <footer className="flex shrink-0 flex-wrap items-center gap-x-1 border-t px-2 py-1">
-        <PipelineAccess widget={widget} run={run} />
-        <VerdictWarning verdict={widget.verdict} />
+        <PipelineAccess widget={widget} run={run} input={pipeline} onInputChange={setPipeline} />
         {openable && <OpenWidgetLink widget={widget} run={run} />}
         {icons}
       </footer>

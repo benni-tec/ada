@@ -22,11 +22,11 @@ class WidgetService(Protocol):
     ) -> Widget:
         """A widget on an operator's output, and on further named `inputs` if given (each an
         operator of the project; see Widget.inputs). It is created from an operator id only; no
-        data passes through the caller. With a session id it is also recorded there.
-
-        A custom widget's code is reviewed by the project's judge, with a sample of every
-        input: a blocking verdict refuses it (Invalid, with the findings), any other is
-        stored on the widget."""
+        data passes through the caller. With a session id it is also recorded there. A text
+        widget's placeholders are checked against all its inputs, and once it is stored its
+        review by the judge is queued. A custom widget's code is reviewed by the judge at
+        once, with a sample of every input: a blocking verdict refuses it (Invalid, with the
+        findings), any other is stored on the widget."""
         ...
 
     async def update(
@@ -51,6 +51,11 @@ class WidgetService(Protocol):
         """What the widget's frame found when it drew: an error, or None when it drew. Kept
         as `render_error` (cut at 2,000 characters) and announced only when it changed; no
         session entry."""
+        ...
+
+    async def warnings(self, id: Id) -> Sequence[str]:
+        """What is not wrong with the widget but likely unintended, e.g. a text widget's
+        input that no placeholder reads. Empty for the other types."""
         ...
 
     async def get(self, id: Id) -> Widget: ...

@@ -18,12 +18,15 @@ from ada.core.ports.repositories import (
     WidgetRepository,
 )
 from ada.core.ports.system import Clock
+from ada.core.ports.tasks import TaskDispatcher
+from ada.core.ports.transactions import AfterCommit
 from ada.core.services.ports.judges import JudgeService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.widgets import WidgetService
 from ada.core.services.schema.roles import check_widget
 from ada.core.services.widgets.specs import CUSTOM, custom_problems
+from ada.core.services.widgets.text import TEXT_TYPE
 
 # Who starts the run when a widget asks for its data without naming one: nobody asked for
 # it, the widget did, so it is the platform's doing.
@@ -50,6 +53,8 @@ class Widgets(WidgetService):
         runs: RunService,
         judges: JudgeService,
         events: EventPublisher,
+        dispatcher: TaskDispatcher,
+        after_commit: AfterCommit,
         clock: Clock,
     ) -> None:
         self.widgets = widgets
@@ -60,6 +65,8 @@ class Widgets(WidgetService):
         self.runs = runs
         self.judges = judges
         self.events = events
+        self.dispatcher = dispatcher
+        self.after_commit = after_commit
         self.clock = clock
 
     async def create(
@@ -82,7 +89,12 @@ class Widgets(WidgetService):
         inputs = await self._inputs(project_id, inputs or {})
         # What the widget needs (a measure, an x and a y, a geography role) must be
         # declared on its operator now, not discovered when someone first looks at it.
-        _check(type.strip(), operator.output, spec or {})
+        _check(
+            type.strip(),
+            operator.output,
+            spec or {},
+            await self._schemas({MAIN_INPUT: operator_id, **inputs}),
+        )
         if session_id is not None:
             session = await self.sessions.get(session_id)
             if session.project_id != project_id:
@@ -115,6 +127,7 @@ class Widgets(WidgetService):
         )
         if session_id is not None:
             await self.session_records.record_widget(session_id, widget.id, note, actor)
+        self._judge(widget)
         return widget
 
     async def update(
@@ -143,14 +156,34 @@ class Widgets(WidgetService):
         if spec is not None:
             changes["spec"] = spec
         updated = widget.model_copy(update=changes)
-        if updated.type != widget.type or updated.spec != widget.spec:
+        judged = (updated.type, updated.spec, updated.inputs) != (
+            widget.type,
+            widget.spec,
+            widget.inputs,
+        )
+        if (
+            updated.type != widget.type
+            or updated.spec != widget.spec
+            or (judged and updated.type == TEXT_TYPE)
+        ):
             operator = await self.operators.get(widget.operator_id)
-            _check(updated.type, operator.output, updated.spec)
-        if _drawing(updated) != _drawing(widget):
-            # It draws differently now: the last drawing's error is about something gone.
-            updated = await self._reviewed(updated.model_copy(update={"render_error": None}))
+            _check(
+                updated.type,
+                operator.output,
+                updated.spec,
+                await self._schemas(updated.all_inputs()),
+            )
+        if judged:
+            # It draws differently now: the last drawing's error and the last verdict are
+            # about something gone. A custom widget's code is reviewed at once (a blocking
+            # verdict refuses it); a text widget's review is queued after the commit.
+            updated = await self._reviewed(
+                updated.model_copy(update={"verdict": None, "render_error": None})
+            )
         await self.widgets.save(updated)
         await self._announce(updated)
+        if judged:
+            self._judge(updated)
         return updated
 
     async def report_render(self, id: Id, error: str | None) -> None:
@@ -162,6 +195,29 @@ class Widgets(WidgetService):
         await self.widgets.set_render_error(id, error)
         # Frames draw what they drew; only the cards' error lines need the news.
         await self._announce(widget, render_only=True)
+
+    async def warnings(self, id: Id) -> Sequence[str]:
+        widget = await self.widgets.get(id)
+        if widget.type != TEXT_TYPE:
+            return []
+        operator = await self.operators.get(widget.operator_id)
+        return check_widget(
+            widget.type, operator.output, widget.spec, await self._schemas(widget.all_inputs())
+        )
+
+    def _judge(self, widget: Widget) -> None:
+        """Queue the judge's review of a text widget, once this unit of work has stored
+        it: the call returns at once, and the verdict follows (widget.updated)."""
+        if widget.type != TEXT_TYPE:
+            return
+
+        async def queue() -> None:
+            await self.dispatcher.judge_widget(widget.id)
+
+        self.after_commit.add(queue)
+
+    async def _schemas(self, inputs: dict[str, OperatorId]) -> dict[str, Schema]:
+        return {name: (await self.operators.get(op)).output for name, op in inputs.items()}
 
     async def get(self, id: Id) -> Widget:
         return await self.widgets.get(id)
@@ -288,17 +344,12 @@ class Widgets(WidgetService):
         return False
 
 
-def _check(type: str, output: Schema, spec: JsonObject) -> None:
-    """Whether a widget of this type can show the output with this spec. A custom widget
+def _check(type: str, output: Schema, spec: JsonObject, inputs: dict[str, Schema]) -> None:
+    """Whether a widget of this type can show its inputs with this spec. A custom widget
     draws whatever its code draws, so only its spec is checked."""
     if type != CUSTOM:
-        check_widget(type, output, spec)
+        check_widget(type, output, spec, inputs)
         return
     problems = custom_problems(spec)
     if problems:
         raise Invalid("A custom widget cannot be made from this spec: " + "; ".join(problems))
-
-
-def _drawing(widget: Widget) -> tuple[object, ...]:
-    """What decides how a widget draws: its type, spec and inputs."""
-    return widget.type, widget.spec, widget.inputs

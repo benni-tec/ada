@@ -39,6 +39,7 @@ from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.mcp.sessions import SESSIONLESS
 from api_support import (
     COLUMNS,
+    FakeJudging,
     Judged,
     Overrides,
     Results,
@@ -64,7 +65,7 @@ AGENT = {"kind": "external_agent", "name": "claude-code"}
 
 @pytest.fixture(scope="module")
 def client(unreachable_settings: Settings) -> Iterator[TestClient]:
-    with serve(unreachable_settings, Overrides()) as client:
+    with serve(unreachable_settings, Overrides(), FakeJudging()) as client:
         yield client
 
 
@@ -658,10 +659,11 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
     tools = {tool.name: tool for tool in await client.list_tools()}
     verbs = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
     verbs |= {"pin", "edit", "set", "show", "generate", "check", "build", "query", "search"}
-    verbs |= {"read", "extract", "map", "watch", "unwatch", "delegate", "report"}
+    verbs |= {"read", "extract", "map", "watch", "unwatch", "delegate", "report", "review"}
     verbs |= {"attach", "detach"}
     injected = {"service", "projects", "pipelines", "sessions", "widgets", "runs", "dispatcher"}
     injected |= {"exploration", "batches", "refreshes", "web", "research", "attachments"}
+    injected |= {"reviews"}
 
     for name, tool in tools.items():
         assert name.split("_")[0] in verbs, name

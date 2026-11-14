@@ -6,7 +6,7 @@ import type { Loaded } from '@/lib/runtime'
 import { useDark } from '@/lib/theme'
 
 import { sandboxed } from './embed'
-import { chartSpec, readPalette, vegaConfig } from './spec'
+import { chartSpec, readPalette, sizesItself, vegaConfig } from './spec'
 
 /**
  * A Vega-Lite chart of the operator's output.
@@ -19,6 +19,9 @@ export function Chart({ widget, data, roles }: Loaded) {
   const ref = useRef<HTMLDivElement>(null)
   const dark = useDark()
   const [problem, setProblem] = useState<string | null>(null)
+  // The spec drawn last: until the current one is, the chart is busy (and a frame sized to
+  // its content waits for it).
+  const [drawn, setDrawn] = useState<unknown>(null)
   const spec = useMemo(() => chartSpec({ widget, data, roles }), [widget, data, roles])
 
   useEffect(() => {
@@ -38,10 +41,18 @@ export function Chart({ widget, data, roles }: Loaded) {
       tooltip: { theme: dark ? 'dark' : 'light' },
     }).then(
       (embedded) => {
-        if (current) result = embedded
-        else embedded.finalize()
+        if (current) {
+          result = embedded
+          setDrawn(spec)
+        } else {
+          embedded.finalize()
+        }
       },
-      (error: unknown) => current && setProblem(error instanceof Error ? error.message : String(error)),
+      (error: unknown) => {
+        if (!current) return
+        setProblem(error instanceof Error ? error.message : String(error))
+        setDrawn(spec)
+      },
     )
     return () => {
       current = false
@@ -57,7 +68,8 @@ export function Chart({ widget, data, roles }: Loaded) {
           This chart’s spec does not render: {problem}
         </p>
       )}
-      <div className="ada-chart" role="figure" aria-label={title}>
+      {/* Sized by its spec, it keeps its own height where the page fits frames to content. */}
+      <div className={sizesItself(widget.spec) ? 'ada-chart ada-chart-intrinsic' : 'ada-chart'} role="figure" aria-label={title} aria-busy={drawn !== spec}>
         <div className="ada-vega" ref={ref} />
       </div>
     </>

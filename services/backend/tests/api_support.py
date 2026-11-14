@@ -319,6 +319,23 @@ class FakeJudges(JudgeService):
         )
 
 
+class FakeJudging(Provider):
+    """A judge that answers from a queue (`Judged`) in place of the platform's, for tests
+    of what callers do with a verdict; the judges' own tests use the real one."""
+
+    scope = Scope.REQUEST
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.judged = Judged()
+
+    @provide(scope=Scope.APP)
+    def judged_(self) -> Judged:
+        return self.judged
+
+    judges = provide(FakeJudges, provides=JudgeService)
+
+
 class Overrides(Provider):
     """Binds the fakes in place of the other workstreams' services, and a clock that
     stands still."""
@@ -329,7 +346,6 @@ class Overrides(Provider):
         super().__init__()
         self.clock = FixedClock()
         self.results = Results()
-        self.judged = Judged()
 
     @provide(scope=Scope.APP)
     def clock_(self) -> Clock:
@@ -339,14 +355,9 @@ class Overrides(Provider):
     def results_(self) -> Results:
         return self.results
 
-    @provide(scope=Scope.APP)
-    def judged_(self) -> Judged:
-        return self.judged
-
     pipelines = provide(FakePipelines, provides=PipelineService)
     runs = provide(FakeRuns, provides=RunService)
     sources = provide(FakeSources, provides=SourceService)
-    judges = provide(FakeJudges, provides=JudgeService)
 
 
 class FakeWeb(Provider):

@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { AgentSettingsSection } from './agents'
 import { DataSourcesSection } from './data-sources'
 import { GlobalInstructionsSection, ProjectInstructionsSection } from './instructions'
+import { GlobalJudgesSection, ProjectJudgesSection } from './judges'
 import { WebSection } from './web'
 
 /**
@@ -103,6 +104,8 @@ function Section({ section, projectId, projectName }: { section: SettingsSection
   switch (section) {
     case 'models':
       return <AgentSettingsSection />
+    case 'judges':
+      return <GlobalJudgesSection />
     case 'agent-instructions':
       return <GlobalInstructionsSection />
     case 'web':
@@ -111,5 +114,7 @@ function Section({ section, projectId, projectName }: { section: SettingsSection
       return <DataSourcesSection projectId={projectId} />
     case 'project-instructions':
       return <ProjectInstructionsSection projectId={projectId} projectName={projectName} />
+    case 'project-judges':
+      return <ProjectJudgesSection projectId={projectId} projectName={projectName} />
   }
 }

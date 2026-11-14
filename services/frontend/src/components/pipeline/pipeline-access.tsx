@@ -45,14 +45,39 @@ function useSourceOf(projectId: string, recorded: CardRun['sources']) {
   )
 }
 
+const MAIN_INPUT = 'main'
+
+/** The operator behind one of the widget's inputs: "main" is its own. An input it does
+ * not have falls back to its own, so the dialog still opens on something true. */
+function inputOperator(widget: Widget, input: string): { operatorId: OperatorId; input: string } {
+  const other = input === MAIN_INPUT ? undefined : widget.inputs?.[input]
+  return other ? { operatorId: other, input } : { operatorId: widget.operator_id, input: MAIN_INPUT }
+}
+
 /**
  * "Pipeline" at the left of the card's footer: one button that opens the widget's
  * pipeline as a graph. Every card has one: whoever doubts a number can follow it back to
  * its source and fetch time, in the card's own run. The pipeline is read only when the
  * dialog opens, so a page of cards asks for none.
+ *
+ * The button opens the pipeline of the widget's own operator (the input "main"). With
+ * `input` and `onInputChange` the card controls which input is open (null: closed), so a
+ * click on a text widget's value can open the pipeline of the input it comes from.
  */
-export function PipelineAccess({ widget, run }: { widget: Widget; run: CardRun }) {
-  const [open, setOpen] = useState(false)
+export function PipelineAccess({
+  widget,
+  run,
+  input: controlled,
+  onInputChange,
+}: {
+  widget: Widget
+  run: CardRun
+  input?: string | null
+  onInputChange?: (input: string | null) => void
+}) {
+  const [own, setOwn] = useState<string | null>(null)
+  const input = onInputChange ? (controlled ?? null) : own
+  const setInput = onInputChange ?? setOwn
   return (
     <>
       <Button
@@ -60,7 +85,7 @@ export function PipelineAccess({ widget, run }: { widget: Widget; run: CardRun }
         variant="ghost"
         size="xs"
         aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
+        onClick={() => setInput(MAIN_INPUT)}
         className="text-muted-foreground"
       >
         Pipeline
@@ -68,7 +93,9 @@ export function PipelineAccess({ widget, run }: { widget: Widget; run: CardRun }
       </Button>
       {/* What is left of the line, so the icon actions sit at the right. */}
       <span className="flex-1" />
-      {open && <PipelineDialog widget={widget} run={run} onClose={() => setOpen(false)} />}
+      {input !== null && (
+        <PipelineDialog key={input} widget={widget} input={input} run={run} onClose={() => setInput(null)} />
+      )}
     </>
   )
 }
@@ -88,11 +115,23 @@ function RunLine({ run }: { run: CardRun }) {
   )
 }
 
-/** The pipeline dialog. The pipeline is read when it opens. A custom widget's dialog has a
- * second tab with its code. */
-function PipelineDialog({ widget, run, onClose }: { widget: Widget; run: CardRun; onClose: () => void }) {
-  const lineage = useQuery(lineageQuery(widget.operator_id))
+/** The pipeline dialog, on one of the widget's inputs. The pipeline is read when it opens.
+ * A custom widget's dialog has a second tab with its code. */
+function PipelineDialog({
+  widget,
+  input: asked,
+  run,
+  onClose,
+}: {
+  widget: Widget
+  input: string
+  run: CardRun
+  onClose: () => void
+}) {
+  const { operatorId, input } = inputOperator(widget, asked)
+  const lineage = useQuery(lineageQuery(operatorId))
   const sourceOf = useSourceOf(widget.project_id, run.sources)
+  const title = `Pipeline of “${widget.title || 'Untitled widget'}”${input === MAIN_INPUT ? '' : `, input “${input}”`}`
   const pipeline = lineage.isPending ? (
     <div className="p-4">
       <Loading what="the pipeline" />
@@ -102,10 +141,10 @@ function PipelineDialog({ widget, run, onClose }: { widget: Widget; run: CardRun
       <ErrorNotice error={lineage.error} prefix="The pipeline cannot be loaded:" />
     </div>
   ) : (
-    <PipelineView widget={widget} run={run} operators={lineage.data} sourceOf={sourceOf} />
+    <PipelineView target={operatorId} run={run} operators={lineage.data} sourceOf={sourceOf} />
   )
   return (
-    <Modal title={`Pipeline of “${widget.title || 'Untitled widget'}”`} description={<RunLine run={run} />} onClose={onClose}>
+    <Modal title={title} description={<RunLine run={run} />} onClose={onClose}>
       {widget.type === 'custom' ? (
         <Tabs defaultValue="pipeline" className="h-full min-h-0 gap-0">
           <TabsList variant="line" className="mx-3 my-1">
@@ -128,15 +167,15 @@ function PipelineDialog({ widget, run, onClose }: { widget: Widget; run: CardRun
 
 /**
  * The pipeline as a graph, the selected operator's details beside it and its first rows in
- * the card's run below. The widget's operator is selected first: it is what the card shows.
+ * the card's run below. The input's operator is selected first: it is what the card shows.
  */
 function PipelineView({
-  widget,
+  target,
   run,
   operators,
   sourceOf,
 }: {
-  widget: Widget
+  target: OperatorId
   run: CardRun
   operators: readonly Operator[]
   sourceOf: (operator: Operator) => SourceInfo | undefined
@@ -149,7 +188,7 @@ function PipelineView({
   useEffect(() => {
     view.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus()
   }, [])
-  const [selectedId, setSelectedId] = useState<OperatorId>(widget.operator_id)
+  const [selectedId, setSelectedId] = useState<OperatorId>(target)
   const byId = useMemo(() => new Map(operators.map((operator) => [operator.id, operator])), [operators])
   const selected = byId.get(selectedId) ?? operators[operators.length - 1]
   const stored = useQuery({ ...runQuery(run.id ?? ''), enabled: run.id !== null })
@@ -173,7 +212,7 @@ function PipelineView({
       <section aria-label="Graph" className="flex h-80 min-h-0 flex-col lg:h-auto">
         <PipelineGraph
           operators={operators}
-          target={widget.operator_id}
+          target={target}
           selected={selected.id}
           onSelect={setSelectedId}
           sourceOf={sourceOf}

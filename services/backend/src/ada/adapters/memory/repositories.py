@@ -22,6 +22,7 @@ from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
 from ada.core.models.errors import Conflict, NotFound
+from ada.core.models.judges import JudgeDefaults, JudgeKind, JudgeOverride, Verdict
 from ada.core.models.operators import Operator, OperatorId, OperatorKind
 from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
@@ -38,6 +39,7 @@ from ada.core.ports.repositories import (
     AttachmentRepository,
     DashboardRepository,
     DataSourceRepository,
+    JudgeSettingsRepository,
     LlmModelRepository,
     LlmProviderRepository,
     OperatorRepository,
@@ -89,6 +91,13 @@ class MemoryStore:
         self.monitor_secrets: dict[Id, str] = {}
         # Session id -> its paid web calls.
         self.web_calls: dict[Id, int] = {}
+        # The judges' defaults, one per kind from the start, as the migration seeds them;
+        # and the projects' overrides. Their model ids are checked when read, so a deleted
+        # model reads as none, as the database's SET NULL has it.
+        self.judge_defaults: dict[JudgeKind, JudgeDefaults] = {
+            kind: JudgeDefaults(kind=kind, revision=1) for kind in JudgeKind
+        }
+        self.judge_overrides: dict[tuple[Id, JudgeKind], JudgeOverride] = {}
 
     def forget_model(self, key: tuple[Id, str]) -> None:
         """Remove a model and clear the selections naming it, as ON DELETE SET NULL does."""
@@ -362,6 +371,10 @@ class MemoryWidgetRepository(WidgetRepository):
 
     async def list_by_session(self, session_id: Id) -> Sequence[Widget]:
         return [w for w in self.store.widgets.values() if w.session_id == session_id]
+
+    async def set_verdict(self, id: Id, verdict: Verdict | None) -> None:
+        widget = _get(self.store.widgets, "widget", id)
+        self.store.widgets[id] = widget.model_copy(update={"verdict": verdict})
 
 
 class MemoryDashboardRepository(DashboardRepository):
@@ -735,3 +748,54 @@ class MemoryAgentSettingsRepository(AgentSettingsRepository):
 
     def _key(self, model_id: str | None) -> tuple[Id, str] | None:
         return _model_key(self.store, model_id) if model_id is not None else None
+
+
+class MemoryJudgeSettingsRepository(JudgeSettingsRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def defaults(self) -> Sequence[JudgeDefaults]:
+        return [self._current(defaults) for defaults in self.store.judge_defaults.values()]
+
+    async def update_defaults(
+        self, defaults: JudgeDefaults, expected_revision: int
+    ) -> JudgeDefaults:
+        stored = self.store.judge_defaults[defaults.kind]
+        if stored.revision != expected_revision:
+            raise Conflict("judge defaults", defaults.kind, expected_revision, stored.revision)
+        self._check(defaults.model_id)
+        updated = defaults.model_copy(update={"revision": expected_revision + 1})
+        self.store.judge_defaults[defaults.kind] = updated
+        return self._current(updated)
+
+    async def overrides(self, project_id: Id) -> Sequence[JudgeOverride]:
+        return [
+            self._current(override)
+            for (project, _), override in self.store.judge_overrides.items()
+            if project == project_id
+        ]
+
+    async def save_override(self, override: JudgeOverride, expected_revision: int) -> JudgeOverride:
+        _get(self.store.projects, "project", override.project_id)
+        key = (override.project_id, override.kind)
+        stored = self.store.judge_overrides.get(key)
+        actual = stored.revision if stored is not None else 0
+        if actual != expected_revision:
+            raise Conflict("judge override", override.kind, expected_revision, actual)
+        self._check(override.model_id)
+        updated = override.model_copy(update={"revision": expected_revision + 1})
+        self.store.judge_overrides[key] = updated
+        return self._current(updated)
+
+    def _check(self, model_id: str | None) -> None:
+        if model_id is not None:
+            _model_key(self.store, model_id)
+
+    def _current[M: JudgeDefaults | JudgeOverride](self, record: M) -> M:
+        if record.model_id is None:
+            return record
+        try:
+            _model_key(self.store, record.model_id)
+        except NotFound:
+            return record.model_copy(update={"model_id": None})
+        return record

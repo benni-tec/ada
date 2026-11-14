@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -302,10 +301,6 @@ def _widget(row: WidgetRow) -> Widget:
     )
 
 
-def _verdict(widget: Widget) -> dict[str, Any] | None:
-    return dump(widget.verdict) if widget.verdict is not None else None
-
-
 class SqlWidgetRepository(WidgetRepository):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -329,7 +324,7 @@ class SqlWidgetRepository(WidgetRepository):
             copied_from=widget.copied_from,
             inputs=dict(widget.inputs),
             render_error=widget.render_error,
-            verdict=_verdict(widget),
+            verdict=dump(widget.verdict) if widget.verdict is not None else None,
         )
         await add_row(self.session, row)
 
@@ -353,11 +348,21 @@ class SqlWidgetRepository(WidgetRepository):
                 note=widget.note,
                 inputs=dict(widget.inputs),
                 render_error=widget.render_error,
-                verdict=_verdict(widget),
+                verdict=dump(widget.verdict) if widget.verdict is not None else None,
             )
         )
         if result.rowcount == 0:  # type: ignore[attr-defined]
             raise NotFound("widget", widget.id)
+
+    async def set_verdict(self, id: Id, verdict: Verdict | None) -> None:
+        table = WidgetRow.__table__
+        result = await self.session.execute(
+            update(table)
+            .where(table.c.id == id)
+            .values(verdict=dump(verdict) if verdict is not None else None)
+        )
+        if result.rowcount == 0:  # type: ignore[attr-defined]
+            raise NotFound("widget", id)
 
     async def list(self, project_id: Id) -> Sequence[Widget]:
         statement = oldest_first(WidgetRow, WidgetRow.project_id == project_id)

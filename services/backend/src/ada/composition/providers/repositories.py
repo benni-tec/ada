@@ -5,6 +5,7 @@ from ada.adapters.db.alert_repositories import SqlAlertRepository, SqlAlertRuleR
 from ada.adapters.db.attachment_repositories import SqlAttachmentRepository
 from ada.adapters.db.llm_repositories import (
     SqlAgentSettingsRepository,
+    SqlJudgeSettingsRepository,
     SqlLlmModelRepository,
     SqlLlmProviderRepository,
 )
@@ -36,6 +37,7 @@ from ada.core.ports.repositories import (
     AttachmentRepository,
     DashboardRepository,
     DataSourceRepository,
+    JudgeSettingsRepository,
     LlmModelRepository,
     LlmProviderRepository,
     OperatorRepository,
@@ -74,6 +76,7 @@ class RepositoryProvider(Provider):
     llm_providers = provide(SqlLlmProviderRepository, provides=LlmProviderRepository)
     llm_models = provide(SqlLlmModelRepository, provides=LlmModelRepository)
     agent_settings = provide(SqlAgentSettingsRepository, provides=AgentSettingsRepository)
+    judge_settings = provide(SqlJudgeSettingsRepository, provides=JudgeSettingsRepository)
 
     source_locks = provide(SqlSourceLocks, provides=SourceLocks)
     # Its own connection per record, from the engine, not the request's session.

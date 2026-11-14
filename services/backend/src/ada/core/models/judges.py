@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from ada.core.models.base import DomainModel
+from ada.core.models.base import DomainModel, Id
 from ada.core.models.schema import Column
 
 
@@ -69,3 +69,44 @@ class Verdict(DomainModel):
     # not reviewed twice.
     content_hash: str
     checked_at: datetime
+
+
+class JudgeDefaults(DomainModel):
+    """The global settings of one kind, beside the global LLM registry."""
+
+    kind: JudgeKind
+    strictness: Strictness = Strictness.WARN
+    # "<provider>/<model>" from the configured models; None: no model, so unchecked.
+    model_id: str | None = None
+    # Added to the kind's prompt in every project.
+    instructions: str = ""
+    revision: int = 0
+
+
+class JudgeOverride(DomainModel):
+    """A project's overrides of one kind; None inherits the global default."""
+
+    project_id: Id
+    kind: JudgeKind
+    strictness: Strictness | None = None
+    model_id: str | None = None
+    # Project instructions come after the global ones.
+    instructions: str | None = None
+    # 0 while the project overrides nothing of this kind (no record yet).
+    revision: int = 0
+
+
+class JudgeSettings(DomainModel):
+    """What review uses in a project: the defaults with the project's overrides applied."""
+
+    project_id: Id
+    kind: JudgeKind
+    strictness: Strictness
+    model_id: str | None
+    # Global, then project.
+    instructions: str
+    # The fields the project overrides.
+    overridden: frozenset[str] = frozenset()
+    # The project override's revision, 0 when there is none yet: the expected_revision of
+    # the next override.
+    revision: int = 0

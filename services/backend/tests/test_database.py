@@ -63,7 +63,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == [f"{n:04}" for n in range(1, 12)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(1, 13)]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -84,6 +84,15 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         # 0010 lets widgets read further inputs and keep a drawing error.
         columns = {c["name"] for c in inspect(engine).get_columns("widgets")}
         assert {"inputs", "render_error", "verdict"} <= columns
+        # 0012 seeds the judges' defaults: warn, no model, one row per kind.
+        with engine.connect() as connection:
+            judges = connection.exec_driver_sql(
+                "SELECT kind, strictness, model_id, revision FROM judge_defaults ORDER BY kind"
+            ).all()
+        assert [tuple(row) for row in judges] == [
+            ("text_widget", "warn", None, 1),
+            ("widget_code", "warn", None, 1),
+        ]
 
         command.downgrade(_config(database_url), "0001")
 
@@ -94,9 +103,10 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "tool_call" not in {c["name"] for c in inspector.get_columns("session_entries")}
         assert "web_usage" not in inspector.get_table_names()
         assert "session_attachments" not in inspector.get_table_names()
+        assert "judge_defaults" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == [f"{n:04}" for n in range(2, 12)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(2, 13)]
     assert migrate(database_url) == []
 
 
@@ -325,6 +335,18 @@ async def test_every_get_of_an_unknown_id_names_its_kind(engine: AsyncEngine) ->
 # Round trips: every field of every record comes back as it went in.
 
 
+VERDICT = Verdict(
+    kind=JudgeKind.TEXT_WIDGET,
+    outcome=Outcome.FAIL,
+    passed=False,
+    blocking=True,
+    findings=(Finding(message="Use a placeholder", excerpt="12 %"),),
+    model="test/judge",
+    content_hash="abc",
+    checked_at=factories.NOW,
+)
+
+
 async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
     async with unit_of_work(engine) as repos:
         world = await make_world(repos)
@@ -364,26 +386,17 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         await repos.sessions.add_entry(later)
         await repos.sessions.add_entry(first)
         original = db_helpers.widget(world.project.id, world.operator.id, session_id=session.id)
-        verdict = Verdict(
-            kind=JudgeKind.WIDGET_CODE,
-            outcome=Outcome.WARN,
-            passed=True,
-            blocking=False,
-            findings=(Finding(message="Numbers in the code", excerpt="[1, 2]"),),
-            content_hash="abc",
-            checked_at=factories.NOW,
-        )
         copy = db_helpers.widget(
             world.project.id,
             world.operator.id,
             copied_from=original.id,
             created_at=factories.NOW + timedelta(seconds=1),
-            verdict=verdict,
+            verdict=VERDICT,
         )
         await repos.widgets.add(original)
         await repos.widgets.add(copy)
         # A judge's verdict and a drawing error are stored with the widget.
-        original = original.model_copy(update={"verdict": verdict, "render_error": "boom"})
+        original = original.model_copy(update={"verdict": VERDICT, "render_error": "boom"})
         await repos.widgets.save(original)
         with pytest.raises(NotFound):
             await repos.sessions.add_entry(db_helpers.entry(uuid7()))
@@ -403,6 +416,15 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         assert await repos.sessions.entries(session.id) == [first, later]
         assert await repos.widgets.list(world.project.id) == [original, copy]
         assert await repos.widgets.list_by_session(session.id) == [original]
+        # A verdict is written on its own, leaving the rest of the widget as it was.
+        await repos.widgets.set_verdict(original.id, VERDICT)
+        assert await repos.widgets.get(original.id) == original.model_copy(
+            update={"verdict": VERDICT}
+        )
+        await repos.widgets.set_verdict(copy.id, None)
+        assert (await repos.widgets.get(copy.id)).verdict is None
+        with pytest.raises(NotFound):
+            await repos.widgets.set_verdict(uuid7(), None)
         updated = await repos.sessions.update(session.model_copy(update={"title": "New"}), 1)
     assert (updated.title, updated.revision) == ("New", 2)
     # A research session's web calls, each committed at once; other sessions are not counted.

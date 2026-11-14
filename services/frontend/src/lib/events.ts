@@ -5,6 +5,7 @@ import {
   alertKeys,
   attachmentKeys,
   dashboardKeys,
+  judgeKeys,
   keys,
   reportKeys,
   type EventType,
@@ -91,6 +92,8 @@ export function effectsOf(event: LiveEvent): Effects {
       invalidate.push(keys.projectWidgets(projectId))
       const widget = id(payload, 'widget_id')
       if (widget) invalidate.push(keys.widget(widget))
+      // A review's verdict arrives as an update; the judges' lists show it.
+      invalidate.push(judgeKeys.verdicts(projectId))
       break
     }
     case 'run.started':

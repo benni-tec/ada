@@ -57,6 +57,7 @@ from agent_support import (
     say,
 )
 from api_support import (
+    FakeJudging,
     FakeWeb,
     Judged,
     Overrides,
@@ -100,7 +101,7 @@ def client(
     web: tuple[FakeWebSearch, FakeExplorer],
 ) -> Iterator[TestClient]:
     settings = unreachable_settings.model_copy(update={"research_web_calls": WEB_CALLS})
-    with serve(settings, Overrides(), agent, FakeWeb(*web)) as client:
+    with serve(settings, Overrides(), FakeJudging(), agent, FakeWeb(*web)) as client:
         # One provider with its key, one model, the session agent: as the Settings page sets.
         assert client.portal is not None
         client.portal.call(configure, container(client), config())

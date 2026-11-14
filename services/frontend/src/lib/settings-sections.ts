@@ -3,6 +3,7 @@
 
 export const globalSections = {
   models: 'Models and providers',
+  judges: 'Judges',
   'agent-instructions': 'Agent instructions',
   web: 'Web',
 } as const
@@ -10,6 +11,7 @@ export const globalSections = {
 export const projectSections = {
   'data-sources': 'Data sources',
   'project-instructions': 'Agent instructions',
+  'project-judges': 'Judges',
 } as const
 
 export type SettingsSectionId = keyof typeof globalSections | keyof typeof projectSections

@@ -38,7 +38,8 @@ class Widget(DomainModel):
     # What went wrong the last time the widget was drawn, as its frame reported it; None
     # when it drew. Kept so the agent that wrote it can see it and fix it.
     render_error: str | None = None
-    # A judge's review of a custom widget's code, kept beside it; None for the other types.
+    # A judge's review of what the agent wrote: a text widget's words against its inputs,
+    # a custom widget's code. None when it was not reviewed (yet).
     verdict: Verdict | None = None
 
     def all_inputs(self) -> dict[str, OperatorId]:
