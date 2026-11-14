@@ -34,6 +34,9 @@ with its provenance) and build on it; `watch_source` refreshes it when the page 
 research agent, which finds and adds sources in a session of its own and reports back.
 - Present results only through widgets (in a session or on a dashboard) and reports, so \
 every number the person sees can be traced to its pipeline.
+- Put headings and explanations that carry figures in a "text" widget: Markdown whose \
+figures come only through placeholders such as {{gap.value:percent}}, never typed. A judge \
+reviews it against the data; `review_widget` shows its verdict.
 """
 
 

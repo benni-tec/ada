@@ -550,6 +550,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/judges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Project Judges
+         * @description What the judges use in the project, one per kind, with the fields it overrides.
+         */
+        get: operations["get_project_judges_api_projects__project_id__judges_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/judges/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Override Project Judge */
+        put: operations["override_project_judge_api_projects__project_id__judges__kind__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/operators": {
         parameters: {
             query?: never;
@@ -695,6 +732,26 @@ export interface paths {
         put?: never;
         /** Create Template */
         post: operations["create_template_api_projects__project_id__templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/verdicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Verdicts
+         * @description The project's widgets with a verdict (`Widget.verdict`), newest verdict first.
+         */
+        get: operations["list_verdicts_api_projects__project_id__verdicts_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -983,6 +1040,43 @@ export interface paths {
          *     settings' revision, shared with the session agent).
          */
         put: operations["set_agent_instructions_api_settings_agent_instructions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/judges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Judge Defaults
+         * @description The global settings of every kind of judge, beside the LLM registry.
+         */
+        get: operations["get_judge_defaults_api_settings_judges_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/judges/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Judge Defaults */
+        put: operations["set_judge_defaults_api_settings_judges__kind__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1321,6 +1415,27 @@ export interface paths {
         get: operations["get_widget_data_api_widgets__widget_id__data_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/widgets/{widget_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Widget
+         * @description Review a text or custom widget again, in the request: on `run_id`, else on a new run.
+         *     The widget comes back with its verdict.
+         */
+        post: operations["review_widget_api_widgets__widget_id__review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1672,6 +1787,19 @@ export interface components {
          * @enum {string}
          */
         EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report";
+        /** Finding */
+        Finding: {
+            /** Excerpt */
+            excerpt: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default error
+             * @enum {string}
+             */
+            severity: "error" | "warning";
+        };
         /**
          * FoundBy
          * @description How an agent came upon a source: the web search and its scope.
@@ -1817,6 +1945,82 @@ export interface components {
         };
         JsonObject: {
             [key: string]: unknown;
+        };
+        /**
+         * JudgeDefaults
+         * @description The global settings of one kind, beside the global LLM registry.
+         */
+        JudgeDefaults: {
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            kind: components["schemas"]["JudgeKind"];
+            /** Model Id */
+            model_id?: string | null;
+            /**
+             * Revision
+             * @default 0
+             */
+            revision: number;
+            /** @default warn */
+            strictness: components["schemas"]["Strictness"];
+        };
+        /**
+         * JudgeDefaultsChange
+         * @description Fields left out stay as they are. `model_id` null clears the model (reviews are then
+         *     unchecked); `instructions` "" clears them.
+         */
+        JudgeDefaultsChange: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Instructions */
+            instructions?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            strictness?: components["schemas"]["Strictness"] | null;
+        };
+        /**
+         * JudgeKind
+         * @enum {string}
+         */
+        JudgeKind: "text_widget" | "widget_code";
+        /**
+         * JudgeOverrideChange
+         * @description Fields left out stay as they are; null inherits the global default again.
+         */
+        JudgeOverrideChange: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Instructions */
+            instructions?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            strictness?: components["schemas"]["Strictness"] | null;
+        };
+        /**
+         * JudgeSettings
+         * @description What review uses in a project: the defaults with the project's overrides applied.
+         */
+        JudgeSettings: {
+            /** Instructions */
+            instructions: string;
+            kind: components["schemas"]["JudgeKind"];
+            /** Model Id */
+            model_id: string | null;
+            /**
+             * Overridden
+             * @default []
+             */
+            overridden: string[];
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 0
+             */
+            revision: number;
+            strictness: components["schemas"]["Strictness"];
         };
         /** Liveness */
         Liveness: {
@@ -2150,6 +2354,11 @@ export interface components {
             /** Ids */
             ids: components["schemas"]["Id"][];
         };
+        /**
+         * Outcome
+         * @enum {string}
+         */
+        Outcome: "pass" | "warn" | "fail" | "unchecked";
         /**
          * OutputKind
          * @enum {string}
@@ -2670,6 +2879,11 @@ export interface components {
             /** Size */
             size: number;
         };
+        /**
+         * Strictness
+         * @enum {string}
+         */
+        Strictness: "off" | "warn" | "block";
         /** Template */
         Template: {
             /** @default {} */
@@ -2795,6 +3009,31 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** Verdict */
+        Verdict: {
+            /** Blocking */
+            blocking: boolean;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Findings
+             * @default []
+             */
+            findings: components["schemas"]["Finding"][];
+            kind: components["schemas"]["JudgeKind"];
+            /** Model */
+            model?: string | null;
+            outcome: components["schemas"]["Outcome"];
+            /** Passed */
+            passed: boolean;
+            /** Reason */
+            reason?: string | null;
+        };
         /**
          * VersionBump
          * @enum {string}
@@ -2857,6 +3096,7 @@ export interface components {
             title: string;
             /** Type */
             type: string;
+            verdict?: components["schemas"]["Verdict"] | null;
         };
         /**
          * WidgetChange
@@ -3969,6 +4209,73 @@ export interface operations {
             };
         };
     };
+    get_project_judges_api_projects__project_id__judges_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeSettings"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    override_project_judge_api_projects__project_id__judges__kind__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                kind: components["schemas"]["JudgeKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JudgeOverrideChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_operator_api_projects__project_id__operators_post: {
         parameters: {
             query?: never;
@@ -4359,6 +4666,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Template"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_verdicts_api_projects__project_id__verdicts_get: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["JudgeKind"] | null;
+                outcome?: components["schemas"]["Outcome"] | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Widget"][];
                 };
             };
             /** @description Validation Error */
@@ -4931,6 +5272,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentSettingsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_judge_defaults_api_settings_judges_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeDefaults"][];
+                };
+            };
+        };
+    };
+    set_judge_defaults_api_settings_judges__kind__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: components["schemas"]["JudgeKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JudgeDefaultsChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeDefaults"];
                 };
             };
             /** @description Validation Error */
@@ -5602,6 +5998,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WidgetData"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_widget_api_widgets__widget_id__review_post: {
+        parameters: {
+            query?: {
+                run_id?: components["schemas"]["Id"] | null;
+            };
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Widget"];
                 };
             };
             /** @description Validation Error */

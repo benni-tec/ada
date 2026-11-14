@@ -25,9 +25,11 @@ from ada.adapters.memory.repositories import (
     MemoryStore,
     MemoryWidgetRepository,
 )
+from ada.adapters.memory.tasks import RecordingTaskDispatcher
 from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.adapters.sources.examples import ExampleSource
 from ada.adapters.sources.http import HttpSourceReaders, create_client
+from ada.adapters.transactions import PendingWork
 from ada.core.models.base import Id
 from ada.core.models.operators import Operator
 from ada.core.models.runs import Run, Snapshot
@@ -119,6 +121,8 @@ class World:
             ),
             self.runs,
             self.events,
+            RecordingTaskDispatcher(),
+            PendingWork(),
             self.clock,
         )
         memory.projects[self.project.id] = self.project

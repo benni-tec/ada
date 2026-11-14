@@ -1,5 +1,6 @@
-"""The in-platform agent's configuration: model providers, their models, and the settings
-row that names the session agent. Shared by all projects."""
+"""The in-platform agent's configuration: model providers, their models, the settings row
+that names the session agent, and the judges' settings, which name models too. Shared by
+all projects, but for the projects' judge overrides."""
 
 from collections.abc import Sequence
 from typing import Any
@@ -9,12 +10,21 @@ from sqlalchemy import Select, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ada.adapters.db.support import add_row, fetch, oldest_first, require, rows, update_row
-from ada.adapters.db.tables import AgentSettingsRow, LlmModelRow, LlmProviderRow
+from ada.adapters.db.tables import (
+    AgentSettingsRow,
+    JudgeDefaultsRow,
+    LlmModelRow,
+    LlmProviderRow,
+    ProjectJudgeRow,
+    ProjectRow,
+)
 from ada.core.models.agents import AgentSettings, LlmModel, LlmProvider, ProviderKind
 from ada.core.models.base import UNCHANGED, Change, Id
-from ada.core.models.errors import NotFound
+from ada.core.models.errors import Conflict, NotFound
+from ada.core.models.judges import JudgeDefaults, JudgeKind, JudgeOverride, Strictness
 from ada.core.ports.repositories import (
     AgentSettingsRepository,
+    JudgeSettingsRepository,
     LlmModelRepository,
     LlmProviderRepository,
 )
@@ -182,3 +192,89 @@ class SqlAgentSettingsRepository(AgentSettingsRepository):
             return None
         found = (await self.session.execute(_models().where(LlmModelRow.id == id))).first()
         return _model(found[0], found[1]).id if found is not None else None
+
+
+async def _model_uuid(session: AsyncSession, id: str | None) -> UUID | None:
+    return (await _model_row(session, id))[0].id if id is not None else None
+
+
+async def _model_name(session: AsyncSession, id: UUID | None) -> str | None:
+    if id is None:
+        return None
+    found = (await session.execute(_models().where(LlmModelRow.id == id))).first()
+    return _model(found[0], found[1]).id if found is not None else None
+
+
+class SqlJudgeSettingsRepository(JudgeSettingsRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def defaults(self) -> Sequence[JudgeDefaults]:
+        statement = select(JudgeDefaultsRow).order_by(JudgeDefaultsRow.kind)
+        return [await self._defaults(row) for row in await rows(self.session, statement)]
+
+    async def update_defaults(
+        self, defaults: JudgeDefaults, expected_revision: int
+    ) -> JudgeDefaults:
+        row = await update_row(
+            self.session,
+            JudgeDefaultsRow,
+            "judge defaults",
+            defaults.kind.value,
+            expected_revision,
+            {
+                "strictness": defaults.strictness.value,
+                "model_id": await _model_uuid(self.session, defaults.model_id),
+                "instructions": defaults.instructions,
+            },
+        )
+        return await self._defaults(row)
+
+    async def overrides(self, project_id: Id) -> Sequence[JudgeOverride]:
+        statement = (
+            select(ProjectJudgeRow)
+            .where(ProjectJudgeRow.project_id == project_id)
+            .order_by(ProjectJudgeRow.kind)
+        )
+        return [await self._override(row) for row in await rows(self.session, statement)]
+
+    async def save_override(self, override: JudgeOverride, expected_revision: int) -> JudgeOverride:
+        values = {
+            "strictness": override.strictness.value if override.strictness else None,
+            "model_id": await _model_uuid(self.session, override.model_id),
+            "instructions": override.instructions,
+        }
+        key = (override.project_id, override.kind.value)
+        if expected_revision == 0:
+            await require(self.session, ProjectRow, override.project_id, "project")
+            existing = await self.session.get(ProjectJudgeRow, key, populate_existing=True)
+            if existing is not None:
+                raise Conflict("judge override", override.kind, 0, existing.revision)
+            row = ProjectJudgeRow(
+                project_id=override.project_id, kind=override.kind.value, **values
+            )
+            await add_row(self.session, row)
+            return await self._override(row)
+        row = await update_row(
+            self.session, ProjectJudgeRow, "judge override", key, expected_revision, values
+        )
+        return await self._override(row)
+
+    async def _defaults(self, row: JudgeDefaultsRow) -> JudgeDefaults:
+        return JudgeDefaults(
+            kind=JudgeKind(row.kind),
+            strictness=Strictness(row.strictness),
+            model_id=await _model_name(self.session, row.model_id),
+            instructions=row.instructions,
+            revision=row.revision,
+        )
+
+    async def _override(self, row: ProjectJudgeRow) -> JudgeOverride:
+        return JudgeOverride(
+            project_id=row.project_id,
+            kind=JudgeKind(row.kind),
+            strictness=Strictness(row.strictness) if row.strictness is not None else None,
+            model_id=await _model_name(self.session, row.model_id),
+            instructions=row.instructions,
+            revision=row.revision,
+        )

@@ -20,6 +20,7 @@ from ada.adapters.memory.repositories import (
     MemoryAlertRuleRepository,
     MemoryDashboardRepository,
     MemoryDataSourceRepository,
+    MemoryJudgeSettingsRepository,
     MemoryLlmModelRepository,
     MemoryLlmProviderRepository,
     MemoryOperatorRepository,
@@ -47,6 +48,7 @@ from ada.core.ports.repositories import (
     AlertRuleRepository,
     DashboardRepository,
     DataSourceRepository,
+    JudgeSettingsRepository,
     LlmModelRepository,
     LlmProviderRepository,
     OperatorRepository,
@@ -103,6 +105,7 @@ class MemoryRepositories(Provider):
     llm_providers = provide(MemoryLlmProviderRepository, provides=LlmProviderRepository)
     llm_models = provide(MemoryLlmModelRepository, provides=LlmModelRepository)
     agent_settings = provide(MemoryAgentSettingsRepository, provides=AgentSettingsRepository)
+    judge_settings = provide(MemoryJudgeSettingsRepository, provides=JudgeSettingsRepository)
     source_checks = provide(MemorySourceCheckLog, provides=SourceCheckLog, scope=Scope.APP)
     source_locks = provide(MemorySourceLocks, provides=SourceLocks, scope=Scope.APP)
     turn_progress = provide(MemoryTurnProgress, provides=TurnProgress, scope=Scope.APP)

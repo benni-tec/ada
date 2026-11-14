@@ -1426,6 +1426,13 @@ history entry:
     empty keeps the stored key and "Remove the stored key" sends `api_key: null`. A 409 on
     an edit or on the picker reads the settings again and says so. Every change also
     invalidates `GET /llm/models`, which the composers read.
+  - **Judges** (`judges`, `GET /settings/judges`): one card per kind, "Text widgets"
+    (`text_widget`) and "Custom widget code" (`widget_code`), each with the strictness
+    (radios Off / Warn / Block, each with a line on what it does), the model (a select of
+    `GET /llm/models`, "None" first; with no models a link to Models and providers) and the
+    instructions added to the kind's prompt. Save sends the changed fields with the
+    defaults' revision (`PUT /settings/judges/{kind}`); a 409 reads them again, says so and
+    keeps what was typed.
   - **Agent instructions** (`agent-instructions`): a textarea ("Instructions for every
     project") with its length against the 20,000 characters the agent reads, saved with
     `PUT /settings/agent-instructions` and the settings' revision.
@@ -1452,6 +1459,15 @@ history entry:
   - **Agent instructions** (`project-instructions`): the project's textarea
     ("Instructions for this project"), saved with `PATCH /projects/{id}
     {agent_instructions, expected_revision}`.
+  - **Judges** (`project-judges`, `GET /projects/{id}/judges`): the same cards with the
+    effective values. Each field says "Global default" unless the project overrides it
+    (`overridden`), then "Set for this project" with "Use global default", which sends
+    `null` for that field. The global instructions are shown above "Instructions for this
+    project", which are added after them; the project's part is the effective text after
+    the global one, since the API sends only their join. Saving sends the changed fields
+    with the override's revision (`PUT /projects/{id}/judges/{kind}`). Each card lists the
+    kind's recent verdicts (`GET /projects/{id}/verdicts?kind=`): the widget (a link to its
+    page), its outcome and when.
 
 Both instruction forms keep the typed text apart from the stored one: a 409 reads the
 record again, says so and keeps the text, so saving again replaces theirs. Links into
@@ -1459,7 +1475,16 @@ Settings add `?settings=<section>` to the current page (`withSettings`): the gea
 chat's note open Models and providers, the overview's "Manage in Settings" Data sources.
 
 The settings' calls are in `lib/api/settings.ts`, on the typed client, except the upload
-(`uploadFile`), whose raw body the schema does not describe.
+(`uploadFile`), whose raw body the schema does not describe. The judges' are in `lib/api/judges.ts`.
+
+**The verdict badge** (`components/verdict-badge.tsx`, in the card header beside the type,
+so on every card and report block) shows for text and custom widgets, or any widget with a
+verdict: "Reviewed ✓" (pass without findings), "N findings" (warnings, amber, a triangle),
+"Failed: N findings" (fail, red, an octagon), or "Not reviewed" (unchecked or none yet,
+with the reason in a tooltip). It opens the review: model and time, the findings with
+their excerpts, errors first, and "Review again" (`POST /widgets/{id}/review?run_id=<the
+card's run>`). A new verdict arrives with `widget.updated`, which also invalidates the
+project's verdict lists.
 
 ### Dashboards and the panel beside a session
 
@@ -1510,7 +1535,7 @@ The settings' calls are in `lib/api/settings.ts`, on the typed client, except th
 | `/projects/{id}/reports/new` | Generate a report from a dashboard (`?dashboard=<id>` preselects it) |
 | `/projects/{id}/alerts` | The project's alerts are its dashboards' alerts, so the page has one card per dashboard (those with active alerts first): its name (a link), the number of active alerts, and a table of its rules (severity, name, condition, checking, alerts, check now and edit); a rule with alerts opens to a nested table of them (key, Active or Ended, when; one with an active alert starts open), and each alert opens to the rows behind it (`GET /alerts/{id}/rows`). The filter All / Active / Ended is for the whole page; "New rule" opens the rule editor and its formula builder. The words people read are "active" and "ended", not the API's `firing` and `resolved` |
 | `/projects/{id}/settings` | Redirects to the overview with the settings open: at Data sources when the address names one (`#source-<id>`, kept), else at Models and providers |
-| `?settings=<section>`, on any of the project's pages | Settings in a modal over the page: `models`, `agent-instructions`, `web`, `data-sources`, `project-instructions` (see "Settings" above) |
+| `?settings=<section>`, on any of the project's pages | Settings in a modal over the page: `models`, `judges`, `agent-instructions`, `web`, `data-sources`, `project-instructions`, `project-judges` (see "Settings" above) |
 | `?open=<widget id>`, on any of the project's pages | The widget full size in a modal over the page (see Widgets) |
 
 A write the page makes carries the revision it last showed; a 409 reads the record again

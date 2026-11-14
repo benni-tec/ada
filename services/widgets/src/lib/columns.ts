@@ -96,6 +96,13 @@ export function formatAs(value: number, format: NumberFormat | undefined, decima
   }
 }
 
+/** "+1,346", "−210" or "±0": a difference always says which way it goes. */
+export function signed(difference: number, write: (value: number) => string): string {
+  const text = write(Math.abs(difference))
+  if (text === write(0)) return `±${text}`
+  return `${difference > 0 ? '+' : '−'}${text}`
+}
+
 /** The format a column is written in: the spec's, else plain for years and the time
  * role's columns, else the usual number. */
 export function columnFormat(column: Column, roles?: Roles, format?: NumberFormat): NumberFormat | undefined {

@@ -66,7 +66,8 @@ same definition again returns the same operator.
 be traced to its source and fetch time.
 - A widget shows one operator's output (value, table, line-chart, map, or a Vega-Lite \
 chart). It fetches its own data from the platform; you pass only the operator id, never \
-numbers.
+numbers. A text widget is Markdown that reads its operator and further named inputs \
+through placeholders ({{input.column}}), so its figures are traced like any widget's.
 - A dashboard is a live view of widgets in named slots; every edit adds a version. A \
 report freezes widgets at one run. Alert rules watch a measure on a dashboard.
 """
@@ -77,6 +78,9 @@ Rules:
 (list_pipelines, get_lineage) to building new ones; build new steps on top of them.
 - Never state a number you did not read from a tool result in this conversation. Prefer \
 showing numbers in a widget to writing them in your answer.
+- Headings and explanations for a dashboard or report go in text widgets, and every figure \
+in them only through a placeholder, never typed. A judge reviews each text widget against \
+its data; fix what its verdict finds with update_widget.
 - Explore data with query_operator (filters, GROUP BY, window functions over any \
 operator), but never show or quote its rows: what you present must come from a transform \
 and a widget, so it can be traced.

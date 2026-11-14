@@ -7,6 +7,7 @@ from ada.core.models.base import Id, JsonObject
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import Event, EventType
 from ada.core.models.operators import OperatorId, OperatorKind
+from ada.core.models.schema import Schema
 from ada.core.models.widgets import MAIN_INPUT, Widget, WidgetData
 from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import (
@@ -16,10 +17,13 @@ from ada.core.ports.repositories import (
     WidgetRepository,
 )
 from ada.core.ports.system import Clock
+from ada.core.ports.tasks import TaskDispatcher
+from ada.core.ports.transactions import AfterCommit
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.widgets import WidgetService
 from ada.core.services.schema.roles import check_widget
+from ada.core.services.widgets.text import TEXT_TYPE
 
 # Who starts the run when a widget asks for its data without naming one: nobody asked for
 # it, the widget did, so it is the platform's doing.
@@ -40,6 +44,8 @@ class Widgets(WidgetService):
         session_records: SessionService,
         runs: RunService,
         events: EventPublisher,
+        dispatcher: TaskDispatcher,
+        after_commit: AfterCommit,
         clock: Clock,
     ) -> None:
         self.widgets = widgets
@@ -49,6 +55,8 @@ class Widgets(WidgetService):
         self.session_records = session_records
         self.runs = runs
         self.events = events
+        self.dispatcher = dispatcher
+        self.after_commit = after_commit
         self.clock = clock
 
     async def create(
@@ -71,7 +79,12 @@ class Widgets(WidgetService):
         inputs = await self._inputs(project_id, inputs or {})
         # What the widget needs (a measure, an x and a y, a geography role) must be
         # declared on its operator now, not discovered when someone first looks at it.
-        check_widget(type.strip(), operator.output, spec or {})
+        check_widget(
+            type.strip(),
+            operator.output,
+            spec or {},
+            await self._schemas({MAIN_INPUT: operator_id, **inputs}),
+        )
         if session_id is not None:
             session = await self.sessions.get(session_id)
             if session.project_id != project_id:
@@ -103,6 +116,7 @@ class Widgets(WidgetService):
         )
         if session_id is not None:
             await self.session_records.record_widget(session_id, widget.id, note, actor)
+        self._judge(widget)
         return widget
 
     async def update(
@@ -131,9 +145,26 @@ class Widgets(WidgetService):
         if spec is not None:
             changes["spec"] = spec
         updated = widget.model_copy(update=changes)
-        if updated.type != widget.type or updated.spec != widget.spec:
+        judged = (updated.type, updated.spec, updated.inputs) != (
+            widget.type,
+            widget.spec,
+            widget.inputs,
+        )
+        if (
+            updated.type != widget.type
+            or updated.spec != widget.spec
+            or (judged and updated.type == TEXT_TYPE)
+        ):
             operator = await self.operators.get(widget.operator_id)
-            check_widget(updated.type, operator.output, updated.spec)
+            check_widget(
+                updated.type,
+                operator.output,
+                updated.spec,
+                await self._schemas(updated.all_inputs()),
+            )
+        if judged:
+            # A verdict is about what it read: the new content is reviewed afresh.
+            updated = updated.model_copy(update={"verdict": None})
         await self.widgets.save(updated)
         payload = {"widget_id": str(updated.id)}
         if updated.session_id is not None:
@@ -146,7 +177,32 @@ class Widgets(WidgetService):
                 at=self.clock.now(),
             )
         )
+        if judged:
+            self._judge(updated)
         return updated
+
+    async def warnings(self, id: Id) -> Sequence[str]:
+        widget = await self.widgets.get(id)
+        if widget.type != TEXT_TYPE:
+            return []
+        operator = await self.operators.get(widget.operator_id)
+        return check_widget(
+            widget.type, operator.output, widget.spec, await self._schemas(widget.all_inputs())
+        )
+
+    def _judge(self, widget: Widget) -> None:
+        """Queue the judge's review of a text widget, once this unit of work has stored
+        it: the call returns at once, and the verdict follows (widget.updated)."""
+        if widget.type != TEXT_TYPE:
+            return
+
+        async def queue() -> None:
+            await self.dispatcher.judge_widget(widget.id)
+
+        self.after_commit.add(queue)
+
+    async def _schemas(self, inputs: dict[str, OperatorId]) -> dict[str, Schema]:
+        return {name: (await self.operators.get(op)).output for name, op in inputs.items()}
 
     async def get(self, id: Id) -> Widget:
         return await self.widgets.get(id)

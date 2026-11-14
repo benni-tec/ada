@@ -109,9 +109,9 @@ test('the record reads as a conversation, its widget cards all at the page’s o
   expect(within(own).getByText('Starting the page’s run…')).toBeInTheDocument()
   act(() => startRun())
   const frame = await within(own).findByTitle('Widget: Coverage by region')
-  expect(frame).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r1')
+  expect(frame).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r1&fit=content')
   expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin')
-  expect(await within(made).findByTitle('Widget: Latest coverage')).toHaveAttribute('src', 'http://localhost:5174/value.html#widget=w2&run=r1')
+  expect(await within(made).findByTitle('Widget: Latest coverage')).toHaveAttribute('src', 'http://localhost:5174/value.html#widget=w2&run=r1&fit=content')
   expect(started).toEqual(['r1'])
 
   // A widget made by an external agent names its client and note; `?widget=` marks one.

@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { coverage, widget } from '@/test/samples'
 import { Any } from '@/widgets/any/any'
 
-import { followTheme } from './host'
+import { fetchAll, followFit, followTheme, reportHeight } from './host'
 import { WidgetRuntime } from './runtime'
 import type { WidgetData } from './types'
 
@@ -135,4 +135,73 @@ test('the widget takes the theme the page names in the fragment, and follows it 
   expect(document.documentElement.dataset.theme).toBeUndefined()
   stop()
   window.location.hash = ''
+})
+
+// Several inputs, and the page around the frame
+
+test('reads several inputs in one run: without a run, the first starts it and the rest read it', async () => {
+  const fetch = vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(String(input), 'http://ada.test')
+    const name = url.searchParams.get('input') ?? 'main'
+    if (name === 'broken') return json({ detail: 'Widget w1 has no input broken' }, 422)
+    return json(coverage({ run_id: url.searchParams.get('run_id') ?? 'r-new' }))
+  })
+  vi.stubGlobal('fetch', fetch)
+
+  const results = await fetchAll('w1', null, ['main', 'gap', 'broken'])
+  expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
+    '/api/widgets/w1/data?limit=1000',
+    '/api/widgets/w1/data?limit=1000&run_id=r-new&input=gap',
+    '/api/widgets/w1/data?limit=1000&run_id=r-new&input=broken',
+  ])
+  expect(results.get('gap')).toMatchObject({ status: 'loaded', data: { run_id: 'r-new' } })
+  expect(results.get('broken')).toMatchObject({ status: 'error', message: 'Widget w1 has no input broken' })
+})
+
+test('where the page fits the frame to its content, the widget tells it its height as it changes', () => {
+  const observed: (() => void)[] = []
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        observed.push(callback)
+      }
+      observe() {}
+      disconnect() {}
+    },
+  )
+  const parent = { postMessage: vi.fn() }
+  Object.defineProperty(window, 'parent', { value: parent, configurable: true })
+  const element = document.createElement('div')
+  let height = 120.4
+  element.getBoundingClientRect = () => ({ height }) as DOMRect
+
+  // The page sizes the frame: the widget fills it and says nothing.
+  window.location.hash = '#widget=w1'
+  const stopFit = followFit()
+  const stop = reportHeight(element)
+  expect(document.documentElement.dataset.fit).toBeUndefined()
+  expect(parent.postMessage).not.toHaveBeenCalled()
+
+  window.location.hash = '#widget=w1&fit=content'
+  window.dispatchEvent(new HashChangeEvent('hashchange'))
+  expect(document.documentElement.dataset.fit).toBe('content')
+  expect(parent.postMessage).toHaveBeenLastCalledWith({ type: 'ada:resize', height: 121 }, '*')
+
+  // Still loading: the page keeps the frame's usual height.
+  height = 33
+  element.innerHTML = '<div role="status" aria-busy="true">Loading…</div>'
+  observed[0]()
+  expect(parent.postMessage).toHaveBeenCalledTimes(1)
+  element.innerHTML = ''
+
+  height = 300
+  observed[0]()
+  observed[0]()
+  expect(parent.postMessage).toHaveBeenLastCalledWith({ type: 'ada:resize', height: 300 }, '*')
+  // The same height again is not news.
+  expect(parent.postMessage).toHaveBeenCalledTimes(2)
+  stop()
+  stopFit()
+  delete document.documentElement.dataset.fit
 })

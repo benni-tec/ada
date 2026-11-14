@@ -11,6 +11,8 @@ export type Loaded = {
   data: WidgetData
   /** What the output columns mean; empty when the operator declares none. */
   roles: Roles
+  /** When `data` arrived. */
+  fetchedAt: Date
 }
 
 type Result = { status: 'error'; message: string } | { status: 'loaded'; loaded: Loaded }
@@ -25,7 +27,7 @@ async function load(ctx: WidgetContext | null): Promise<Loaded> {
   const [widget, data] = ctx
     ? await Promise.all([fetchWidget(ctx), fetchData(ctx)])
     : await loadFromMcpHost().then((hosted) => [hosted.widget, hosted.data] as const)
-  return { widget, data, roles: data.output.roles ?? {} }
+  return { widget, data, roles: data.output.roles ?? {}, fetchedAt: new Date() }
 }
 
 /** Loads the widget named in the URL fragment and its data, shows loading and error
@@ -64,7 +66,7 @@ export function WidgetRuntime({ children }: { children: (loaded: Loaded) => Reac
 
   if (!result) {
     return (
-      <div className="ada-widget ada-centered" role="status">
+      <div className="ada-widget ada-centered" role="status" aria-busy="true">
         <span className="ada-muted">Loading…</span>
       </div>
     )
@@ -87,6 +89,9 @@ export function WidgetRuntime({ children }: { children: (loaded: Loaded) => Reac
   )
 }
 
+const SCENARIO_TITLE = 'This run binds inputs to other pipelines'
+const STALE_TITLE = 'A source behind this could not be refreshed'
+
 /** A simulated or outdated number must never look like a measured, current one, so these
  * markers are always rendered, above the content, whatever the widget type. */
 export function Flags({ data }: { data: Pick<WidgetData, 'is_scenario' | 'is_stale'> }) {
@@ -94,15 +99,35 @@ export function Flags({ data }: { data: Pick<WidgetData, 'is_scenario' | 'is_sta
   return (
     <ul className="ada-flags" aria-label="Data warnings">
       {data.is_scenario && (
-        <li className="ada-flag ada-flag-scenario" title="This run binds inputs to other pipelines">
+        <li className="ada-flag ada-flag-scenario" title={SCENARIO_TITLE}>
           Scenario: simulated numbers
         </li>
       )}
       {data.is_stale && (
-        <li className="ada-flag ada-flag-stale" title="A source behind this could not be refreshed">
+        <li className="ada-flag ada-flag-stale" title={STALE_TITLE}>
           Stale: last good data, a refresh failed
         </li>
       )}
     </ul>
+  )
+}
+
+/** The same markers on one value, for a widget that shows values from several inputs
+ * (the text widget): the value of a stale or simulated input says so where it stands. */
+export function ValueFlags({ data }: { data: Pick<WidgetData, 'is_scenario' | 'is_stale'> }) {
+  if (!data.is_scenario && !data.is_stale) return null
+  return (
+    <>
+      {data.is_scenario && (
+        <span className="ada-flag ada-flag-inline ada-flag-scenario" title={SCENARIO_TITLE}>
+          scenario
+        </span>
+      )}
+      {data.is_stale && (
+        <span className="ada-flag ada-flag-inline ada-flag-stale" title={STALE_TITLE}>
+          stale
+        </span>
+      )}
+    </>
   )
 }

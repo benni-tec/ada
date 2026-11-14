@@ -119,6 +119,25 @@ body,
   background: transparent;
 }
 
+/* Content mode (`#…&fit=content`, host.ts followFit): the page sizes the frame to the
+   widget, so nothing stretches to the frame. Each type has a height of its own below, the
+   page follows what the runtime reports, and past the page's limit the frame scrolls. */
+:root[data-fit='content'],
+:root[data-fit='content'] body,
+:root[data-fit='content'] #root,
+:root[data-fit='content'] .ada-widget {
+  height: auto;
+}
+
+:root[data-fit='content'] {
+  overflow-y: auto;
+}
+
+:root[data-fit='content'] body,
+:root[data-fit='content'] #root {
+  overflow: visible;
+}
+
 .ada-widget {
   display: flex;
   flex-direction: column;
@@ -183,6 +202,16 @@ body,
   color: var(--stale-fg);
 }
 
+/* The same markers on a single value, in the line of the text. */
+.ada-flag-inline {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  font-size: 0.75em;
+  line-height: 1.5;
+  vertical-align: 0.1em;
+}
+
 .ada-note {
   margin: 0;
   font-size: 12px;
@@ -227,12 +256,23 @@ body,
   color: var(--text-secondary);
 }
 
+/* The frame's height follows the number here, so its size cannot follow the frame's. */
+:root[data-fit='content'] .ada-value-number {
+  font-size: clamp(28px, 9vw, 48px);
+}
+
 /* table */
 
 .ada-table-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+/* At most this tall, so the header stays in view while the rows scroll. */
+:root[data-fit='content'] .ada-table-scroll {
+  flex: none;
+  max-height: 480px;
 }
 
 .ada-table-scroll:focus-visible {
@@ -283,6 +323,11 @@ body,
   overflow: visible;
 }
 
+:root[data-fit='content'] .ada-chart {
+  flex: none;
+  height: 300px;
+}
+
 /* chart (Vega-Lite): the view measures this box for width/height "container". */
 
 .ada-chart .ada-vega {
@@ -293,6 +338,16 @@ body,
 .ada-chart .ada-vega svg {
   position: static;
   display: block;
+}
+
+/* A chart whose spec sets its height (a heatmap's rows, a composed view) is as tall as it
+   says, not squashed into the frame. */
+:root[data-fit='content'] .ada-chart-intrinsic {
+  height: auto;
+}
+
+:root[data-fit='content'] .ada-chart-intrinsic .ada-vega {
+  position: static;
 }
 
 .ada-axis text {
@@ -360,6 +415,11 @@ body,
   position: relative;
 }
 
+:root[data-fit='content'] .ada-map {
+  flex: none;
+  height: 400px;
+}
+
 .ada-map svg {
   position: absolute;
   inset: 0;
@@ -404,4 +464,159 @@ body,
 /* The same hatching as suppressed regions on the map. */
 .ada-swatch-suppressed {
   background: repeating-linear-gradient(45deg, var(--map-missing) 0 3px, var(--text-muted) 3px 4px);
+}
+
+/* text */
+
+.ada-text {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  line-height: 1.55;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+:root[data-fit='content'] .ada-text {
+  flex: none;
+  overflow: visible;
+}
+
+.ada-text > div > :first-child {
+  margin-top: 0;
+}
+
+.ada-text > div > :last-child {
+  margin-bottom: 0;
+}
+
+.ada-text h1,
+.ada-text h2,
+.ada-text h3,
+.ada-text h4,
+.ada-text h5,
+.ada-text h6 {
+  margin: 1em 0 0.4em;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.ada-text h1 {
+  font-size: 1.5em;
+}
+
+.ada-text h2 {
+  font-size: 1.3em;
+}
+
+.ada-text h3 {
+  font-size: 1.15em;
+}
+
+.ada-text h4,
+.ada-text h5,
+.ada-text h6 {
+  font-size: 1em;
+}
+
+.ada-text p,
+.ada-text ul,
+.ada-text ol,
+.ada-text blockquote,
+.ada-text pre,
+.ada-text figure {
+  margin: 0 0 0.75em;
+}
+
+.ada-text ul,
+.ada-text ol {
+  padding-left: 1.5em;
+}
+
+.ada-text li + li {
+  margin-top: 0.2em;
+}
+
+.ada-text blockquote {
+  padding-left: 12px;
+  border-left: 3px solid var(--grid);
+  color: var(--text-secondary);
+}
+
+.ada-text a {
+  color: var(--series-1);
+  text-underline-offset: 2px;
+}
+
+.ada-text code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--grid);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.ada-text pre {
+  overflow-x: auto;
+  padding: 8px 12px;
+  background: var(--grid);
+  border-radius: 6px;
+}
+
+.ada-text pre code {
+  padding: 0;
+  background: none;
+}
+
+.ada-text hr {
+  border: 0;
+  border-top: 1px solid var(--grid);
+  margin: 1em 0;
+}
+
+.ada-text-table-scroll {
+  overflow-x: auto;
+  margin-bottom: 0.75em;
+}
+
+.ada-text-table .ada-text-table-scroll {
+  margin-bottom: 4px;
+}
+
+.ada-text .ada-table {
+  width: auto;
+  min-width: 50%;
+}
+
+/* A figure from an input: quiet, in tabular digits, underlined with dots to say it can be
+   followed to its pipeline. */
+.ada-placeholder {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px dotted var(--text-muted);
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+button.ada-placeholder {
+  cursor: pointer;
+}
+
+button.ada-placeholder:hover {
+  border-bottom-style: solid;
+}
+
+button.ada-placeholder:focus-visible {
+  outline: 2px solid var(--series-1);
+  outline-offset: 1px;
+}
+
+.ada-placeholder[data-missing] {
+  color: var(--text-muted);
+  font-style: italic;
 }

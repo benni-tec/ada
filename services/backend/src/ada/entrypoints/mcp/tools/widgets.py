@@ -25,6 +25,9 @@ class WidgetView(DomainModel):
     widget: Widget
     # Where a person sees it in the frontend, relative to the host serving ADA.
     url: str
+    # What is not wrong but likely unintended, e.g. a text widget's input that no
+    # placeholder reads.
+    warnings: tuple[str, ...] = ()
 
 
 def register(mcp: FastMCP, inject: Inject) -> None:
@@ -84,6 +87,24 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             {"mark": {"type": "text", "dy": -6},
              "encoding": {"text": {"field": "value", "format": ".1f"}}}]}
 
+        - "text", headings and explanations in Markdown: `markdown` (at most 20,000
+          characters; CommonMark with GFM tables and links, no raw HTML, no images).
+          Every figure in it comes from an input through a placeholder, never typed:
+          {{main.value}} is the column `value` of the widget's own operator, {{gap.share}}
+          that of the input `gap`; {{gap.share:percent}} formats it ("integer" 12,346,
+          "number1" 12,345.7, "percent" 72.5 %, "plain" 12345.678, "signed1" +1.3);
+          {{gap.share[county=Kainuu]}} takes the row where `county` is Kainuu (filters
+          chain: [a=x][b=y]); {{gap}} shows the whole input as a small table (at most 50
+          rows). A value is the latest period's when the input has a time role, else the
+          input's only row: filter or aggregate in SQL so one row remains. Write \\{{ for
+          literal braces. Every placeholder is checked against its input's columns; an
+          input no placeholder reads comes back in `warnings`. A judge then reviews the
+          text against the data (`widget.verdict`; `review_widget` waits for it): a
+          number typed into the text, or a statement the data contradicts, is a finding.
+          Example, with inputs {"gap": <operator id>}: "## Screening gap\n\nCoverage
+          was {{gap.coverage:percent}} in {{gap.year}}, {{gap.change:signed1}} points
+          against the year before."
+
         Number formats are "integer", "number", "percent" (the value is already in
         percent: 72.5 gives "72.5 %") or "plain" (no thousands separator). Integer
         columns named `year` or `*_year`, and the time role's columns, are plain anyway.
@@ -98,12 +119,12 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         `inputs` names further operators of the project the widget reads besides its own,
         e.g. {"targets": "<operator id>"}: lowercase names (letters, digits, _), at most 8;
         its own operator is the input "main". All are read in the same run and frozen
-        together in reports. Only types that show several datasets read them; the others
-        ignore them.
+        together in reports. A "text" widget reads the inputs its placeholders name; the
+        other built-in types read only "main".
 
         Give a one-line `note` on what the widget shows and why: the session shows the
-        widget with the note on its card. Returns the widget and its `url`: give
-        the url to the person."""
+        widget with the note on its card. Returns the widget, its `url` (give it to the
+        person) and any `warnings`."""
         operator = await pipelines.get(operator_id)
         widget = await widgets.create(
             operator.project_id,
@@ -116,7 +137,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             session_id=session_id,
             inputs=inputs,
         )
-        return WidgetView(widget=widget, url=widget_url(widget))
+        return WidgetView(
+            widget=widget, url=widget_url(widget), warnings=tuple(await widgets.warnings(widget.id))
+        )
 
     @mcp.tool(app=AppConfig(resource_uri=ANY_WIDGET))
     @inject
@@ -137,11 +160,14 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         it to fix a chart or add labels instead of creating a second widget. The widget's
         operator cannot change: for other data, create a widget. A copy on a dashboard is a
         widget of its own (its id is in the dashboard's slots) and does not change with the
-        original. Returns the widget and its `url`."""
+        original. A changed text widget is reviewed by the judge again. Returns the widget,
+        its `url` and any `warnings`."""
         widget = await widgets.update(
             widget_id, title=title, note=note, type=type, spec=spec, inputs=inputs
         )
-        return WidgetView(widget=widget, url=widget_url(widget))
+        return WidgetView(
+            widget=widget, url=widget_url(widget), warnings=tuple(await widgets.warnings(widget.id))
+        )
 
     # For the widget itself, inside an MCP host: the model never needs the numbers.
     @mcp.tool(app=AppConfig(visibility=["app"]))

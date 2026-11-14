@@ -32,11 +32,14 @@ from ada.core.ports.repositories import (
 from ada.core.ports.system import Clock
 from ada.core.services.order import check_order, order_changed
 from ada.core.services.ports.dashboards import DashboardService
+from ada.core.services.ports.judges import JudgeService
 from ada.core.services.ports.reports import ReportService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.reports import content as tree
 from ada.core.services.reports.sources import SourcesList
 from ada.core.services.reports.versions import FIRST, State, decide, parse_version, required
+from ada.core.services.widgets.review import WidgetJudging, store_verdict
+from ada.core.services.widgets.text import TEXT_TYPE
 
 # The content that fills a template instead of spelling out a tree: {"slots": {name: id}}.
 FILL_KEY = "slots"
@@ -63,6 +66,7 @@ class Reports(ReportService):
         data_sources: DataSourceRepository,
         dashboards: DashboardService,
         runs: RunService,
+        judges: JudgeService,
         events: EventPublisher,
         clock: Clock,
     ) -> None:
@@ -76,6 +80,7 @@ class Reports(ReportService):
         self.events = events
         self.clock = clock
         self.sources_list = SourcesList(operators, snapshots, data_sources)
+        self.judging = WidgetJudging(runs, operators, judges)
 
     async def get(self, id: Id) -> Report:
         return await self.reports.get(id)
@@ -221,6 +226,7 @@ class Reports(ReportService):
         await self._check_owner(project_id, session_id, dashboard_id)
         if await self._named(project_id, name, session_id, dashboard_id) is not None:
             raise Invalid(f"There is a report named {name!r} already; add a version to it instead")
+        run = await self._prepare(blocks, run)
         version_id = uuid7()
         report = Report(
             id=uuid7(),
@@ -276,6 +282,7 @@ class Reports(ReportService):
                 "range and text"
             )
         number = decide(latest.version, need, bump)
+        run = await self._prepare(blocks, run)
         version_id = uuid7()
         # Moving the pointer is the write that two concurrent versions conflict on.
         report = await self.reports.update(
@@ -306,12 +313,6 @@ class Reports(ReportService):
         dashboard_version_id: Id | None,
     ) -> ReportVersion:
         widgets = [await self.widgets.get(id) for id in tree.widget_ids(blocks)]
-        # Every input of every widget, so a widget with several inputs is frozen whole.
-        operators = (op for widget in widgets for op in widget.all_inputs().values())
-        for operator_id in dict.fromkeys(operators):
-            # Fixes the snapshots the widget reads; a run reused by a later version
-            # keeps what it fixed first.
-            run = await self.runs.execute(run.id, operator_id)
         version = ReportVersion(
             id=version_id,
             report_id=report.id,
@@ -341,6 +342,45 @@ class Reports(ReportService):
             )
         )
         return version
+
+    async def _prepare(self, blocks: Sequence[tree.Block], run: Run) -> Run:
+        """The run with every widget's operators executed, and the text widgets reviewed on
+        it, before anything of the version is written."""
+        widgets = [await self.widgets.get(id) for id in tree.widget_ids(blocks)]
+        # Every input of every widget, so a widget with several inputs is frozen whole.
+        operators = (op for widget in widgets for op in widget.all_inputs().values())
+        for operator_id in dict.fromkeys(operators):
+            # Fixes the snapshots the widget reads; a run reused by a later version
+            # keeps what it fixed first.
+            run = await self.runs.execute(run.id, operator_id)
+        await self._review(widgets, run)
+        return run
+
+    async def _review(self, widgets: Sequence[Widget], run: Run) -> None:
+        """The judge reads every text widget as the version shows it, on the version's run.
+        A blocking verdict refuses the version, naming the findings; any other is stored
+        on its widget."""
+        refused: list[str] = []
+        for widget in widgets:
+            if widget.type != TEXT_TYPE:
+                continue
+            verdict = await self.judging.review(widget, run.id)
+            if verdict is None:
+                continue
+            if verdict.blocking:
+                findings = "; ".join(
+                    f'{finding.message} ("{finding.excerpt}")'
+                    for finding in verdict.findings
+                    if finding.severity == "error"
+                )
+                refused.append(f'"{widget.title}" ({widget.id}): {findings}')
+            else:
+                await store_verdict(self.widgets, self.events, self.clock, widget, verdict)
+        if refused:
+            raise Invalid(
+                "The judge refused text widgets of this version; fix them with update_widget "
+                "and try again: " + " | ".join(refused)
+            )
 
     # Checks
 
