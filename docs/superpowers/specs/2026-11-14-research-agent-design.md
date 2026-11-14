@@ -167,6 +167,12 @@ link, and a "model-extracted" badge when `extracted_by_model` is set.
   delegation entry or the session list (shown under its parent) and writes to it; those turns
   use the research profile. A follow-up turn may call `report_back` again; each report is a
   new entry in the parent.
+- **Who acts on the report** (Felix, 2026-11-14). If the session agent delegated, the report
+  is posted the way `AgentTurns.post_message` posts a message, so it queues a parent turn and
+  the session agent continues (for example builds the widget on the new data). If a person
+  delegated, the report is only added to the parent's record, with no turn. A parent turn
+  that is already running when a report arrives is not interrupted; the new turn queues
+  behind it as messages do today.
 - **Limits.** The research turn runs with a higher step limit than a chat turn (the
   `max_steps` already in the runtime), and each research session caps its paid web calls
   (Exa and Context.dev tool calls in that session) at a number set in settings, default 40.
