@@ -1,19 +1,21 @@
 from dishka import Provider, Scope, provide
 
-from ada.adapters.memory.repositories import (
-    MemoryAlertRepository,
-    MemoryAlertRuleRepository,
-    MemoryDashboardRepository,
-    MemoryDataSourceRepository,
-    MemoryOperatorRepository,
-    MemoryProjectRepository,
-    MemoryReportRepository,
-    MemoryRunRepository,
-    MemorySessionRepository,
-    MemorySnapshotRepository,
-    MemoryStore,
-    MemoryTemplateRepository,
-    MemoryWidgetRepository,
+from ada.adapters.db.alert_repositories import SqlAlertRepository, SqlAlertRuleRepository
+from ada.adapters.db.pipeline_repositories import (
+    SqlOperatorRepository,
+    SqlRunRepository,
+    SqlSnapshotRepository,
+)
+from ada.adapters.db.reporting_repositories import (
+    SqlDashboardRepository,
+    SqlReportRepository,
+    SqlTemplateRepository,
+)
+from ada.adapters.db.workspace_repositories import (
+    SqlDataSourceRepository,
+    SqlProjectRepository,
+    SqlSessionRepository,
+    SqlWidgetRepository,
 )
 from ada.core.ports.repositories import (
     AlertRepository,
@@ -32,26 +34,24 @@ from ada.core.ports.repositories import (
 
 
 class RepositoryProvider(Provider):
-    """Where definitions are kept. In memory until the database repositories exist; each
-    binding below is then replaced by its SQLAlchemy implementation, which takes the
-    request's AsyncSession."""
+    """Where definitions are kept: PostgreSQL, through the request's AsyncSession. The
+    session is one per request and shared by all repositories of that request, so they
+    write in one transaction (see providers/infrastructure.py)."""
 
     scope = Scope.REQUEST
 
-    store = provide(MemoryStore, scope=Scope.APP)
-
-    projects = provide(MemoryProjectRepository, provides=ProjectRepository)
-    data_sources = provide(MemoryDataSourceRepository, provides=DataSourceRepository)
-    sessions = provide(MemorySessionRepository, provides=SessionRepository)
-    operators = provide(MemoryOperatorRepository, provides=OperatorRepository)
-    snapshots = provide(MemorySnapshotRepository, provides=SnapshotRepository)
-    runs = provide(MemoryRunRepository, provides=RunRepository)
-    widgets = provide(MemoryWidgetRepository, provides=WidgetRepository)
-    dashboards = provide(MemoryDashboardRepository, provides=DashboardRepository)
-    templates = provide(MemoryTemplateRepository, provides=TemplateRepository)
-    reports = provide(MemoryReportRepository, provides=ReportRepository)
-    alert_rules = provide(MemoryAlertRuleRepository, provides=AlertRuleRepository)
-    alerts = provide(MemoryAlertRepository, provides=AlertRepository)
+    projects = provide(SqlProjectRepository, provides=ProjectRepository)
+    data_sources = provide(SqlDataSourceRepository, provides=DataSourceRepository)
+    sessions = provide(SqlSessionRepository, provides=SessionRepository)
+    operators = provide(SqlOperatorRepository, provides=OperatorRepository)
+    snapshots = provide(SqlSnapshotRepository, provides=SnapshotRepository)
+    runs = provide(SqlRunRepository, provides=RunRepository)
+    widgets = provide(SqlWidgetRepository, provides=WidgetRepository)
+    dashboards = provide(SqlDashboardRepository, provides=DashboardRepository)
+    templates = provide(SqlTemplateRepository, provides=TemplateRepository)
+    reports = provide(SqlReportRepository, provides=ReportRepository)
+    alert_rules = provide(SqlAlertRuleRepository, provides=AlertRuleRepository)
+    alerts = provide(SqlAlertRepository, provides=AlertRepository)
 
 
 provider = RepositoryProvider()
