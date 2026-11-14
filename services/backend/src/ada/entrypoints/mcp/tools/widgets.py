@@ -48,9 +48,13 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
         - "value", one number: `column` (default: the first measure role, else the first
           numeric column), `label` (default: the column name), `unit` (e.g. "%"),
-          `decimals`. Shows the latest period when the output has a time role, otherwise
-          the last row, so filter or aggregate in SQL first.
-        - "table": `columns`, the column names to show, in order (default: all).
+          `decimals`, `format`, `compare_to` (a numeric column of the same row, or a
+          number such as a target: shown as "+1,346 against 11,970"). Shows the latest
+          period when the output has a time role, otherwise the last row, so filter or
+          aggregate in SQL first.
+        - "table": `columns`, the column names to show, in order (default: all);
+          `labels`, header text per column ({"cases": "Cases"}); `format`, a number
+          format per column ({"share": "percent"}); `decimals`.
         - "line-chart": `x` (default: the time role's start, else the first date column),
           `y`, one column (default: the first measure role, else the first numeric
           column), `series`, a column whose values split the lines, e.g. a region.
@@ -59,6 +63,28 @@ def register(mcp: FastMCP, inject: Inject) -> None:
           the region outlines as GeoJSON, joined from the boundaries reference source),
           `label` (default: a column "name"). Needs a geography role at one level; shows
           each region's latest period.
+        - "chart", any chart: `spec` is a Vega-Lite 6.5 spec (vega-lite 6.5.0, vega
+          6.4.0) without `data`. The operator's rows are put in as `data.values`, one
+          object per row keyed by column name, dates as ISO strings (use "temporal").
+          The top needs a `mark`, `layer`, `concat`/`hconcat`/`vconcat`, `facet` or
+          `repeat`; refused: `data`, `datasets`, `url` and `href` anywhere, `usermeta`.
+          A single view fills the frame; transforms, params and expressions work.
+          A line with a target:
+          {"layer": [{"mark": "line", "encoding": {
+             "x": {"field": "year", "type": "ordinal"},
+             "y": {"field": "cases", "type": "quantitative"}}},
+           {"mark": {"type": "rule", "strokeDash": [4, 4]},
+            "encoding": {"y": {"datum": 80}}}]}
+          Bars with labels:
+          {"encoding": {"x": {"field": "region", "type": "nominal", "sort": "-y"},
+                        "y": {"field": "value", "type": "quantitative"}},
+           "layer": [{"mark": "bar"},
+            {"mark": {"type": "text", "dy": -6},
+             "encoding": {"text": {"field": "value", "format": ".1f"}}}]}
+
+        Number formats are "integer", "number", "percent" (the value is already in
+        percent: 72.5 gives "72.5 %") or "plain" (no thousands separator). Integer
+        columns named `year` or `*_year`, and the time role's columns, are plain anyway.
 
         A widget whose operator lacks what its type needs is refused, with every problem
         named: a column the spec names must exist (and be numeric where a number is

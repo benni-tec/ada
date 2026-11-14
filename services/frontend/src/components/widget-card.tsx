@@ -15,7 +15,7 @@ import { Provenance } from './provenance'
 import { WidgetCardActions } from './widget-card-actions'
 
 // Starting heights per type; the frame can be resized by dragging its lower edge.
-const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 320, map: 420 }
+const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 320, chart: 320, map: 420 }
 
 function frameHeight(widget: Widget, tall?: boolean) {
   return (heights[widget.type] ?? 280) * (tall ? 1.75 : 1)

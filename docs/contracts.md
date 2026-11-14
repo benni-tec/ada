@@ -765,10 +765,18 @@ widget whose operator lacks what its type needs is refused, with every problem n
 
 | Type | Spec keys | Needs |
 | --- | --- | --- |
-| `value` | `column` (default: the first measure role, else the first numeric column), `label` (default: the column name), `unit`, `decimals`. Shows the latest period when the output has a time role, else the last row | `column` if given exists and is numeric; else a measure or a numeric column |
-| `table` | `columns`: the column names to show, in order (default: all) | every name exists |
+| `value` | `column` (default: the first measure role, else the first numeric column), `label` (default: the column name), `unit`, `decimals`, `format`, `compare_to` (a column of the same row, or a number; shown as "+1,346 against 11,970", the difference signed, both in the value's format). Shows the latest period when the output has a time role, else the last row | `column` if given exists and is numeric; else a measure or a numeric column; `format` one of the formats; `compare_to` a numeric column that exists, or a number; `decimals` 0–10 |
+| `table` | `columns`: the column names to show, in order (default: all); `labels`: `{column: "Header"}`; `format`: `{column: format}`; `decimals` for `number` and `percent` (and for number columns without a format) | every name in `columns`, `labels` and `format` exists; formats are known; `decimals` 0–10 |
 | `line-chart` | `x` (default: the time role's start, else the first date column), `y`: one column (default: the first measure role, else the first numeric column), `series`: a column whose values split the lines | `x`, `series` exist; `y` numeric; else a measure or a numeric column other than x |
 | `map` | `value` (as `value`'s `column`), `geometry` (default `geometry`: GeoJSON outlines, joined from the boundaries reference source), `label` (default: a column `name`, else the code). Shows each region's latest period | a geography role whose level is not `mixed`; the geometry column (json or text); `label` if given exists; a value as for `value` |
+| `chart` | the spec is a Vega-Lite spec (vega-lite 6.5.0, vega 6.4.0) without data; the widget puts the operator's rows in as `data: {values}`, one object per row keyed by column name, dates as ISO strings | a `mark`, `layer`, `concat`, `hconcat`, `vconcat`, `facet` or `repeat` at the top; no `data`, `datasets`, `url`, `href` or `usermeta` key at any depth. Whether it compiles is checked by the widget when it renders (it shows Vega-Lite's error) |
+
+**Number formats** (`format`): `integer` (rounded, with thousands separators), `number`
+(up to `decimals` places), `percent` (the value is already in percent: 72.5 gives
+"72.5 %"), `plain` (as it is, no thousands separator). Integer columns named `year` or
+ending in `_year`, and the time role's columns, are `plain` unless the spec says
+otherwise, in every widget (table cells, the value, a line chart's numeric x, a chart's
+axes and text).
 
 ## Live events
 
@@ -804,9 +812,21 @@ index.
 ## Widgets
 
 A widget type is a folder `services/widgets/src/widgets/<type>/`, built into one
-self-contained file `dist/<type>.html`: `value`, `table`, `line-chart`, `map`. `any` is the
-one bundle that renders every type, picked by the widget's `type`. A widget never
+self-contained file `dist/<type>.html`: `value`, `table`, `line-chart`, `map`, `chart`. `any`
+is the one bundle that renders every type, picked by the widget's `type`. A widget never
 receives data from an agent; it asks the server for the output of its operator.
+
+- **The chart widget** bundles Vega-Lite (`vega` 6.4.0, `vega-lite` 6.5.0, `vega-embed`
+  7.3.0, `vega-interpreter` 2.3.2, pinned), about 1.1 MB (360 KB gzipped) per bundle, and
+  so is `any`. It renders SVG with `ast: true` and Vega's expression interpreter, so no
+  code is generated from strings and a frame CSP needs no `unsafe-eval` (a widget test
+  renders with `Function` refused). Its loader refuses every file and image, and it has no
+  actions menu. A single view (`mark` or `layer`) fills the frame (`width`/`height:
+  "container"`, autosize `fit`) unless the spec sizes itself; composed views size their
+  parts. Its Vega config follows the page theme (the colours of `styles.css`, re-read when
+  `data-theme` or the system scheme changes); the spec's own `config` still wins. Scenario
+  and stale flags come from the runtime, as for every type. A spec that does not compile
+  shows Vega-Lite's message in the card.
 
 - **Where the built files are.** `WIDGETS_DIR` (default: `services/widgets/dist` of the
   checkout; moon sets it; `/app/widgets` in the backend image, which builds them).

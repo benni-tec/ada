@@ -33,3 +33,27 @@ test('uses the label, unit and column from the spec, the first numeric column wi
   rerender(<Value {...loaded({ widget: widget({ spec: { column: 'deaths' } }) })} />)
   expect(screen.getByText('No column "deaths" in the data')).toBeInTheDocument()
 })
+
+test('compares with a column of the same row or a number, in the format the spec names', () => {
+  const totals = coverage({
+    columns: [
+      { name: 'year', type: 'integer' },
+      { name: 'cases', type: 'integer' },
+      { name: 'previous', type: 'integer' },
+    ],
+    rows: [[2024, 13316, 11970]],
+  })
+  const count = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
+  const spec = { column: 'cases', compare_to: 'previous', format: 'integer' }
+  const { rerender } = render(<Value {...loaded({ widget: widget({ spec }), data: totals, roles: {} })} />)
+  expect(screen.getByText(count.format(13316))).toBeInTheDocument()
+  expect(screen.getByText(`+${count.format(1346)} against ${count.format(11970)}`)).toBeInTheDocument()
+
+  rerender(<Value {...loaded({ widget: widget({ spec: { compare_to: 80, format: 'percent' } }), data: south })} />)
+  expect(screen.getByText('72.5 %')).toBeInTheDocument()
+  expect(screen.getByText('−7.5 % against 80 %')).toBeInTheDocument()
+
+  // A year is a label: no thousands separator.
+  rerender(<Value {...loaded({ widget: widget({ spec: { column: 'year' } }), data: totals, roles: {} })} />)
+  expect(screen.getByText('2024')).toBeInTheDocument()
+})

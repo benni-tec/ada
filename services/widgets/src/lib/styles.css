@@ -283,6 +283,18 @@ body,
   overflow: visible;
 }
 
+/* chart (Vega-Lite): the view measures this box for width/height "container". */
+
+.ada-chart .ada-vega {
+  position: absolute;
+  inset: 0;
+}
+
+.ada-chart .ada-vega svg {
+  position: static;
+  display: block;
+}
+
 .ada-axis text {
   fill: var(--text-muted);
   font-size: 11px;

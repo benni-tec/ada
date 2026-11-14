@@ -54,8 +54,9 @@ inputs; an input operator is a named slot. An operator's id is its definition: a
 same definition again returns the same operator.
 - A run evaluates operators and fixes the snapshots of data it reads, so every number can \
 be traced to its source and fetch time.
-- A widget shows one operator's output (value, table, line-chart, map). It fetches its own \
-data from the platform; you pass only the operator id, never numbers.
+- A widget shows one operator's output (value, table, line-chart, map, or a Vega-Lite \
+chart). It fetches its own data from the platform; you pass only the operator id, never \
+numbers.
 - A dashboard is a live view of widgets in named slots; every edit adds a version. A \
 report freezes widgets at one run. Alert rules watch a measure on a dashboard.
 """

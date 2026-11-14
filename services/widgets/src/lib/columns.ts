@@ -57,11 +57,64 @@ export function formatTick(value: number): string {
   return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value)
 }
 
-export function formatCell(value: unknown, column: Column): string {
+/** How a number is written, as a spec names it: `integer` rounds to whole numbers,
+ * `number` keeps up to `decimals` places, `percent` adds a percent sign to a value that is
+ * already in percent (72.5 → "72.5 %"), `plain` writes it as it is, without thousands
+ * separators (years, codes). */
+export type NumberFormat = 'integer' | 'number' | 'percent' | 'plain'
+
+const NUMBER_FORMATS: readonly string[] = ['integer', 'number', 'percent', 'plain']
+
+export function isNumberFormat(value: unknown): value is NumberFormat {
+  return typeof value === 'string' && NUMBER_FORMATS.includes(value)
+}
+
+/** A year is a label, not an amount: no thousands separator. */
+export function isYearName(name: string): boolean {
+  const lower = name.toLowerCase()
+  return lower === 'year' || lower.endsWith('_year')
+}
+
+/** Columns whose numbers are written without separators: integer years (`year`,
+ * `*_year`) and the time role's columns. */
+export function isPlainColumn(column: Column, roles?: Roles): boolean {
+  if (column.type === 'integer' && isYearName(column.name)) return true
+  const time = roles?.time
+  return !!time && (column.name === time.start || column.name === time.end)
+}
+
+export function formatAs(value: number, format: NumberFormat | undefined, decimals?: number): string {
+  switch (format) {
+    case 'plain':
+      return String(value)
+    case 'integer':
+      return formatNumber(Math.round(value), 0)
+    case 'percent':
+      return `${formatNumber(value, decimals)} %`
+    default:
+      return formatNumber(value, decimals)
+  }
+}
+
+/** The format a column is written in: the spec's, else plain for years and the time
+ * role's columns, else the usual number. */
+export function columnFormat(column: Column, roles?: Roles, format?: NumberFormat): NumberFormat | undefined {
+  return format ?? (isPlainColumn(column, roles) ? 'plain' : undefined)
+}
+
+export function formatCell(
+  value: unknown,
+  column: Column,
+  options: { roles?: Roles; format?: NumberFormat; decimals?: number } = {},
+): string {
   if (value === null || value === undefined) return '–'
   if (NUMERIC_TYPES.has(column.type)) {
     const number = toNumber(value)
-    return number === null ? String(value) : formatNumber(number)
+    if (number === null) return String(value)
+    const format = columnFormat(column, options.roles, options.format)
+    // Decimals are for fractions: an integer column keeps whole numbers unless its format says otherwise.
+    const decimals = format === undefined && column.type === 'integer' ? undefined : options.decimals
+    return formatAs(number, format, decimals)
   }
   if (typeof value === 'boolean') return value ? 'yes' : 'no'
   if (typeof value === 'object') return JSON.stringify(value)
