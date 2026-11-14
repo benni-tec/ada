@@ -243,7 +243,12 @@ def pages() -> FakePageReader:
 
 @pytest.fixture
 async def documents(world: World, pages: FakePageReader) -> World:
-    readers = FakeSourceReaders({AccessKind.DOCUMENT: DocumentReader(pages, world.clock)})
+    readers = FakeSourceReaders(
+        {
+            AccessKind.DOCUMENT: DocumentReader(pages, world.clock),
+            AccessKind.URL: FakeSourceReader(),
+        }
+    )
     world.service, world.events = data_sources(
         world.memory, readers, world.store, world.clock, pages
     )
@@ -353,7 +358,7 @@ async def test_an_edit_from_before_watching_keeps_the_monitor(world: World) -> N
     source = await world.register()
     repository = MemoryDataSourceRepository(world.memory)
 
-    await repository.set_monitor(source.id, "mon_1", "sealed")
+    await repository.set_monitor(source.id, "mon_1", "sealed", None)
     await repository.update(source.model_copy(update={"name": "Renamed"}), source.revision)
 
     stored = await repository.get(source.id)
@@ -885,10 +890,11 @@ async def test_watch_stores_encrypted_secret_and_sets_push(
     ]
 
 
-async def test_watching_again_replaces_the_monitor_and_unwatch_clears_it(
+async def test_watching_again_replaces_the_monitor_and_unwatch_restores_the_policy(
     documents: World, pages: FakePageReader
 ) -> None:
-    source = await documents.register(access_kind=AccessKind.DOCUMENT, format=DataFormat.JSON)
+    probe = FreshnessPolicy(kind=FreshnessKind.PROBE, ttl_seconds=3600)
+    source = await documents.register(freshness=probe)
     await documents.service.watch(source.id)
 
     await documents.service.watch(source.id)
@@ -896,8 +902,25 @@ async def test_watching_again_replaces_the_monitor_and_unwatch_clears_it(
 
     assert [call[0] for call in pages.calls] == ["watch", "watch", "unwatch", "unwatch"]
     assert pages.calls[2] == ("unwatch", ("mon_1",))
-    assert (unwatched.monitor_id, unwatched.freshness.kind) == (None, FreshnessKind.MANUAL)
+    assert (unwatched.monitor_id, unwatched.freshness) == (None, probe)
     assert source.id not in documents.memory.monitor_secrets
+
+
+async def test_a_watched_address_cannot_change(documents: World) -> None:
+    source = await documents.register(access_kind=AccessKind.DOCUMENT, format=DataFormat.JSON)
+    watched = await documents.service.watch(source.id)
+
+    renamed = await documents.service.update(
+        source.id, watched.revision, name="Renamed", address=f" {source.address} "
+    )
+    with pytest.raises(Invalid, match="Stop watching it before changing the address"):
+        await documents.service.update(source.id, renamed.revision, address="https://x.test/b")
+    unwatched = await documents.service.unwatch(source.id)
+    moved = await documents.service.update(
+        source.id, unwatched.revision, address="https://x.test/b"
+    )
+
+    assert moved.address == "https://x.test/b"
 
 
 class FailingWatch(FakePageReader):

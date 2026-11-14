@@ -33,7 +33,7 @@ from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionEntry
-from ada.core.models.sources import DataSource
+from ada.core.models.sources import DataSource, FreshnessPolicy
 from ada.core.models.widgets import Widget
 
 
@@ -62,14 +62,23 @@ class DataSourceRepository(Protocol):
         ...
 
     async def set_monitor(
-        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+        self,
+        id: Id,
+        monitor_id: str | None,
+        secret_encrypted: str | None,
+        freshness_before: FreshnessPolicy | None,
     ) -> None:
-        """Store (or with None clear) the monitor that watches the source and its secret,
-        already sealed. Leaves the revision alone."""
+        """Store (or with None clear) the monitor that watches the source, its secret,
+        already sealed, and the freshness policy the source had before it was watched.
+        Leaves the revision alone."""
         ...
 
     async def monitor_secret_encrypted(self, id: Id) -> str | None:
         """The sealed secret of the source's monitor; it is never part of a DataSource."""
+        ...
+
+    async def freshness_before_watch(self, id: Id) -> FreshnessPolicy | None:
+        """The freshness policy stored with the source's monitor."""
         ...
 
 
