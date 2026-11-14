@@ -80,6 +80,7 @@ function serve() {
   return serveApi({
     'GET /api/projects/p1': project(),
     'GET /api/projects/p1/models': [model],
+    'GET /api/projects/p1/case-types': [],
     'GET /api/models/m1': model,
     'GET /api/models/m1/versions/latest': version,
     'GET /api/models/m1/population': [],
@@ -101,8 +102,8 @@ test('every page carries the data rule, and the list links to the model', async 
 
 test('the evaluation leads with the trigger and the deadlines, then the days behind, then survival', async () => {
   serve()
-  renderAt('/projects/p1/models/m1')
-  await screen.findByRole('tab', { name: 'Evaluation' })
+  renderAt('/projects/p1/models/m1?view=evaluation')
+  expect(await screen.findByRole('tab', { name: 'Evaluation' })).toHaveAttribute('aria-selected', 'true')
   fireEvent.click(screen.getByLabelText('Cough for 6 weeks, smoker over 40'))
   fireEvent.click(screen.getByLabelText('Imaging finding suggesting lung cancer'))
   fireEvent.click(screen.getByRole('button', { name: 'Evaluate' }))

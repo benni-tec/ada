@@ -6,7 +6,7 @@ import {
   errorMessage,
   evaluateModel,
   pathwaySteps,
-  type Deadline,
+  statusWords,
   type Evaluation,
   type EvaluationInputs,
   type Id,
@@ -159,13 +159,6 @@ function Select({ label, value, options, onChange }: { label: string; value: str
   )
 }
 
-const statusWords: Record<Deadline['status'], (by: number) => string> = {
-  met: (by) => (by === 0 ? 'met on the day' : `met, ${by} days early`),
-  late: (by) => `late by ${by} day${by === 1 ? '' : 's'}`,
-  due: (by) => (by === 0 ? 'due today' : `due in ${by} day${by === 1 ? '' : 's'}`),
-  overdue: (by) => `overdue by ${by} day${by === 1 ? '' : 's'}`,
-  not_applicable: () => 'no standard time',
-}
 
 function Result({ result, version, inputs, onToggle }: { result: Evaluation; version: ModelVersion; inputs: EvaluationInputs; onToggle: (name: string, on: boolean) => void }) {
   const { trigger, deadlines, pathway, survival, levers, flags, warnings } = result

@@ -88,3 +88,12 @@ export const gradeLabels: Record<EvidenceGrade, string> = {
   registry: 'registry',
   assumption: 'assumption',
 }
+
+/** A deadline's status as words, e.g. "overdue by 3 days". */
+export const statusWords: Record<Deadline['status'], (by: number) => string> = {
+  met: (by) => (by === 0 ? 'met on the day' : `met, ${by} days early`),
+  late: (by) => `late by ${by} day${by === 1 ? '' : 's'}`,
+  due: (by) => (by === 0 ? 'due today' : `due in ${by} day${by === 1 ? '' : 's'}`),
+  overdue: (by) => `overdue by ${by} day${by === 1 ? '' : 's'}`,
+  not_applicable: () => 'no standard time',
+}

@@ -5,6 +5,7 @@ import { ConnectionIndicator, ProjectLive } from '@/components/live'
 import { ProjectSidebar } from '@/components/project-sidebar'
 import { SettingsModal } from '@/components/settings/settings-modal'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Toaster } from '@/components/toast'
 import { AdaMark } from '@/components/vahti/vahti'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { WidgetModal } from '@/components/widget-modal'
@@ -59,6 +60,7 @@ function ProjectLayout() {
         </SidebarInset>
         <WidgetModal projectId={projectId} />
         <SettingsModal projectId={projectId} />
+        <Toaster />
       </SidebarProvider>
     </ProjectLive>
   )
