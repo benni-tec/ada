@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings) |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`; after the web's `0006` and the sessions' `0007`) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -70,6 +70,16 @@ What wave 4's MCP workstream added to them (`docs/contracts/wave4.md`, A, B, E):
 | `core/services/ports/batches.py` | `BatchService.build` (`build_pipeline`), with the step models (`Step` and its five kinds) and `Batch` |
 | `core/services/ports/refreshes.py` | `RefreshService.refresh_now` (refresh and wait), with `RefreshOutcome`, `RefreshStatus`, `SnapshotSummary`; `MAX_WAIT_SECONDS` (60) |
 | `core/services/ports/dashboards.py` | `DashboardService.pin_widget(..., layout=None)`; `edit` copies a widget new to the dashboard (see Dashboards) |
+
+What wave 5's settings workstream added to them (`docs/contracts/wave5.md`, E, F):
+
+| Where | Change |
+| --- | --- |
+| `core/models/agents.py`, `core/models/projects.py` | `AgentSettings.instructions`, `AgentSettingsView.instructions`, `Project.agent_instructions` (all `""` by default) |
+| `core/services/ports/agents.py` | `AgentSettingsService.set_instructions(instructions, expected_revision)` |
+| `core/services/ports/projects.py` | `ProjectService.update(id, expected_revision, name=None, agent_instructions=None)` replaces `rename` |
+| `config.py` | `Settings.web_daily_credit_limit` (300), shared with the web workstream |
+| Migration `0008` | `agent_settings.instructions` and `projects.agent_instructions`, text, `''` by default |
 
 ## Adding a feature without touching shared files
 
@@ -538,7 +548,7 @@ so whatever it makes is recorded like any client's work.
 
 ### Configuration
 
-The agent is configured in the platform, on the Settings page, and the configuration is
+The agent is configured in the platform, in Settings, and the configuration is
 shared by all projects (one ADA instance, one set of keys). There is no models file.
 
 - **Providers** (`LlmProvider {id, name, kind, base_url, has_api_key, created_at,
@@ -561,10 +571,16 @@ shared by all projects (one ADA instance, one set of keys). There is no models f
   per provider): the id is `<provider name>/<model>`, split at the first slash, so model
   names may contain slashes; it follows a renamed provider. Deleting a provider deletes
   its models (`CASCADE`).
-- **The session agent** (`AgentSettings {session_agent, revision}`, the one row of
-  `agent_settings`, inserted by migration `0005`): the model that answers sessions and
-  dashboard panels, or null. Deleting its model or provider clears it (`SET NULL`); that
-  does not count the revision up.
+- **The session agent** (`AgentSettings {session_agent, instructions, revision}`, the one
+  row of `agent_settings`, inserted by migration `0005`): the model that answers sessions
+  and dashboard panels, or null. Deleting its model or provider clears it (`SET NULL`);
+  that does not count the revision up.
+- **Instructions.** Free text for the session agent, trimmed, `""` for none: for every
+  project in `AgentSettings.instructions` (e.g. a pasted skill; `set_instructions`, which
+  shares the settings' revision with the session agent), and per project in
+  `Project.agent_instructions` (e.g. the challenge it is about, the language to answer in;
+  `ProjectService.update`, the project's revision). Neither is an MCP tool. The briefing
+  appends them after ADA's own rules (see How a turn runs), which they cannot replace.
 - **Availability.** A `gemini` provider needs a key ("The provider <name> needs an API
   key"); an `openai-compatible` one works without. A key the master key cannot decrypt
   (master key changed or lost) makes the provider's models unavailable with "The stored
@@ -628,7 +644,11 @@ its entry (`SessionEntry.context`, empty by default) and checked when it is post
 3. **The request.** `Briefing` (`briefing.py`) builds the system prompt: what ADA is, the
    project and session with ids, the panel and origin dashboards, the rules, and each
    context item explained (a pipeline to build on with its name and columns, a dashboard
-   and slot to pin to, a widget referred to). The history is at most the last 40
+   and slot to pin to, a widget referred to); then, when set, people's instructions under
+   "Instructions for every project:" and "Instructions for this project:", each with a
+   line saying ADA's rules above still hold, and each cut at 20,000 characters
+   (`MAX_INSTRUCTIONS`, with "[Cut at 20,000 characters.]"). `AgentTurns` reads the
+   settings' instructions per turn, so a change applies to the next message. The history is at most the last 40
    messages: earlier answers as their text plus one line per tool call naming what it
    made, a line per source read, and a note when they failed or were cancelled; operators
    and widgets that other clients recorded, as notes.
@@ -713,7 +733,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | Method and path | Does |
 | --- | --- |
 | `GET /projects`, `POST /projects {name}` | List; create |
-| `GET /projects/{id}`, `PATCH /projects/{id} {name, expected_revision}` | Read; rename |
+| `GET /projects/{id}`, `PATCH /projects/{id} {expected_revision, name?, agent_instructions?}` | Read; rename or set the session agent's instructions for the project (fields left out stay; `""` clears the instructions) |
 | `POST /projects/{id}/files?filename=` | Upload a file (raw body, up to 50 MiB) for a document source: `{address, sha256, size}` (201) |
 | `GET /projects/{id}/sources`, `POST /projects/{id}/sources` | List; register (`name, access_kind, address, format`, optional `options, freshness, declared_schema`) |
 | `GET /sources/{id}`, `PATCH /sources/{id} {expected_revision, ...}` | Read; update the given fields. A changed address or options queues a forced refresh |
@@ -725,13 +745,15 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /sessions/{id}/turns`, `GET /turns/{id}` | The session's agent turns, oldest first; one turn |
 | `POST /turns/{id}/cancel` | Ask a queued or running turn to stop; 202 with the turn |
 | `GET /llm/models` | `ModelList {models: [{id, provider, model, purposes, available, reason}], session_agent}`; `session_agent` is a model id or null |
-| `GET /settings/agent` | `AgentSettingsView {providers: LlmProvider[], models: ModelList, session_agent, secrets_available, revision}` (tag `settings`, instance-wide, like all below) |
+| `GET /settings/agent` | `AgentSettingsView {providers: LlmProvider[], models: ModelList, session_agent, secrets_available, instructions, revision}` (tag `settings`, instance-wide, like all below) |
 | `POST /settings/llm-providers {name, kind, base_url?, api_key?}` | Add a provider; 201 `LlmProvider`. A key without a master key is 409 |
 | `PATCH /settings/llm-providers/{id} {expected_revision, name?, kind?, base_url?, api_key?}` | Change it; fields left out stay, `null` or `""` clears `base_url` and `api_key`; 409 on a stale revision |
 | `DELETE /settings/llm-providers/{id}` | 204; its models go with it, a session agent among them is cleared |
 | `POST /settings/llm-models {provider_id, model}` | Add a model; 201 `ModelInfo` |
 | `DELETE /settings/llm-models/{id}` | 204; `id` is `<provider>/<model>`, URL-encoded; clears the session agent when it was this one |
 | `PUT /settings/session-agent {model_id, expected_revision}` | Set (or with `null` clear) the session agent; the `GET /settings/agent` body. An unknown model is 422 |
+| `PUT /settings/agent-instructions {instructions, expected_revision}` | The session agent's instructions for every project (`""` for none); the `GET /settings/agent` body; 409 on a stale revision (the settings' revision, shared with the session agent) |
+| `GET /settings/web` | `WebSettings {context_dev_configured, daily_credit_limit}`, read from `Settings` only (`context_dev_api_key` set, `web_daily_credit_limit`) |
 | `GET /sessions/{id}/widgets` | The session's widgets |
 | `POST /projects/{id}/operators` | Add an operator; the body's `kind` selects source, transform or input |
 | `GET /operators/{id}`, `GET /operators/{id}/lineage` | Read; the pipeline, inputs first |
@@ -990,7 +1012,9 @@ receives data from an agent; it asks the server for the output of its operator.
   count, on its own above the rest (what needs attention first); then Overview; Sessions
   (with a new session dialog), Dashboards (a new dashboard dialog) and Reports (a link to
   `/reports/new`), each a collapsible item listing its items. Data sources are not in the
-  sidebar: they are on the settings page. Sessions and reports newest first. The footer holds Settings (a gear), active on the settings route.
+  sidebar: they are in Settings. Sessions and reports newest first. The footer holds
+  Settings (a gear), a link to the current page with `?settings=models`, marked
+  (`data-active`) while the settings are open.
   The current item is marked (`data-active`, and the router's `aria-current="page"`).
   Collapsed, the icons have tooltips and a type's icon opens the sidebar again. Toggled by
   the top bar's button, the rail or Ctrl/Cmd+B; a sheet on phones.
@@ -1043,8 +1067,8 @@ receives data from an agent; it asks the server for the output of its operator.
   reason; `model` is sent when the models are known. While the latest turn is queued or
   running, a stop button posts `POST /turns/{id}/cancel`. Without an agent
   (`session_agent` null or unavailable, or a post answered with `turn: null`) the message
-  is still recorded and a note says nobody will answer, with a link to Settings to add a
-  provider and pick the session agent. If the models route fails, the picker and the note
+  is still recorded and a note says nobody will answer, with a link to Settings (Models
+  and providers, over the same page) to add a provider and pick the session agent. If the models route fails, the picker and the note
   are left out and the message is sent without `model`.
 - **Add widget** (`components/chat/add-widget.tsx`): a Popover with a Command over the
   pipelines list, searchable by name, source names and column names. Choosing one adds a
@@ -1055,31 +1079,57 @@ receives data from an agent; it asks the server for the output of its operator.
 
 ### Settings
 
-`/projects/{id}/settings` (`components/settings/`), type label "Settings" (a gear), in two
-sections:
+Settings are a large modal (`components/settings/settings-modal.tsx`, on `Modal`) over
+whatever project page is open, named by `?settings=<section>` (validated on the project
+layout route, `lib/settings-sections.ts`; an unknown section is dropped). Escape and ×
+drop the parameter (replacing the history entry) and leave the page as it was. A side
+navigation (`nav` "Settings sections") holds two groups, each a `group` named by its
+heading; the current section's link has `aria-current="page"`, and switching replaces the
+history entry:
 
-- **Agents**, shared by all projects (`GET /settings/agent`): a notice when
-  `secrets_available` is false (`ADA_SECRET_KEY` is not set; key fields are disabled); the
-  session agent picker (a select of the catalog, "None" first, unavailable models disabled
-  with their reason), saved at once with `PUT /settings/session-agent` and the settings'
-  revision; the providers as cards (name, kind, base URL, "Key stored" / "No key", a
-  pencil to edit, a trash can to delete after an inline confirmation), each with its
-  models (matched by `provider` name; delete with a trash can, add by name); "Add
-  provider" opens the same form as edit: name, kind, base URL, API key. The key is a
-  password field that always starts empty and is emptied after every save; in an edit,
-  empty keeps the stored key and "Remove the stored key" sends `api_key: null`. A 409 on
-  an edit or on the picker reads the settings again and says so. Every change also
-  invalidates `GET /llm/models`, which the composers read.
-- **Data sources**, this project's: each with name, access kind, format, address,
-  freshness, last check and last error, an icon to refresh now (`POST
-  /sources/{id}/refresh {force: true}`) and a pencil to edit (name, address, freshness;
-  the access kind and format stay as registered, since `SourceChange` has neither). "Add
-  data source" registers one (name, access kind, format, address, freshness). An edit
-  carries `expected_revision`; a 409 reads the list again and says so, and saving again
-  replaces it. Each entry is `#source-<id>`, scrolled to and marked when the address
-  names it.
+- **Global**, "Shared by all projects":
+  - **Models and providers** (`models`, `GET /settings/agent`): a notice when
+    `secrets_available` is false (`ADA_SECRET_KEY` is not set; key fields are disabled);
+    the session agent picker (a select of the catalog, "None" first, unavailable models
+    disabled with their reason), saved at once with `PUT /settings/session-agent` and the
+    settings' revision; the providers as cards (name, kind, base URL, "Key stored" / "No
+    key", a pencil to edit, a trash can to delete after an inline confirmation), each with
+    its models (matched by `provider` name; delete with a trash can, add by name); "Add
+    provider" opens the same form as edit: name, kind, base URL, API key. The key is a
+    password field that always starts empty and is emptied after every save; in an edit,
+    empty keeps the stored key and "Remove the stored key" sends `api_key: null`. A 409 on
+    an edit or on the picker reads the settings again and says so. Every change also
+    invalidates `GET /llm/models`, which the composers read.
+  - **Agent instructions** (`agent-instructions`): a textarea ("Instructions for every
+    project") with its length against the 20,000 characters the agent reads, saved with
+    `PUT /settings/agent-instructions` and the settings' revision.
+  - **Web** (`web`, `GET /settings/web`, read only): whether a Context.dev key is
+    configured, and "Context.dev credits per project per day"; expensive operations
+    (crawl, answers) are only available as sources with long minimum refresh intervals
+    (crawl at least 7 days, answers at least 30).
+- **This project**, with the project's name:
+  - **Data sources** (`data-sources`): each with name, access kind, format, address,
+    freshness, last check and last error, an icon to refresh now (`POST
+    /sources/{id}/refresh {force: true}`) and a pencil to edit (name, address, freshness;
+    the access kind and format stay as registered, since `SourceChange` has neither). "Add
+    data source" registers one (name, access kind, format, address, freshness). "Upload a
+    PDF" (file, name defaulting to the file's, engine "Local (pdfplumber)" or
+    "Context.dev", extract pages or tables) posts the file as the raw body of `POST
+    /projects/{id}/files?filename=` and registers a document source (`document`, `pdf`) on
+    the returned `address` with `options {engine, extract}`. An edit carries
+    `expected_revision`; a 409 reads the list again and says so, and saving again replaces
+    it. Each entry is `#source-<id>`, scrolled to and marked when the address names it.
+  - **Agent instructions** (`project-instructions`): the project's textarea
+    ("Instructions for this project"), saved with `PATCH /projects/{id}
+    {agent_instructions, expected_revision}`.
 
-The agent settings' calls are in `lib/api/settings.ts`, on the typed client.
+Both instruction forms keep the typed text apart from the stored one: a 409 reads the
+record again, says so and keeps the text, so saving again replaces theirs. Links into
+Settings add `?settings=<section>` to the current page (`withSettings`): the gear and the
+chat's note open Models and providers, the overview's "Manage in Settings" Data sources.
+
+The settings' calls are in `lib/api/settings.ts`, on the typed client, except the upload
+(`uploadFile`), whose raw body the schema does not describe.
 
 ### Dashboards and the panel beside a session
 
@@ -1129,7 +1179,8 @@ The agent settings' calls are in `lib/api/settings.ts`, on the typed client.
 | `/projects/{id}/reports/{report_id}` | A report version (`?version=1.2.0`, default the latest): its tree with each widget at the version's run (opening full size at that run), the run, range, dashboard version, the sources list; each card's pipeline view previews the version's run |
 | `/projects/{id}/reports/new` | Generate a report from a dashboard (`?dashboard=<id>` preselects it) |
 | `/projects/{id}/alerts` | The project's alerts are its dashboards' alerts, so the page has one card per dashboard (those with active alerts first): its name (a link), the number of active alerts, and a table of its rules (severity, name, condition, checking, alerts, check now and edit); a rule with alerts opens to a nested table of them (key, Active or Ended, when; one with an active alert starts open), and each alert opens to the rows behind it (`GET /alerts/{id}/rows`). The filter All / Active / Ended is for the whole page; "New rule" opens the rule editor and its formula builder. The words people read are "active" and "ended", not the API's `firing` and `resolved` |
-| `/projects/{id}/settings` | The agent shared by all projects (providers and their keys, models, the session agent) and this project's data sources (add, edit, refresh now; `#source-<id>` for one). See "Settings" above |
+| `/projects/{id}/settings` | Redirects to the overview with the settings open: at Data sources when the address names one (`#source-<id>`, kept), else at Models and providers |
+| `?settings=<section>`, on any of the project's pages | Settings in a modal over the page: `models`, `agent-instructions`, `web`, `data-sources`, `project-instructions` (see "Settings" above) |
 | `?open=<widget id>`, on any of the project's pages | The widget full size in a modal over the page (see Widgets) |
 
 A write the page makes carries the revision it last showed; a 409 reads the record again
@@ -1202,7 +1253,8 @@ not describe it.
 - The frontend's tests are Vitest with mocked fetch and EventSource, a few seconds in all
   on a quiet machine. A few long user flows render the whole app through the real routes
   (`renderAt`, `serveApi` and the fixtures in `src/test/app.tsx`), one file per area:
-  `project`, `session`, `dashboard`, `reports`, `alerts` in `src/test/`. Beside the code,
+  `project`, `session`, `dashboard`, `reports`, `alerts`, `settings` in `src/test/`.
+  `serveApi` hands a handler the request too, with its body unread (an upload). Beside the code,
   unit tests guard the logic: the formula builder, the pipeline graph's layout, the
   dashboard layout, agent-turn parts, live event effects, the live connection and widget
   frames. Under Vitest the routes are not code-split (`vite.config.ts`), so a file loads
@@ -1349,11 +1401,12 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `WIDGETS_DIR` | The built widgets (default `services/widgets/dist` of the checkout; `/app/widgets` in the image) |
 | `ADA_SECRET_KEY` | The master key of the agent's API keys: a Fernet key, or several separated by commas (the first encrypts). Unset: no key can be stored. See The agent |
 | `ADA_SECRET_KEY_FILE` | A file holding the master key instead (Docker secrets); `ADA_SECRET_KEY` wins when both are set |
+| `WEB_DAILY_CREDIT_LIMIT` | Context.dev credits the web may spend per project and day (default 300); shown read only in Settings › Web |
 
 There are no users and no authentication yet: whoever can reach the gateway can use the
 API and the MCP endpoint. Do not expose it publicly as it is.
 
 Secrets never go into the repository. `.env` holds only `VERSION`; put local secrets,
 such as `ADA_SECRET_KEY`, in `.env.local`, which git ignores and the compose file passes
-to the backend and the worker. The model providers' keys are entered on the Settings page
+to the backend and the worker. The model providers' keys are entered in Settings
 and stored encrypted in the database.
