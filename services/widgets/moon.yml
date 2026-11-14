@@ -1,0 +1,45 @@
+# Widgets: each one a self-contained HTML file (dist/<name>.html) that shows the output of
+# an operator. The backend serves them as MCP App resources, so the same file renders in our
+# frontend and inside an MCP host.
+language: "typescript"
+layer: "library"
+stack: "frontend"
+tags: ["react"]
+
+toolchains:
+  default: "node"
+
+fileGroups:
+  sources:
+    - "src/**/*"
+  configs:
+    - "package.json"
+    - "tsconfig*.json"
+    - "vite.config.ts"
+    - "build.mjs"
+
+tasks:
+  dev:
+    description: "Serve one widget for development: WIDGET=<name> moon run widgets:dev"
+    command: "vite"
+    preset: "server"
+
+  build:
+    command: "node build.mjs"
+    inputs:
+      - "@group(sources)"
+      - "@group(configs)"
+    outputs:
+      - "dist"
+
+  typecheck:
+    command: "tsc -b"
+    inputs:
+      - "@group(sources)"
+      - "@group(configs)"
+
+  lint:
+    command: "oxlint"
+    inputs:
+      - "@group(sources)"
+      - ".oxlintrc.json"

@@ -1,0 +1,7 @@
+javascript:
+  packageManager: "pnpm"
+node: {}
+pnpm: {}
+unstable_python:
+  packageManager: "uv"
+unstable_uv: {}

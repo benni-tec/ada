@@ -1,0 +1,97 @@
+# The full stack on your machine: our images behind the gateway, plus PostgreSQL and Valkey
+# from docker-compose.infra.yml. Gateway on http://localhost:8080.
+#   moon run root:up / root:pull / root:logs / root:down
+#
+#   VERSION        image tag for all our containers, set in .env: latest or sha-<commit>
+#   APP_PORT       gateway port on the host                 (default 8080)
+#   BACKEND_PORT   backend port inside the network          (default 8000)
+#   FRONTEND_PORT  frontend port inside the network         (default 5173)
+#
+# Runs images, never builds: CI publishes them to ghcr.io (.github/workflows/ci.yml) and
+# `moon run :image` builds the same names from the checkout.
+name: ada
+
+include:
+  - docker-compose.infra.yml
+
+x-backend: &backend
+  image: ghcr.io/benni-tec/ada/backend:${VERSION:-latest}
+  restart: unless-stopped
+  environment:
+    DATABASE_URL: postgresql+psycopg://ada:${POSTGRES_PASSWORD:-ada-dev}@postgres:5432/ada
+    VALKEY_URL: redis://valkey:6379/0
+    UVICORN_PORT: ${BACKEND_PORT:-8000}
+  volumes:
+    # Snapshots, shared by the API and the workers.
+    - analysis-data:/data
+  depends_on:
+    postgres:
+      condition: service_healthy
+    valkey:
+      condition: service_healthy
+    # The schema is up to date before anything uses the database.
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  # One-shot: applies pending migrations, then exits.
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: ["ada", "migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    <<: *backend
+    healthcheck:
+      # Liveness only: the API answers even while its dependencies are down.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${BACKEND_PORT:-8000}/api/health/live')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    <<: *backend
+    command: ["taskiq", "worker", "ada.entrypoints.worker:broker"]
+
+  scheduler:
+    <<: *backend
+    # Exactly one scheduler, or every scheduled task runs more than once.
+    command: ["taskiq", "scheduler", "ada.entrypoints.worker:scheduler"]
+
+  frontend:
+    image: ghcr.io/benni-tec/ada/frontend:${VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      PORT: ${FRONTEND_PORT:-5173}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:${FRONTEND_PORT:-5173}/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  gateway:
+    image: ghcr.io/benni-tec/ada/gateway:${VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      BACKEND_HOST: backend
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+      FRONTEND_HOST: frontend
+      FRONTEND_PORT: ${FRONTEND_PORT:-5173}
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  analysis-data:

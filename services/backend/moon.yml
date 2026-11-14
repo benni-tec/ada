@@ -1,0 +1,101 @@
+language: "python"
+layer: "application"
+stack: "backend"
+tags: ["fastapi"]
+
+toolchains:
+  default: "unstable_python"
+
+# Development settings for every task; they match docker-compose.infra.yml.
+env:
+  DATABASE_URL: "postgresql+psycopg://ada:${POSTGRES_PASSWORD:-ada-dev}@localhost:${POSTGRES_PORT:-5434}/ada"
+  VALKEY_URL: "redis://localhost:${VALKEY_PORT:-6380}/0"
+  # Snapshots of a backend running from source land in <repo>/data, which git ignores.
+  DATA_DIR: "$workspaceRoot/data"
+
+fileGroups:
+  sources:
+    - "src/**/*"
+  tests:
+    - "tests/**/*"
+  configs:
+    - "pyproject.toml"
+    # The uv workspace root holds the lockfile and the shared ruff config.
+    - "/pyproject.toml"
+    - "/uv.lock"
+
+tasks:
+  dev:
+    command: "uv run uvicorn ada.entrypoints.http.app:create_app --factory --reload --port 8000"
+    preset: "server"
+    deps:
+      - "~:migrate"
+      # Persistent too, so moon starts them alongside the API.
+      - "~:worker"
+      - "~:scheduler"
+
+  worker:
+    command: "uv run taskiq worker ada.entrypoints.worker:broker --reload"
+    preset: "server"
+    deps:
+      - "~:migrate"
+
+  scheduler:
+    command: "uv run taskiq scheduler ada.entrypoints.worker:scheduler"
+    preset: "server"
+    deps:
+      - "~:migrate"
+
+  migrate:
+    description: "Apply pending database migrations"
+    command: "uv run ada migrate"
+    deps:
+      - "root:infra"
+    options:
+      # Depends on the database's state, not on files.
+      cache: false
+      runInCI: false
+
+  revision:
+    description: "Write a migration from the model changes: moon run backend:revision -- \"<message>\""
+    command: "uv run ada revision"
+    deps:
+      - "~:migrate"
+    options:
+      cache: false
+      runInCI: false
+
+  test:
+    command: "uv run pytest"
+    inputs:
+      - "@group(sources)"
+      - "@group(tests)"
+      - "@group(configs)"
+
+  lint:
+    # ruff, then tach for the module boundaries of the hexagonal layout (tach.toml).
+    script: "uv run ruff check . && uv run tach check --exact"
+    inputs:
+      - "@group(sources)"
+      - "@group(tests)"
+      - "tach.toml"
+      - "/pyproject.toml"
+
+  format:
+    command: "uv run ruff format --check ."
+    inputs:
+      - "@group(sources)"
+      - "@group(tests)"
+      - "/pyproject.toml"
+
+  # Same name and tags as CI publishes (latest and sha-<commit>),
+  # so docker-compose.yml runs it as is.
+  image:
+    description: "Build the Docker image as ghcr.io/benni-tec/ada/backend"
+    script: "tag=sha-$(git rev-parse --short=7 HEAD 2>/dev/null || echo uncommitted) && docker build -f services/backend/Dockerfile . -t ghcr.io/benni-tec/ada/backend:latest -t ghcr.io/benni-tec/ada/backend:$tag"
+    toolchains: "system"
+    inputs: []
+    options:
+      runFromWorkspaceRoot: true
+      cache: false
+      runInCI: false

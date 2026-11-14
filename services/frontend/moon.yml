@@ -1,0 +1,60 @@
+language: "typescript"
+layer: "application"
+stack: "frontend"
+tags: ["react"]
+
+toolchains:
+  default: "node"
+
+fileGroups:
+  sources:
+    - "src/**/*"
+    - "public/**/*"
+    - "index.html"
+  configs:
+    - "package.json"
+    - "tsconfig*.json"
+    - "vite.config.ts"
+
+tasks:
+  dev:
+    command: "vite"
+    preset: "server"
+
+  build:
+    command: "vite build"
+    inputs:
+      - "@group(sources)"
+      - "@group(configs)"
+    outputs:
+      - "dist"
+
+  typecheck:
+    command: "tsc -b"
+    inputs:
+      - "@group(sources)"
+      - "@group(configs)"
+
+  test:
+    command: "vitest run"
+    inputs:
+      - "@group(sources)"
+      - "@group(configs)"
+
+  lint:
+    command: "oxlint"
+    inputs:
+      - "@group(sources)"
+      - ".oxlintrc.json"
+
+  # Same name and tags as CI publishes (latest and sha-<commit>),
+  # so docker-compose.yml runs it as is.
+  image:
+    description: "Build the Docker image as ghcr.io/benni-tec/ada/frontend"
+    script: "tag=sha-$(git rev-parse --short=7 HEAD 2>/dev/null || echo uncommitted) && docker build -f services/frontend/Dockerfile . -t ghcr.io/benni-tec/ada/frontend:latest -t ghcr.io/benni-tec/ada/frontend:$tag"
+    toolchains: "system"
+    inputs: []
+    options:
+      runFromWorkspaceRoot: true
+      cache: false
+      runInCI: false

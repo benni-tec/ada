@@ -1,0 +1,21 @@
+# nginx in front of everything: /api and /mcp to the backend, the rest to the frontend.
+# Its image is built from services/gateway/Dockerfile; ports and hosts come from env variables.
+layer: "configuration"
+stack: "infrastructure"
+tags: ["nginx"]
+
+toolchains:
+  default: "system"
+
+tasks:
+  # Same name and tags as CI publishes (latest and sha-<commit>),
+  # so docker-compose.yml runs it as is.
+  image:
+    description: "Build the Docker image as ghcr.io/benni-tec/ada/gateway"
+    script: "tag=sha-$(git rev-parse --short=7 HEAD 2>/dev/null || echo uncommitted) && docker build -f services/gateway/Dockerfile . -t ghcr.io/benni-tec/ada/gateway:latest -t ghcr.io/benni-tec/ada/gateway:$tag"
+    toolchains: "system"
+    inputs: []
+    options:
+      runFromWorkspaceRoot: true
+      cache: false
+      runInCI: false

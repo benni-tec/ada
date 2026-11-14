@@ -1,0 +1,22 @@
+# uv workspace root: one lockfile and one .venv for every Python service.
+# There is no root package; the services under services/ are the members.
+
+[tool.uv.workspace]
+members = ["services/backend"]
+
+[dependency-groups]
+# Tools shared by all Python services.
+dev = [
+    "ruff>=0.17.5",
+    "tach>=0.35.3",
+]
+
+[tool.ruff]
+line-length = 100
+# The Python of mise.toml.
+target-version = "py314"
+# Lets import sorting recognise each service's own package as first-party.
+src = ["services/*/src", "services/*/tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]

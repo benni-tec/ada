@@ -1,0 +1,55 @@
+# Single entry point: /api and /mcp go to the backend, everything else to the frontend.
+# A template: nginx fills in the ${...} environment variables at startup (defaults in the Dockerfile).
+
+# Re-resolve the upstream names, so a recreated backend or frontend container (new IP)
+# is picked up without restarting the gateway. NGINX_LOCAL_RESOLVERS is Docker's DNS,
+# filled in by the nginx image (NGINX_ENTRYPOINT_LOCAL_RESOLVERS in the Dockerfile).
+resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+
+upstream backend {
+    zone backend 64k;
+    server ${BACKEND_HOST}:${BACKEND_PORT} resolve;
+    keepalive 16;
+}
+
+upstream frontend {
+    zone frontend 64k;
+    server ${FRONTEND_HOST}:${FRONTEND_PORT} resolve;
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Live updates for the frontend: a server-sent event stream that stays open.
+    location ~ ^/api/events(/|$) {
+        proxy_pass http://backend;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+
+    location ~ ^/api(/|$) {
+        proxy_pass http://backend;
+    }
+
+    # MCP uses streamable HTTP: responses can be long-lived server-sent event streams.
+    location ~ ^/mcp(/|$) {
+        proxy_pass http://backend;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+
+    location / {
+        proxy_pass http://frontend;
+    }
+}

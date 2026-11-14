@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend and widget checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # moon compares a pull request with its base branch, so it needs the history.
+          fetch-depth: 0
+      # ... and the base as a local branch, which is how moon names it.
+      - if: github.event_name == 'pull_request'
+        run: git branch --force "$GITHUB_BASE_REF" "origin/$GITHUB_BASE_REF"
+      # Installs node, pnpm, python, uv and moon as pinned in mise.toml.
+      - uses: jdx/mise-action@v5
+      - run: pnpm install --frozen-lockfile
+      - run: moon run frontend:lint frontend:typecheck frontend:test frontend:build
+      - run: moon run widgets:lint widgets:typecheck widgets:build
+
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - if: github.event_name == 'pull_request'
+        run: git branch --force "$GITHUB_BASE_REF" "origin/$GITHUB_BASE_REF"
+      - uses: jdx/mise-action@v5
+      - run: uv sync --locked
+      - run: moon run backend:lint backend:format backend:test
+
+  images:
+    name: Image ${{ matrix.image }}
+    # Only images whose code passed the checks get built and published.
+    needs: [frontend, backend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, frontend, gateway]
+    steps:
+      - uses: actions/checkout@v7
+
+      # ghcr.io/benni-tec/ada/<image>; registry names must be lowercase.
+      - name: Image name
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.name.outputs.image }}
+          # latest and sha-<commit> from main; VERSION in .env selects one for Compose.
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+            type=ref,event=pr
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Pull requests only check that the images build; main publishes them.
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          # Every image builds from the repo root (and its .dockerignore).
+          context: .
+          file: services/${{ matrix.image }}/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

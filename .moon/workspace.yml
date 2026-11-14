@@ -1,0 +1,10 @@
+projects:
+  globs:
+    - "services/*"
+  sources:
+    # Repo-level tasks such as the Docker Compose stack.
+    root: "."
+
+vcs:
+  client: "git"
+  defaultBranch: "main"

@@ -1,0 +1,36 @@
+[project]
+name = "ada"
+version = "0.1.0"
+description = "ADA backend: pipelines of operators over data sources, served over REST and MCP"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.20.1",
+    "dishka>=1.10.1",
+    "duckdb>=2.0.0",
+    "fastapi>=0.162.7",
+    "fastmcp>=4.2.0",
+    "psycopg[binary,pool]>=3.3.9",
+    "pydantic-settings>=2.16.3",
+    "sqlalchemy[asyncio]>=2.1.8",
+    "taskiq>=0.13.0",
+    "taskiq-redis>=1.2.4",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+ada = "ada.entrypoints.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]
+
+[tool.pytest]
+testpaths = ["tests"]
+# tach installs a pytest plugin that skips "unaffected" tests on request; we always run all.
+addopts = ["-p", "no:tach"]

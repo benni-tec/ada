@@ -1,0 +1,13 @@
+node_modules
+dist
+.venv
+__pycache__
+.pytest_cache
+.ruff_cache
+.moon/cache
+.moon/docker
+# Secrets and local overrides. The committed .env holds only VERSION.
+.env.local
+.DS_Store
+# Parquet snapshots written by a backend running from source.
+/data

@@ -1,0 +1,64 @@
+# Repo-level tasks. Run with `moon run root:<task>`.
+layer: "tool"
+
+# The root package.json and pyproject.toml would otherwise pull in the Node and Python
+# toolchains (and their installs) for these Docker-only tasks.
+toolchains:
+  default: "system"
+  javascript: false
+  node: false
+  pnpm: false
+  unstable_python: false
+  unstable_uv: false
+
+taskOptions:
+  cache: false
+  runInCI: false
+
+tasks:
+  install:
+    description: "Install all dependencies: the pnpm and uv workspaces"
+    script: "pnpm install && uv sync"
+    inputs: []
+
+  infra:
+    description: "Start PostgreSQL and Valkey only (for `moon run :dev`)"
+    command: "docker compose -f docker-compose.infra.yml up -d --wait"
+    inputs: []
+
+  infra-down:
+    description: "Stop PostgreSQL and Valkey (keeps the data volume)"
+    command: "docker compose -f docker-compose.infra.yml down"
+    inputs: []
+
+  # Runs the images present locally (from `root:pull` or `moon run :image`), pulling missing ones.
+  up:
+    description: "Start the full stack on http://localhost:8080"
+    command: "docker compose up -d --wait"
+    inputs: []
+
+  pull:
+    description: "Fetch the images of the VERSION in .env from ghcr.io"
+    command: "docker compose pull"
+    inputs: []
+
+  down:
+    description: "Stop the full stack (keeps the data volumes)"
+    command: "docker compose down"
+    inputs: []
+
+  logs:
+    description: "Follow the logs of the full stack"
+    command: "docker compose logs -f"
+    inputs: []
+    preset: "server"
+
+  pin:
+    description: "Set VERSION in .env to the current commit, for a reproducible deploy"
+    script: "sed -i.bak \"s/^VERSION=.*/VERSION=sha-$(git rev-parse --short=7 HEAD)/\" .env && rm .env.bak && grep ^VERSION= .env"
+    inputs: []
+
+  unpin:
+    description: "Set VERSION in .env back to latest"
+    script: "sed -i.bak 's/^VERSION=.*/VERSION=latest/' .env && rm .env.bak && grep ^VERSION= .env"
+    inputs: []

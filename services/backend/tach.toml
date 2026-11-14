@@ -1,0 +1,74 @@
+# Module boundaries of the hexagonal layout (README: Architecture). `tach check` runs in
+# backend:lint, so CI fails on an import that crosses a boundary.
+#
+# The check is exact: a listed dependency that nothing uses fails too. Ports, adapters,
+# the worker and the composition root may all depend on ada.core.models; add it to their
+# lists with the first import.
+
+source_roots = ["src"]
+exclude = ["tests"]
+# ada/__init__.py holds only the package docstring.
+root_module = "ignore"
+
+# The core imports nothing outside itself.
+[[modules]]
+path = "ada.core.models"
+depends_on = []
+
+# Outbound ports: what the core needs; implemented by adapters.
+[[modules]]
+path = "ada.core.ports"
+depends_on = []
+
+# Inbound ports: the use cases; called by entrypoints.
+[[modules]]
+path = "ada.core.services.ports"
+depends_on = ["ada.core.models"]
+
+[[modules]]
+path = "ada.core.services"
+depends_on = ["ada.core.models", "ada.core.ports", "ada.core.services.ports"]
+
+[[modules]]
+path = "ada.adapters"
+depends_on = ["ada.core.ports"]
+
+# Entrypoints reach services and adapters only through the container.
+[[modules]]
+path = "ada.entrypoints.http"
+depends_on = [
+    "ada.composition",
+    "ada.config",
+    "ada.core.models",
+    "ada.core.services.ports",
+    # The MCP app is mounted into the HTTP app.
+    "ada.entrypoints.mcp",
+]
+
+[[modules]]
+path = "ada.entrypoints.mcp"
+depends_on = ["ada.core.models", "ada.core.services.ports"]
+
+[[modules]]
+path = "ada.entrypoints.worker"
+depends_on = ["ada.composition", "ada.config", "ada.core.services.ports"]
+
+[[modules]]
+path = "ada.entrypoints.cli"
+# migrate runs before any container is usable, so it calls the adapter directly.
+depends_on = ["ada.adapters", "ada.config"]
+
+# The composition root wires everything together.
+[[modules]]
+path = "ada.composition"
+depends_on = [
+    "ada.adapters",
+    "ada.config",
+    "ada.core.ports",
+    "ada.core.services",
+    "ada.core.services.ports",
+]
+
+[[modules]]
+path = "ada.config"
+depends_on = []

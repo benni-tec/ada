@@ -1,0 +1,19 @@
+# The core imports no framework, driver or wiring library; tach.toml guards our own modules,
+# this guards third-party ones. Everything else comes from the root configuration.
+extend = "../../../../../pyproject.toml"
+
+[lint]
+extend-select = ["TID251"]
+
+[lint.flake8-tidy-imports.banned-api]
+"dishka".msg = "The core is wired in ada.composition, not here."
+"fastapi".msg = "HTTP belongs in ada.entrypoints.http."
+"fastmcp".msg = "MCP belongs in ada.entrypoints.mcp."
+"starlette".msg = "HTTP belongs in ada.entrypoints.http."
+"sqlalchemy".msg = "Database access belongs in ada.adapters.db."
+"alembic".msg = "Migrations belong in ada.adapters.db."
+"psycopg".msg = "Database access belongs in ada.adapters.db."
+"duckdb".msg = "Analysis queries belong in ada.adapters.duckdb."
+"redis".msg = "Valkey access belongs in ada.adapters.valkey."
+"taskiq".msg = "Tasks belong in ada.entrypoints.worker."
+"taskiq_redis".msg = "Tasks belong in ada.entrypoints.worker."

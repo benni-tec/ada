@@ -1,0 +1,11 @@
+# Tool versions for the whole monorepo. Run `mise install` once after cloning.
+[tools]
+node = "26.13.1"
+pnpm = "12.11.2"
+python = "3.14.10"
+uv = "0.13.1"
+"aqua:moonrepo/moon" = "2.6.5"
+
+[env]
+# Let uv use the mise-managed interpreter instead of downloading its own.
+UV_PYTHON_PREFERENCE = "only-system"
