@@ -13,9 +13,10 @@ on:
 permissions:
   contents: read
 
+# A newer pull request run cancels the older one. Runs on main each get a group of their own,
+# so none is cancelled; the deploy job queues them.
 concurrency:
-  group: ci-${{ github.ref }}
-  # A newer push to main waits instead of cancelling a deploy halfway through.
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -113,9 +114,10 @@ jobs:
     permissions:
       contents: read
       packages: read
+    # One deploy at a time, the others wait in line (up to 100) instead of replacing each other.
     concurrency:
       group: deploy-ada
-      cancel-in-progress: false
+      queue: max
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
@@ -154,12 +156,20 @@ jobs:
           # the compose files as a tar stream. Nothing secret is in the command line.
           remote='
             set -euo pipefail
-            sha=$1 actor=$2
+            sha=$1 actor=$2 event=$3 run=$4
             test -f /opt/ada/.env || { echo "/opt/ada/.env is missing (POSTGRES_PASSWORD)" >&2; exit 1; }
             read -r token
             exec 9> /opt/ada.lock
             flock -w 600 9
             cd /opt/ada
+            # Run numbers follow the order of pushes and manual runs. A push older than the newest
+            # run deployed so far leaves the live one alone; a manual run always deploys.
+            live_run="$(cat RUN 2>/dev/null || echo 0)"
+            if [ "$event" = push ] && [ "$run" -lt "$live_run" ]; then
+              echo "::notice::Deploy skipped: run $live_run, which is newer, has already deployed."
+              cat > /dev/null
+              exit 0
+            fi
             tar -x docker-compose.yml docker-compose.infra.yml docker-compose.deploy.yml
             # A login of its own, so the other apps on this VM keep theirs.
             export DOCKER_CONFIG="$(mktemp -d)"
@@ -171,13 +181,14 @@ jobs:
             # Every service healthy (or the migration finished) before the revision is recorded.
             $compose up -d --remove-orphans --wait --wait-timeout 300
             echo "$sha" > REVISION
+            echo "$(( run > live_run ? run : live_run ))" > RUN
           '
 
           # One connection only: a second one right after the first stalls on a fresh VM.
           { printf '%s\n' "$GITHUB_TOKEN"; git archive --format=tar HEAD docker-compose.yml docker-compose.infra.yml docker-compose.deploy.yml; } |
             ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
               -o ServerAliveInterval=15 -o ServerAliveCountMax=6 \
-              "$DEPLOY_USER@$DEPLOY_HOST" "bash -c $(printf '%q' "$remote") deploy $sha $GITHUB_ACTOR"
+              "$DEPLOY_USER@$DEPLOY_HOST" "bash -c $(printf '%q' "$remote") deploy $sha $GITHUB_ACTOR $GITHUB_EVENT_NAME $GITHUB_RUN_NUMBER"
 
           # The gateway sends /api to the backend, so this reaches its liveness route through
           # Caddy, the gateway and the backend. The host is the VM's sslip.io name.
