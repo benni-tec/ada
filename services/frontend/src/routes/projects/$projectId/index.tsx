@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
 
+import { ProjectAlerts } from '@/components/alerts/project-alerts'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { Provenance, Time } from '@/components/provenance'
@@ -48,7 +49,11 @@ function ProjectPage() {
           <Sessions projectId={projectId} />
           <Widgets projectId={projectId} />
         </div>
-        <Sources projectId={projectId} />
+        <div className="flex flex-col gap-8">
+          {/* Alerts (wave 2, workstream I) */}
+          <ProjectAlerts projectId={projectId} />
+          <Sources projectId={projectId} />
+        </div>
       </div>
     </div>
   )

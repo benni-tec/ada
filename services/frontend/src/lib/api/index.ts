@@ -5,6 +5,8 @@ export type { ApiError, Schemas } from './client'
 export type * from './models'
 export * from './queries'
 export * from './requests'
+// Alerts (wave 2, workstream I)
+export * from './alerts'
 
 export type Health = Schemas['Health']
 
