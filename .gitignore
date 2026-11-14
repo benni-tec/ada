@@ -11,3 +11,5 @@ __pycache__
 .DS_Store
 # Parquet snapshots written by a backend running from source.
 /data
+# Agent worktrees.
+.claude/

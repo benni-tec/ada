@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 
 from dishka import Provider, Scope, from_context, provide
 from redis.asyncio import Redis
@@ -23,11 +23,21 @@ class InfrastructureProvider(Provider):
         await engine.dispose()
 
     @provide(scope=Scope.REQUEST)
-    async def session(self, engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+    async def session(
+        self, engine: AsyncEngine
+    ) -> AsyncGenerator[AsyncSession, BaseException | None]:
         # One session per request, shared by its repositories. Commits when the request
-        # succeeds, rolls back when it raises.
-        async with AsyncSession(engine, expire_on_commit=False) as session, session.begin():
-            yield session
+        # succeeds, rolls back when it raises. dishka does not raise the request's exception
+        # at the yield; it sends it in, so the outcome is read from what the yield returns.
+        session = AsyncSession(engine, expire_on_commit=False)
+        try:
+            exception = yield session
+            if exception is None:
+                await session.commit()
+            else:
+                await session.rollback()
+        finally:
+            await session.close()
 
     @provide(scope=Scope.APP)
     async def valkey(self, settings: Settings) -> AsyncIterator[Redis]:
