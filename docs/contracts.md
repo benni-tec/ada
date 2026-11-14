@@ -32,6 +32,7 @@ What the integration after wave 2 changed in them:
 | `core/services/ports/reports.py` | `ReportService.sources(version_id)` |
 | `core/services/ports/alerts.py` | `AlertService.update_rule` also takes `key_columns`, `max_data_age_seconds`, `alert_pipeline_id`; the three fields that may be empty take `Change[...]` |
 | `core/ports/sources.py` | `SourceLocks`: one unit of work fetches a source at a time |
+| `core/services/ports/runs.py` | `RunService.snapshot(id)`: a snapshot by id, for the pipeline view (after wave 2) |
 
 ## Adding a feature without touching shared files
 
@@ -438,6 +439,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /operators/{id}`, `GET /operators/{id}/lineage` | Read; the pipeline, inputs first |
 | `POST /projects/{id}/runs`, `GET /runs/{id}` | Start; read |
 | `GET /runs/{id}/operators/{operator_id}/rows?limit=` | An operator's output in a run |
+| `GET /snapshots/{id}` | A snapshot a run fixed (`Run.snapshots` names them by id): `fetched_at`, `content_hash`, `row_count`, `period` (`RunService.snapshot`) |
 | `GET /projects/{id}/widgets`, `POST /projects/{id}/widgets` | Every widget of the project, oldest first; create |
 | `GET /widgets/{id}`, `GET /widgets/{id}/data?run_id=&limit=` | Read; `WidgetData` (without `run_id` a new run is started) |
 | `GET /widget-bundles/{type}.html` | A built widget (see Widgets) |
@@ -546,8 +548,31 @@ receives data from an agent; it asks the server for the output of its operator.
   in development, `/api/widget-bundles` otherwise. The widget reads
   `GET /api/widgets/{id}` and `GET /api/widgets/{id}/data` on the same origin.
   `WidgetData.output` is the operator's output schema, so the roles need no third request.
-  Frames reload when the live stream says data changed (the widget epoch), except on a
-  dashboard, whose new run reloads them.
+  **One run per view.** Every page shows its widgets at one run, which it passes to every
+  card, frame and pipeline preview explicitly: a report its version's run; a dashboard
+  (and the dashboard panel beside a session) the dashboard's run for its range; a session
+  one run of the project without a range (`POST /projects/{id}/runs`); a widget page the
+  run named by `?run=`, else one of its own like a session's. A frame never starts a run:
+  until the page's run is there the card says it is starting. When the live stream says
+  data changed (the widget epoch), a following page starts a new run (`useViewRun` in
+  `lib/view-run.ts`) and the frames reload by their new address; a frozen run (a report,
+  `?run=`) never changes.
+- **The card's footer** is one line: at the left the pipeline in one line ("Pipeline:
+  Sotkanet screening → 2 steps → map": the source names, the steps that are not sources,
+  the widget type), from `GET /operators/{id}/lineage`, which opens the pipeline view; at
+  the right icon actions with tooltips (their accessible names): "Add to dashboard" (the
+  pin chooser, opening below the line) wherever the widget is not on a dashboard, and on
+  a dashboard "Go to the session it came from" (`?widget=<id>`), disabled with "Not made
+  in a session" when it has no session.
+- **The pipeline view** is a modal dialog (`components/pipeline/`): the operator tree as a
+  graph laid out by depth (sources at the left, the widget's operator at the right, a
+  shared input drawn once; materializing nodes solid and tinted, pass-through dashed;
+  nodes are buttons, the arrow keys follow the edges), the selected operator's details
+  (kind, id, parameters, output schema with its roles, who made it, and for a snapshot in
+  the card's run its fetch time, content hash and row count from `GET /snapshots/{id}`),
+  and its first 50 rows in the card's run (`GET /runs/{id}/operators/{op}/rows?limit=50`).
+  A line at the top says which run that is: "Frozen: report version 1.1.0, run …" or
+  "The dashboard's current run, follows new data". The view never starts a run.
 - **In an MCP host (MCP Apps).** Every bundle is a resource `ui://ada/widgets/<type>.html`
   (`text/html;profile=mcp-app`), and `create_widget` names `ui://ada/widgets/any.html`
   as its UI. With no fragment and a parent frame, the runtime speaks the MCP Apps
@@ -570,16 +595,17 @@ receives data from an agent; it asks the server for the output of its operator.
 | --- | --- |
 | `/` | Projects |
 | `/projects/{id}` | A project: sessions, dashboards, reports, widgets, firing alerts and data sources |
-| `/projects/{id}/sessions/{session_id}` | A session's record with its widget cards (each can be pinned to a dashboard), and its panel dashboard beside it; `?widget=<id>` scrolls to one. MCP tools return this address for widgets made in a session |
-| `/projects/{id}/widgets/{widget_id}` | One widget on its own page; the address of widgets made outside a session |
+| `/projects/{id}/sessions/{session_id}` | A session's record with its widget cards, all at one run of the page (each can be added to a dashboard), and its panel dashboard beside it at the dashboard's run; `?widget=<id>` scrolls to one. MCP tools return this address for widgets made in a session |
+| `/projects/{id}/widgets/{widget_id}` | One widget on its own page, at `?run=` when given, else at one run of the page; the address of widgets made outside a session |
 | `/projects/{id}/dashboards/{dashboard_id}` | The slots on the grid, all on one run; firing alert badges; the time range control (whole years; "Show" starts a run, "Save as default"); "Generate report"; version history with view (`?version=n`) and restore; start a session from it |
-| `/projects/{id}/reports/{report_id}` | A report version (`?version=1.2.0`, default the latest): its tree with each widget at the version's run, the run, range, dashboard version, the sources list, and per widget its pipeline |
+| `/projects/{id}/reports/{report_id}` | A report version (`?version=1.2.0`, default the latest): its tree with each widget at the version's run, the run, range, dashboard version, the sources list; each card's pipeline view previews the version's run |
 | `/projects/{id}/reports/new` | Generate a report from a dashboard (`?dashboard=<id>` preselects it) |
 | `/projects/{id}/alerts` | The alert feed (all, firing, resolved; each alert opens its alerting rows) and the rules by dashboard, with the rule editor and its formula builder |
 
 A write the page makes carries the revision it last showed; a 409 reads the record again
 and says so. The query keys are in `lib/api` (`keys`, `dashboardKeys`, `reportKeys`,
-`alertKeys`); `lib/events.ts` maps each live event to the keys it makes stale.
+`alertKeys`, `runKeys`); `lib/events.ts` maps each live event to the keys it makes stale.
+Every widget card has the footer and pipeline view of "Widgets" above, at its page's run.
 
 ## Tests
 
@@ -656,8 +682,9 @@ and queues the remaining sources for the worker.
   flagged as a scenario and its widgets would say "simulated". Bindings that simulate and
   bindings that feed an alert pipeline need telling apart.
 - **Union snapshots accumulate.** They are a cache keyed by content, retired only by a
-  probe change or a forced refresh, like materialized transforms. Widget data without a
-  run starts a new run each time; runs accumulate too. Nothing prunes them yet.
+  probe change or a forced refresh, like materialized transforms. Every page view starts a
+  run, and another one whenever data changes (widget data without a run, as an MCP host
+  asks for it, starts one each time); runs accumulate too. Nothing prunes them yet.
 - **Editing a source's declared schema does not reach its pipelines.** The source operator
   keeps the output it was registered with (operators never change). Register the source
   anew instead, as `seed-demo` does.

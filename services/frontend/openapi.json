@@ -881,6 +881,27 @@
         "format": "uuid",
         "type": "string"
       },
+      "Interval": {
+        "description": "A period of data: both ends inclusive. A year is 1 January to 31 December; a\nmulti-year window such as 2022-2024 is one interval, not three.",
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "Interval",
+        "type": "object"
+      },
       "JsonObject": {
         "additionalProperties": true,
         "type": "object"
@@ -2259,6 +2280,81 @@
           "expected_revision"
         ],
         "title": "SlotsEdit",
+        "type": "object"
+      },
+      "Snapshot": {
+        "description": "The stored output of a materializing operator for one set of parameters. Written\nonce and never changed; a refresh makes a new snapshot.",
+        "properties": {
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "fetched_at": {
+            "format": "date-time",
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          },
+          "operator_id": {
+            "$ref": "#/components/schemas/OperatorId"
+          },
+          "parameters_key": {
+            "title": "Parameters Key",
+            "type": "string"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Interval"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "row_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Count"
+          },
+          "superseded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded At"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "operator_id",
+          "parameters_key",
+          "content_hash",
+          "location",
+          "fetched_at"
+        ],
+        "title": "Snapshot",
         "type": "object"
       },
       "SourceChange": {
@@ -5117,6 +5213,50 @@
         "summary": "List Session Widgets",
         "tags": [
           "sessions"
+        ]
+      }
+    },
+    "/api/snapshots/{snapshot_id}": {
+      "get": {
+        "description": "A snapshot a run fixed (`Run.snapshots`): its fetch time, content hash and rows.",
+        "operationId": "get_snapshot_api_snapshots__snapshot_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Snapshot",
+        "tags": [
+          "runs"
         ]
       }
     },

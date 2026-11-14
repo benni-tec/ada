@@ -4,6 +4,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { WidgetCard } from '@/components/widget-card'
 import { widgetQuery } from '@/lib/api'
+import { useProjectRun, type CardRun } from '@/lib/view-run'
 import { WidgetCrumb } from '@/components/breadcrumbs'
 
 type Search = {
@@ -22,6 +23,12 @@ function WidgetPage() {
   const { projectId, widgetId } = Route.useParams()
   const { run } = Route.useSearch()
   const { data: widget, error, isPending } = useQuery(widgetQuery(widgetId))
+  // The run named in the address (a report links to its own this way), else one for this
+  // view that follows the data, as a session's.
+  const own = useProjectRun(projectId, run === undefined)
+  const shown: CardRun = run
+    ? { id: run, frozen: true, what: 'the run named in this page’s address' }
+    : { id: own.data?.id ?? null, frozen: false, what: 'This page’s current run' }
 
   if (isPending) return <Loading what="the widget" />
   if (error) return <ErrorNotice error={error} prefix="The widget cannot be loaded:" />
@@ -29,7 +36,8 @@ function WidgetPage() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="sr-only">{widget.title || 'Widget'}</h1>
-      <WidgetCard widget={widget} runId={run} tall linkToWidget={false} />
+      {own.error && <ErrorNotice error={own.error} prefix="The data cannot be read:" />}
+      <WidgetCard widget={widget} run={shown} tall linkToWidget={false} />
       {widget.session_id && (
         <p className="text-sm">
           <Link

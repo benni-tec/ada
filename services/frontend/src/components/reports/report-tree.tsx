@@ -4,20 +4,16 @@ import type { ReactNode } from 'react'
 
 import { ErrorNotice, Loading } from '@/components/notices'
 import { WidgetCard } from '@/components/widget-card'
-import { widgetQuery, type Block, type CalloutBlock, type Id, type ReportSource } from '@/lib/api'
+import { widgetQuery, type Block, type CalloutBlock, type Id } from '@/lib/api'
+import type { CardRun } from '@/lib/view-run'
 
-import { Pipeline } from './pipeline'
-
-type Pinned = {
-  /** The run every widget of the version reads: the same numbers on every visit. */
-  runId: Id
-  sources: ReportSource[]
-}
+/** The version's run, which every widget of it reads: the same numbers on every visit. */
+type Pinned = CardRun & { id: Id }
 
 /**
  * A report version's component tree. Static blocks are words from the author; widget
  * blocks are the only parts that show data, each in its frame pinned to the version's run,
- * with its pipeline one click away.
+ * with its pipeline in the card's footer, previewed at that run.
  */
 export function ReportTree({ blocks, pinned }: { blocks: Block[]; pinned: Pinned }) {
   return (
@@ -109,17 +105,16 @@ function WidgetBlockView({ widgetId, caption, pinned }: { widgetId: Id; caption:
   if (error) return <ErrorNotice error={error} prefix="A widget cannot be loaded:" />
   return (
     <figure className="flex flex-col gap-1">
-      <WidgetCard widget={widget} runId={pinned.runId} linkToWidget={false} reloadOnData={false} />
+      <WidgetCard widget={widget} run={pinned} linkToWidget={false} />
       <div className="rounded-lg border border-neutral-200 dark:border-neutral-800">
         {caption && (
           <figcaption className="px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300">{caption}</figcaption>
         )}
-        <Pipeline operatorId={widget.operator_id} sources={pinned.sources} />
-        <p className="border-t border-neutral-200 px-4 py-2 text-xs dark:border-neutral-800">
+        <p className="px-4 py-2 text-xs [&:not(:first-child)]:border-t [&:not(:first-child)]:border-neutral-200 dark:[&:not(:first-child)]:border-neutral-800">
           <Link
             to="/projects/$projectId/widgets/$widgetId"
             params={{ projectId: widget.project_id, widgetId: widget.id }}
-            search={{ run: pinned.runId }}
+            search={{ run: pinned.id }}
             className="text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
           >
             Open this widget at the report’s run

@@ -7,6 +7,7 @@ export * from './dashboards'
 export * from './queries'
 export * from './requests'
 export * from './reports'
+export * from './runs'
 export * from './alerts'
 
 export type Health = Schemas['Health']

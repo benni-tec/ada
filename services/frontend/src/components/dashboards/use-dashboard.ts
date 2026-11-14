@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 
 import {
   ApiFailure,
@@ -12,24 +12,14 @@ import {
   type DashboardView,
   type Id,
 } from '@/lib/api'
-import { useLive } from '@/lib/live'
+import { useViewRun } from '@/lib/view-run'
 
 /**
  * The run a dashboard is viewed at: every widget on it reads this one, so the dashboard is
- * one consistent cut. Changed source data makes the run stale (the widgets reload at the
- * same moment), and a new run is started so the dashboard follows the latest data.
- * `enabled` is false until the range is known: a run for the wrong range would be wasted.
+ * one consistent cut, and it follows the latest data (useViewRun).
  */
 export function useDashboardRun(dashboardId: Id, range: DashboardTimeRange, enabled = true) {
-  const queryClient = useQueryClient()
-  const { widgetEpoch } = useLive()
-  const seen = useRef(widgetEpoch)
-  useEffect(() => {
-    if (seen.current === widgetEpoch) return
-    seen.current = widgetEpoch
-    void queryClient.invalidateQueries({ queryKey: dashboardKeys.allRuns() })
-  }, [widgetEpoch, queryClient])
-  return useQuery({ ...dashboardRunQuery(dashboardId, range), enabled })
+  return useViewRun(dashboardRunQuery(dashboardId, range), dashboardKeys.allRuns(), enabled)
 }
 
 /**

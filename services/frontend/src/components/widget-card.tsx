@@ -3,13 +3,20 @@ import { useContext, type ReactNode } from 'react'
 
 import type { Widget } from '@/lib/api'
 import { useLive } from '@/lib/live'
+import type { CardRun } from '@/lib/view-run'
 import { widgetSrc } from '@/lib/widgets'
 
+import { PinToDashboard } from './dashboards/pin-to-dashboard'
+import { PipelineAccess } from './pipeline/pipeline-access'
 import { Provenance } from './provenance'
 import { WidgetCardActions } from './widget-card-actions'
 
 // Starting heights per type; the frame can be resized by dragging its lower edge.
 const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 320, map: 420 }
+
+function frameHeight(widget: Widget, tall?: boolean) {
+  return (heights[widget.type] ?? 280) * (tall ? 1.75 : 1)
+}
 
 /**
  * The widget bundle in a sandboxed frame. It fetches its own data by widget id, so the
@@ -19,8 +26,9 @@ const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 
  * it the frame's origin is opaque and the request becomes cross-origin.
  *
  * `reloadOnData`: whether the frame reloads when the project's data changes. Off where
- * the run is decided by the page: a dashboard starts a new run when data changes, so the
- * frame reloads by its new address; a report pins one run whose numbers never change.
+ * the run is decided by the page: a page that follows the data starts a new run when it
+ * changes, so the frame reloads by its new address; a report pins one run whose numbers
+ * never change.
  */
 export function WidgetFrame({
   widget,
@@ -35,9 +43,8 @@ export function WidgetFrame({
 }) {
   // Changing key remounts the frame, which reloads the widget and its data.
   const { widgetEpoch } = useLive()
-  const height = (heights[widget.type] ?? 280) * (tall ? 1.75 : 1)
   return (
-    <div className="resize-y overflow-hidden" style={{ height }}>
+    <div className="resize-y overflow-hidden" style={{ height: frameHeight(widget, tall) }}>
       <iframe
         key={reloadOnData ? widgetEpoch : 0}
         src={widgetSrc(widget, runId)}
@@ -51,30 +58,34 @@ export function WidgetFrame({
 }
 
 /**
- * A widget with a header saying who made it and why. The header is the provenance of
- * the widget: in a session driven by an external agent it is the only explanation.
+ * A widget with a header saying who made it and why, and a footer of one line: its
+ * pipeline at the left, actions as icons at the right. The header is the provenance of the
+ * widget: in a session driven by an external agent it is the only explanation.
+ *
+ * `run` is the run the page shows, which the frame and the pipeline's preview both read.
+ * The page starts it (one per view) and starts a new one when the data changes, which
+ * reloads the frame by its new address; a frozen run never changes. So the frame neither
+ * reloads on the live stream by itself nor starts a run of its own.
  */
 export function WidgetCard({
   widget,
-  runId,
+  run,
   highlighted = false,
   tall = false,
   linkToWidget = true,
-  reloadOnData = true,
   actions,
 }: {
   widget: Widget
-  runId?: string | null
+  run: CardRun
   highlighted?: boolean
   tall?: boolean
   linkToWidget?: boolean
-  /** See WidgetFrame. */
-  reloadOnData?: boolean
-  /** Shown in a strip under the widget; defaults to what WidgetCardActions gives. */
+  /** The icons at the right of the footer; by default what WidgetCardActions gives, and
+   * where nothing does, "Add to dashboard". */
   actions?: ReactNode
 }) {
   const fromContext = useContext(WidgetCardActions)
-  const strip = actions ?? fromContext?.(widget)
+  const icons = actions ?? (fromContext ? fromContext(widget) : <PinToDashboard widget={widget} />)
   const external = widget.created_by.kind === 'external_agent'
   const border = highlighted
     ? 'border-amber-400 ring-2 ring-amber-400 dark:border-amber-500 dark:ring-amber-500'
@@ -117,8 +128,21 @@ export function WidgetCard({
           {widget.type}
         </span>
       </header>
-      <WidgetFrame widget={widget} runId={runId} tall={tall} reloadOnData={reloadOnData} />
-      {strip && <footer className="border-t border-neutral-200 px-4 py-2 dark:border-neutral-800">{strip}</footer>}
+      {run.id === null ? (
+        <div
+          className="flex animate-pulse items-center justify-center bg-neutral-50 text-sm text-neutral-500 dark:bg-neutral-950"
+          style={{ height: frameHeight(widget, tall) }}
+        >
+          Starting the page’s run…
+        </div>
+      ) : (
+        <WidgetFrame widget={widget} runId={run.id} tall={tall} reloadOnData={false} />
+      )}
+      {/* One line; an action's own rows (a chooser, an outcome) wrap below it. */}
+      <footer className="flex flex-wrap items-center gap-x-2 border-t border-neutral-200 px-3 py-1 dark:border-neutral-800">
+        <PipelineAccess widget={widget} run={run} />
+        {icons}
+      </footer>
     </article>
   )
 }

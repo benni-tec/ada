@@ -19,7 +19,7 @@ from ada.adapters.memory.repositories import (
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.analysis import FetchedData, Query, StoredSnapshot
 from ada.core.models.base import Id, JsonObject
-from ada.core.models.errors import Invalid
+from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import EventType
 from ada.core.models.operators import Operator, OperatorKind, operator_identity
 from ada.core.models.runs import Snapshot
@@ -547,6 +547,22 @@ async def test_reading_a_fixed_run_publishes_nothing(world: World) -> None:
 
     assert published == 2
     assert len(world.events.published) == published
+
+
+async def test_the_snapshots_a_run_fixed_are_read_by_id(world: World) -> None:
+    source = await world.source()
+    run = await world.runs.start(world.project_id, AGENT)
+    await world.read(source, run.id)
+
+    fixed = (await world.runs.get(run.id)).snapshots[source.id]
+    snapshot = await world.runs.snapshot(fixed)
+
+    assert snapshot.operator_id == source.id
+    assert snapshot.row_count == 3
+    assert snapshot.fetched_at == world.clock.now()
+    assert snapshot.content_hash
+    with pytest.raises(NotFound):
+        await world.runs.snapshot(uuid7())
 
 
 async def test_a_failing_execution_publishes_failed_with_the_error(world: World) -> None:

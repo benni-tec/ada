@@ -198,26 +198,24 @@ test('says so when the version does not exist', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('This report has no version 9.9.9.')
 })
 
-test('shows a widget’s pipeline on request, from its source to its SQL', async () => {
-  const fetch = serveReport()
+test('every widget’s pipeline is one line in its card, and nothing is previewed until it is opened', async () => {
+  const fetch = serveReport({ 'GET /api/projects/p1/sources': [] })
   renderAt('/projects/p1/reports/rep1')
 
-  const figure = (await screen.findByText('By wellbeing services county')).closest('figure')
-  expect(figure).not.toBeNull()
-  const lineageCalls = () =>
-    fetch.mock.calls.filter(([input]) => String(input instanceof Request ? input.url : input).includes('lineage'))
-  expect(lineageCalls()).toHaveLength(0)
+  const card = await screen.findByRole('article', { name: 'Coverage by region' })
+  expect(
+    await within(card).findByRole('button', { name: 'Pipeline: Sotkanet → 1 step → line chart' }),
+  ).toBeInTheDocument()
+  const asked = fetch.mock.calls.map(([input]) => new URL(input instanceof Request ? input.url : String(input)).pathname)
+  expect(asked.filter((path) => path.includes('/rows') || path.startsWith('/api/runs/'))).toEqual([])
 
-  const details = within(figure!).getByText('Pipeline').closest('details')!
-  details.open = true
-  fireEvent(details, new Event('toggle'))
-
-  const steps = await within(figure!).findByRole('list', { name: 'Steps, from the sources to the widget' })
-  const [first, second] = within(steps).getAllByRole('listitem')
-  expect(first).toHaveTextContent('Source')
-  expect(first).toHaveTextContent('Sotkanet · https://sotkanet.test/3621.csv')
-  expect(second).toHaveTextContent('SQL')
-  expect(second).toHaveTextContent('SELECT region, value FROM input_0')
+  fireEvent.click(within(card).getByRole('button', { name: /^Pipeline:/ }))
+  const dialog = await screen.findByRole('dialog', { name: 'Pipeline of “Coverage by region”' })
+  fireEvent.click(within(dialog).getByRole('button', { name: /^Source: Sotkanet/ }))
+  // From the version's sources list: the address the data came from.
+  expect(within(dialog).getByRole('complementary', { name: 'Details' })).toHaveTextContent(
+    'https://sotkanet.test/3621.csv',
+  )
 })
 
 test('lists the project’s reports on its page', async () => {

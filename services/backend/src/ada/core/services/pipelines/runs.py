@@ -105,6 +105,9 @@ class Runs(RunService):
     async def list(self, project_id: Id, limit: int = 50) -> Sequence[Run]:
         return await self.runs.list(project_id, limit)
 
+    async def snapshot(self, id: Id) -> Snapshot:
+        return await self.snapshots.get(id)
+
     async def execute(self, run_id: Id, operator_id: OperatorId) -> Run:
         run, _ = await self._execute(run_id, operator_id)
         return run

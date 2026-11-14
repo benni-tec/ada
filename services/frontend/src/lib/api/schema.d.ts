@@ -730,6 +730,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Snapshot
+         * @description A snapshot a run fixed (`Run.snapshots`): its fetch time, content hash and rows.
+         */
+        get: operations["get_snapshot_api_snapshots__snapshot_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/{source_id}": {
         parameters: {
             query?: never;
@@ -1201,6 +1221,23 @@ export interface components {
         };
         /** Format: uuid */
         Id: string;
+        /**
+         * Interval
+         * @description A period of data: both ends inclusive. A year is 1 January to 31 December; a
+         *     multi-year window such as 2022-2024 is one interval, not three.
+         */
+        Interval: {
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+        };
         JsonObject: {
             [key: string]: unknown;
         };
@@ -1720,6 +1757,32 @@ export interface components {
             expected_revision: number;
             /** Slots */
             slots: components["schemas"]["Slot"][];
+        };
+        /**
+         * Snapshot
+         * @description The stored output of a materializing operator for one set of parameters. Written
+         *     once and never changed; a refresh makes a new snapshot.
+         */
+        Snapshot: {
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            id: components["schemas"]["Id"];
+            /** Location */
+            location: string;
+            operator_id: components["schemas"]["OperatorId"];
+            /** Parameters Key */
+            parameters_key: string;
+            period?: components["schemas"]["Interval"] | null;
+            project_id: components["schemas"]["Id"];
+            /** Row Count */
+            row_count?: number | null;
+            /** Superseded At */
+            superseded_at?: string | null;
         };
         /**
          * SourceChange
@@ -3494,6 +3557,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Widget"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_snapshot_api_snapshots__snapshot_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Snapshot"];
                 };
             };
             /** @description Validation Error */

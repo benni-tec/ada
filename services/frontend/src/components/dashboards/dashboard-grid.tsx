@@ -1,15 +1,18 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 import { WidgetCard } from '@/components/widget-card'
+import { WidgetCardActions } from '@/components/widget-card-actions'
 import { slotLayout, type DashboardSlot, type Id, type Widget } from '@/lib/api'
+import type { CardRun } from '@/lib/view-run'
+
+import { GoToSession } from './pin-to-dashboard'
 
 type Widgets = Map<Id, Widget>
 
 /** What a slot holds: the widget on the shared run, or why there is none. */
-function SlotContent({ slot, widgets, runId }: { slot: DashboardSlot; widgets: Widgets; runId: Id | null }) {
+function SlotContent({ slot, widgets, run }: { slot: DashboardSlot; widgets: Widgets; run: CardRun }) {
   const widget = slot.widget_id ? widgets.get(slot.widget_id) : undefined
-  // The dashboard starts a new run when data changes; the new run reloads the frame.
-  if (widget) return <WidgetCard widget={widget} runId={runId} reloadOnData={false} />
+  if (widget) return <WidgetCard widget={widget} run={run} />
   return (
     <div className="flex min-h-32 flex-col justify-center gap-1 rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700">
       {slot.widget_id ? (
@@ -19,6 +22,11 @@ function SlotContent({ slot, widgets, runId }: { slot: DashboardSlot; widgets: W
       )}
     </div>
   )
+}
+
+/** A widget on a dashboard is on one already: its action leads back to where it was made. */
+function OnDashboard({ children }: { children: ReactNode }) {
+  return <WidgetCardActions value={(widget) => <GoToSession widget={widget} />}>{children}</WidgetCardActions>
 }
 
 function SlotName({ slot }: { slot: DashboardSlot }) {
@@ -33,11 +41,12 @@ function SlotName({ slot }: { slot: DashboardSlot }) {
 export function DashboardGrid({
   slots,
   widgets,
-  runId,
+  run,
 }: {
   slots: readonly DashboardSlot[]
   widgets: Widgets
-  runId: Id | null
+  /** The dashboard's run: every widget reads it. */
+  run: CardRun
 }) {
   if (slots.length === 0) {
     return (
@@ -47,6 +56,7 @@ export function DashboardGrid({
     )
   }
   return (
+    <OnDashboard>
     <ul aria-label="Dashboard widgets" className="grid auto-rows-[minmax(5rem,auto)] grid-cols-1 gap-4 md:grid-cols-12">
       {slots.map((slot) => {
         const { x, y, w, h } = slotLayout(slot)
@@ -54,11 +64,12 @@ export function DashboardGrid({
         return (
           <li key={slot.name} style={place} className="min-w-0 md:[grid-column:var(--col)] md:[grid-row:var(--row)]">
             <SlotName slot={slot} />
-            <SlotContent slot={slot} widgets={widgets} runId={runId} />
+            <SlotContent slot={slot} widgets={widgets} run={run} />
           </li>
         )
       })}
     </ul>
+    </OnDashboard>
   )
 }
 
@@ -67,11 +78,12 @@ export function DashboardGrid({
 export function CompactGrid({
   slots,
   widgets,
-  runId,
+  run,
 }: {
   slots: readonly DashboardSlot[]
   widgets: Widgets
-  runId: Id | null
+  /** The dashboard's run: every widget reads it. */
+  run: CardRun
 }) {
   if (slots.length === 0) return <p className="text-sm text-neutral-500">Nothing is pinned to this dashboard yet.</p>
   const ordered = [...slots].sort((a, b) => {
@@ -79,13 +91,15 @@ export function CompactGrid({
     return p.y - q.y || p.x - q.x
   })
   return (
+    <OnDashboard>
     <ul aria-label="Dashboard widgets" className="flex flex-col gap-3">
       {ordered.map((slot) => (
         <li key={slot.name} className="min-w-0">
           <SlotName slot={slot} />
-          <SlotContent slot={slot} widgets={widgets} runId={runId} />
+          <SlotContent slot={slot} widgets={widgets} run={run} />
         </li>
       ))}
     </ul>
+    </OnDashboard>
   )
 }
