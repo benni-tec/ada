@@ -18,9 +18,14 @@ class AlertProvider(Provider):
     @provide(scope=Scope.APP)
     async def notifier(self, settings: Settings) -> AsyncIterator[AlertNotifier]:
         async with httpx.AsyncClient(timeout=5) as client:
-            yield HttpAlertNotifier(
+            notifier = HttpAlertNotifier(
                 client, settings.alert_ntfy_url, settings.alert_webhook_url, settings.ada_public_url
             )
+            try:
+                yield notifier
+            finally:
+                # Let pushes for committed alerts finish before the client closes.
+                await notifier.drain()
 
     alerts = provide(Alerts, provides=AlertService)
 

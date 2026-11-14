@@ -56,6 +56,11 @@ class HttpAlertNotifier(AlertNotifier):
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
+    async def drain(self) -> None:
+        """Wait for deliveries still in flight; each is already capped at five seconds."""
+        if self._tasks:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
+
     async def _deliver(self, rule: AlertRule, alert: Alert, rows: list[JsonObject]) -> None:
         try:
             with fail_after(5):
