@@ -4,7 +4,7 @@ What the workstreams of `docs/plan.md` agree on. These are fixed for a wave: if 
 turns out wrong, report it instead of changing it, so everyone changes together.
 
 The spec (`docs/spec.md`) says what the system does and why. This file says where things
-live and how the pieces talk. It describes the code as integrated after wave 3.
+live and how the pieces talk. It describes the code as integrated after wave 5 and the research merge.
 
 ## Frozen code
 
@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`; after the web's `0006` and the sessions' `0007`) |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -89,6 +89,28 @@ What wave 5's settings workstream added to them:
 | `config.py` | `Settings.web_daily_credit_limit` (300), shared with the web workstream |
 | Migration `0008` (down revision `0007`) | `agent_settings.instructions` and `projects.agent_instructions`, text, `''` by default |
 
+What the research merge added to them (the research branch on wave 5; see "Web sources",
+"Watched sources", "The web tools" and "The research agent"):
+
+| Where | Change |
+| --- | --- |
+| `core/models/web.py` | `SearchScope` (`data`, `news`, `research`, `any`), `SearchHit`, `WebPage`, `WebLink`, `Crawl`, `Answer`, `Extraction`, `Monitor` (its secret a `SecretStr`), `WebNotConfigured` (`"<what> is not configured: <SETTING> is not set"`). The web's models moved here from `core/ports/web.py` |
+| `core/models/sources.py` | `Provenance {publisher, licence, landing_page, found_by: FoundBy {query, scope}, extracted_by_model, note}`, `DataSource.provenance`, `DataSource.monitor_id`; `WebOperation.EXTRACT`, `MODEL_EXTRACTED` (answers, extract), `WEB_EXTRACT_CREDITS`, `WEB_MINIMUM_TTL[EXTRACT]` (7 days) |
+| `core/models/runs.py` | `Snapshot.origin`: the final address the data came from |
+| `core/models/sessions.py` | `SessionAgent` (`session`, `research`), `Session.agent`, `Session.parent_session_id`; `EntryKind.DELEGATION`, `EntryKind.REPORT` (`ref` the research session) |
+| `core/models/agents.py` | `RESEARCH_AGENT`; `AgentSettings.research_agent`, `ModelList.research_agent` and `agent_for(agent)`, `AgentSettingsView.research_agent`; `ResearchLimits.web_calls` |
+| `core/models/health.py` | `Health.web_search`, `page_reading`, `watching`; `WebConfigured` |
+| `core/ports/web.py` | `WebSearch` (Exa: `configured`, `search`); `WebExplorer` (Context.dev) loses `search` and gains `extract`, `watch`, `unwatch`, and `read(main_content_only=)` |
+| `core/ports/agents.py` | `LanguageModels.research_agent()`; `AgentToolbox.connect(agent, session_id, profile)`; `TurnProgress.session_turns`, `abandon`; `ResearchCalls` (a research session's web calls, own transaction) |
+| `core/ports/repositories.py` | `DataSourceRepository.set_monitor`, `monitor_secret_encrypted` (the sealed secret is never on the model) |
+| `core/ports/transactions.py` | `UnitsOfWork.run(service, work)`: a use case in a unit of work of its own |
+| `core/services/ports/agents.py` | `AgentTurnService.post_report`, `wait`, `ended`; `AgentSettingsService.set_research_agent`; `ResearchService` (`delegate`, `report`, `use_web_call`) |
+| `core/services/ports/sessions.py` | `SessionService.create_research`, `record_report` |
+| `core/services/ports/sources.py` | `register` and `update` take `provenance`; `watch`, `unwatch`, `verify_push` |
+| `core/services/ports/web.py` | `WebExplorationService.search(scope, limit)`, `read`, `extract`, `map`; `WebExtractAnswer`; the tools' credit prices |
+| `config.py` | `exa_api_key` (`EXA_API_KEY`), `ada_public_url` (`ADA_PUBLIC_URL`), `research_web_calls` (40) |
+| Migration `0009` (down revision `0008`) | `data_sources.provenance` (JSONB), `monitor_id`, `monitor_secret_encrypted`; `snapshots.origin`; `sessions.agent` (`'session'`), `parent_session_id` (to sessions, `SET NULL`, indexed), `web_calls` (0); `agent_settings.research_agent_model_id` (to models, `SET NULL`) |
+
 ## Adding a feature without touching shared files
 
 Four packages are scanned at startup. A feature adds a module; no list is edited.
@@ -110,18 +132,18 @@ stand-in.
 
 | Provider module | Ports |
 | --- | --- |
-| `infrastructure.py` | Settings, database engine and request session, `AfterCommit` (`PendingWork`), Valkey client, `Clock` |
-| `system.py` | `Database`, `TaskQueue`, `SystemStatusService` |
-| `repositories.py` | All sixteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog` and `TurnProgress` (own connection, a short transaction per write) |
+| `infrastructure.py` | Settings, database engine and request session, `AfterCommit` (`PendingWork`), `UnitsOfWork` (`ContainerUnits`: a request scope of the application's container), Valkey client, `Clock` |
+| `system.py` | `Database`, `TaskQueue`, `SystemStatusService`, `WebConfigured` (from `Settings`) |
+| `repositories.py` | All sixteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog`, `TurnProgress` and `ResearchCalls` (`SqlResearchCalls`) (own connection, a short transaction per write) |
 | `analysis.py` | `AnalysisStore` (Parquet and DuckDB), `PipelineService`, `RunService`, `ExplorationService` (`Exploration`), `BatchService` (`Batches`) |
-| `sources.py` | `SourceReaders` (HTTP: URL, request, document and web sources), `SourceService`, `RefreshService` (`WaitingRefreshes`) |
-| `web.py` | `WebExplorer` (`ContextDevWeb`, REST, ADA's key), `WebBudget` (`SqlWebBudget`: own connection, a short transaction per write), `WebExplorationService` (`WebExploration`) |
+| `sources.py` | `SourceReaders` (HTTP: URL, request, document and web sources), `SourceService` (with the `WebExplorer` for monitors, the `SecretBox` for their secrets and `ADA_PUBLIC_URL`), `RefreshService` (`WaitingRefreshes`) |
+| `web.py` | `WebSearch` (`ExaSearch`, ADA's Exa key), `WebExplorer` (`ContextDevWeb`, REST, ADA's Context.dev key), both on one HTTP client of their own; `WebBudget` (`SqlWebBudget`: own connection, a short transaction per write), `WebExplorationService` (`WebExploration`) |
 | `workspace.py` | `ProjectService`, `SessionService`, `WidgetService` |
 | `background.py` | `EventBroadcaster` (Valkey pub/sub), `EventPublisher` (transactional, per request), `EventStream` (Valkey), `TaskDispatcher` (taskiq on Valkey) |
 | `dashboards.py` | `DashboardService` (`Dashboards`) |
 | `reports.py` | `ReportService` (`Reports`), `TemplateService` (`Templates`) |
 | `alerts.py` | `AlertService` (`Alerts`) |
-| `agents.py` | `SecretBox` (`FernetSecretBox`, from `ADA_SECRET_KEY`), `AgentSettingsService` and `LanguageModels` (both `AgentConfiguration`, per request), `AgentRuntime` (`PydanticAiRuntime`), `AgentTurnService` (`AgentTurns`). The toolbox is not bound: whoever runs a turn passes it |
+| `agents.py` | `SecretBox` (`FernetSecretBox`, from `ADA_SECRET_KEY`), `AgentSettingsService` and `LanguageModels` (both `AgentConfiguration`, per request), `AgentRuntime` (`PydanticAiRuntime`), `AgentTurnService` (`AgentTurns`), `ResearchService` (`Research`), `ResearchLimits` (from `Settings`). The toolbox is not bound: whoever runs a turn passes it |
 
 Services are bound at `Scope.REQUEST`; whatever holds a connection or shared state at
 `Scope.APP`. The in-memory repositories, event bus and task dispatcher in
@@ -239,6 +261,14 @@ Shared by the sources, the pipelines, the worker and the alerts:
   cut off by the timeout reports `failed` with no snapshot read.
 - **Registration checks.** `register` and `update` check the declared schema's roles
   (below), that its column names are unique, and the `pushdown` and `period` options.
+- **Provenance**, on every source (`DataSource.provenance`, optional): `{publisher,
+  licence, landing_page, found_by: {query, scope} | null, extracted_by_model, note}`.
+  `register` and `update` (REST and MCP) take it whole; a licence that cannot be
+  established is `"unknown"` with the reason in `note`. A web source whose operation is
+  model-extracted (answers, extract) gets `extracted_by_model: true` whatever was passed.
+  The frontend's source entry shows it ("Licence unknown", "Model-extracted").
+- **Snapshots keep their origin**: `Snapshot.origin` is `FetchedData.origin`, the final
+  address after redirects (for a web source the page's URL).
 
 ### Document sources (PDF)
 
@@ -295,25 +325,30 @@ sources only, and they have no other) reads the web through Context.dev on ADA's
 | `"scrape"` (default) | `POST /v1/web/scrape`, Markdown only | 1 | The page at the address, with the document columns and converters (`DOCUMENT_COLUMNS`, `markdown_pages`, `markdown_tables`): `extract: "pages"` (default) one row `page 1, text <markdown>`; `"tables"` the rows of its Markdown tables, `page, table, row, cells` |
 | `"crawl"` | `POST /v1/web/crawl`: `max_pages` (1–50, default 10), `max_depth`, `url_regex`, `exclude_url_regex` | 1 per page | `pages`: one row per crawled page in crawl order, `page` its number, `text` its URL on the first line, a blank line, then its Markdown (the document columns stay as they are); `tables`: the Markdown tables of all pages, `page` the crawled page's number |
 | `"answers"` | `POST /v1/web/answers`, mode `fast`: `task` (1–2000 characters) and `json_format`, an example object whose top level has one array of records | 10 | The records of that array, in the **declared** columns (required: an answers source has no fixed columns), each value converted to its column's type (`TRY_CAST`; one that does not convert is null), plus `sources json` (added at registration): the URLs the answer read or cites, on every row |
+| `"extract"` | `POST /v1/web/scrape` with `formats: {json: true}`: a JSON schema of `rows`, one nullable string property per declared column, and `instruction` (1–2000 characters) | about 5 | The rows a model reads off the page, in the **declared** columns (1–30, required), converted like an answer's; a value the page does not state is null |
 
-- **Answers are model-extracted.** Their rows are what a model researched and wrote down,
-  not text read from a document: their provenance is the answer's `sources`, which a
-  widget or report on them should cite. Prefer a scrape or a document source of the
-  same page where one exists.
-- **Minimum freshness**, checked at registration and update: `freshness.kind` is `"ttl"`
-  or `"manual"` (no probe, no push), and a ttl is at least 1 day for scrape, 7 days for
-  crawl and 30 days for answers (`WEB_MINIMUM_TTL`). A forced refresh of a crawl or
-  answers source within that interval since its last successful fetch (the last check,
-  unless it failed, else the snapshot's `fetched_at`) is refused before anything is
-  fetched or recorded: `Invalid("<name> was fetched on … UTC; a web source with operation
+- **Answers and extractions are model-extracted.** Their rows are what a model researched
+  or read off a page and wrote down, not text parsed from a document: their provenance
+  says so (`extracted_by_model`), and an answer's rows carry its `sources`, which a widget
+  or report on them should cite. Prefer a scrape or a document source of the same page
+  where one exists, and check extracted figures against the page.
+- **Minimum freshness**, checked at registration and update: `freshness.kind` is
+  `"ttl"`, `"manual"` or `"push"` (no probe; push is what `watch_source` sets, see Watched
+  sources), and a ttl is at least 1 day for scrape, 7 days for crawl and extract and 30
+  days for answers (`WEB_MINIMUM_TTL`). A forced refresh of a crawl, extract or answers
+  source within that interval since its last successful fetch (the last check, unless it
+  failed, else the snapshot's `fetched_at`) is refused before anything is fetched or
+  recorded: `Invalid("<name> was fetched on … UTC; a web source with operation
   \"crawl\" is fetched at most every 7 days, so it can be refreshed again from … UTC")`.
   This holds for the refresh an edit queues too: an edited crawl or answers source shows
-  its new options only once the interval has passed.
+  its new options only once the interval has passed. A **watched** source (a monitor) is
+  exempt: its monitor checks the page once a day and fires only on a change, and each
+  refetch still spends the budget.
 - A refresh whose rows did not change makes no snapshot (the content hash, as always).
 - **Credits.** Each fetch spends the project's daily credits (below) before it is sent:
   1 for a scrape, `max_pages` for a crawl (what Context.dev did not charge, by its
-  `key_metadata.credits_consumed`, is given back afterwards), 10 for answers (corrected
-  likewise). Over the budget the refresh fails with `Invalid("The web budget of this
+  `key_metadata.credits_consumed`, is given back afterwards), 10 for answers and 5 for an
+  extraction (both corrected likewise). Over the budget the refresh fails with `Invalid("The web budget of this
   project (300 credits a day) does not leave the N this refresh of <name> needs today")`.
 - Readable failures, recorded as the source's `last_error` like a document's: no key
   (`CONTEXT_DEV_API_KEY`), refused key, no credits, a page Context.dev could not read
@@ -321,17 +356,49 @@ sources only, and they have no other) reads the web through Context.dev on ADA's
   records are `Invalid`; Context.dev busy (408, 429, 5xx) or unreachable is `Unavailable`.
 - Every request is tagged `["ada", "project:<id>"]`, as the web tools' are.
 
+### Watched sources (push)
+
+A source at an http(s) address (in practice a web page, but a PDF or a file at a URL
+works the same) can be watched with a Context.dev page monitor, so it is refreshed when
+the page changes instead of on a schedule. Freshness is either: a long ttl or a monitor.
+
+- **`SourceService.watch(id)`** (`watch_source`, `POST /sources/{id}/watch`) needs
+  `ADA_PUBLIC_URL` (`WebNotConfigured` naming it), the master key (`NotConfigured`) and
+  the Context.dev key. It holds the source's lock, creates a monitor on the address
+  (`POST /v1/monitors`: target page, daily interval, webhook
+  `{ADA_PUBLIC_URL}/api/hooks/context/{source_id}` for `change.detected`), stores its id
+  on the source and its secret (generated by Context.dev) sealed by the `SecretBox`
+  (`set_monitor`, outside the revision), and sets the freshness to `push`. Watching a
+  watched source replaces its monitor (the old one deleted after the new one is stored);
+  if storing fails, the new monitor is deleted again. **`unwatch(id)`** deletes the
+  monitor (one already gone is no error) and sets the freshness to manual.
+- **The webhook** (`entrypoints/http/routers/hooks.py`, public, `POST
+  /api/hooks/context/{source_id}`): 404 for an unknown or unwatched source; 401 unless
+  `x-context-signature: t=<unix>,v1=<hex>` is the HMAC-SHA256 of `"<t>.<raw body>"` under
+  the monitor's secret, compared in constant time, with `t` within 5 minutes of now
+  (`core/services/sources/watching.py`); otherwise it queues `refresh_source(id,
+  force=True)` after the commit and answers 202 `{status: "queued"}`. Nothing in the body
+  is read or trusted. A repeated delivery is harmless: unchanged content writes no
+  snapshot.
+- Alerts need nothing new: a rule whose source got a newer snapshot is due (`due()`).
+- The secret never appears on `DataSource`, in a response, an event or a log.
+
 ### The daily web budget
 
-Context.dev is used on ADA's account, so each project may spend at most
+Exa and Context.dev are used on ADA's accounts, so each project may spend at most
 `Settings.web_daily_credit_limit` credits a day (UTC; `WEB_DAILY_CREDIT_LIMIT`, default
-300), the web tools and web sources together. `WebBudget` counts them in `web_usage
+300), the web tools and web sources together. Credits are Context.dev's; an Exa search is
+counted at a fixed weight. `WebBudget` counts them in `web_usage
 (project_id, day, credits)` (migration `0006`): `spend` checks and counts in one upsert,
 in a short transaction of its own (`SqlWebBudget`), so concurrent calls cannot overrun
 it and a call that was sent stays counted when its tool call or refresh fails and rolls
 back; `adjust` corrects a reservation afterwards. Nothing is counted for a call refused
-before it is sent (no key, bad arguments, over the budget). Prices: `web_search` 1 per
-10 results (rounded up), `web_read` 1, `web_map` 1; web sources as above.
+before it is sent (no key, bad arguments, over the budget). Prices
+(`core/services/ports/web.py`): `search_web` 5 (`WEB_SEARCH_CREDITS`: an Exa search with
+highlights costs about $0.005–0.01, the recorded one of five results $0.007, several
+Context.dev scrapes' worth, so it counts as much as an extraction), `read_page` 1,
+`extract_table` 5 reserved and corrected to what Context.dev charged, `map_site` 1; web
+sources as above. A monitor costs no credits; each refetch it triggers does.
 
 ### Periods and pushdown
 
@@ -638,12 +705,18 @@ shared by all projects (one ADA instance, one set of keys). There is no models f
   row of `agent_settings`, inserted by migration `0005`): the model that answers sessions
   and dashboard panels, or null. Deleting its model or provider clears it (`SET NULL`);
   that does not count the revision up.
+- **The research agent** (`AgentSettings.research_agent`, same row, `PUT
+  /settings/research-agent`, the settings' revision): the model research sessions run on,
+  or null, in which case they use the session agent's (`ModelList.agent_for`,
+  `LanguageModels.research_agent()`). Deleting its model clears it like the session
+  agent. The catalog's `purposes` holds `research_agent` for it.
 - **Instructions.** Free text for the session agent, trimmed, `""` for none: for every
   project in `AgentSettings.instructions` (e.g. a pasted skill; `set_instructions`, which
   shares the settings' revision with the session agent), and per project in
   `Project.agent_instructions` (e.g. the challenge it is about, the language to answer in;
   `ProjectService.update`, the project's revision). Neither is an MCP tool. The briefing
-  appends them after ADA's own rules (see How a turn runs), which they cannot replace.
+  appends them after ADA's own rules (see How a turn runs), which they cannot replace; the
+  research agent's briefing gets them too.
 - **Availability.** A `gemini` provider needs a key ("The provider <name> needs an API
   key"); an `openai-compatible` one works without. A key the master key cannot decrypt
   (master key changed or lost) makes the provider's models unavailable with "The stored
@@ -718,14 +791,18 @@ its entry (`SessionEntry.context`, empty by default) and checked when it is post
 4. **Tools.** `InProcessToolbox` (`entrypoints/mcp/agent.py`) opens FastMCP's in-memory
    client on the platform's MCP server. Every tool call is a unit of work of its own, as
    over HTTP, so entries and widgets appear in the session as they are made.
-   `get_widget_data`, `create_project` and `create_session` are left out. A tool that
-   takes `session_id` gets the turn's session when the model leaves it out (its schema
-   does not require it); its calls are not recorded as `tool_call` entries. A tool error
+   `get_widget_data`, `create_project` and `create_session` are left out, and
+   `report_back` for the session agent; a research session's turns get only the research
+   tools (`RESEARCH_TOOLS`, see The research agent). A tool that takes `session_id` gets
+   the turn's session when the model leaves it out (its schema does not require it); its
+   calls are checked by the session middleware like any call, but not recorded as
+   `tool_call` entries (`in_platform_agent()`), the research agent's included. A tool error
    comes back as `ToolCallFailed`, which the runtime hands to the model as a retry.
 5. **Running.** `PydanticAiRuntime` (`adapters/llm/runtime.py`) builds a pydantic-ai
    `Agent` per turn, on the model of the request's target (it holds no configuration; a
    `model_factory` replaces the providers in tests): text output, the tools called one at a time, 3 retries per tool, at
-   most 24 model requests. It streams each model request and each tool step and calls
+   most 24 model requests (60 in a research session), and at most 30 minutes per turn
+   (`TURN_TIME_LIMIT`; "The turn did not finish within 30 minutes"). It streams each model request and each tool step and calls
    `TurnSink.checkpoint()` between steps.
 6. **Parts.** Text and reasoning parts are added when they first have text and replaced as
    deltas arrive. A tool part is added when the call is made (`input-available`, the full
@@ -749,6 +826,13 @@ its entry (`SessionEntry.context`, empty by default) and checked when it is post
   the only writer of status and parts; a cancel request writes `cancel_requested` (and,
   for a queued turn, the status, in one conditional statement). Neither overwrites the
   other, and a cancel racing a start is decided by the database.
+- **One turn of a session at a time.** `run_turn` first calls `AgentTurnService.wait`,
+  which returns once the session's earlier turns have ended (polling `TurnProgress
+  .session_turns` every second, holding no connection), so the turn a research report
+  queues waits for the parent's running turn. A turn ahead that holds the session for
+  longer than the time limit plus a minute is failed (`TurnProgress.abandon`: "The turn
+  did not end in time; the worker running it has probably stopped") and the session goes
+  on.
 - **Cancelling** a queued turn ends it at once (`cancelled`, `finished_at`,
   `agent.turn_finished` after the commit); a running one is flagged and stops at its next
   checkpoint; a finished one is returned unchanged.
@@ -789,6 +873,53 @@ the newest session whose `origin_dashboard_id` and `panel_dashboard_id` are the 
 else a new one titled "<dashboard name> (agent)", announced with `session.created`. It
 answers 200 when found and 201 when created.
 
+### The research agent
+
+A second agent profile (`core/services/agents/research.py`, `Research`) that finds data on
+the web and adds it as sources, in a **research session**: a child session
+(`Session.agent = "research"`, `parent_session_id`) of the session that delegated.
+
+- **Delegating.** `ResearchService.delegate(parent, brief, title, actor)` (MCP
+  `delegate_research(brief, title, session_id)` for the session agent or any client;
+  `POST /sessions/{id}/research {brief, title}` for the person, acting as `web`) needs a
+  research or session agent model (`Invalid` otherwise), creates the child in the
+  parent's project (`create_research`; a research session cannot delegate further), adds
+  a `delegation` entry to the parent (`ref` the child, `text` its title, the delegating
+  actor), posts the brief as the child's first message and queues its turn on the
+  research model. It returns the child at once.
+- **Its turns.** A turn in a research session (the brief, or a person's follow-up in it)
+  runs on the research model (`agent_for`), with `ABOUT_RESEARCH`, ADA's description and
+  `RESEARCH_RULES` (answer with data, prefer official statistics, look at
+  `list_sources` first, register each dataset with provenance as a url, document or web
+  source, check it loads, never invent a number, say what is missing, finish with
+  `report_back`), then the people's instructions; at most 60 steps. Its tools
+  (`RESEARCH_TOOLS` in `entrypoints/mcp/agent.py`): `search_web`, `read_page`,
+  `extract_table`, `map_site`, `register_source`, `refresh_source`, `list_sources`,
+  `update_source`, `add_source_operator`, `preview_operator`, `watch_source`,
+  `report_back`; no dashboards, reports or alerts.
+- **The web call cap.** Each web tool call in a research session counts against
+  `research_web_calls` (40) before anything else (`ResearchService.use_web_call`,
+  `ResearchCalls`: `sessions.web_calls`, in a short transaction of its own, so a call that
+  then fails or times out counts too and no row stays locked while Exa or Context.dev
+  works); past it: `Invalid("This research session has used its 40 web calls; call
+  report_back with what you have")`. Other sessions are not capped (the daily budget
+  applies to all).
+- **Reporting back.** `report_back(summary, source_ids, missing, session_id)` (research
+  sessions only) posts a `report` entry into the parent (`ref` the child; the text is the
+  summary, "Sources added:" with each source's name and id, checked to be in the
+  project, and "Not found:"). When an **agent** delegated, the report also queues a
+  parent turn, whose prompt is the report, so the session agent continues from it; when a
+  person delegated it is only added to the record. A research turn on the brief that ends
+  without calling `report_back` posts its final text marked "(incomplete: ended without a
+  report)", or "Research failed: <error>" when it failed (also when it could not be
+  queued); a cancelled one posts nothing. Each `report_back` call is a new report.
+- **The frontend.** Research sessions hang under their parent in the sidebar with a
+  "research" label; the parent's record shows a delegation as a card linking to the
+  child with its state from the child's latest turn (running, done, failed:
+  `lib/research.ts`) and a report as the research agent's message with a link; the
+  composer's "Research" button sends the draft as a brief (its first line, cut at 80
+  characters, as the title), enabled when a research or session agent is set.
+
 ## REST
 
 All routes are under `/api`. Bodies are the domain models' JSON forms; request bodies
@@ -799,25 +930,29 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /projects`, `POST /projects {name}` | List; create |
 | `GET /projects/{id}`, `PATCH /projects/{id} {expected_revision, name?, agent_instructions?}` | Read; rename or set the session agent's instructions for the project (fields left out stay; `""` clears the instructions) |
 | `POST /projects/{id}/files?filename=` | Upload a file (raw body, up to 50 MiB) for a document source: `{address, sha256, size}` (201) |
-| `GET /projects/{id}/sources`, `POST /projects/{id}/sources` | List; register (`name, access_kind, address, format`, optional `options, freshness, declared_schema`) |
+| `GET /projects/{id}/sources`, `POST /projects/{id}/sources` | List; register (`name, access_kind, address, format`, optional `options, freshness, declared_schema, provenance`) |
 | `GET /sources/{id}`, `PATCH /sources/{id} {expected_revision, ...}` | Read; update the given fields. A changed address or options queues a forced refresh |
+| `POST /sources/{id}/watch`, `DELETE /sources/{id}/watch` | Watch the source's page with a Context.dev monitor (freshness push); stop (freshness manual). The source (see Watched sources) |
+| `POST /hooks/context/{source_id}` | Context.dev's monitor webhook: 202 `{status: "queued"}` (a forced refresh), 401 for a bad or stale signature, 404 for an unknown or unwatched source |
 | `POST /sources/{id}/refresh {force?, wait?, timeout_seconds?}` | Queue a refresh; answers 202 `{data_source_id, force}`. With `wait` the fetch runs in the request (at most `timeout_seconds`, default 30, up to 60) and answers 200 `RefreshOutcome {data_source_id, status, snapshot, error}` (see Sources) |
-| `GET /projects/{id}/sessions`, `POST /projects/{id}/sessions {title, origin_dashboard_id?}` | List; create |
+| `GET /projects/{id}/sessions`, `POST /projects/{id}/sessions {title, origin_dashboard_id?}` | List (research sessions too, with `agent` and `parent_session_id`); create |
+| `POST /sessions/{id}/research {brief, title}` | Delegate research as the person: 201 with the research session (see The research agent) |
 | `GET /sessions/{id}`, `PATCH /sessions/{id} {expected_revision, title?, panel_dashboard_id?}` | Read; rename or set the panel dashboard |
-| `GET /sessions/{id}/entries` | The session's record, oldest first. Entry kinds: `message` (with `context`), `operator` and `widget` (`ref` the id, `text` the note), `agent_turn` (`ref` the turn), `tool_call` (an external agent's MCP call, in `tool_call`; see MCP tools) |
+| `GET /sessions/{id}/entries` | The session's record, oldest first. Entry kinds: `message` (with `context`), `operator` and `widget` (`ref` the id, `text` the note), `agent_turn` (`ref` the turn), `tool_call` (an external agent's MCP call, in `tool_call`; see MCP tools), `delegation` and `report` (`ref` the research session) |
 | `POST /sessions/{id}/messages {text, context?, model?}` | Add a message (see The agent); 201 `PostedMessage {entry, turn}`, `turn` null when no session agent is configured. An unknown `model` is 422 |
 | `GET /sessions/{id}/turns`, `GET /turns/{id}` | The session's agent turns, oldest first; one turn |
 | `POST /turns/{id}/cancel` | Ask a queued or running turn to stop; 202 with the turn |
-| `GET /llm/models` | `ModelList {models: [{id, provider, model, purposes, available, reason}], session_agent}`; `session_agent` is a model id or null |
-| `GET /settings/agent` | `AgentSettingsView {providers: LlmProvider[], models: ModelList, session_agent, secrets_available, instructions, revision}` (tag `settings`, instance-wide, like all below) |
+| `GET /llm/models` | `ModelList {models: [{id, provider, model, purposes, available, reason}], session_agent, research_agent}`; each a model id or null |
+| `GET /settings/agent` | `AgentSettingsView {providers: LlmProvider[], models: ModelList, session_agent, research_agent, secrets_available, instructions, revision}` (tag `settings`, instance-wide, like all below) |
 | `POST /settings/llm-providers {name, kind, base_url?, api_key?}` | Add a provider; 201 `LlmProvider`. A key without a master key is 409 |
 | `PATCH /settings/llm-providers/{id} {expected_revision, name?, kind?, base_url?, api_key?}` | Change it; fields left out stay, `null` or `""` clears `base_url` and `api_key`; 409 on a stale revision |
 | `DELETE /settings/llm-providers/{id}` | 204; its models go with it, a session agent among them is cleared |
 | `POST /settings/llm-models {provider_id, model}` | Add a model; 201 `ModelInfo` |
 | `DELETE /settings/llm-models/{id}` | 204; `id` is `<provider>/<model>`, URL-encoded; clears the session agent when it was this one |
 | `PUT /settings/session-agent {model_id, expected_revision}` | Set (or with `null` clear) the session agent; the `GET /settings/agent` body. An unknown model is 422 |
+| `PUT /settings/research-agent {model_id, expected_revision}` | Set (or with `null` clear: research then uses the session agent) the research agent; the `GET /settings/agent` body |
 | `PUT /settings/agent-instructions {instructions, expected_revision}` | The session agent's instructions for every project (`""` for none); the `GET /settings/agent` body; 409 on a stale revision (the settings' revision, shared with the session agent) |
-| `GET /settings/web` | `WebSettings {context_dev_configured, daily_credit_limit}`, read from `Settings` only (`context_dev_api_key` set, `web_daily_credit_limit`) |
+| `GET /settings/web` | `WebSettings {context_dev_configured, exa_configured, watching_configured, daily_credit_limit}`, read from `Settings` only (`context_dev_api_key`, `exa_api_key`, the Context.dev key and `ada_public_url`, `web_daily_credit_limit`) |
 | `GET /sessions/{id}/widgets` | The session's widgets |
 | `POST /projects/{id}/operators` | Add an operator; the body's `kind` selects source, transform or input |
 | `GET /operators/{id}`, `GET /operators/{id}/lineage` | Read; the pipeline, inputs first |
@@ -866,7 +1001,8 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 ## MCP tools
 
 Tool names are snake case and start with a verb (`list create register update refresh
-add get preview system pin edit set show generate check build query`; `tests/test_api.py`). Tools
+add get preview system pin edit set show generate check build query search read extract
+map watch unwatch delegate report`; `tests/test_api.py`). Tools
 that create something take a `note`: one line on why the agent is doing this, shown in
 the session. The acting `Actor` is
 `external_agent` with the client name the MCP host reported when it connected; a client
@@ -909,13 +1045,14 @@ in `entrypoints/mcp/sessions.py`, described in the schema), except `list_project
 
 | Group | Tools |
 | --- | --- |
-| Projects, sources | `list_projects`, `create_project`, `register_source`, `list_sources`, `update_source`, `refresh_source` (`wait` and `timeout_seconds` up to 60: fetch in the call and answer `{status, snapshot, error}`; else `status: "queued"`) |
+| Projects, sources | `list_projects`, `create_project`, `register_source` and `update_source` (with `provenance`), `list_sources`, `refresh_source` (`wait` and `timeout_seconds` up to 60: fetch in the call and answer `{status, snapshot, error}`; else `status: "queued"`), `watch_source`, `unwatch_source` (see Watched sources) |
 | Sessions, pipelines | `create_session`, `add_source_operator`, `add_transform` (mentions DuckDB's `UNPIVOT` for wide tables), `list_pipelines` (the pipelines list: look there before building), `get_lineage`, `preview_operator`, `query_operator`, `build_pipeline` (below) |
 | Widgets | `create_widget`, `update_widget` (title, note, type or a whole new spec, checked like a new widget's; the operator stays; dashboard copies do not follow), `list_session_widgets`, and `get_widget_data` for the widget itself (MCP Apps visibility `app`) |
 | Dashboards | `create_dashboard`, `list_dashboards`, `get_dashboard`, `list_dashboard_versions`, `pin_widget` (its description says the dashboard gets a copy; optional `layout`), `edit_dashboard` (any widget of the project; one new to the dashboard is copied), `set_dashboard_time_range` (ISO dates), `show_dashboard_in_session` (the session's revision). They return `{dashboard, version, url}` |
 | Reports | `create_report`, `add_report_version`, `generate_report_from_dashboard`, `list_reports`, `get_report` (optional `version`), `create_template`, `list_templates`. They return `{report, version, versions, url}` |
 | Alerts | `create_alert_rule` (its description carries the formula format), `list_alert_rules`, `get_alert_rule`, `update_alert_rule` (a `clear` list empties the interval, maximum age or alert pipeline), `check_alert_rule` (`{rule, changed, firing}`), `list_alerts` (`{alert, rule_name, severity, dashboard_id, url}`) |
-| Web | `web_search`, `web_read`, `web_map` (below): exploration only |
+| Web | `search_web`, `read_page`, `extract_table`, `map_site` (below): exploration only |
+| Research | `delegate_research`, `report_back` (research sessions only; see The research agent) |
 | System | `system_status` |
 
 Tools return ids and small previews, never whole datasets. A tool that produces a widget,
@@ -928,7 +1065,8 @@ is temporary and to try again later.
 session (`list_projects`, `create_session`, then its id as `session_id` everywhere), batch first
 (`build_pipeline`, `edit_dashboard`), explore with `query_operator` and never show its
 rows, search and read the web with the web tools and never show what they return (register
-the URL as a source instead), present only through widgets and reports.
+the URL as a source with its provenance instead; `watch_source` keeps it fresh), delegate
+missing data with `delegate_research`, present only through widgets and reports.
 
 **`query_operator(operator_id, select, where?, group_by?, having?, order_by?, limit=100,
 run_id?, snapshot_id?)`** explores any operator, sources included. The fragments (a leading
@@ -941,34 +1079,41 @@ or in a new run with no bindings and an open range. Nothing is stored. It return
 agent's exploration only and must not be shown or quoted to the person, and so does the
 tool's description.
 
-**The web tools** (`entrypoints/mcp/tools/web.py`) proxy three of Context.dev's tools on
-ADA's own key, so neither an external client nor the in-platform agent needs a Context.dev
-account. Each takes a required `project_id` and `session_id` (the session must be in the
-project: `Invalid` otherwise) and goes through `WebExplorationService`
-(`core/services/exploration/web.py`) to the `WebExplorer` port (`core/ports/web.py`;
-`ContextDevWeb` in `adapters/web/context_dev.py`, REST at `https://api.context.dev/v1`,
-`Authorization: Bearer <key>`):
+**The web tools** (`entrypoints/mcp/tools/web.py`) search the web on ADA's Exa key and
+read it on ADA's Context.dev key, so neither an external client nor the in-platform agent
+needs an account. Each takes a required `project_id` and `session_id` (the session
+middleware refuses a session of another project before the call) and goes through
+`WebExplorationService` (`core/services/exploration/web.py`, which reads nothing from the
+database, so no connection is held while the service works) to the `WebSearch` port
+(`ExaSearch` in `adapters/web/exa.py`, `https://api.exa.ai`) or the `WebExplorer` port
+(`ContextDevWeb` in `adapters/web/context_dev.py`, `https://api.context.dev/v1`), both
+`Authorization: Bearer <key>`:
 
-| Tool | Context.dev | Forwarded | Returns |
+| Tool | Service | Forwarded | Returns |
 | --- | --- | --- | --- |
-| `web_search(query, num_results=10, include_domains?, exclude_domains?, country?, languages?)` | `POST /web/search` | those (`numResults` 1–20) | `{results: [{title, url, snippet}], note}` |
-| `web_read(url, max_chars=20000)` | `POST /web/scrape` | `url`, `formats: {markdown: true}` | `{url, title, markdown (cut to max_chars, at most 60000), truncated, note}` |
-| `web_map(domain, search?, max_links=50)` | `GET /web/urls` | `domain`, `search`, `maxLinks` (1–500) | `{links: [{url, title}], note}` |
+| `search_web(query, scope="data", limit=8)` | Exa `POST /search`, type `auto`, highlights as snippets | `numResults` (1–10); `scope` `data` limits `includeDomains` to statistics offices, registries and open-data portals (THL, Sotkanet, Statistics Finland, the Cancer Registry, IARC, Eurostat, OECD, WHO, Kela, Zenodo, Kaggle, …), `news` to news sites, `research` to papers, `any` none (`DOMAINS` in `exa.py`) | `{results: [{url, title, published, snippet}], note}` |
+| `read_page(url, max_chars=20000)` | Context.dev `POST /web/scrape` | `formats: {markdown: true}`, main content only, no links | `{url, title, markdown (cut to max_chars, at most 60000), truncated, note}` |
+| `extract_table(url, instruction, columns)` | Context.dev `POST /web/scrape`, `formats: {json: true}` | a schema of `rows` with one nullable string per column (1–30), `instructions` (1–2000 characters) | `{url, rows, truncated, note}`: model-extracted, null where the page states nothing |
+| `map_site(domain, search?, max_links=50)` | Context.dev `GET /web/urls` | `domain`, `search`, `maxLinks` (1–500) | `{links: [{url, title}], note}` |
 
-- Every request carries `tags: ["ada", "project:<id>"]`. Nothing else is forwarded: no
-  screenshots, browser actions, profiles, webhooks, policies, ZDR, batches, monitors,
-  logs or usage, people or company data (they act on ADA's account or are personal data).
-  The dearer operations (crawl, answers) exist only as web sources, with a long minimum
-  freshness (Sources: Web sources).
-- No key (`CONTEXT_DEV_API_KEY` or `CONTEXT_API_KEY`): a readable refusal, nothing
-  counted. Each call spends the project's daily credits (Sources: The daily web budget);
-  over it: `Invalid("The web budget of this project (300 credits a day) is used up for
-  today")`.
+- Every Context.dev request carries `tags: ["ada", "project:<id>"]` (Exa has no tags).
+  Nothing else is forwarded: no screenshots, browser actions, profiles, policies, ZDR,
+  batches, logs or usage, people or company data. The dearer operations (crawl, answers,
+  and an extraction kept as data) exist only as web sources, with a long minimum
+  freshness (Sources: Web sources); monitors only through `watch_source`.
+- No key: `"web search is not configured: EXA_API_KEY is not set"`, `"page reading is not
+  configured: CONTEXT_DEV_API_KEY is not set"`, nothing counted. Each call spends the
+  project's daily credits (Sources: The daily web budget); over it: `Invalid("The web
+  budget of this project (300 credits a day) is used up for today")`. In a research
+  session each call also counts against its web call cap, first.
+- Context.dev's refusals are `Invalid` (refused key, no credits, a page it could not
+  read, with its message, the key never quoted), busy or unreachable `Unavailable`. Exa's
+  errors are `Unavailable` naming the status and its short error code, never the body.
 - Every answer carries `note`, `EXPLORATION_NOTE`: "For your own exploration only. Do not
   show or quote this to the person: to present web data, register its URL as a source
   (register_source, access_kind \"web\" or \"document\") and build on it, so it can be
   traced." The tools' descriptions and the server instructions say the same.
-- Their names start with `web`, the one exception to the verbs (`tests/test_api.py`).
+- `system_status` says which are configured (`web_search`, `page_reading`, `watching`).
 
 **`build_pipeline(project_id, session_id, steps)`**: each step is
 `{ref?, note?, <kind>: {...}}` with exactly one kind: `register_source` (the fields of
@@ -1139,7 +1284,8 @@ receives data from an agent; it asks the server for the output of its operator.
   opens a menu of the projects and "All projects". Then Alerts, one link with the firing
   count, on its own above the rest (what needs attention first); then Overview; Sessions
   (with a new session dialog), Dashboards (a new dashboard dialog) and Reports (a link to
-  `/reports/new`), each a collapsible item listing its items. Data sources are not in the
+  `/reports/new`), each a collapsible item listing its items; research sessions are nested
+  under the session that delegated them, labelled "research". Data sources are not in the
   sidebar: they are in Settings. Sessions and reports newest first. The footer holds
   Settings (a gear), a link to the current page with `?settings=models`, marked
   (`data-active`) while the settings are open.
@@ -1178,11 +1324,14 @@ receives data from an agent; it asks the server for the output of its operator.
   drawn with Trace like an agent turn's steps and collapsed: "<client> used n tools[, m
   failed]" with the time of the first. Opened, each call is a line with its tool, status
   (failed in red as "Failed: <tool>", its error under it) and duration, and opens to its
-  arguments as JSON. Exploration calls (`query_operator`, `web_*`) are marked "explored,
-  not shown". A call whose effect has its own entry is not drawn twice: a successful
+  arguments as JSON. Exploration calls (`query_operator`, `search_web`, `read_page`,
+  `extract_table`, `map_site`) are marked "explored, not shown". A call whose effect has its own entry is not drawn twice: a successful
   `add_source_operator`, `add_transform`, `create_widget` or `build_pipeline` right after
   an operator or widget entry of the same actor is left out (the call is recorded after
   what it made), and does not split the group around it.
+- **Delegations and reports** (`delegation`, `report` entries; see The research agent):
+  a card to the research session with its state, and the report as the research agent's
+  message with a link to the session.
 - **An agent turn** (`components/chat/agent-turn.tsx`) is read with `GET /turns/{id}`.
   Consecutive parts that are not text form one shadcn Trace: reasoning ("Thinking" open
   while it streams, "Thought" folded after), tool calls ("Calling / Called / Failed:
@@ -1230,7 +1379,8 @@ history entry:
     `secrets_available` is false (`ADA_SECRET_KEY` is not set; key fields are disabled);
     the session agent picker (a select of the catalog, "None" first, unavailable models
     disabled with their reason), saved at once with `PUT /settings/session-agent` and the
-    settings' revision; the providers as cards (name, kind, base URL, "Key stored" / "No
+    settings' revision; beside it the research agent picker ("Research agent", empty for
+    the session agent's model), saved with `PUT /settings/research-agent`; the providers as cards (name, kind, base URL, "Key stored" / "No
     key", a pencil to edit, a trash can to delete after an inline confirmation), each with
     its models (matched by `provider` name; delete with a trash can, add by name); "Add
     provider" opens the same form as edit: name, kind, base URL, API key. The key is a
@@ -1241,14 +1391,18 @@ history entry:
   - **Agent instructions** (`agent-instructions`): a textarea ("Instructions for every
     project") with its length against the 20,000 characters the agent reads, saved with
     `PUT /settings/agent-instructions` and the settings' revision.
-  - **Web** (`web`, `GET /settings/web`, read only): whether a Context.dev key is
-    configured, and "Context.dev credits per project per day"; expensive operations
-    (crawl, answers) are only available as sources with long minimum refresh intervals
-    (crawl at least 7 days, answers at least 30).
+  - **Web** (`web`, `GET /settings/web`, read only): whether the Exa key, the Context.dev
+    key and watching (`ADA_PUBLIC_URL`) are configured, naming what to set when not, and
+    "Web credits per project per day" with what each tool counts; expensive operations
+    (crawl, extract, answers) are kept as sources with long minimum refresh intervals
+    unless watched.
 - **This project**, with the project's name:
   - **Data sources** (`data-sources`): each with name, access kind, format, address,
-    freshness, last check and last error, an icon to refresh now (`POST
-    /sources/{id}/refresh {force: true}`) and a pencil to edit (name, address, freshness;
+    freshness, last check and last error, its provenance (publisher, licence or
+    "Licence unknown", a "Landing page" link, "Model-extracted", the search that found it,
+    the note), an icon to refresh now (`POST /sources/{id}/refresh {force: true}`), an eye
+    to watch or stop watching its page (only for an http(s) address; "Watched" while it
+    is) and a pencil to edit (name, address, freshness;
     the access kind and format stay as registered, since `SourceChange` has neither). "Add
     data source" registers one (name, access kind, format, address, freshness). "Upload a
     PDF" (file, name defaulting to the file's, engine "Local (pdfplumber)" or
@@ -1342,7 +1496,11 @@ not describe it.
   list, roles and geography), `test_time` (periods and pushdown), `test_dashboards`,
   `test_reports`, `test_alerts` (the formula compiler first), `test_agent` (turns, the
   in-process toolbox), `test_web` (the web tools over MCP, web sources, the credit
-  budget and the Context.dev client, all with a fake explorer or httpx's `MockTransport`),
+  budget, the research cap, and the Exa and Context.dev clients, with `FakeWebSearch` and
+  `FakeExplorer` from `tests/fakes.py`, the recorded answers of `tests/recordings/web.json`
+  replayed by `WebReplay`, which ignores the monitor's name and the tags, or httpx's
+  `MockTransport`); watching and the webhook are in `test_sources`, the research agent in
+  `test_agent`,
   `test_settings` and `test_settings_db` (the master key, the agent
   configuration service and routes, its repositories), `test_api` (the REST routes and MCP tools of the
   workspace, health, widget bundles, the composition root), `test_database` (migrations,
@@ -1508,11 +1666,17 @@ and queues the remaining sources for the worker.
   through the task's request scope, which keeps one pooled connection idle in a
   transaction until the turn ends (minutes). Harmless for correctness (no locks beyond
   reads); reading them in a scope of their own would free it.
-- **A worker killed mid-turn leaves the turn `running`.** Cancellation by the process
-  (`CancelledError`) is not caught, and nothing sweeps stale running turns. A sweep (e.g.
-  running turns with no checkpoint for some minutes become failed) would fix it.
-- **Two messages in quick succession run two turns at once**, each with the history it
-  found; the second does not wait for the first's answer.
+- **A worker killed mid-turn leaves the turn `running`** until the session's next turn
+  finds it holding the session for longer than the time limit (30 minutes and a margin)
+  and fails it; nothing sweeps a session nobody writes to again.
+- **A waiting turn holds a worker slot.** The session's turns run one after the other, and
+  a turn waiting for the one ahead polls inside its task.
+- **Webhook deliveries are not deduplicated** by Context.dev's `X-Context-Id`; a repeated
+  delivery refetches the page (and spends its credits) but writes no new snapshot when the
+  content is the same. The monitor's change payload is not read: a delivery only means
+  "refetch".
+- **Monitors carry no project tags.** The recorded monitor request has none and tags on
+  monitors are untested, so they are not sent.
 - **The agent's history is bounded by count (40 messages), not by tokens**, and tool
   results are given to the model in full (a long `get_lineage` costs tokens). Earlier
   answers keep only a one-line summary per tool call.
@@ -1545,8 +1709,11 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `WIDGETS_DIR` | The built widgets (default `services/widgets/dist` of the checkout; `/app/widgets` in the image) |
 | `ADA_SECRET_KEY` | The master key of the agent's API keys: a Fernet key, or several separated by commas (the first encrypts). Unset: no key can be stored. See The agent |
 | `ADA_SECRET_KEY_FILE` | A file holding the master key instead (Docker secrets); `ADA_SECRET_KEY` wins when both are set |
-| `CONTEXT_DEV_API_KEY` (or `CONTEXT_API_KEY`) | ADA's Context.dev key: the `context.dev` document engine, web sources and the web tools. Unset: those refuse readably |
-| `WEB_DAILY_CREDIT_LIMIT` | Context.dev credits each project may spend per day, web tools and web sources together (default 300); shown read only in Settings › Web |
+| `CONTEXT_DEV_API_KEY` (or `CONTEXT_API_KEY`) | ADA's Context.dev key: the `context.dev` document engine, web sources, page monitors and `read_page`, `extract_table`, `map_site`. Unset: those refuse readably |
+| `EXA_API_KEY` | ADA's Exa key, for `search_web`. Unset: it refuses, naming the variable |
+| `ADA_PUBLIC_URL` | Where Context.dev reaches this platform (`{ADA_PUBLIC_URL}/api/hooks/context/{id}`), for watched sources. Unset: watching refuses, naming it |
+| `WEB_DAILY_CREDIT_LIMIT` | Web credits each project may spend per day, web tools (Exa searches at 5) and web sources together (default 300); shown read only in Settings › Web |
+| `RESEARCH_WEB_CALLS` | Web tool calls a research session may make over all its turns (default 40) |
 
 There are no users and no authentication yet: whoever can reach the gateway can use the
 API and the MCP endpoint. Do not expose it publicly as it is.

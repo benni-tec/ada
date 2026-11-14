@@ -1,5 +1,13 @@
 # Research agent: feasibility findings (2026-11-14)
 
+> **Merged onto wave 5 (2026-11-14), with changes.** `docs/contracts.md` is the authority
+> now; see "The research merge" in `docs/plan.md`. In short: the web tools are `search_web`,
+> `read_page`, `extract_table` and `map_site`, each with `project_id` and `session_id`, the
+> project's daily web credits and the exploration note; a web page is a `web` source (page
+> Markdown is operation `scrape`, a model-extracted table operation `extract`), while
+> `document` stays PDFs; web sources may keep a long ttl or be watched (push); the
+> migration is `0009`. Kept below as written, for the reasoning.
+
 Recorded live with the real keys. Recordings: `services/backend/tests/recordings/web.json`
 (index, same shape as `sources.json`; `request` is a file name, replayed with an equality
 assert) and the `exa-*` / `context-*` files next to it. The monitor secret is `test-secret`.

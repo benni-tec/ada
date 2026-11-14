@@ -234,11 +234,36 @@ a `session_id` (but listing and creating projects and sessions), each external c
 **Settings**: global and project agent instructions after ADA's own rules; settings as a
 modal with Global and This project sections, and PDF upload. Migrations 0006–0008.
 
-Next: the research branch (Exa search, Context.dev reading and extraction, watched pages
-through Context.dev monitors, provenance and licence on sources, a research agent in child
-sessions) merges onto this, with one set of web tools (`search_web` on Exa, `read_page` and
-`extract_table` on Context.dev, plus wave 5's session, budget and exploration note),
-`document` meaning files and `web` meaning pages, and freshness by long TTLs or by monitors.
+## The research merge (done)
+
+Felix's research branch (designed in `docs/superpowers/specs/2026-11-14-research-agent-design.md`,
+planned in `docs/superpowers/plans/2026-11-14-research-agent.md`, checked against the live
+services in `docs/superpowers/specs/2026-11-14-research-feasibility.md`) was built in
+parallel from an older main and merged onto wave 5. It adds Exa search, Context.dev page
+reading and extraction, provenance and licence on every source, watched pages through
+Context.dev monitors (push freshness, a signed webhook), and a research agent that works in
+delegated child sessions and reports back. Decided with the user for the merge, and folded
+into `docs/contracts.md`:
+
+- **One set of web tools**, the research branch's names on wave 5's rules: `search_web` on
+  Exa (scopes data, news, research, any), `read_page` and `extract_table` on Context.dev,
+  and wave 5's `web_map` as `map_site`; each with `project_id` and `session_id`, the
+  project's daily credits (a search counts 5), the project tags at Context.dev and the
+  exploration note. `web_search` and `web_read` are gone. One `WebExplorer` port for
+  Context.dev beside a `WebSearch` port for Exa.
+- **`document` is files, `web` is pages.** Documents stay PDFs as in wave 4; the research
+  branch's page sources are web sources, its extraction the operation `extract` (ttl at
+  least 7 days). Provenance applies to every source; model-extracted operations say so.
+- **Freshness is both**: wave 5's minimum ttl for web sources, or a monitor (push), which
+  also exempts a source from the forced-refresh interval.
+- **Migration** `0009`, after wave 5's `0006` to `0008`.
+- The research agent's turns go through the session middleware as in-platform agent calls
+  and read the people's instructions after its own rules.
+
+Dropped from the research branch: documents read through Context.dev as one JSON row or
+extracted rows (now web sources), the "never ttl" rule, Exa's page contents call (no tool
+used it), and its separate `CONTEXT_API_KEY` setting (main's `CONTEXT_DEV_API_KEY` accepts
+both names). Not built from its design: `watch_page` and Gemini Deep Research (stretch).
 
 ## Wave 6: custom widgets and session attachments (planned)
 
@@ -315,5 +340,5 @@ Foundation ──▶ A  B  C  D  E  F ──▶ Integration 1 ──▶ G  H  I 
 ──▶ Pipeline view ──▶ Wave 3 (backend, frontend) ──▶ Integration 3 (all done)
 ──▶ Bottom-up invalidation (proposed) ──▶ Test consolidation (done) ──▶ Settings page (done)
 ──▶ Wave 4 (MCP, documents, widgets) ──▶ Integration 4 (done) ──▶ Wave 5 (web, sessions, settings)
-──▶ Wave 6 (custom widgets, attachments) ──▶ Functions (later)
+──▶ Research merge (done) ──▶ Wave 6 (custom widgets, attachments) ──▶ Functions (later)
 ```

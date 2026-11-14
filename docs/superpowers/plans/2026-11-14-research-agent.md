@@ -1,5 +1,13 @@
 # Research agent, web tools and watched pages: implementation plan
 
+> **Merged onto wave 5 (2026-11-14), with changes.** `docs/contracts.md` is the authority
+> now; see "The research merge" in `docs/plan.md`. In short: the web tools are `search_web`,
+> `read_page`, `extract_table` and `map_site`, each with `project_id` and `session_id`, the
+> project's daily web credits and the exploration note; a web page is a `web` source (page
+> Markdown is operation `scrape`, a model-extracted table operation `extract`), while
+> `document` stays PDFs; web sources may keep a long ttl or be watched (push); the
+> migration is `0009`. Kept below as written, for the reasoning.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give ada web search and page reading, Context.dev page sources with monitor-driven refresh, provenance on datasets, and a research agent (Gemini or any other configured model) that runs as a delegated child session.
