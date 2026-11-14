@@ -1082,6 +1082,7 @@ def batch(sql: str = "SELECT region, sum(value) AS total FROM input_0 GROUP BY r
                 "name": "Regions",
                 "address": "https://example.test/regions.csv",
                 "declared_schema": DECLARED.model_dump(mode="json"),
+                "provenance": {"publisher": "Example statistics", "licence": "CC BY 4.0"},
                 "refresh": True,
             },
         },
@@ -1145,6 +1146,11 @@ async def test_a_batch_builds_everything_with_references_and_again_nothing_new(
     assert [e.kind for e in entries][3:] == ["tool_call"] * 3
     assert calls == [("build_pipeline", "ok")] * 2 + [("get_lineage", "ok")]
     assert (len(sources), len(widgets)) == (1, 1)
+    assert sources[0].provenance is not None
+    assert (sources[0].provenance.publisher, sources[0].provenance.licence) == (
+        "Example statistics",
+        "CC BY 4.0",
+    )
 
 
 async def test_a_batch_that_fails_midway_stores_nothing(

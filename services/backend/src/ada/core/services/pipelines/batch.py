@@ -140,6 +140,7 @@ class Batches(BatchService):
                 options=part.options,
                 freshness=part.freshness,
                 declared_schema=part.declared_schema,
+                provenance=part.provenance,
             )
         if part.refresh:
             source_id = source.id

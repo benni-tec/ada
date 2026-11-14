@@ -6,7 +6,7 @@ from pydantic import ConfigDict, model_validator
 from ada.core.models.actors import Actor
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.schema import Roles, Schema
-from ada.core.models.sources import AccessKind, DataFormat, FreshnessPolicy
+from ada.core.models.sources import AccessKind, DataFormat, FreshnessPolicy, Provenance
 from ada.core.models.widgets import Widget
 
 # In a step, a value "$name" stands for the result of the earlier step whose `ref` is
@@ -33,6 +33,7 @@ class RegisterSource(_Part):
     options: JsonObject | None = None
     freshness: FreshnessPolicy | None = None
     declared_schema: Schema | None = None
+    provenance: Provenance | None = None
     refresh: bool = False
 
 
