@@ -180,10 +180,33 @@ export function ModelCard({ version }: { version: ModelVersion }) {
           <ul className="mt-2 flex flex-col gap-1 text-sm">
             <li>Deadlines and days behind target: exact, tested against hand calculations.</li>
             <li>The average Finnish profile lands on Finland's observed survival; the residual is reported (Population).</li>
-            <li className="text-orange-800 dark:text-orange-300">
-              Discrimination and calibration curves: not possible, there is no patient-level data.
-            </li>
           </ul>
+          {compiled.validation.length > 0 && (
+            <table className="mt-3 w-full text-sm" data-validation>
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-2 font-medium">Check</th>
+                  <th className="py-1 pr-2 font-medium">Expected</th>
+                  <th className="py-1 font-medium">Model</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compiled.validation.map((check) => (
+                  <tr key={check.name} className="border-t align-top">
+                    <td className="py-1 pr-2">
+                      {check.name}
+                      <span className="block text-xs text-muted-foreground">{check.note}</span>
+                    </td>
+                    <td className="py-1 pr-2">{check.expected}</td>
+                    <td className="py-1 font-medium">{check.predicted}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="mt-3 text-sm text-orange-800 dark:text-orange-300">
+            Discrimination and calibration curves: not possible, there is no patient-level data.
+          </p>
         </section>
       </div>
     </div>

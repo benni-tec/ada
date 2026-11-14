@@ -87,6 +87,21 @@ def test_build_takes_the_median_target_and_computes_the_residual(version: ModelV
     assert any("unconverted" in w for w in version.compiled.warnings)
 
 
+def test_the_build_checks_itself_against_figures_it_was_not_built_from(
+    version: ModelVersion,
+) -> None:
+    checks = {c.name: c for c in version.compiled.validation}
+    # Hanna's own examples: an 8-week delay compounds the per-4-weeks HR twice.
+    hanna = checks["delay_post:lung: 8 weeks of delay"]
+    assert hanna.expected == hanna.predicted == round(1.06**2, 4)
+    # Pokhrel's gap, basic vs high education, against Zai's direct HR, which the model
+    # carries: 1.25 observed in 1996-2005 against 1.22 estimated for 2000-2019.
+    women = checks["education gap, lung, female"]
+    assert women.predicted == 1.22
+    assert 1.2 < women.expected < 1.3
+    assert "Pokhrel" in women.note
+
+
 def test_the_spec_must_hold_together() -> None:
     spec = pathway_spec()
     with pytest.raises(Invalid, match="intended_use"):

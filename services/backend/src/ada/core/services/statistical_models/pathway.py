@@ -136,6 +136,14 @@ YLE = Citation(
     url="https://yle.fi/a/74-20251023",
 )
 
+POKHREL = Citation(
+    source="Pokhrel et al., Br J Cancer 2010;103:1109-14 (PMC2965870)",
+    passage="Table 1, 1996-2005, 5-year cancer-specific survival by education, lung: women "
+    "18.8 % (high) / 13.5 % (secondary) / 12.3 % (basic); men 10.6 / 9.5 / 9.2 %.",
+    grade=EvidenceGrade.REGISTRY,
+    url="https://pmc.ncbi.nlm.nih.gov/articles/PMC2965870/",
+)
+
 LUNG = "lung"
 FEMALE, MALE = "female", "male"
 
@@ -396,6 +404,13 @@ def pathway_spec() -> ModelSpec:
                 }
             },
             provenance=YLE,
+            survival_by_education={
+                f"{LUNG}:{FEMALE}:basic": 0.123,
+                f"{LUNG}:{FEMALE}:tertiary": 0.188,
+                f"{LUNG}:{MALE}:basic": 0.092,
+                f"{LUNG}:{MALE}:tertiary": 0.106,
+            },
+            education_provenance=POKHREL,
         ),
         toggles=(
             Toggle(

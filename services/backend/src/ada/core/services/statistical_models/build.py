@@ -16,6 +16,7 @@ from ada.core.models.statistical_models import (
     PopulationFigure,
     Scale,
     TriggerStage,
+    ValidationCheck,
 )
 from ada.core.services.statistical_models.evaluate import (
     ANY,
@@ -171,6 +172,61 @@ def _population(
     return figures, warnings
 
 
+def _validation(spec: ModelSpec) -> list[ValidationCheck]:
+    """Checks against figures the model was not built from: Hanna's own worked examples
+    (eight and twelve weeks of delay compound the per-4-weeks HR), and the education gap
+    Pokhrel observed in Finland, as the ratio of cumulative excess hazards, basic vs high
+    education, against the direct education HR the model carries."""
+    checks: list[ValidationCheck] = []
+    for key, name in spec.arrows.items():
+        parameter = spec.parameters[name]
+        if parameter.form is not Form.PER_4_WEEKS:
+            continue
+        for weeks in (8, 12):
+            checks.append(
+                ValidationCheck(
+                    name=f"{key}: {weeks} weeks of delay",
+                    expected=round(parameter.estimate ** (weeks / 4), 4),
+                    predicted=round(math.exp(math.log(parameter.estimate) * weeks * 7 / 28), 4),
+                    note=(
+                        f"{parameter.provenance.source}: the per-4-weeks HR compounded, as "
+                        "the paper's own examples do"
+                    ),
+                )
+            )
+    by_education = spec.comparison.survival_by_education
+    for site in spec.sites:
+        for sex in sorted({c.sex for c in spec.baseline if c.site == site}):
+            basic = by_education.get(f"{site}:{sex}:basic")
+            high = by_education.get(f"{site}:{sex}:tertiary")
+            direct = None
+            for key in (
+                f"direct_education:{site}:{sex}",
+                f"direct_education:{site}",
+                "direct_education",
+            ):
+                if key in spec.arrows:
+                    direct = spec.parameters[spec.arrows[key]]
+                    break
+            if basic is None or high is None or direct is None:
+                continue
+            source = spec.comparison.education_provenance
+            checks.append(
+                ValidationCheck(
+                    name=f"education gap, {site}, {sex}",
+                    expected=round(math.log(basic) / math.log(high), 3),
+                    predicted=round(direct.estimate, 3),
+                    note=(
+                        "Ratio of cumulative excess hazards, basic vs high education: "
+                        f"observed in {source.source if source else 'the comparison'} "
+                        f"({basic:.3f} vs {high:.3f} alive at 5 years) against the direct HR "
+                        f"of {direct.provenance.source}"
+                    ),
+                )
+            )
+    return checks
+
+
 def compile_spec(spec: ModelSpec) -> Compiled:
     validate(spec)
     targets = _targets(spec)
@@ -182,5 +238,6 @@ def compile_spec(spec: ModelSpec) -> Compiled:
         targets=targets,
         parameters=parameters,
         population=tuple(population),
+        validation=tuple(_validation(spec)),
         warnings=tuple(dict.fromkeys(warnings + more)),
     )

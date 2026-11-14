@@ -2,7 +2,7 @@
 
 > **Planned, not started (2026-11-14, revision 3).** This replaces the task sketch in Part 3 of `2026-11-14-statistical-models.md`. The model follows the v2 specification in `2026-11-14-statistical-models-grounding.md`: a Nordic baseline, the fast-track trigger and deadlines as the lead output, a DAG with one parameter per arrow, two toggles instead of a Monte Carlo, and a Finland residual instead of recalibration. Read that document first.
 
-> **Built on 2026-11-14 (branch `pathway-model`, migration `0015`): lung, v1.** What is in the code: the resource and its versions (Tasks 2, 3), the evaluator with the trigger, the deadlines, the days behind target, survival per setting, levers and flags (Task 4), REST and MCP with the agent (Task 5), the Models page with its three tabs and the banner (Task 7). The parameters ship in `core/services/statistical_models/pathway.py` with their provenance; registering each as an ADA source and reading it from an operator (Task 1 as written) is still to do, as are the Danish document, colorectal and pancreas, a stage-specific and age-banded baseline, the excess share for the scale conversion, the validation runner beyond the residual (Task 6) and the demo material (Task 8). The checkboxes below are updated to match.
+> **Built on 2026-11-14 (branch `pathway-model`, migration `0015`): lung, v1.** What is in the code: the resource and its versions (Tasks 2, 3), the evaluator with the trigger, the deadlines, the days behind target, survival per setting, levers and flags (Task 4), REST and MCP with the agent (Task 5), the Models page with its three tabs and the banner (Task 7). The parameters ship in `core/services/statistical_models/pathway.py` with their provenance; registering each as an ADA source and reading it from an operator (Task 1 as written) is still to do, as are the Danish document, colorectal and pancreas, a stage-specific and age-banded baseline, the excess share for the scale conversion, and the demo slides themselves (the profiles and the outline are in `2026-11-14-pathway-model-demo.md`). The checkboxes below are updated to match.
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -62,7 +62,7 @@ Every item becomes a registered source and an operator the model reads. The pass
 - [x] **Direct education effect:** Zai's cancer-specific HRs adjusted for stage and treatment: all sites by sex; lung women 1.22; colorectal women 1.13. Men's lung and all pancreas use the all-sites HR, graded `assumption`.
 - [x] **Post-trigger delay:** Hanna 2020 (PMC7610021): colectomy 1.06 (1.01–1.12), colorectal adjuvant 1.13 (1.09–1.17), lung surgery 1.06 (0.93–1.19), NSCLC adjuvant 1.01 (0.99–1.04); scale overall; valid for 4–16 weeks of total delay. Heiden 2021 (PMC8160592): the step at 12 weeks from the diagnostic CT, HR from the paper's survival table; scale overall. Pancreas: a range, graded `assumption`.
 - [x] **Pre-trigger delay:** Sud 2020 (PMC7237184): 0.0056 per day for lung, pancreas and colorectal (5-year survival < 90 %); no CI, ±8 % as pseudo-SD; graded `assumption`.
-- [ ] **Education check:** Pokhrel 2010 (PMC2965870) Table 1, 5-year cause-specific survival by education per site and sex, 1996–2005.
+- [x] **Education check:** Pokhrel 2010 (PMC2965870) Table 1, 5-year cause-specific survival by education per site and sex, 1996–2005.
 - [ ] **The parameter table:** one operator, `pathway_model_parameters`: `module, arrow, term, level, estimate, ci_low, ci_high, scale (excess | cause_specific | overall | days), country, evidence_grade (standard | meta_analysis | cohort | registry | assumption), source_id, passage`.
 
 ## Task 2: Models and versions (integration step)
@@ -132,9 +132,9 @@ Every item becomes a registered source and an operator the model reads. The pass
 **Files:** `B/core/services/models/validate.py`, `T/test_model_validate.py`.
 
 - [x] Residual check (from Task 3): per site and sex, the pre-residual prediction, NORDCAN Finland, and the residual factor.
-- [ ] Education check: the model's survival gap by education per site and sex (toggles default) against Pokhrel 2010's cause-specific survival by education.
-- [ ] Cross-model check: the delay-only effect against Hanna's worked examples (8 and 12 weeks of colectomy delay).
-- [ ] Results go into `version.validation`, each figure with the operator it came from, so a widget can show it.
+- [x] Education check: the model's survival gap by education per site and sex (toggles default) against Pokhrel 2010's cause-specific survival by education.
+- [x] Cross-model check: the delay-only effect against Hanna's worked examples (8 and 12 weeks of colectomy delay).
+- [x] Results go into `version.validation`, each figure with the operator it came from, so a widget can show it.
 
 ## Task 7: Frontend
 
@@ -157,8 +157,8 @@ Every item becomes a registered source and an operator the model reads. The pass
 
 ## Task 8: Demo and presentation
 
-- [ ] Three synthetic personas: lung, public route, nurse at first contact, suspicion criteria met, imaging late, now past the treatment deadline; colorectal, basic education, work-up on time, long wait for the MDT plan; pancreas, emergency presentation (mostly `assumption`, to show the grading). Stored as docs or a project text widget, never as real data.
-- [ ] Slides: the problem (Lundberg 2020, Yle MOT, Khalife 2025); the Nordic trigger and deadlines Finland lacks (Helsedirektoratet, RCC; Jensen 2017 for the effect); the DAG and why not a product of HRs (Westreich & Greenland); "timing explains about half the lung gap" with the residual (the population view); the education gap that survives adjustment (Zai, Pokhrel); what the model cannot claim (lead time, the paradox, where the effects come from); regulation. Check every ○ reference first.
+- [x] Three synthetic personas (lung only, in `2026-11-14-pathway-model-demo.md`; the colorectal and pancreas ones wait for their sites): lung, public route, nurse at first contact, suspicion criteria met, imaging late, now past the treatment deadline; colorectal, basic education, work-up on time, long wait for the MDT plan; pancreas, emergency presentation (mostly `assumption`, to show the grading). Stored as docs or a project text widget, never as real data.
+- [x] Slides: the problem (Lundberg 2020, Yle MOT, Khalife 2025); the Nordic trigger and deadlines Finland lacks (Helsedirektoratet, RCC; Jensen 2017 for the effect); the DAG and why not a product of HRs (Westreich & Greenland); "timing explains about half the lung gap" with the residual (the population view); the education gap that survives adjustment (Zai, Pokhrel); what the model cannot claim (lead time, the paradox, where the effects come from); regulation. Check every ○ reference first.
 
 ## Open questions
 

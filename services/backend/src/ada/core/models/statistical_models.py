@@ -172,6 +172,10 @@ class ComparisonPopulation(DomainModel):
     # site -> step -> typical days.
     days: dict[str, dict[PathwayStep, int]]
     provenance: Citation
+    # "<site>:<sex>:<education level>" -> observed 5-year survival, for the education check;
+    # with the citation it comes from.
+    survival_by_education: dict[str, float] = {}
+    education_provenance: Citation | None = None
 
 
 class Toggle(DomainModel):
@@ -239,6 +243,15 @@ class PopulationFigure(DomainModel):
     note: str
 
 
+class ValidationCheck(DomainModel):
+    """One check of the build against a figure the model was not built from."""
+
+    name: str
+    expected: float
+    predicted: float
+    note: str
+
+
 class Compiled(DomainModel):
     """What the build derived from the spec."""
 
@@ -248,6 +261,7 @@ class Compiled(DomainModel):
     # key "<name>" holds the original and "<name>@<site>" the converted one.
     parameters: dict[str, Parameter]
     population: tuple[PopulationFigure, ...]
+    validation: tuple[ValidationCheck, ...] = ()
     warnings: tuple[str, ...] = ()
 
 
