@@ -1,0 +1,178 @@
+from collections.abc import Sequence
+from uuid import uuid7
+
+from ada.core.models.actors import Actor
+from ada.core.models.base import Id
+from ada.core.models.dashboards import Dashboard, DashboardVersion, Slot
+from ada.core.models.errors import Invalid
+from ada.core.models.events import Event, EventType
+from ada.core.models.time import TimeRange
+from ada.core.ports.events import EventPublisher
+from ada.core.ports.repositories import (
+    DashboardRepository,
+    ProjectRepository,
+    WidgetRepository,
+)
+from ada.core.ports.system import Clock
+from ada.core.services.dashboards.layout import complete_layout
+from ada.core.services.ports.dashboards import DashboardService
+
+
+class Dashboards(DashboardService):
+    def __init__(
+        self,
+        dashboards: DashboardRepository,
+        projects: ProjectRepository,
+        widgets: WidgetRepository,
+        events: EventPublisher,
+        clock: Clock,
+    ) -> None:
+        self.dashboards = dashboards
+        self.projects = projects
+        self.widgets = widgets
+        self.events = events
+        self.clock = clock
+
+    async def create(self, project_id: Id, name: str, actor: Actor) -> Dashboard:
+        await self.projects.get(project_id)
+        dashboard = Dashboard(
+            id=uuid7(), project_id=project_id, name=_name(name), created_at=self.clock.now()
+        )
+        await self.dashboards.add(dashboard)
+        # Announced so a project page lists a dashboard an agent created over MCP; it has
+        # no version yet.
+        await self._announce(dashboard, None)
+        return dashboard
+
+    async def get(self, id: Id) -> Dashboard:
+        return await self.dashboards.get(id)
+
+    async def list(self, project_id: Id) -> Sequence[Dashboard]:
+        # Read the project first, so an unknown id is a 404 and not an empty list.
+        await self.projects.get(project_id)
+        return await self.dashboards.list(project_id)
+
+    async def current(self, id: Id) -> DashboardVersion | None:
+        dashboard = await self.dashboards.get(id)
+        if dashboard.current_version_id is None:
+            return None
+        return await self.dashboards.get_version(dashboard.current_version_id)
+
+    async def version(self, version_id: Id) -> DashboardVersion:
+        return await self.dashboards.get_version(version_id)
+
+    async def versions(self, id: Id) -> Sequence[DashboardVersion]:
+        await self.dashboards.get(id)
+        return await self.dashboards.versions(id)
+
+    async def edit(
+        self, id: Id, slots: Sequence[Slot], expected_revision: int, actor: Actor
+    ) -> DashboardVersion:
+        dashboard = await self.dashboards.get(id)
+        placed = await self._placed(dashboard, slots)
+        return await self._add_version(dashboard, placed, expected_revision, actor)
+
+    async def pin_widget(
+        self, id: Id, widget_id: Id, slot: str, expected_revision: int, actor: Actor
+    ) -> DashboardVersion:
+        dashboard = await self.dashboards.get(id)
+        name = _slot_name(slot)
+        current = await self.current(id)
+        slots = list(current.slots) if current else []
+        for index, existing in enumerate(slots):
+            if existing.name == name:
+                # A pinned slot keeps its place; only what it shows changes.
+                slots[index] = existing.model_copy(update={"widget_id": widget_id})
+                break
+        else:
+            slots.append(Slot(name=name, widget_id=widget_id))
+        placed = await self._placed(dashboard, slots)
+        return await self._add_version(dashboard, placed, expected_revision, actor)
+
+    async def set_default_time_range(
+        self, id: Id, time_range: TimeRange, expected_revision: int
+    ) -> Dashboard:
+        if (
+            time_range.start is not None
+            and time_range.end is not None
+            and time_range.start > time_range.end
+        ):
+            raise Invalid("The time range ends before it starts")
+        dashboard = await self.dashboards.get(id)
+        saved = await self.dashboards.update(
+            dashboard.model_copy(update={"default_time_range": time_range}), expected_revision
+        )
+        await self._announce(saved, saved.current_version_id)
+        return saved
+
+    async def _placed(self, dashboard: Dashboard, slots: Sequence[Slot]) -> tuple[Slot, ...]:
+        """The slots checked and with their layouts completed, in order. A slot's widget
+        must be in the dashboard's project: a dashboard shows its own project's pipelines."""
+        placed: list[Slot] = []
+        names: set[str] = set()
+        for slot in slots:
+            name = _slot_name(slot.name)
+            if name in names:
+                raise Invalid(f"Two slots are called {name!r}; slot names are unique")
+            names.add(name)
+            if slot.widget_id is not None:
+                widget = await self.widgets.get(slot.widget_id)
+                if widget.project_id != dashboard.project_id:
+                    raise Invalid("The widget belongs to another project than the dashboard")
+            named = slot.model_copy(update={"name": name})
+            placed.append(named.model_copy(update={"layout": complete_layout(named, placed)}))
+        return tuple(placed)
+
+    async def _add_version(
+        self,
+        dashboard: Dashboard,
+        slots: tuple[Slot, ...],
+        expected_revision: int,
+        actor: Actor,
+    ) -> DashboardVersion:
+        previous = await self.dashboards.versions(dashboard.id)
+        version = DashboardVersion(
+            id=uuid7(),
+            dashboard_id=dashboard.id,
+            number=previous[-1].number + 1 if previous else 1,
+            slots=slots,
+            template_id=previous[-1].template_id if previous else None,
+            created_by=actor,
+            created_at=self.clock.now(),
+        )
+        # The pointer moves first: it is the revision-checked write, and a stale caller
+        # must be refused before a version exists for it.
+        moved = await self.dashboards.update(
+            dashboard.model_copy(update={"current_version_id": version.id}), expected_revision
+        )
+        await self.dashboards.add_version(version)
+        await self._announce(moved, version.id)
+        return version
+
+    async def _announce(self, dashboard: Dashboard, version_id: Id | None) -> None:
+        await self.events.publish(
+            Event(
+                type=EventType.DASHBOARD_CHANGED,
+                project_id=dashboard.project_id,
+                payload={
+                    "dashboard_id": str(dashboard.id),
+                    "version_id": str(version_id) if version_id else None,
+                },
+                at=self.clock.now(),
+            )
+        )
+
+
+def _name(name: str) -> str:
+    name = name.strip()
+    if not name:
+        raise Invalid("A dashboard needs a name")
+    return name
+
+
+def _slot_name(name: str) -> str:
+    # Slots are addressed by name, so a blank one could not be pinned to again.
+    name = name.strip()
+    if not name:
+        raise Invalid("A slot needs a name")
+    return name
