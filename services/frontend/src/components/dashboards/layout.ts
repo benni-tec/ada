@@ -16,6 +16,7 @@ const minimums: Record<string, { w: number; h: number }> = {
   value: { w: 2, h: 2 },
   table: { w: 3, h: 3 },
   'line-chart': { w: 3, h: 3 },
+  chart: { w: 3, h: 3 },
   map: { w: 3, h: 3 },
 }
 const fallbackMinimum = { w: 2, h: 2 }

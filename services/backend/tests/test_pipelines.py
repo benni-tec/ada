@@ -868,6 +868,28 @@ async def test_a_run_refuses_a_binding_at_another_level_or_grain(tables: Tables)
         ("value", Roles(), {"column": "region"}, "needs a number, and 'region' is text"),
         ("map", Roles(geo=COUNTY.model_copy(update={"level": "mixed"})), {}, "mixed levels"),
         ("map", Roles(geo=COUNTY), {}, "boundaries in a column 'geometry'"),
+        ("table", Roles(), {"labels": {"nope": "Nope"}}, "no column 'nope' for `labels`"),
+        ("table", Roles(), {"format": {"value": "money"}}, "`format` of 'value' must be"),
+        ("value", Roles(), {"compare_to": "region"}, "`compare_to` needs a number"),
+        ("chart", Roles(), {"encoding": {}}, "a chart spec is a Vega-Lite spec with a `mark`"),
+        (
+            "chart",
+            Roles(),
+            {"mark": "bar", "data": {"values": [{"value": 1}]}},
+            "`data` is not allowed: ADA puts the operator's rows in",
+        ),
+        (
+            "chart",
+            Roles(),
+            {"layer": [{"mark": "image", "encoding": {"url": {"value": "https://x"}}}]},
+            r"`layer\[0\]\.encoding\.url` is not allowed",
+        ),
+        (
+            "chart",
+            Roles(),
+            {"mark": "bar", "encoding": {"href": {"field": "region"}}, "usermeta": {}},
+            "`encoding.href` is not allowed.*`usermeta` is not allowed",
+        ),
     ],
 )
 def test_a_widget_states_what_it_misses(
@@ -875,6 +897,19 @@ def test_a_widget_states_what_it_misses(
 ) -> None:
     with pytest.raises(Invalid, match=message):
         check_widget(type, schema(roles), spec)
+
+
+def test_a_chart_table_and_value_take_their_options() -> None:
+    target = {"mark": "rule", "encoding": {"y": {"datum": 80}}}
+    line = {"mark": "line", "encoding": {"x": {"field": "period_start", "type": "temporal"}}}
+    for type, spec in [
+        ("chart", {"layer": [line, target], "config": {"axis": {"grid": False}}}),
+        ("chart", {"facet": {"field": "region"}, "spec": line}),
+        ("table", {"labels": {"value": "Coverage"}, "format": {"value": "percent"}, "decimals": 1}),
+        ("value", {"compare_to": "lower", "format": "number"}),
+        ("value", {"compare_to": 80}),
+    ]:
+        check_widget(type, schema(Roles()), spec)
 
 
 async def test_create_widget_returns_invalid_with_the_reason(tables: Tables) -> None:

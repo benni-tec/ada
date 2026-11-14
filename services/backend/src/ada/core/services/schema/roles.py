@@ -8,6 +8,7 @@ from ada.core.models.base import JsonObject
 from ada.core.models.errors import Invalid
 from ada.core.models.schema import Column, ColumnType, MeasureRole, OutputKind, Roles, Schema
 from ada.core.services.schema.geo import MIXED
+from ada.core.services.widgets.specs import chart_problems, table_problems, value_problems
 
 NUMERIC = frozenset({ColumnType.INTEGER, ColumnType.NUMBER})
 TIME = frozenset({ColumnType.DATE, ColumnType.TIMESTAMP})
@@ -108,16 +109,21 @@ type _Columns = dict[str, Column]
 
 
 def _value(output: Schema, spec: JsonObject, columns: _Columns) -> list[str]:
-    return _measure(output, spec, columns, "column")
+    return _measure(output, spec, columns, "column") + value_problems(spec, columns)
 
 
 def _table(output: Schema, spec: JsonObject, columns: _Columns) -> list[str]:
+    options = table_problems(spec, columns)
     wanted = spec.get("columns")
     if wanted is None or not columns:
-        return []
+        return options
     if not isinstance(wanted, list) or not all(isinstance(name, str) for name in wanted):
-        return ["`columns` must be a list of column names"]
-    return [f"there is no column {name!r}" for name in wanted if name not in columns]
+        return ["`columns` must be a list of column names", *options]
+    return [f"there is no column {name!r}" for name in wanted if name not in columns] + options
+
+
+def _chart(output: Schema, spec: JsonObject, columns: _Columns) -> list[str]:
+    return chart_problems(spec)
 
 
 def _line_chart(output: Schema, spec: JsonObject, columns: _Columns) -> list[str]:
@@ -192,7 +198,13 @@ def _text(spec: JsonObject, key: str) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-_NEEDS = {"value": _value, "table": _table, "line-chart": _line_chart, "map": _map}
+_NEEDS = {
+    "value": _value,
+    "table": _table,
+    "line-chart": _line_chart,
+    "map": _map,
+    "chart": _chart,
+}
 
 
 def has_bounds(measure: MeasureRole) -> bool:
