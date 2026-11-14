@@ -4,13 +4,20 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Roll back: a commit whose images exist (default: the selected branch head)"
+        required: false
 
 permissions:
   contents: read
 
+# A newer pull request run cancels the older one. Runs on main each get a group of their own,
+# so none is cancelled; the deploy job queues them.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   frontend:
@@ -97,3 +104,98 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    name: Deploy to the Verda VM
+    # docs/deploy.md. Only the images job's output is deployed: sha-<commit> of this run.
+    needs: [images]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    # One deploy at a time, the others wait in line (up to 100) instead of replacing each other.
+    concurrency:
+      group: deploy-ada
+      queue: max
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+    steps:
+      # Secrets are not available to `if`, so the gate is a step.
+      - id: gate
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::notice::Deploy skipped: DEPLOY_HOST, DEPLOY_SSH_KEY or DEPLOY_KNOWN_HOSTS is not set."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+
+      - if: steps.gate.outputs.run == 'true'
+        name: Deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # metadata-action's `type=sha` tag: sha- and the first 7 characters of the commit.
+          sha="$(git rev-parse --short=7 HEAD)"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+          # Runs on the VM as root's login shell would: the token arrives first on stdin, then
+          # the compose files as a tar stream. Nothing secret is in the command line.
+          remote='
+            set -euo pipefail
+            sha=$1 actor=$2 event=$3 run=$4
+            test -f /opt/ada/.env || { echo "/opt/ada/.env is missing (POSTGRES_PASSWORD)" >&2; exit 1; }
+            read -r token
+            exec 9> /opt/ada.lock
+            flock -w 600 9
+            cd /opt/ada
+            # Run numbers follow the order of pushes and manual runs. A push older than the newest
+            # run deployed so far leaves the live one alone; a manual run always deploys.
+            live_run="$(cat RUN 2>/dev/null || echo 0)"
+            if [ "$event" = push ] && [ "$run" -lt "$live_run" ]; then
+              echo "::notice::Deploy skipped: run $live_run, which is newer, has already deployed."
+              cat > /dev/null
+              exit 0
+            fi
+            tar -x docker-compose.yml docker-compose.infra.yml docker-compose.deploy.yml
+            # A login of its own, so the other apps on this VM keep theirs.
+            export DOCKER_CONFIG="$(mktemp -d)"
+            trap "rm -rf $DOCKER_CONFIG" EXIT
+            printf %s "$token" | docker login ghcr.io -u "$actor" --password-stdin >/dev/null
+            export VERSION="sha-$sha"
+            compose="docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yml"
+            $compose pull
+            # Every service healthy (or the migration finished) before the revision is recorded.
+            $compose up -d --remove-orphans --wait --wait-timeout 300
+            echo "$sha" > REVISION
+            echo "$(( run > live_run ? run : live_run ))" > RUN
+          '
+
+          # One connection only: a second one right after the first stalls on a fresh VM.
+          { printf '%s\n' "$GITHUB_TOKEN"; git archive --format=tar HEAD docker-compose.yml docker-compose.infra.yml docker-compose.deploy.yml; } |
+            ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+              -o ServerAliveInterval=15 -o ServerAliveCountMax=6 \
+              "$DEPLOY_USER@$DEPLOY_HOST" "bash -c $(printf '%q' "$remote") deploy $sha $GITHUB_ACTOR $GITHUB_EVENT_NAME $GITHUB_RUN_NUMBER"
+
+          # The gateway sends /api to the backend, so this reaches its liveness route through
+          # Caddy, the gateway and the backend. The host is the VM's sslip.io name.
+          url=https://ada.95-133-254-42.sslip.io/api/health/live
+          for _ in $(seq 18); do
+            curl -fsS --max-time 5 "$url" && exit 0
+            sleep 5
+          done
+          echo "::error::$url did not answer within 3 minutes"
+          exit 1
