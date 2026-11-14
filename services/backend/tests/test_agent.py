@@ -6,11 +6,13 @@ The REST routes run in a TestClient; a turn runs as the worker's task would, on 
 container, in the client's event loop."""
 
 import asyncio
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid7
 
 import pytest
+from dishka import AsyncContainer
 from fastapi.testclient import TestClient
 from fastmcp import Client
 from mcp.types import Implementation
@@ -26,8 +28,9 @@ from ada.adapters.memory.repositories import MemoryStore
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.agents import AgentTurn, ProviderKind, ToolPart
+from ada.core.models.base import Id
 from ada.core.models.web import SearchHit
-from ada.core.ports.agents import ToolCallFailed
+from ada.core.ports.agents import ToolCallFailed, TurnProgress
 from ada.core.services.agents import service as agent_service
 from ada.core.services.ports.agents import AgentTurnService
 from ada.core.services.ports.projects import ProjectService
@@ -35,7 +38,6 @@ from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.mcp.agent import CLIENT, LEFT_OUT, RESEARCH_TOOLS, InProcessToolbox
 from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.worker import create_broker
-from ada.entrypoints.worker.tasks import agent as agent_task
 from agent_support import (
     AGENT,
     MODEL,
@@ -486,6 +488,10 @@ def test_a_turn_that_cannot_finish_fails(
     monkeypatch.setattr(agent_service, "MAX_STEPS", 2)
     script.then(*[call("list_pipelines", {"project_id": project["id"]}) for _ in range(4)])
     too_long = run(client, message(client, session, "Hi")["turn"]["id"])
+    script.steps.clear()
+    monkeypatch.setattr(agent_service, "TURN_TIME_LIMIT", timedelta(seconds=0.2))
+    script.then(hang)
+    too_slow = run(client, message(client, session, "Hi")["turn"]["id"])
 
     # A tool that keeps refusing.
     assert refused.status == "failed"
@@ -497,6 +503,13 @@ def test_a_turn_that_cannot_finish_fails(
         "failed",
         "The agent did not finish within 2 steps",
     )
+    assert too_slow.status == "failed"
+    assert (too_slow.error or "").startswith("The turn did not finish within")
+
+
+async def hang(messages: Any, info: Any) -> AsyncIterator[str]:
+    await asyncio.sleep(10)
+    yield "Too late."
 
 
 # The research agent, in child sessions
@@ -690,6 +703,10 @@ def test_research_turn_without_report_posts_incomplete_report_once(
     script.then(say("Statistics Finland ", "has no such table."))
     run(client, turn_id)
     run(client, turn_id)
+    # A person's follow-ups in the research session are a conversation of their own.
+    script.then(say("THL has none either."), fail(ModelHTTPError(503, "scripted", "overloaded")))
+    for text in ("Look at THL too", "And Eurostat?"):
+        run(client, message(client, child, text)["turn"]["id"])
 
     _, report = entries(client, session)
     assert report["text"] == (
@@ -708,6 +725,44 @@ def test_failed_research_turn_reports_failure(
     _, report = entries(client, session)
     assert failed.status == "failed"
     assert report["text"] == f"Research failed: {failed.error}"
+
+
+def test_a_research_turn_that_cannot_be_queued_reports_its_failure(
+    client: TestClient, session: dict[str, Any], script: Script, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recording = dispatcher(client)
+    queue, refused = recording.run_turn, []
+
+    async def queue_unless_first(turn_id: Id) -> None:
+        if not refused:
+            refused.append(turn_id)
+            raise ConnectionError("Valkey is unreachable")
+        await queue(turn_id)
+
+    script.then(
+        call("delegate_research", {"brief": BRIEF, "title": "Survival"}),
+        say("I asked for research."),
+    )
+    first = message(client, session, "How does survival differ by district?")["turn"]["id"]
+    monkeypatch.setattr(recording, "run_turn", queue_unless_first)
+    run(client, first)
+
+    *_, delegation, report, queued = entries(client, session)
+    [unqueued] = send(client, "GET", f"/sessions/{delegation['ref']}/turns")
+    _, second = send(client, "GET", f"/sessions/{session['id']}/turns")
+    assert [UUID(unqueued["id"])] == refused
+    assert (unqueued["status"], unqueued["error"]) == (
+        "failed",
+        "The turn could not be queued: Valkey is unreachable",
+    )
+    assert (report["kind"], report["actor"], report["text"]) == (
+        "report",
+        RESEARCH_AGENT,
+        f"Research failed: {unqueued['error']}",
+    )
+    # The session agent delegated, so it hears of the failure in a turn of its own.
+    assert (queued["ref"], second["prompt_entry_id"]) == (second["id"], report["id"])
+    assert UUID(second["id"]) in recording.turns
 
 
 def test_web_call_cap(
@@ -820,11 +875,34 @@ async def test_an_outside_client_cannot_pass_for_the_agent(
 
 # The worker
 
+RUN_TURN = "ada.entrypoints.worker.tasks.agent:run_turn"
+
+
+async def two_turns(container: AsyncContainer) -> list[Id]:
+    """Two messages in a new session, and the turns they queued."""
+    async with container() as request:
+        project = await (await request.get(ProjectService)).create("P")
+        session = await (await request.get(SessionService)).create(project.id, "S")
+    turns = []
+    for text in ("Hi", "Hello?"):
+        async with container() as request:
+            posted = await (await request.get(AgentTurnService)).post_message(
+                session.id, text, Actor(kind=ActorKind.USER, name="web")
+            )
+        assert posted.turn is not None
+        turns.append(posted.turn.id)
+    return turns
+
+
+async def get_turn(container: AsyncContainer, id: Id) -> AgentTurn:
+    async with container() as request:
+        return await (await request.get(AgentTurnService)).get(id)
+
 
 async def test_the_worker_task_runs_a_turn_after_the_earlier_turns_of_its_session(
     unreachable_settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(agent_task, "WAIT_POLL", 0.01)
+    monkeypatch.setattr(agent_service, "WAIT_POLL", 0.01)
     script = Script()
     broker = create_broker(
         unreachable_settings,
@@ -838,36 +916,70 @@ async def test_the_worker_task_runs_a_turn_after_the_earlier_turns_of_its_sessio
     await broker.startup()
     try:
         await configure(app_container, config())
-        async with app_container() as request:
-            project = await (await request.get(ProjectService)).create("P")
-            session = await (await request.get(SessionService)).create(project.id, "S")
-        turns = []
-        for text in ("Hi", "Hello?"):
-            async with app_container() as request:
-                posted = await (await request.get(AgentTurnService)).post_message(
-                    session.id, text, Actor(kind=ActorKind.USER, name="web")
-                )
-            assert posted.turn is not None
-            turns.append(posted.turn.id)
+        turns = await two_turns(app_container)
         script.then(say("Hello from the worker."), say("Still here."))
 
-        task = broker.find_task("ada.entrypoints.worker.tasks.agent:run_turn")
+        task = broker.find_task(RUN_TURN)
         assert task is not None
         # Two turns of one session can run at once in the worker: the second waits.
         second = await task.kiq(turn_id=str(turns[1]))
         await asyncio.sleep(0.1)
-        async with app_container() as request:
-            waiting = await (await request.get(AgentTurnService)).get(turns[1])
+        waiting = await get_turn(app_container, turns[1])
         first = await (await task.kiq(turn_id=str(turns[0]))).wait_result(timeout=5)
         result = await second.wait_result(timeout=5)
         assert not first.is_err and not result.is_err, (first.error, result.error)
 
-        async with app_container() as request:
-            done = [await (await request.get(AgentTurnService)).get(id) for id in turns]
+        done = [await get_turn(app_container, id) for id in turns]
         assert (waiting.status, [turn.status for turn in done]) == ("queued", ["done", "done"])
         assert [turn.parts[0].text for turn in done] == [  # type: ignore[union-attr]
             "Hello from the worker.",
             "Still here.",
         ]
+    finally:
+        await broker.shutdown()
+
+
+async def test_a_turn_left_running_past_the_time_limit_fails_before_the_next_runs(
+    unreachable_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(agent_service, "WAIT_POLL", 0.01)
+    script, overrides = Script(), Overrides()
+    broker = create_broker(
+        unreachable_settings,
+        *memory_adapters(),
+        overrides,
+        AgentOverrides(script),
+        in_memory=True,
+    )
+    assert isinstance(broker, InMemoryBroker)
+    app_container = broker.middlewares[0]._container  # type: ignore[attr-defined]
+    await broker.startup()
+    try:
+        await configure(app_container, config())
+        stuck, turn = await two_turns(app_container)
+        # The worker running the first turn died: it is left running.
+        assert await (await app_container.get(TurnProgress)).start(stuck)
+        seen = []
+
+        async def look(step: int) -> None:
+            seen.append((await get_turn(app_container, stuck)).status)
+
+        script.before_step = look
+        script.then(say("Hello again."))
+        task = broker.find_task(RUN_TURN)
+        assert task is not None
+        waiting = await task.kiq(turn_id=str(turn))
+        await asyncio.sleep(0.1)
+        within_limit = (await get_turn(app_container, turn)).status
+        bound = agent_service.TURN_TIME_LIMIT + agent_service.TURN_MARGIN
+        overrides.clock.advance(seconds=bound.total_seconds() + 1)
+        result = await waiting.wait_result(timeout=5)
+        assert not result.is_err, result.error
+
+        failed, done = [await get_turn(app_container, id) for id in (stuck, turn)]
+        assert within_limit == "queued"
+        assert (failed.status, failed.error) == ("failed", agent_service.ABANDONED)
+        # Failed before the next turn started: never two running at once.
+        assert (seen, done.status) == (["failed"], "done")
     finally:
         await broker.shutdown()

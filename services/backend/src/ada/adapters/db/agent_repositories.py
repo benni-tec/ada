@@ -87,6 +87,18 @@ class SqlAgentTurnRepository(AgentTurnRepository):
             raise NotFound("agent turn", id)
         return await self.get(id)
 
+    async def abandon(self, id: Id, error: str, at: datetime) -> bool:
+        """TurnProgress.abandon; False when the turn has ended already."""
+        unfinished = (TurnStatus.QUEUED.value, TurnStatus.RUNNING.value)
+        return await self._update(
+            id,
+            AgentTurnRow.status.in_(unfinished),
+            status=TurnStatus.FAILED.value,
+            error=error,
+            finished_at=at,
+            cancel_requested=True,
+        )
+
     async def request_cancel(self, id: Id, at: datetime) -> AgentTurn:
         # One statement each, so a worker starting the turn at the same moment either
         # finds it cancelled or has started it and sees the flag at its next step.
@@ -146,3 +158,16 @@ class SqlTurnProgress(TurnProgress):
     ) -> AgentTurn:
         async with AsyncSession(self.engine, expire_on_commit=False) as session, session.begin():
             return await SqlAgentTurnRepository(session).finish(id, status, parts, error, at)
+
+    async def session_turns(self, id: Id) -> Sequence[AgentTurn]:
+        async with AsyncSession(self.engine, expire_on_commit=False) as session, session.begin():
+            turns = SqlAgentTurnRepository(session)
+            return await turns.list((await turns.get(id)).session_id)
+
+    async def abandon(self, id: Id, error: str, at: datetime) -> AgentTurn | None:
+        async with AsyncSession(self.engine, expire_on_commit=False) as session, session.begin():
+            turns = SqlAgentTurnRepository(session)
+            if await turns.abandon(id, error, at):
+                return await turns.get(id)
+            await turns.get(id)
+            return None

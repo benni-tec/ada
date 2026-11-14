@@ -43,9 +43,17 @@ class AgentTurnService(Protocol):
         person did, it is only added to the record."""
         ...
 
-    async def queued_behind(self, id: Id) -> bool:
-        """True while the turn is queued and an earlier turn of its session has not
-        finished: the session's turns run one after the other."""
+    async def wait(self, id: Id) -> None:
+        """Return once the earlier turns of the turn's session have ended, or at once when
+        the turn is no longer queued: the session's turns run one after the other. A turn
+        ahead that holds the session up for longer than a turn may run is failed first, so
+        two turns of a session never run at once."""
+        ...
+
+    async def ended(self, id: Id) -> None:
+        """Announce a turn that ended without `run` ending it (it could not be queued, or
+        it was failed after its worker stopped): that it finished, and for a research turn
+        what `run` would report into the parent session."""
         ...
 
     async def turns(self, session_id: Id) -> Sequence[AgentTurn]:
@@ -140,6 +148,7 @@ class ResearchService(Protocol):
         ...
 
     async def use_web_call(self, session_id: Id) -> None:
-        """Count a paid web call made for the session. A research session past its cap
-        raises Invalid, telling the agent to report back; other sessions are not capped."""
+        """Count a paid web call about to be made for the session, committed at once, so a
+        call that then fails counts too. A research session past its cap raises Invalid,
+        telling the agent to report back; other sessions are not capped."""
         ...

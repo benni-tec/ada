@@ -119,3 +119,30 @@ class TurnProgress(Protocol):
         error: str | None,
         at: datetime,
     ) -> AgentTurn: ...
+
+    async def session_turns(self, id: Id) -> Sequence[AgentTurn]:
+        """The turns of turn `id`'s session, oldest first: read afresh at every call, by a
+        turn waiting for the ones before it, without holding a connection meanwhile."""
+        ...
+
+    async def abandon(self, id: Id, error: str, at: datetime) -> AgentTurn | None:
+        """End a turn that is still queued or running as failed, and flag it for cancelling,
+        so a worker that still runs it after all stops at its next step. None when it has
+        ended meanwhile."""
+        ...
+
+
+class ResearchCalls(Protocol):
+    """The paid web calls of research sessions, each counted in a short transaction of its
+    own, like TurnProgress.
+
+    A web tool counts its call before it calls the provider. Counted in the tool call's own
+    transaction, a call that fails or times out would roll its count back and escape the
+    cap, and the session's row would stay locked, its connection held, for as long as the
+    provider takes."""
+
+    async def use(self, session_id: Id, cap: int) -> bool:
+        """Count one call against a research session, committed when this returns. False,
+        counting nothing, when it has made `cap` calls already. Other sessions are not
+        capped or counted: True. NotFound for an unknown session."""
+        ...

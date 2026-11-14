@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import text, update
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from ada.adapters.db.support import (
@@ -39,6 +39,7 @@ from ada.core.models.sources import (
     Provenance,
 )
 from ada.core.models.widgets import Widget
+from ada.core.ports.agents import ResearchCalls
 from ada.core.ports.repositories import (
     DataSourceRepository,
     ProjectRepository,
@@ -254,21 +255,6 @@ class SqlSessionRepository(SessionRepository):
         )
         return _session(row)
 
-    async def use_web_call(self, id: Id, cap: int) -> bool:
-        # One statement, so concurrent calls cannot both take the last one. The table, not
-        # the mapped class: a counter does not change the session's revision.
-        table = SessionRow.__table__
-        counted = await self.session.execute(
-            update(table)
-            .where(table.c.id == id, table.c.web_calls < cap)
-            .values(web_calls=table.c.web_calls + 1)
-            .returning(table.c.id)
-        )
-        if counted.first() is not None:
-            return True
-        await require(self.session, SessionRow, id, "session")
-        return False
-
     async def add_entry(self, entry: SessionEntry) -> None:
         await require(self.session, SessionRow, entry.session_id, "session")
         row = SessionEntryRow(
@@ -349,6 +335,35 @@ class SqlSourceLocks(SourceLocks):
         # randomness enough to keep two sources apart in practice.
         key = int.from_bytes(id.bytes[:8], "big", signed=True)
         await self.session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+
+
+class SqlResearchCalls(ResearchCalls):
+    """Counts on a connection of its own, committed at once (see the port)."""
+
+    def __init__(self, engine: AsyncEngine) -> None:
+        self.engine = engine
+
+    async def use(self, session_id: Id, cap: int) -> bool:
+        # One statement, so concurrent calls cannot both take the last one. The table, not
+        # the mapped class: a counter does not change the session's revision.
+        table = SessionRow.__table__
+        async with AsyncSession(self.engine) as session, session.begin():
+            counted = await session.execute(
+                update(table)
+                .where(
+                    table.c.id == session_id,
+                    table.c.agent == SessionAgent.RESEARCH.value,
+                    table.c.web_calls < cap,
+                )
+                .values(web_calls=table.c.web_calls + 1)
+                .returning(table.c.id)
+            )
+            if counted.first() is not None:
+                return True
+            agent = await session.scalar(select(table.c.agent).where(table.c.id == session_id))
+        if agent is None:
+            raise NotFound("session", session_id)
+        return agent != SessionAgent.RESEARCH.value
 
 
 class SqlSourceCheckLog(SourceCheckLog):

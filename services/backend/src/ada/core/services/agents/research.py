@@ -11,8 +11,8 @@ from ada.core.models.actors import Actor
 from ada.core.models.agents import ResearchLimits
 from ada.core.models.base import Id
 from ada.core.models.errors import Invalid
-from ada.core.models.sessions import Session, SessionAgent, SessionEntry
-from ada.core.ports.agents import LanguageModels
+from ada.core.models.sessions import Session, SessionEntry
+from ada.core.ports.agents import LanguageModels, ResearchCalls
 from ada.core.ports.repositories import DataSourceRepository, SessionRepository
 from ada.core.services.ports.agents import AgentTurnService, ResearchService
 from ada.core.services.ports.sessions import SessionService
@@ -26,6 +26,7 @@ class Research(ResearchService):
         sessions: SessionRepository,
         data_sources: DataSourceRepository,
         language_models: LanguageModels,
+        calls: ResearchCalls,
         limits: ResearchLimits,
     ) -> None:
         self.turns = turns
@@ -33,6 +34,7 @@ class Research(ResearchService):
         self.sessions = sessions
         self.data_sources = data_sources
         self.language_models = language_models
+        self.calls = calls
         self.limits = limits
 
     async def delegate(
@@ -74,11 +76,9 @@ class Research(ResearchService):
         return posted.entry
 
     async def use_web_call(self, session_id: Id) -> None:
-        session = await self.sessions.get(session_id)
-        if session.agent is not SessionAgent.RESEARCH:
-            return
+        # Not through the call's own unit of work: see ResearchCalls.
         cap = self.limits.web_calls
-        if not await self.sessions.use_web_call(session_id, cap):
+        if not await self.calls.use(session_id, cap):
             raise Invalid(
                 f"This research session has used its {cap} web calls; "
                 "call report_back with what you have"

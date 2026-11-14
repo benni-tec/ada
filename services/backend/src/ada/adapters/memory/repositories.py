@@ -25,10 +25,10 @@ from ada.core.models.operators import Operator, OperatorId, OperatorKind
 from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
-from ada.core.models.sessions import Session, SessionEntry
+from ada.core.models.sessions import Session, SessionAgent, SessionEntry
 from ada.core.models.sources import DataSource
 from ada.core.models.widgets import Widget
-from ada.core.ports.agents import TurnProgress
+from ada.core.ports.agents import ResearchCalls, TurnProgress
 from ada.core.ports.repositories import (
     AgentSettingsRepository,
     AgentTurnRepository,
@@ -200,14 +200,6 @@ class MemorySessionRepository(SessionRepository):
     async def add_entry(self, entry: SessionEntry) -> None:
         await self.get(entry.session_id)
         self.store.session_entries.append(entry)
-
-    async def use_web_call(self, id: Id, cap: int) -> bool:
-        await self.get(id)
-        used = self.store.web_calls.get(id, 0)
-        if used >= cap:
-            return False
-        self.store.web_calls[id] = used + 1
-        return True
 
     async def entries(self, session_id: Id) -> Sequence[SessionEntry]:
         return [e for e in self.store.session_entries if e.session_id == session_id]
@@ -518,6 +510,21 @@ class MemoryAgentTurnRepository(AgentTurnRepository):
         return id in self.store.cancel_requests
 
 
+class MemoryResearchCalls(ResearchCalls):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def use(self, session_id: Id, cap: int) -> bool:
+        session = await MemorySessionRepository(self.store).get(session_id)
+        if session.agent is not SessionAgent.RESEARCH:
+            return True
+        used = self.store.web_calls.get(session_id, 0)
+        if used >= cap:
+            return False
+        self.store.web_calls[session_id] = used + 1
+        return True
+
+
 class MemoryTurnProgress(TurnProgress):
     """Memory has no transactions; progress goes straight to the store."""
 
@@ -541,6 +548,18 @@ class MemoryTurnProgress(TurnProgress):
         at: datetime,
     ) -> AgentTurn:
         return await MemoryAgentTurnRepository(self.store).finish(id, status, parts, error, at)
+
+    async def session_turns(self, id: Id) -> Sequence[AgentTurn]:
+        turns = MemoryAgentTurnRepository(self.store)
+        return await turns.list((await turns.get(id)).session_id)
+
+    async def abandon(self, id: Id, error: str, at: datetime) -> AgentTurn | None:
+        turns = MemoryAgentTurnRepository(self.store)
+        turn = await turns.get(id)
+        if turn.status not in (TurnStatus.QUEUED, TurnStatus.RUNNING):
+            return None
+        self.store.cancel_requests.add(id)
+        return await turns.finish(id, TurnStatus.FAILED, turn.parts, error, at)
 
 
 class MemoryLlmProviderRepository(LlmProviderRepository):

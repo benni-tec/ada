@@ -19,6 +19,7 @@ import factories
 from ada.adapters.db.agent_repositories import SqlTurnProgress
 from ada.adapters.db.base import Base
 from ada.adapters.db.migrate import _config, migrate
+from ada.adapters.db.workspace_repositories import SqlResearchCalls
 from ada.composition import create_container
 from ada.core.models.agents import (
     AgentTurn,
@@ -339,11 +340,6 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         assert await repos.data_sources.list(world.project.id) == [world.source, source]
         assert await repos.sessions.get(session.id) == session
         assert await repos.sessions.get(child.id) == child
-        assert [await repos.sessions.use_web_call(child.id, 2) for _ in range(3)] == [
-            True,
-            True,
-            False,
-        ]
         # A monitor is written outside the revision; its secret never leaves the repository.
         await repos.data_sources.set_monitor(source.id, "mon_1", "sealed")
         watched = await repos.data_sources.get(source.id)
@@ -359,6 +355,17 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
             session.model_copy(update={"panel_dashboard_id": dashboard.id}), 1
         )
     assert (updated.panel_dashboard_id, updated.revision) == (dashboard.id, 2)
+    # A research session's web calls, each committed at once; other sessions are not counted.
+    calls = SqlResearchCalls(engine)
+    assert [await calls.use(child.id, 2) for _ in range(3)] == [True, True, False]
+    assert await calls.use(session.id, 2) is True
+    with pytest.raises(NotFound):
+        await calls.use(uuid7(), 2)
+    counted = "SELECT web_calls FROM sessions WHERE id = :id"
+    assert (
+        await scalar(engine, counted, id=child.id),
+        await scalar(engine, counted, id=session.id),
+    ) == (2, 0)
 
 
 async def test_reporting_records_round_trip(engine: AsyncEngine) -> None:
@@ -743,6 +750,32 @@ async def test_cancelling_ends_a_queued_turn_and_flags_a_running_one(engine: Asy
         assert await repos.agent_turns.start(queued.id) is False
         assert flagged.status is TurnStatus.RUNNING
         assert await repos.agent_turns.cancel_requested(running.id) is True
+
+
+async def test_a_turn_left_running_is_failed_once_on_its_own(engine: AsyncEngine) -> None:
+    async with unit_of_work(engine) as repos:
+        turn = await stored_turn(repos)
+    progress = SqlTurnProgress(engine)
+    assert await progress.start(turn.id) is True
+
+    # Read and written while the waiting turn's own unit of work stays open.
+    async with unit_of_work(engine) as waiting:
+        await waiting.agent_turns.get(turn.id)
+        seen = await progress.session_turns(turn.id)
+        failed = await progress.abandon(turn.id, "gone", factories.NOW)
+        again = await progress.abandon(turn.id, "again", factories.NOW)
+        assert [t.status for t in await progress.session_turns(turn.id)] == [TurnStatus.FAILED]
+
+    async with unit_of_work(engine) as repos:
+        flagged = await repos.agent_turns.cancel_requested(turn.id)
+    assert [(t.id, t.status) for t in seen] == [(turn.id, TurnStatus.RUNNING)]
+    assert failed is not None
+    assert (failed.status, failed.error, failed.finished_at) == (
+        TurnStatus.FAILED,
+        "gone",
+        factories.NOW,
+    )
+    assert (again, flagged) == (None, True)
 
 
 async def test_a_running_turn_commits_its_progress_on_its_own(engine: AsyncEngine) -> None:

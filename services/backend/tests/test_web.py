@@ -1,22 +1,34 @@
 """The web tools against recorded Exa and Context.dev answers (tests/recordings/web.json)."""
 
 import json
+from collections.abc import Sequence
+from pathlib import Path
 from uuid import uuid7
 
 import httpx
 import pytest
+from dishka.integrations.fastapi import FastapiProvider
+from fastmcp import Client
 from pydantic import SecretStr
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ada.adapters.sources.http import create_client
 from ada.adapters.web.context import ContextPages
 from ada.adapters.web.exa import DATA_DOMAINS, ExaSearch
+from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.web import SearchHit, SearchScope
+from ada.core.services.ports.projects import ProjectService
+from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.mcp.agent import InProcessToolbox
+from ada.entrypoints.mcp.server import create_mcp
 from api_support import FakeWeb, call, mcp_client
+from conftest import settings_in
 from fakes import FakePageReader, FakeWebSearch, WebReplay
+from memory import MemoryBackground
 
 pytestmark = pytest.mark.anyio
 KEY = SecretStr("test-key")
@@ -177,3 +189,58 @@ async def test_system_status_reports_web_configuration(unreachable_settings: Set
     assert await flags(keyed) == [True, True, False]
     full = keyed.model_copy(update={"ada_public_url": "https://ada.example"})
     assert await flags(full) == [True, True, True]
+
+
+class TimedOutSearch(FakeWebSearch):
+    """A provider that times out, after noting how many database connections were held
+    while it was called."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.engine: AsyncEngine | None = None
+        self.held: list[int] = []
+
+    async def search(self, query: str, scope: SearchScope, limit: int) -> Sequence[SearchHit]:
+        await super().search(query, scope, limit)
+        assert self.engine is not None
+        self.held.append(self.engine.pool.checkedout())
+        raise Unavailable("Exa did not answer in time")
+
+
+async def test_failed_web_calls_count_against_the_research_cap(
+    migrated_database_url: str, tmp_path: Path
+) -> None:
+    search = TimedOutSearch()
+    settings = settings_in(tmp_path, migrated_database_url).model_copy(
+        update={"research_web_calls": 2}
+    )
+    container = create_container(
+        settings, FastapiProvider(), MemoryBackground(), FakeWeb(search, FakePageReader())
+    )
+    try:
+        search.engine = await container.get(AsyncEngine)
+        async with container() as request:
+            project = await (await request.get(ProjectService)).create("P")
+            sessions = await request.get(SessionService)
+            parent = await sessions.create(project.id, "S")
+            child = await sessions.create_research(
+                parent.id, "Survival", Actor(kind=ActorKind.USER, name="web")
+            )
+        arguments = {"query": "survival", "session_id": str(child.id)}
+        async with Client(create_mcp(container)) as client:
+            results = [
+                await client.call_tool("search_web", arguments, raise_on_error=False)
+                for _ in range(3)
+            ]
+        async with search.engine.connect() as connection:
+            counted = await connection.scalar(
+                text("SELECT web_calls FROM sessions WHERE id = :id"), {"id": child.id}
+            )
+    finally:
+        await container.close()
+
+    # Each attempt is counted and committed before the provider is called, so a call that
+    # fails still counts, and no connection or row lock is held while the provider works.
+    assert (len(search.searches), search.held, counted) == (2, [0, 0], 2)
+    assert all(result.is_error for result in results)
+    assert "used its 2 web calls" in results[2].content[0].text  # type: ignore[union-attr]

@@ -14,7 +14,8 @@ PAGE_CHARACTERS = 20_000
 
 def register(mcp: FastMCP, inject: Inject) -> None:
     # The in-platform toolbox fills `session_id`, so a research session's calls are
-    # counted against its cap. A call that fails is not counted: its transaction rolls back.
+    # counted against its cap: before the provider is called, and committed at once, so a
+    # call that fails or times out counts too.
     @mcp.tool
     @inject
     async def search_web(
