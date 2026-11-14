@@ -31,7 +31,7 @@ const below = (id: string, v: number): FormulaNode => ({
   args: [value(`${id}-v`), constant(`${id}-c`, v)],
 })
 
-test('describes a condition as the server does', () => {
+test('describes a condition as the server does, and reads the node a server error names', () => {
   const drop: FormulaNode = {
     id: 'drop',
     kind: 'compare',
@@ -54,15 +54,13 @@ test('describes a condition as the server does', () => {
   expect(describe({ id: 'n', kind: 'not', args: [below('low', 80)] })).toBe('not (value < 80)')
   expect(describe({ id: 'd', kind: 'constant', value: '2024-01-01', type: 'date' })).toBe('date 2024-01-01')
   expect(describe({ id: 't', kind: 'constant', value: 'north' })).toBe('"north"')
-})
 
-test('reads the node a server error names', () => {
   expect(nodeIdOf("Formula node 'n3': 'x' is not a column")).toBe('n3')
   expect(nodeIdOf('The key column x is not a column')).toBeNull()
   expect(nodeIdOf(null)).toBeNull()
 })
 
-test('new ids are unique in the tree', () => {
+test('operands of and/or are added with new ids, reordered and removed', () => {
   const next = idFactory({ id: 'n1', kind: 'and', args: [below('n2', 1), below('n4', 2)] })
   expect([next(), next()]).toEqual(['n3', 'n5'])
   expect(blank('compare', columns, idFactory(null), 'root')).toEqual({
@@ -74,9 +72,7 @@ test('new ids are unique in the tree', () => {
       { id: 'n2', kind: 'constant', value: 0 },
     ],
   })
-})
 
-test('operands of and/or are added, reordered and removed', () => {
   let tree: FormulaNode = { id: 'all', kind: 'and', args: [below('a', 1), below('b', 2)] }
   tree = addOperand(tree, 'all', columns)
   expect(tree.args?.map((arg) => arg.kind)).toEqual(['compare', 'compare', 'compare'])
@@ -94,7 +90,7 @@ test('operands of and/or are added, reordered and removed', () => {
   expect(remove(tree, 'a')).toEqual(below('b', 2))
 })
 
-test('nodes are nested in a new node and unwrapped again', () => {
+test('nodes are nested and unwrapped again; changing a kind keeps the id and related operands', () => {
   const low = below('low', 80)
   const negated = wrap(low, 'low', 'not', columns)
   expect(negated.kind).toBe('not')
@@ -107,9 +103,7 @@ test('nodes are nested in a new node and unwrapped again', () => {
 
   const previous = wrap(low, 'low-v', 'previous', columns)
   expect(describe(previous)).toBe('previous(value, 1 period) < 80')
-})
 
-test('changing a kind keeps the id and related operands', () => {
   const tree: FormulaNode = { id: 'all', kind: 'and', args: [below('a', 1), below('b', 2), below('c', 3)] }
   const any = changeKind(tree, 'all', 'or', columns)
   expect(any.id).toBe('all')

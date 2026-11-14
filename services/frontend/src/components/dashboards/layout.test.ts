@@ -11,12 +11,10 @@ const slot = (name: string, x: number, y: number, w: number, h: number): Dashboa
   layout: { x, y, w, h },
 })
 
-test('a move stays on the grid', () => {
+test('a move stays on the grid; a resize keeps to the type’s minimum and the grid’s right edge', () => {
   expect(moved({ x: 4, y: 2, w: 6, h: 4 }, 5, -5)).toEqual({ x: 6, y: 0, w: 6, h: 4 })
   expect(moved({ x: 4, y: 2, w: 6, h: 4 }, -9, 1)).toEqual({ x: 0, y: 3, w: 6, h: 4 })
-})
 
-test('a resize keeps to the type’s minimum and the grid’s right edge', () => {
   expect(minimumOf('value')).toEqual({ w: 2, h: 2 })
   expect(minimumOf('table')).toEqual({ w: 3, h: 3 })
   expect(resized({ x: 8, y: 0, w: 4, h: 4 }, 3, -9, 'value')).toEqual({ x: 8, y: 0, w: 4, h: 2 })
