@@ -524,3 +524,25 @@ test('in a research session the research model answers unless another is picked'
   await send('Now the cancer ones')
   expect(sent[1]).toMatchObject({ model: 'gemini/flash' })
 })
+
+test('a research model that cannot run gives way to the session agent’s, which the message names', async () => {
+  const sent: Record<string, unknown>[] = []
+  serveSession({
+    'GET /api/sessions/s1': session({ agent: 'research' }),
+    'GET /api/llm/models': models({ research_agent: 'mistral/large' }),
+    'POST /api/sessions/s1/messages': (body: Record<string, unknown>) => {
+      sent.push(body)
+      return json({ entry: question, turn: turn({ id: 't2', status: 'queued' }) }, 201)
+    },
+    'GET /api/turns/t2': turn({ id: 't2', status: 'queued' }),
+  })
+  renderAt('/projects/p1/sessions/s1')
+  await items()
+
+  expect(await within(composer()).findByRole('button', { name: 'Model: gemini/flash' })).toBeInTheDocument()
+  expect(within(composer()).queryByRole('note')).not.toBeInTheDocument()
+  fireEvent.change(within(composer()).getByLabelText('Message'), { target: { value: 'Look for registries' } })
+  fireEvent.click(within(composer()).getByRole('button', { name: 'Send' }))
+  await waitFor(() => expect(sent).toHaveLength(1))
+  expect(sent[0]).toMatchObject({ model: 'gemini/flash' })
+})

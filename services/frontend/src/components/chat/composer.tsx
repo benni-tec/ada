@@ -27,11 +27,14 @@ import type { ChatDraft } from './chat-draft'
 import { DraftChips } from './context-chips'
 import { ModelPicker } from './model-picker'
 
-/** Whether an agent will answer: only when the default model (`answering`) can run. */
-function agentOf(models: LlmModels | undefined, answering: string | null | undefined): 'yes' | 'no' | 'unknown' {
+/** Whether an agent will answer: only when the model a message goes to can run. */
+function agentOf(models: LlmModels | undefined, model: string | null | undefined): 'yes' | 'no' | 'unknown' {
   if (!models) return 'unknown'
-  const agent = models.models.find((model) => model.id === answering)
-  return agent?.available ? 'yes' : 'no'
+  return usable(models, model) ? 'yes' : 'no'
+}
+
+function usable(models: LlmModels | undefined, id: string | null | undefined): boolean {
+  return models?.models.some((model) => model.id === id && model.available) ?? false
 }
 
 /**
@@ -70,8 +73,10 @@ export function Composer({
   // Who answers a message that names no model: in a research session, the researcher.
   const isResearch = session.data?.agent === 'research'
   const answering = isResearch ? researcher : models.data?.session_agent
-  const model = picked ?? answering ?? null
-  const agent = unanswered ? 'no' : agentOf(models.data, answering)
+  // A research model that cannot run gives way to the session agent's, named in the message.
+  const fallback = usable(models.data, answering) ? answering : (models.data?.session_agent ?? answering)
+  const model = picked ?? fallback ?? null
+  const agent = unanswered ? 'no' : agentOf(models.data, model)
 
   // A chip added from elsewhere on the page: the person says next what they want.
   useEffect(() => {
@@ -83,8 +88,8 @@ export function Composer({
       postMessage(sessionId, {
         text: message,
         context: draft.chips.flatMap((chip) => chip.context),
-        // A research session names no model unless the person picked one: the backend uses the researcher.
-        ...(picked ?? (isResearch ? null : model) ? { model: picked ?? model } : {}),
+        // A research session names no model when the researcher answers: the backend uses it.
+        ...(isResearch && model === answering ? {} : model ? { model } : {}),
       }),
     onSuccess: async ({ turn }) => {
       setText('')
@@ -176,7 +181,7 @@ export function Composer({
           />
           <div className="flex items-center gap-1">
             {tools}
-            {models.data && model && agent === 'yes' && (
+            {models.data && model && models.data.models.some((option) => option.available) && (
               <ModelPicker models={models.data} value={model} defaultId={answering} onChange={setPicked} />
             )}
             <span className="flex-1" />
