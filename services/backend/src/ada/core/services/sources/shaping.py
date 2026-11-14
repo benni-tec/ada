@@ -13,15 +13,25 @@ These keys of `DataSource.options` control it; the readers ignore them.
     record.
 `fields` (JSON)
     The columns to keep, as {column: path} where the path is a dot path inside a record,
-    or {column: {"path": path, "type": "integer" | "number" | "text" | "boolean"}} to also
-    convert the value, e.g. a number sent as a string. Without it every record is
-    flattened: nested objects become columns joined with "_", e.g. survival_value.
+    or {column: {"path": path, "type": "integer" | "number" | "text" | "boolean" |
+    "json"}} to also convert the value, e.g. a number sent as a string. "json" keeps a
+    nested value, such as a GeoJSON geometry, as its JSON text in one column. Without
+    `fields` every record is flattened: nested objects become columns joined with "_",
+    e.g. survival_value.
 `csv` (CSV)
     {"delimiter": ",", "encoding": "utf-8", "skip_rows": 0, "columns": [...],
     "null_values": [...]}, all optional. `skip_rows` drops lines before the header,
     `columns` replaces the header's names, and cells equal to one of `null_values` (e.g.
-    ".." in PxWeb tables) become empty. The output is UTF-8 with commas. Without `csv` the
-    bytes are kept as they came.
+    ".." in PxWeb tables) become empty. The output is UTF-8 with commas. Without `csv` (and
+    without `period`) the bytes are kept as they came.
+`period` (JSON and CSV)
+    {"column": "year", "start": "period_start", "end": "period_end", "grain": "year"}:
+    adds the period each row describes as two date columns, the first and the last day,
+    read from the source's own way of writing it in `column`: a year (2024 or "2024"), a
+    window ("2020-2024"), a quarter ("2024Q1"), a month ("2024M03") or a date, which
+    `grain` widens to the year, quarter or month around it
+    (ada.core.services.schema.time.parse_period). `start` and `end` default to
+    period_start and period_end; declare them as the time role. Applied after `fields`.
 
 JSON output is always an array of flat records that all have the same keys in the same
 order, missing ones as null.
@@ -30,16 +40,21 @@ order, missing ones as null.
 import csv
 import io
 import json
+from collections.abc import Sequence
+from datetime import date
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, model_validator
 
 from ada.core.models.analysis import FetchedData
 from ada.core.models.base import DomainModel, JsonObject
 from ada.core.models.errors import Invalid
+from ada.core.models.schema import TimeRole
 from ada.core.models.sources import DataFormat
+from ada.core.models.time import Grain, Interval
+from ada.core.services.schema.time import parse_period
 
-type FieldType = Literal["integer", "number", "text", "boolean"]
+type FieldType = Literal["integer", "number", "text", "boolean", "json"]
 
 
 class FieldOption(DomainModel):
@@ -57,10 +72,24 @@ class CsvOptions(DomainModel):
     null_values: tuple[str, ...] = ()
 
 
+class PeriodOption(DomainModel):
+    column: str = Field(min_length=1)
+    start: str = Field(default="period_start", min_length=1)
+    end: str = Field(default="period_end", min_length=1)
+    grain: Grain | None = None
+
+    @model_validator(mode="after")
+    def _distinct(self) -> PeriodOption:
+        if self.start == self.end:
+            raise ValueError("the period's start and end need two different columns")
+        return self
+
+
 class ShapeOptions(DomainModel):
     rows: str | None = None
     fields: dict[str, str | FieldOption] | None = None
     csv: CsvOptions | None = None
+    period: PeriodOption | None = None
 
 
 def shape_options(options: JsonObject) -> ShapeOptions:
@@ -80,11 +109,66 @@ def shape(data: FetchedData, options: JsonObject) -> FetchedData:
     match data.format:
         case DataFormat.JSON:
             content = _shape_json(data.content, parsed)
-        case DataFormat.CSV if parsed.csv is not None:
-            content = _shape_csv(data.content, parsed.csv)
+        case DataFormat.CSV if parsed.csv is not None or parsed.period is not None:
+            content = _shape_csv(data.content, parsed.csv or CsvOptions(), parsed.period)
         case _:
             return data
     return data.model_copy(update={"content": content})
+
+
+def split_periods(
+    data: FetchedData, time: TimeRole, wanted: Sequence[Interval]
+) -> dict[Interval, FetchedData]:
+    """Shaped data cut into one table per period, by the time role's columns: what a
+    source answered for several periods at once, stored one snapshot per period. Periods
+    without rows are left out. Raises Invalid for a row of a period that was not asked
+    for, or without a period: such a source cannot fetch by period."""
+    wanted_set = set(wanted)
+    match data.format:
+        case DataFormat.JSON:
+            records = json.loads(data.content)
+            parts: dict[Interval, list[Any]] = {}
+            for record in records:
+                period = _row_period(record.get(time.start), record.get(time.end), wanted_set)
+                parts.setdefault(period, []).append(record)
+            return {
+                period: data.model_copy(update={"content": _json(rows)})
+                for period, rows in parts.items()
+            }
+        case DataFormat.CSV:
+            header, *body = list(csv.reader(io.StringIO(data.content.decode())))
+            if time.start not in header or time.end not in header:
+                raise Invalid(f"The data has no columns {time.start!r} and {time.end!r}")
+            start, end = header.index(time.start), header.index(time.end)
+            groups: dict[Interval, list[list[str]]] = {}
+            for row in body:
+                period = _row_period(row[start], row[end], wanted_set)
+                groups.setdefault(period, []).append(row)
+            return {
+                period: data.model_copy(update={"content": _csv([header, *rows])})
+                for period, rows in groups.items()
+            }
+        case _:
+            raise Invalid(f"Splitting {data.format.value} data by period is not supported")
+
+
+def _row_period(start: Any, end: Any, wanted: set[Interval]) -> Interval:
+    try:
+        period = Interval(start=_day(start), end=_day(end))
+    except TypeError, ValueError:
+        raise Invalid(f"A row has no period: {start!r} to {end!r}") from None
+    if period not in wanted:
+        raise Invalid(
+            f"The source answered for {period.start} to {period.end}, which was not asked "
+            "for; a source that fetches by period must answer per requested period"
+        )
+    return period
+
+
+def _day(value: Any) -> date:
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(str(value)[:10])
 
 
 def _shape_json(content: bytes, options: ShapeOptions) -> bytes:
@@ -102,10 +186,38 @@ def _shape_json(content: bytes, options: ShapeOptions) -> bytes:
         records = [_pick(row, options.fields) for row in found]
     else:
         records = [_flatten(row) for row in found]
+    if options.period is not None:
+        records = [_with_period(record, options.period) for record in records]
     # One key order for every record, so the columns do not depend on which row came first.
     columns = list(dict.fromkeys(key for record in records for key in record))
     table = [{column: record.get(column) for column in columns} for record in records]
+    return _json(table)
+
+
+def _json(table: list[Any]) -> bytes:
     return json.dumps(table, ensure_ascii=False, separators=(",", ":")).encode()
+
+
+def _csv(rows: list[list[str]]) -> bytes:
+    out = io.StringIO()
+    csv.writer(out, lineterminator="\n").writerows(rows)
+    return out.getvalue().encode()
+
+
+def _with_period(record: dict[str, Any], option: PeriodOption) -> dict[str, Any]:
+    start, end = _period(record.get(option.column), option)
+    return record | {option.start: start, option.end: end}
+
+
+def _period(value: Any, option: PeriodOption) -> tuple[str | None, str | None]:
+    """The period's first and last day as ISO dates, which DuckDB reads as dates."""
+    try:
+        period = parse_period(value, option.grain)
+    except ValueError as error:
+        raise Invalid(f"Column {option.column}: {error}") from None
+    if period is None:
+        return None, None
+    return period.start.isoformat(), period.end.isoformat()
 
 
 def _at(document: Any, path: str) -> Any:
@@ -164,6 +276,8 @@ def _convert(value: Any, kind: FieldType, column: str) -> Any:
                 return float(value)
             case "text":
                 return str(value)
+            case "json":
+                return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
             case "boolean":
                 if isinstance(value, bool):
                     return value
@@ -176,7 +290,7 @@ def _convert(value: Any, kind: FieldType, column: str) -> Any:
         raise Invalid(f"Column {column}: cannot read {value!r} as {kind}: {error}") from None
 
 
-def _shape_csv(content: bytes, options: CsvOptions) -> bytes:
+def _shape_csv(content: bytes, options: CsvOptions, period: PeriodOption | None) -> bytes:
     try:
         text = content.removeprefix(b"\xef\xbb\xbf").decode(options.encoding)
     except (LookupError, UnicodeDecodeError) as error:
@@ -193,12 +307,18 @@ def _shape_csv(content: bytes, options: CsvOptions) -> bytes:
                 f"but the CSV has {len(header)}: {header}"
             )
         header = list(options.columns)
+    if period is not None and period.column not in header:
+        raise Invalid(f"The period option names {period.column!r}, which is not a column")
     nulls = set(options.null_values)
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
-    writer.writerow(header)
+    writer.writerow(header + ([period.start, period.end] if period else []))
     for number, row in enumerate(body, start=2 + options.skip_rows):
         if len(row) != len(header):
             raise Invalid(f"CSV record {number} has {len(row)} cells, the header {len(header)}")
-        writer.writerow("" if cell in nulls else cell for cell in row)
+        cells = ["" if cell in nulls else cell for cell in row]
+        if period is not None:
+            start, end = _period(cells[header.index(period.column)], period)
+            cells += [start or "", end or ""]
+        writer.writerow(cells)
     return out.getvalue().encode()

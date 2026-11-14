@@ -30,6 +30,34 @@
       "status": 200,
       "content_type": "application/json",
       "body": "nordcan-lung-survival.json"
+    },
+    {
+      "method": "GET",
+      "url": "https://sotkanet.fi/rest/1.1/json?indicator=3621&years=2022&genders=total",
+      "status": 200,
+      "content_type": "application/json;charset=UTF-8",
+      "body": "sotkanet-3621-2022.json"
+    },
+    {
+      "method": "GET",
+      "url": "https://sotkanet.fi/rest/1.1/json?indicator=3621&years=2024&genders=total",
+      "status": 200,
+      "content_type": "application/json;charset=UTF-8",
+      "body": "sotkanet-3621-2024.json"
+    },
+    {
+      "method": "GET",
+      "url": "https://sotkanet.fi/rest/1.1/regions",
+      "status": 200,
+      "content_type": "application/json;charset=UTF-8",
+      "body": "sotkanet-regions.json"
+    },
+    {
+      "method": "GET",
+      "url": "https://geo.stat.fi/geoserver/tilastointialueet/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=tilastointialueet:hyvinvointialue4500k&outputFormat=application/json&srsName=EPSG:3067",
+      "status": 200,
+      "content_type": "application/json;charset=UTF-8",
+      "body": "statfin-wellbeing-counties.json"
     }
   ]
 }

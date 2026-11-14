@@ -24,11 +24,12 @@ from ada.core.services.pipelines.fusion import QueryNode, compose
 from ada.core.services.pipelines.schemas import (
     Columns,
     check_fits,
-    check_roles,
     check_unique,
 )
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.sources import SourceService
+from ada.core.services.schema.intervals import check_bounds
+from ada.core.services.schema.roles import check_compatible, check_roles
 
 
 class Pipelines(PipelineService):
@@ -96,6 +97,8 @@ class Pipelines(PipelineService):
         declared = roles is not None and roles != Roles()
         if roles is not None:
             check_roles(roles, columns)
+            # Bounds do not survive an aggregation (schema/intervals.py).
+            await check_bounds(self.store, sql, roles)
         operator = Operator(
             id=id,
             project_id=project_id,
@@ -128,6 +131,7 @@ class Pipelines(PipelineService):
         check_roles(output.roles, output.columns)
         fallback = await self._upstream(project_id, default)
         check_fits(output, await self.columns.of(fallback), f"The default {default}")
+        check_compatible(output.roles, fallback.output.roles, f"The default {default}")
         operator = Operator(
             id=id,
             project_id=project_id,

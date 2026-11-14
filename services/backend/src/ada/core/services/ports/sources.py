@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from ada.core.models.base import Id, JsonObject
+from ada.core.models.runs import Snapshot
 from ada.core.models.schema import Schema
 from ada.core.models.sources import (
     AccessKind,
@@ -10,6 +11,7 @@ from ada.core.models.sources import (
     FreshnessPolicy,
     RefreshResult,
 )
+from ada.core.models.time import TimeRange
 
 
 class SourceService(Protocol):
@@ -51,3 +53,19 @@ class SourceService(Protocol):
     async def due(self) -> Sequence[DataSource]:
         """The sources whose freshness policy says they should be refreshed now."""
         ...
+
+    async def refresh_range(self, id: Id, time_range: TimeRange) -> Snapshot | None:
+        """The source's data for a time range, as one snapshot of its source operator: the
+        union of its period snapshots, after fetching the requested periods that are
+        missing or stale by the freshness policy. Each period is stored as a snapshot of
+        its own, keyed by the period, so a later range reuses it.
+
+        None when the source cannot fetch by period (its options declare no pushdown) or
+        the range cannot be split into periods (it has no start). The caller then reads
+        the whole source, as `refresh` keeps it, and filters its rows by the time role.
+
+        When fetching fails, periods stored before are served and the failure is recorded
+        as `refresh` records it; a period that was never stored makes it raise."""
+        # A default, so implementations from before pushdown keep working: they cannot
+        # filter, and the caller falls back to the whole source.
+        return None

@@ -3,7 +3,8 @@
 A plan is a small graph of nodes. A stored snapshot is a leaf the query reads; a
 pass-through transform is a step over the nodes it names as input_0, input_1, ...; a
 stand-in is a leaf with known columns and no rows, used to describe a query before any
-data exists. `compose` writes the whole graph as one SQL statement:
+data exists; a period filter keeps the rows of a source whose period is in the run's time
+range. `compose` writes the whole graph as one SQL statement:
 
     WITH __ada_n0 AS (SELECT * FROM __ada_s0),
          __ada_n1 AS (
@@ -27,7 +28,8 @@ from dataclasses import dataclass
 from ada.core.models.analysis import Query
 from ada.core.models.operators import OperatorId
 from ada.core.models.runs import Snapshot
-from ada.core.models.schema import Column, ColumnType
+from ada.core.models.schema import Column, ColumnType, TimeRole
+from ada.core.models.time import TimeRange
 
 # The SQL type a stand-in column gets for each platform type. Describing over these gives
 # back the same platform types, so derived schemas stay stable along a chain.
@@ -65,7 +67,17 @@ class QueryNode:
     inputs: tuple[Node, ...]
 
 
-type Node = SnapshotNode | StandInNode | QueryNode
+@dataclass(frozen=True, eq=False)
+class PeriodFilterNode:
+    """The rows of `input` whose period overlaps the range: how a run applies its time
+    range to a source that could not fetch only the requested periods."""
+
+    input: Node
+    time: TimeRole
+    time_range: TimeRange
+
+
+type Node = SnapshotNode | StandInNode | QueryNode | PeriodFilterNode
 
 
 def compose(root: Node) -> Query:
@@ -88,7 +100,9 @@ def compose(root: Node) -> Query:
                 names[id(node)] = relation
                 return relation
             case StandInNode(columns=columns):
-                body = _stand_in(columns)
+                body = stand_in_sql(columns)
+            case PeriodFilterNode(input=upstream, time=time, time_range=time_range):
+                body = f"SELECT * FROM {name(upstream)} WHERE {_overlaps(time, time_range)}"
             case QueryNode(sql=sql, inputs=inputs):
                 aliases = [
                     f"input_{index} AS (SELECT * FROM {name(upstream)})"
@@ -116,6 +130,14 @@ def content_identity(node: Node) -> str:
             return "query:" + _digest(
                 {"operator": operator_id, "inputs": [content_identity(i) for i in inputs]}
             )
+        case PeriodFilterNode(input=upstream, time=time, time_range=time_range):
+            return "periods:" + _digest(
+                {
+                    "input": content_identity(upstream),
+                    "columns": [time.start, time.end],
+                    "range": time_range.model_dump(mode="json"),
+                }
+            )
         case StandInNode():
             raise ValueError("A stand-in has no data, so it has no content identity")
 
@@ -127,15 +149,41 @@ def parameters_key(inputs: tuple[Node, ...]) -> str:
     to say which data they delivered: the content identities of the inputs, in order. A new
     source snapshot with different content, or an Input bound to another pipeline, changes
     the key and so makes a new snapshot; identical content keeps the key and is reused.
-    Wave 1 operators ignore the run's time range, so it is not part of the key."""
+    The run's time range counts only where it changed the data, through a period filter
+    or the period snapshots below; an operator whose inputs ignore it keeps its key."""
     return "inputs:" + _digest([content_identity(node) for node in inputs])
 
 
-def _stand_in(columns: tuple[Column, ...]) -> str:
+def stand_in_sql(columns: tuple[Column, ...]) -> str:
+    """A table with these columns and no rows, e.g. a period a source has no data for."""
     selected = ", ".join(
         f"CAST(NULL AS {_SQL_TYPES[column.type]}) AS {quote(column.name)}" for column in columns
     )
     return f"SELECT {selected} LIMIT 0"
+
+
+def union(columns: tuple[Column, ...], snapshots: list[Snapshot], order_by: str) -> Query:
+    """One table of several snapshots with the same declared columns, e.g. the periods of
+    a source. Every part is cast to the declared types, so a period whose values are all
+    empty, and so were read with another type, still lines up with the rest."""
+    selected = ", ".join(
+        f"CAST({quote(column.name)} AS {_SQL_TYPES[column.type]}) AS {quote(column.name)}"
+        for column in columns
+    )
+    relations = {f"__ada_s{index}": s.location for index, s in enumerate(snapshots)}
+    parts = "\nUNION ALL\n".join(f"SELECT {selected} FROM {name}" for name in relations)
+    return Query(sql=f"SELECT * FROM (\n{parts}\n) ORDER BY {quote(order_by)}", relations=relations)
+
+
+def _overlaps(time: TimeRole, time_range: TimeRange) -> str:
+    """A row is in the range when its period shares at least one day with it; a row
+    without a period is in no bounded range."""
+    conditions = []
+    if time_range.start is not None:
+        conditions.append(f"CAST({quote(time.end)} AS DATE) >= DATE '{time_range.start}'")
+    if time_range.end is not None:
+        conditions.append(f"CAST({quote(time.start)} AS DATE) <= DATE '{time_range.end}'")
+    return " AND ".join(conditions) or "TRUE"
 
 
 def quote(identifier: str) -> str:
