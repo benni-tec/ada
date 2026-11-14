@@ -5,6 +5,7 @@ residual per site and sex."""
 import math
 from statistics import median
 
+from ada.core.models.analysis import Rows
 from ada.core.models.errors import Invalid
 from ada.core.models.statistical_models import (
     STEPS,
@@ -26,6 +27,57 @@ from ada.core.services.statistical_models.evaluate import (
     target,
     to_excess,
 )
+
+PARAMETER_COLUMNS = ("name", "estimate", "ci_low", "ci_high", "source_id", "passage", "found")
+
+
+def _number(value: object) -> float | None:
+    return None if value is None else float(str(value))
+
+
+def read_parameters(spec: ModelSpec, rows: Rows, operator_id: str, run_id: str) -> ModelSpec:
+    """The spec with its parameters taken from an operator's rows: one row per parameter,
+    with the estimate, the interval, the source and the passage, and `found`, whether the
+    passage is in the source as fetched. Every parameter cited to a registered source must
+    have a found row; the others (assumptions with no source) keep their figures."""
+    names = [c.name for c in rows.columns]
+    missing = [c for c in PARAMETER_COLUMNS if c not in names]
+    if missing:
+        raise Invalid(f"operator {operator_id} lacks the columns {', '.join(missing)}")
+    parameters = dict(spec.parameters)
+    read: set[str] = set()
+    for values in rows.rows:
+        row = dict(zip(names, values, strict=True))
+        name = str(row["name"])
+        if name not in parameters:
+            raise Invalid(f"operator {operator_id} has a row for an unknown parameter: {name}")
+        if not row["found"]:
+            raise Invalid(f"the passage for {name} is not in its source as fetched")
+        if row["estimate"] is None:
+            raise Invalid(f"operator {operator_id} has no estimate for {name}")
+        p = parameters[name]
+        parameters[name] = p.model_copy(
+            update={
+                "estimate": _number(row["estimate"]),
+                "ci_low": _number(row["ci_low"]),
+                "ci_high": _number(row["ci_high"]),
+                "provenance": p.provenance.model_copy(
+                    update={
+                        "passage": str(row["passage"]),
+                        "source_id": str(row["source_id"]),
+                        "operator_id": operator_id,
+                        "run_id": run_id,
+                    }
+                ),
+            }
+        )
+        read.add(name)
+    unread = sorted(
+        n for n, p in spec.parameters.items() if p.provenance.source_id and n not in read
+    )
+    if unread:
+        raise Invalid(f"operator {operator_id} has no row for {', '.join(unread)}")
+    return spec.model_copy(update={"parameters": parameters})
 
 
 def validate(spec: ModelSpec) -> None:

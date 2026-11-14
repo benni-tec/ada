@@ -722,8 +722,8 @@ export interface paths {
         put?: never;
         /**
          * Create Pathway Model
-         * @description The patient pathway model (lung cancer, v1), built from the figures and provenance
-         *     shipped with the platform.
+         * @description The patient pathway model, built from the figures and provenance shipped with the
+         *     platform, or with its effect sizes read from the operator in `parameters`.
          */
         post: operations["create_pathway_model_api_projects__project_id__models_pathway_post"];
         delete?: never;
@@ -2735,6 +2735,10 @@ export interface components {
             model?: string | null;
             /** Text */
             text: string;
+        };
+        /** NewPathwayModel */
+        NewPathwayModel: {
+            parameters?: components["schemas"]["OperatorId"] | null;
         };
         /** NewProject */
         NewProject: {
@@ -5339,7 +5343,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NewPathwayModel"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {

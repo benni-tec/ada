@@ -2718,6 +2718,23 @@
         "title": "NewMessage",
         "type": "object"
       },
+      "NewPathwayModel": {
+        "additionalProperties": false,
+        "properties": {
+          "parameters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatorId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "NewPathwayModel",
+        "type": "object"
+      },
       "NewProject": {
         "additionalProperties": false,
         "properties": {
@@ -7985,7 +8002,7 @@
     },
     "/api/projects/{project_id}/models/pathway": {
       "post": {
-        "description": "The patient pathway model (lung cancer, v1), built from the figures and provenance\nshipped with the platform.",
+        "description": "The patient pathway model, built from the figures and provenance shipped with the\nplatform, or with its effect sizes read from the operator in `parameters`.",
         "operationId": "create_pathway_model_api_projects__project_id__models_pathway_post",
         "parameters": [
           {
@@ -7999,6 +8016,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/NewPathwayModel"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "content": {

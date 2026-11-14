@@ -4,15 +4,21 @@ the memory repositories, and the REST and MCP surfaces, which create no runs."""
 
 from collections.abc import Iterator
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid7
 
 import pytest
 from fastapi.testclient import TestClient
 
-from ada.adapters.memory.repositories import MemoryStore
+from ada.adapters.memory.repositories import (
+    MemoryProjectRepository,
+    MemoryStatisticalModelRepository,
+    MemoryStore,
+)
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
+from ada.core.models.analysis import Column, Rows
 from ada.core.models.errors import Invalid
+from ada.core.models.projects import Project
 from ada.core.models.statistical_models import (
     DeadlineStatus,
     EvaluationInputs,
@@ -21,9 +27,15 @@ from ada.core.models.statistical_models import (
     ModelVersion,
     PathwayStep,
 )
-from ada.core.services.statistical_models.build import compile_spec
+from ada.core.services.ports.exploration import Clauses, Explored
+from ada.core.services.statistical_models.build import (
+    PARAMETER_COLUMNS,
+    compile_spec,
+    read_parameters,
+)
 from ada.core.services.statistical_models.evaluate import evaluate
 from ada.core.services.statistical_models.pathway import pathway_spec
+from ada.core.services.statistical_models.service import StatisticalModels
 from api_support import Overrides, call, mcp_client, new_project, resolve, send, serve
 from fakes import FixedClock
 
@@ -33,7 +45,7 @@ S = PathwayStep
 ACTOR = Actor(kind=ActorKind.USER, name="test")
 
 # The mockup's example: a woman of 64 with lung cancer, first contact at a health centre,
-# a 14-day wait for a physician, an X-ray on day 27 that fires the trigger, and nine days
+# a 14-day wait for a physician, an X-ray on day 27 that fires the trigger, and twelve days
 # into the step from the completed work-up to the treatment plan.
 EXAMPLE = EvaluationInputs(
     site="lung",
@@ -261,6 +273,89 @@ def test_inputs_are_checked_against_the_terms(version: ModelVersion) -> None:
         DeadlineStatus.DUE,
         DeadlineStatus.NOT_APPLICABLE,
     }
+
+
+def _parameter_rows(**changes: tuple[object, ...]) -> Rows:
+    """A row per sourced parameter, as the parameter operator gives them."""
+    spec = pathway_spec()
+    rows = {
+        name: (name, p.estimate, p.ci_low, p.ci_high, p.provenance.source_id, "passage", True)
+        for name, p in spec.parameters.items()
+        if p.provenance.source_id
+    }
+    rows.update(changes)
+    columns = tuple(Column(name=c, type="text") for c in PARAMETER_COLUMNS)
+    return Rows(columns=columns, rows=tuple(rows.values()))
+
+
+def test_parameters_are_read_from_an_operator_and_cited_by_it() -> None:
+    spec = pathway_spec()
+    rows = _parameter_rows(
+        hanna_colectomy=("hanna_colectomy", 1.07, 1.02, 1.13, "src", "colectomy 1.07", True)
+    )
+    read = read_parameters(spec, rows, "op_parameters", "run-1")
+    colectomy = read.parameters["hanna_colectomy"]
+    assert (colectomy.estimate, colectomy.ci_low, colectomy.ci_high) == (1.07, 1.02, 1.13)
+    assert colectomy.provenance.operator_id == "op_parameters"
+    assert colectomy.provenance.run_id == "run-1"
+    assert colectomy.provenance.passage == "colectomy 1.07"
+    # The grade and the citation stay; an assumption with no source keeps its figure.
+    assert colectomy.provenance.grade is spec.parameters["hanna_colectomy"].provenance.grade
+    assert read.parameters["pancreas_delay_assumed"] == spec.parameters["pancreas_delay_assumed"]
+    compile_spec(read)
+
+
+def test_a_parameter_operator_must_cover_every_sourced_figure_with_its_passage() -> None:
+    spec = pathway_spec()
+    with pytest.raises(Invalid, match="not in its source"):
+        read_parameters(
+            spec,
+            _parameter_rows(sud_per_day=("sud_per_day", 0.0056, None, None, "s", "x", False)),
+            "op",
+            "run",
+        )
+    with pytest.raises(Invalid, match="unknown parameter"):
+        read_parameters(
+            spec, _parameter_rows(magic=("magic", 1.0, None, None, "s", "x", True)), "op", "run"
+        )
+    complete = _parameter_rows()
+    partial = complete.model_copy(update={"rows": complete.rows[1:]})
+    with pytest.raises(Invalid, match="no row for"):
+        read_parameters(spec, partial, "op", "run")
+
+
+class RowsExploration:
+    """Answers every query with the same rows, read in one run."""
+
+    def __init__(self, rows: Rows) -> None:
+        self.rows = rows
+        self.run_id = uuid7()
+        self.asked: list[tuple[str, Clauses]] = []
+
+    async def query(
+        self, operator_id: str, clauses: Clauses, actor: Actor, limit: int = 100, **_: Any
+    ) -> Explored:
+        self.asked.append((operator_id, clauses))
+        return Explored(rows=self.rows, run_id=self.run_id)
+
+
+async def test_the_service_builds_the_pathway_model_from_a_parameter_operator() -> None:
+    store = MemoryStore()
+    project = Project(id=uuid7(), name="Nordic cancer care", created_at=FixedClock().now())
+    store.projects[project.id] = project
+    exploration = RowsExploration(_parameter_rows())
+    service = StatisticalModels(
+        MemoryStatisticalModelRepository(store),
+        MemoryProjectRepository(store),
+        exploration,
+        FixedClock(),
+    )
+    version = await service.create_pathway_model(project.id, ACTOR, "op_parameters")
+    zai = version.spec.parameters["zai_direct_men"].provenance
+    assert (zai.operator_id, zai.run_id) == ("op_parameters", str(exploration.run_id))
+    assert [operator for operator, _ in exploration.asked] == ["op_parameters"]
+    shipped = await service.create_pathway_model(project.id, ACTOR)
+    assert shipped.spec.parameters["zai_direct_men"].provenance.operator_id is None
 
 
 # The REST and MCP surfaces.

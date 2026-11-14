@@ -3,6 +3,7 @@ from typing import Protocol
 
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
+from ada.core.models.operators import OperatorId
 from ada.core.models.statistical_models import (
     Evaluation,
     EvaluationInputs,
@@ -25,9 +26,15 @@ class StatisticalModelService(Protocol):
         an unknown toggle, an empty intended use)."""
         ...
 
-    async def create_pathway_model(self, project_id: Id, actor: Actor) -> ModelVersion:
-        """Create the patient pathway model (lung cancer, v1) from the figures and
-        provenance in `ada.core.services.statistical_models.pathway`."""
+    async def create_pathway_model(
+        self, project_id: Id, actor: Actor, parameters: OperatorId | None = None
+    ) -> ModelVersion:
+        """Create the patient pathway model from the figures and provenance in
+        `ada.core.services.statistical_models.pathway`. With `parameters`, the effect sizes
+        are read from that operator instead (columns name, estimate, ci_low, ci_high,
+        source_id, passage, found), each cited by the operator and the run it was read in.
+        Invalid when a row names an unknown parameter, a passage was not found in its
+        source, or a parameter cited to a registered source has no row."""
         ...
 
     async def add_version(self, model_id: Id, spec: ModelSpec, actor: Actor) -> ModelVersion:

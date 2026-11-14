@@ -4,6 +4,7 @@ from dishka import FromDishka
 from fastmcp import FastMCP
 
 from ada.core.models.base import DomainModel, Id
+from ada.core.models.operators import OperatorId
 from ada.core.models.statistical_models import (
     Evaluation,
     EvaluationInputs,
@@ -36,16 +37,24 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def create_pathway_model(
-        project_id: Id, session_id: SessionId, service: FromDishka[StatisticalModelService]
+        project_id: Id,
+        session_id: SessionId,
+        service: FromDishka[StatisticalModelService],
+        parameters: OperatorId | None = None,
     ) -> ModelVersion:
-        """Create the patient pathway model in a project: lung cancer, v1, built from the
-        Norwegian and Swedish fast-track pathway standards (the trigger criteria and the
-        standard times), the Nordic survival level, Finnish education effects (Zai 2025)
-        and published delay effects (Hanna 2020, Heiden 2021, Sud 2020), each with its
-        provenance. Educational use with synthetic profiles only; never patient data.
+        """Create the patient pathway model in a project: lung, colorectal and pancreatic
+        cancer, built from the Danish, Norwegian and Swedish fast-track pathway standards
+        (the trigger criteria and the standard times), the Nordic survival level, Finnish
+        education effects (Zai 2025) and published delay effects (Hanna 2020, Heiden 2021,
+        Sud 2020), each with its provenance. Educational use with synthetic profiles only;
+        never patient data.
+
+        `parameters`: an operator to read the effect sizes from, with the columns name,
+        estimate, ci_low, ci_high, source_id, passage and found (whether the passage is in
+        its source as fetched); each figure is then cited by that operator and run.
         Returns the version with its spec and what the build derived (targets,
         population view)."""
-        return await service.create_pathway_model(project_id, calling_agent())
+        return await service.create_pathway_model(project_id, calling_agent(), parameters)
 
     @mcp.tool
     @inject

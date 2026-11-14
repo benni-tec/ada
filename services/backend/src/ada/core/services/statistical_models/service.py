@@ -6,6 +6,8 @@ from uuid import uuid7
 
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
+from ada.core.models.errors import Invalid
+from ada.core.models.operators import OperatorId
 from ada.core.models.statistical_models import (
     Evaluation,
     EvaluationInputs,
@@ -16,18 +18,28 @@ from ada.core.models.statistical_models import (
 )
 from ada.core.ports.repositories import ProjectRepository, StatisticalModelRepository
 from ada.core.ports.system import Clock
+from ada.core.services.ports.exploration import Clauses, ExplorationService
 from ada.core.services.ports.statistical_models import StatisticalModelService
 from ada.core.services.statistical_models import pathway
-from ada.core.services.statistical_models.build import compile_spec
+from ada.core.services.statistical_models.build import (
+    PARAMETER_COLUMNS,
+    compile_spec,
+    read_parameters,
+)
 from ada.core.services.statistical_models.evaluate import evaluate
 
 
 class StatisticalModels(StatisticalModelService):
     def __init__(
-        self, models: StatisticalModelRepository, projects: ProjectRepository, clock: Clock
+        self,
+        models: StatisticalModelRepository,
+        projects: ProjectRepository,
+        exploration: ExplorationService,
+        clock: Clock,
     ) -> None:
         self.models = models
         self.projects = projects
+        self.exploration = exploration
         self.clock = clock
 
     async def create(
@@ -59,10 +71,18 @@ class StatisticalModels(StatisticalModelService):
         await self.models.add_version(version)
         return version
 
-    async def create_pathway_model(self, project_id: Id, actor: Actor) -> ModelVersion:
-        return await self.create(
-            project_id, pathway.NAME, pathway.DESCRIPTION, pathway.pathway_spec(), actor
-        )
+    async def create_pathway_model(
+        self, project_id: Id, actor: Actor, parameters: OperatorId | None = None
+    ) -> ModelVersion:
+        spec = pathway.pathway_spec()
+        if parameters is not None:
+            explored = await self.exploration.query(
+                parameters, Clauses(select=", ".join(PARAMETER_COLUMNS)), actor, limit=500
+            )
+            if explored.rows.truncated:
+                raise Invalid(f"operator {parameters} has more rows than one model reads")
+            spec = read_parameters(spec, explored.rows, parameters, str(explored.run_id))
+        return await self.create(project_id, pathway.NAME, pathway.DESCRIPTION, spec, actor)
 
     async def add_version(self, model_id: Id, spec: ModelSpec, actor: Actor) -> ModelVersion:
         model = await self.models.get(model_id)

@@ -98,9 +98,10 @@ HANNA = Citation(
 )
 HEIDEN = Citation(
     source="Heiden et al., JAMA Netw Open 2021 (PMC8160592; VA, 9,904 patients, 96 % men)",
-    passage="Surgical procedures delayed more than 12 weeks from the diagnostic CT were associated "
-    "with increased risk of recurrence and worse overall survival: HR 1.132 (95% CI "
-    "0.943–1.359). Time to surgery was not associated with pathologic upstaging.",
+    passage="Patients who underwent surgical treatment within 12 weeks of diagnosis had "
+    "significantly better overall survival than those with procedures delayed more than 12 "
+    "weeks (HR, 1.132; 95% CI, 1.064-1.204). Time to surgery was not associated with "
+    "pathologic upstaging.",
     grade=EvidenceGrade.COHORT,
     url="https://pmc.ncbi.nlm.nih.gov/articles/PMC8160592/",
     source_id="01a1dc00-fac4-764b-8f42-fea3a16e7a5f",
@@ -733,7 +734,7 @@ def pathway_spec() -> ModelSpec:
         baseline=_baseline(),
         parameters={
             "heiden_lung_surgery": _parameter(
-                "heiden_lung_surgery", 1.132, 0.943, 1.359, OV, F.BEYOND_12_WEEKS, HEIDEN
+                "heiden_lung_surgery", 1.132, 1.064, 1.204, OV, F.BEYOND_12_WEEKS, HEIDEN
             ),
             "hanna_lung_surgery": _parameter(
                 "hanna_lung_surgery", 1.06, 0.93, 1.19, OV, F.PER_4_WEEKS, HANNA

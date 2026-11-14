@@ -8,6 +8,7 @@ from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter
 
 from ada.core.models.base import Id
+from ada.core.models.operators import OperatorId
 from ada.core.models.statistical_models import (
     Evaluation,
     EvaluationInputs,
@@ -27,6 +28,11 @@ class NewModel(Request):
     name: str
     description: str = ""
     spec: ModelSpec
+
+
+class NewPathwayModel(Request):
+    # An operator to read the effect sizes from; the shipped figures when left out.
+    parameters: OperatorId | None = None
 
 
 class NewVersion(Request):
@@ -55,11 +61,14 @@ async def create_model(
 
 @router.post("/projects/{project_id}/models/pathway", status_code=201)
 async def create_pathway_model(
-    project_id: Id, service: FromDishka[StatisticalModelService]
+    project_id: Id,
+    service: FromDishka[StatisticalModelService],
+    body: NewPathwayModel | None = None,
 ) -> ModelVersion:
-    """The patient pathway model (lung cancer, v1), built from the figures and provenance
-    shipped with the platform."""
-    return await service.create_pathway_model(project_id, WEB)
+    """The patient pathway model, built from the figures and provenance shipped with the
+    platform, or with its effect sizes read from the operator in `parameters`."""
+    parameters = body.parameters if body else None
+    return await service.create_pathway_model(project_id, WEB, parameters)
 
 
 @router.get("/models/{model_id}")
