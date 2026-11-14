@@ -38,7 +38,7 @@ function ProjectLayout() {
             <Hint label="Toggle the sidebar" side="right">
               <SidebarTrigger />
             </Hint>
-            <Link to="/" aria-label="ADA: all projects" className="ml-1 rounded-md px-1 py-0.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">
+            <Link to="/" aria-label="ADA: all projects" className="ml-1 flex items-center rounded-md px-1 py-0.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">
               <AdaMark size={22} />
             </Link>
             <div className="flex-1" />
