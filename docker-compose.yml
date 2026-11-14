@@ -7,6 +7,9 @@
 #   BACKEND_PORT   backend port inside the network          (default 8000)
 #   FRONTEND_PORT  frontend port inside the network         (default 5173)
 #
+# The in-platform agent reads config/llms.yml (see llms.example.yml) and its keys from
+# .env.local; both are optional and git-ignored.
+#
 # Runs images, never builds: CI publishes them to ghcr.io (.github/workflows/ci.yml) and
 # `moon run :image` builds the same names from the checkout.
 name: ada
@@ -17,13 +20,22 @@ include:
 x-backend: &backend
   image: ghcr.io/benni-tec/ada/backend:${VERSION:-latest}
   restart: unless-stopped
+  # Provider keys of the in-platform agent (e.g. GEMINI_API_KEY), when the file exists.
+  env_file:
+    - path: .env.local
+      required: false
   environment:
     DATABASE_URL: postgresql+psycopg://ada:${POSTGRES_PASSWORD:-ada-dev}@postgres:5432/ada
     VALKEY_URL: redis://valkey:6379/0
     UVICORN_PORT: ${BACKEND_PORT:-8000}
+    # The agent's models file; without it ADA runs without an agent.
+    ADA_LLMS_CONFIG: /config/llms.yml
   volumes:
     # Snapshots, shared by the API and the workers.
     - analysis-data:/data
+    # A directory, not the file: mounting a file that does not exist would make Docker
+    # create a directory in its place.
+    - ./config:/config:ro
   depends_on:
     postgres:
       condition: service_healthy

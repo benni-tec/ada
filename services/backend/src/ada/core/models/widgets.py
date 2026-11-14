@@ -24,6 +24,9 @@ class Widget(DomainModel):
     note: str = ""
     created_by: Actor
     created_at: datetime
+    # The widget this one was copied from when it was pinned to a dashboard: the original,
+    # which knows the session it was made in. A copy can then be changed on its own.
+    copied_from: Id | None = None
 
 
 class WidgetData(DomainModel):

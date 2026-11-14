@@ -17,6 +17,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol
 
+from ada.core.models.agents import AgentTurn, TurnPart, TurnStatus
 from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
@@ -61,6 +62,39 @@ class SessionRepository(Protocol):
     async def update(self, session: Session, expected_revision: int) -> Session: ...
     async def add_entry(self, entry: SessionEntry) -> None: ...
     async def entries(self, session_id: Id) -> Sequence[SessionEntry]: ...
+
+
+class AgentTurnRepository(Protocol):
+    """The in-platform agent's turns. A turn has no revision: the worker running it is its
+    only writer, and the writes that are not the worker's (a cancel request) are plain
+    updates of their own columns."""
+
+    async def get(self, id: Id) -> AgentTurn: ...
+    async def add(self, turn: AgentTurn) -> None: ...
+    async def list(self, session_id: Id) -> Sequence[AgentTurn]: ...
+
+    async def start(self, id: Id) -> bool:
+        """Move a queued turn to running. False, changing nothing, when it is not queued
+        (it was cancelled before it started, or another worker took it)."""
+        ...
+
+    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> None: ...
+
+    async def finish(
+        self,
+        id: Id,
+        status: TurnStatus,
+        parts: Sequence[TurnPart],
+        error: str | None,
+        at: datetime,
+    ) -> AgentTurn: ...
+
+    async def request_cancel(self, id: Id, at: datetime) -> AgentTurn:
+        """Stop a turn: a queued one is cancelled at once, a running one is flagged and
+        stops at its next step. A finished turn stays as it is."""
+        ...
+
+    async def cancel_requested(self, id: Id) -> bool: ...
 
 
 class OperatorRepository(Protocol):

@@ -362,8 +362,12 @@ def test_an_unknown_session_is_not_found(client: TestClient) -> None:
 def test_a_message_is_recorded_as_the_web_user_and_announced(
     client: TestClient, project: dict[str, Any], session: dict[str, Any]
 ) -> None:
-    entry = post(client, f"/sessions/{session['id']}/messages", {"text": "What changed?"})
+    posted = post(client, f"/sessions/{session['id']}/messages", {"text": "What changed?"})
+    # No models file in the tests, so no agent answers.
+    assert posted["turn"] is None
+    entry = posted["entry"]
     assert entry["kind"] == "message"
+    assert entry["context"] == []
     assert entry["text"] == "What changed?"
     assert entry["actor"] == WEB
 

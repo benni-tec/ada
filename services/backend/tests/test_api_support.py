@@ -26,6 +26,7 @@ from ada.core.models.operators import (
     SourceParams,
     operator_identity,
 )
+from ada.core.models.pipelines import Pipeline
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.schema import Column, ColumnType, Roles, Schema
 from ada.core.models.sessions import SessionEntry
@@ -46,6 +47,7 @@ from ada.core.ports.repositories import (
 )
 from ada.core.ports.system import Clock
 from ada.core.ports.tasks import TaskDispatcher
+from ada.core.services.pipelines import listing
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sources import SourceService
@@ -134,6 +136,10 @@ class FakePipelines(PipelineService):
 
     async def lineage(self, id: OperatorId) -> Sequence[Operator]:
         return await self.operators.upstream(id)
+
+    async def pipelines(self, project_id: Id) -> Sequence[Pipeline]:
+        names = {source.id: source.name for source in await self.sources.list(project_id)}
+        return listing.pipelines(await self.operators.list(project_id), names)
 
 
 class FakeRuns(RunService):

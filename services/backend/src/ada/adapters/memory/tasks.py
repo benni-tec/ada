@@ -11,6 +11,7 @@ class RecordingTaskDispatcher(TaskDispatcher):
         self.refreshes: list[tuple[Id, bool]] = []
         self.executions: list[tuple[Id, OperatorId]] = []
         self.alert_checks: list[Id] = []
+        self.turns: list[Id] = []
 
     async def refresh_source(self, data_source_id: Id, force: bool = False) -> None:
         self.refreshes.append((data_source_id, force))
@@ -20,3 +21,6 @@ class RecordingTaskDispatcher(TaskDispatcher):
 
     async def check_alert_rule(self, rule_id: Id) -> None:
         self.alert_checks.append(rule_id)
+
+    async def run_turn(self, turn_id: Id) -> None:
+        self.turns.append(turn_id)

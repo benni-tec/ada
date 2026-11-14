@@ -1,0 +1,82 @@
+"""The in-platform agent's tools: the MCP server create_mcp builds, called in process
+through FastMCP's in-memory client, so the agent can do exactly what an external agent can
+and every call is a unit of work of its own, as over HTTP."""
+
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
+from typing import Any
+
+from dishka import AsyncContainer
+from fastmcp import Client
+from mcp.types import Implementation, TextContent
+
+from ada.core.models.actors import Actor
+from ada.core.models.agents import ToolSpec
+from ada.core.models.base import Id, JsonObject
+from ada.core.ports.agents import AgentToolbox, AgentTools, ToolCallFailed
+from ada.entrypoints.mcp.actor import acting_as
+from ada.entrypoints.mcp.server import create_mcp
+
+# Tools that make no sense inside a session the agent already works in: the widget's own
+# data call, and creating projects or sessions.
+LEFT_OUT = frozenset({"get_widget_data", "create_project", "create_session"})
+
+# Only for the server's logs: the actor comes from acting_as, never from this name.
+CLIENT = Implementation(name="ada-in-platform-agent", version="1")
+
+
+class InProcessToolbox(AgentToolbox):
+    def __init__(self, container: AsyncContainer) -> None:
+        # The application's container: each tool call opens its own request scope from it.
+        self.container = container
+
+    @asynccontextmanager
+    async def connect(self, agent: Actor, session_id: Id) -> AsyncIterator[AgentTools]:
+        # Set before the client starts the in-memory server, whose tasks copy the context.
+        with acting_as(agent):
+            async with Client(create_mcp(self.container), client_info=CLIENT) as client:
+                listed = await client.list_tools()
+                specs = [
+                    ToolSpec(
+                        name=tool.name,
+                        description=tool.description or "",
+                        input_schema=tool.input_schema,
+                    )
+                    for tool in listed
+                    if tool.name not in LEFT_OUT
+                ]
+                yield _McpTools(client, specs, session_id)
+
+
+class _McpTools(AgentTools):
+    def __init__(self, client: Client, specs: Sequence[ToolSpec], session_id: Id) -> None:
+        self.client = client
+        self._specs = list(specs)
+        self.session_id = session_id
+        self._by_name = {spec.name: spec for spec in specs}
+
+    def specs(self) -> Sequence[ToolSpec]:
+        return self._specs
+
+    async def call(self, name: str, arguments: JsonObject) -> Any:
+        spec = self._by_name.get(name)
+        if spec is None:
+            raise ToolCallFailed(f"There is no tool {name!r}")
+        arguments = dict(arguments)
+        # The turn's session, when the model leaves it out: its work belongs there.
+        if "session_id" in spec.input_schema.get("properties", {}) and not arguments.get(
+            "session_id"
+        ):
+            arguments["session_id"] = str(self.session_id)
+        result = await self.client.call_tool(name, arguments, raise_on_error=False)
+        if result.is_error:
+            raise ToolCallFailed(_text(result.content) or f"{name} failed")
+        content = result.structured_content
+        if content is None:
+            return _text(result.content)
+        # Lists come wrapped, since structured content must be an object.
+        return content["result"] if set(content) == {"result"} else content
+
+
+def _text(content: Sequence[Any]) -> str:
+    return "\n".join(item.text for item in content if isinstance(item, TextContent))

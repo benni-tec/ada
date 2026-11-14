@@ -6,16 +6,28 @@ Records are always stored under their parents: the database enforces what memory
 
 from collections.abc import AsyncIterator
 from datetime import date, timedelta
+from typing import Any
+from uuid import uuid7
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import db_helpers
 import factories
+from ada.core.models.agents import (
+    AgentTurn,
+    ReasoningPart,
+    SourcePart,
+    TextPart,
+    ToolPart,
+    ToolState,
+    TurnStatus,
+)
 from ada.core.models.alerts import AlertState
 from ada.core.models.errors import Conflict, NotFound
 from ada.core.models.operators import OperatorKind
 from ada.core.models.schema import GeoRole, Roles, Schema
+from ada.core.models.sessions import DashboardContext, PipelineContext
 from ada.core.models.sources import FreshnessKind, FreshnessPolicy
 from ada.core.models.time import Interval, TimeRange
 from db_helpers import Repos, make_world
@@ -627,3 +639,134 @@ async def test_saving_an_unknown_alert_is_not_found(repos: Repos) -> None:
 
     with pytest.raises(NotFound):
         await repos.alerts.save(db_helpers.alert(world.project.id, run.id, run.id))
+
+
+# Wave 3: message context, widget copies, agent turns ---------------------------------
+
+
+async def test_a_message_keeps_its_context(repos: Repos) -> None:
+    world = await make_world(repos)
+    dashboard = db_helpers.dashboard(world.project.id)
+    await repos.dashboards.add(dashboard)
+    session = factories.session(world.project.id)
+    await repos.sessions.add(session)
+    entry = db_helpers.entry(
+        session.id,
+        context=(
+            PipelineContext(operator_id=world.operator.id),
+            DashboardContext(dashboard_id=dashboard.id, slot="headline"),
+        ),
+    )
+    await repos.sessions.add_entry(entry)
+
+    assert await repos.sessions.entries(session.id) == [entry]
+
+
+async def test_a_widget_copy_points_at_its_original(repos: Repos) -> None:
+    world = await make_world(repos)
+    original = db_helpers.widget(world.project.id, world.operator.id)
+    await repos.widgets.add(original)
+    copy = db_helpers.widget(world.project.id, world.operator.id, copied_from=original.id)
+    await repos.widgets.add(copy)
+
+    assert await repos.widgets.get(copy.id) == copy
+    assert (await repos.widgets.get(original.id)).copied_from is None
+
+
+async def _turn(repos: Repos, **changes: Any) -> AgentTurn:
+    world = await make_world(repos)
+    session = factories.session(world.project.id)
+    await repos.sessions.add(session)
+    entry = db_helpers.entry(session.id)
+    await repos.sessions.add_entry(entry)
+    turn = AgentTurn(
+        **{
+            "id": uuid7(),
+            "session_id": session.id,
+            "prompt_entry_id": entry.id,
+            "model": "gemini/flash",
+            "created_at": factories.NOW,
+        }
+        | changes
+    )
+    await repos.agent_turns.add(turn)
+    return turn
+
+
+async def test_a_turn_round_trips_and_is_listed_by_session(repos: Repos) -> None:
+    turn = await _turn(repos)
+
+    assert await repos.agent_turns.get(turn.id) == turn
+    assert await repos.agent_turns.list(turn.session_id) == [turn]
+    assert await repos.agent_turns.list(uuid7()) == []
+    with pytest.raises(NotFound) as error:
+        await repos.agent_turns.get(uuid7())
+    assert error.value.kind == "agent turn"
+
+
+async def test_a_turn_starts_once(repos: Repos) -> None:
+    turn = await _turn(repos)
+
+    assert await repos.agent_turns.start(turn.id) is True
+    assert await repos.agent_turns.start(turn.id) is False
+    assert (await repos.agent_turns.get(turn.id)).status is TurnStatus.RUNNING
+
+
+async def test_a_turn_stores_its_parts_and_how_it_ended(repos: Repos) -> None:
+    turn = await _turn(repos)
+    await repos.agent_turns.start(turn.id)
+    parts = (
+        ReasoningPart(text="Looking"),
+        ToolPart(
+            tool_call_id="c1",
+            tool_name="list_pipelines",
+            state=ToolState.OUTPUT_AVAILABLE,
+            input={"project_id": "p"},
+            output=[{"operator_id": "op_1"}],
+        ),
+        SourcePart(source_id=uuid7(), title="Sotkanet", url="https://example.test"),
+        TextPart(text="Done"),
+    )
+    await repos.agent_turns.save_parts(turn.id, parts[:2])
+    assert (await repos.agent_turns.get(turn.id)).parts == parts[:2]
+
+    finished = await repos.agent_turns.finish(
+        turn.id, TurnStatus.FAILED, parts, "boom", factories.NOW
+    )
+
+    assert finished == await repos.agent_turns.get(turn.id)
+    assert (finished.status, finished.parts, finished.error, finished.finished_at) == (
+        TurnStatus.FAILED,
+        parts,
+        "boom",
+        factories.NOW,
+    )
+
+
+async def test_cancelling_a_queued_turn_ends_it(repos: Repos) -> None:
+    turn = await _turn(repos)
+
+    cancelled = await repos.agent_turns.request_cancel(turn.id, factories.NOW)
+
+    assert (cancelled.status, cancelled.finished_at) == (TurnStatus.CANCELLED, factories.NOW)
+    assert await repos.agent_turns.start(turn.id) is False
+
+
+async def test_cancelling_a_running_turn_flags_it(repos: Repos) -> None:
+    turn = await _turn(repos)
+    await repos.agent_turns.start(turn.id)
+    assert await repos.agent_turns.cancel_requested(turn.id) is False
+
+    flagged = await repos.agent_turns.request_cancel(turn.id, factories.NOW)
+
+    assert flagged.status is TurnStatus.RUNNING
+    assert await repos.agent_turns.cancel_requested(turn.id) is True
+
+
+async def test_cancelling_a_finished_turn_changes_nothing(repos: Repos) -> None:
+    turn = await _turn(repos)
+    await repos.agent_turns.start(turn.id)
+    done = await repos.agent_turns.finish(turn.id, TurnStatus.DONE, (), None, factories.NOW)
+
+    assert await repos.agent_turns.request_cancel(turn.id, factories.NOW) == done
+    assert await repos.agent_turns.cancel_requested(turn.id) is False

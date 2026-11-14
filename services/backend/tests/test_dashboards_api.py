@@ -147,14 +147,29 @@ def test_pinning_adds_a_version_and_answers_with_the_new_state(
     assert pinned["dashboard"]["current_version_id"] == pinned["version"]["id"]
     assert pinned["version"]["number"] == 1
     assert pinned["version"]["created_by"] == WEB
+    copy_id = pinned["version"]["slots"][0]["widget_id"]
     assert pinned["version"]["slots"] == [
         {
             "name": "coverage",
             "description": "",
-            "widget_id": str(widget.id),
+            "widget_id": copy_id,
             "layout": {"x": 0, "y": 0, "w": 6, "h": 4},
         }
     ]
+    # The dashboard shows its own copy, made by whoever pinned.
+    copy = send(client, "GET", f"/widgets/{copy_id}")
+    assert copy_id != str(widget.id)
+    assert (copy["copied_from"], copy["session_id"], copy["created_by"]) == (
+        str(widget.id),
+        None,
+        WEB,
+    )
+    assert (copy["operator_id"], copy["type"], copy["title"]) == (
+        widget.operator_id,
+        widget.type,
+        widget.title,
+    )
+    assert send(client, "GET", f"/widgets/{widget.id}")["copied_from"] is None
     assert send(client, "GET", f"/dashboards/{dashboard['id']}") == pinned
     assert send(client, "GET", f"/dashboards/{dashboard['id']}/versions") == [pinned["version"]]
     assert (
@@ -301,6 +316,61 @@ def test_changes_are_announced_on_the_live_stream(
     ]
 
 
+def test_a_dashboard_has_one_agent_session(
+    client: TestClient, project: dict[str, Any], dashboard: dict[str, Any]
+) -> None:
+    path = f"/api/dashboards/{dashboard['id']}/agent-session"
+    # Sessions that do not both come from and show the dashboard are not its panel's.
+    started_here = send(
+        client,
+        "POST",
+        f"/projects/{project['id']}/sessions",
+        {"title": "Explore", "origin_dashboard_id": dashboard["id"]},
+        201,
+    )
+
+    created = client.post(path)
+    found = client.post(path)
+
+    assert created.status_code == 201
+    assert found.status_code == 200
+    session = created.json()
+    assert found.json() == session
+    assert session["id"] != started_here["id"]
+    assert session["title"] == f"{dashboard['name']} (agent)"
+    assert session["origin_dashboard_id"] == session["panel_dashboard_id"] == dashboard["id"]
+    assert session["project_id"] == project["id"]
+    created_events = [e for e in published(client) if e.type == EventType.SESSION_CREATED]
+    assert created_events[-1].payload == {"session_id": session["id"]}
+
+
+def test_the_newest_panel_session_is_the_agent_session(
+    client: TestClient, project: dict[str, Any], dashboard: dict[str, Any]
+) -> None:
+    older = send(client, "POST", f"/dashboards/{dashboard['id']}/agent-session", None, 201)
+    newer = send(
+        client,
+        "POST",
+        f"/projects/{project['id']}/sessions",
+        {"title": "Again", "origin_dashboard_id": dashboard["id"]},
+        201,
+    )
+    send(
+        client,
+        "PATCH",
+        f"/sessions/{newer['id']}",
+        {"expected_revision": 1, "panel_dashboard_id": dashboard["id"]},
+    )
+
+    found = send(client, "POST", f"/dashboards/{dashboard['id']}/agent-session")
+
+    assert found["id"] == newer["id"] != older["id"]
+
+
+def test_an_unknown_dashboard_has_no_agent_session(client: TestClient) -> None:
+    assert client.post(f"/api/dashboards/{uuid7()}/agent-session").status_code == 404
+
+
 # MCP
 
 
@@ -379,6 +449,14 @@ async def test_an_agent_creates_a_dashboard_and_pins_a_widget(agent: Client, see
     assert pinned["dashboard"]["revision"] == 2
     assert pinned["version"]["created_by"] == AGENT
     assert [s["name"] for s in pinned["version"]["slots"]] == ["coverage"]
+    copy = (await seen.container.get(MemoryStore)).widgets[
+        UUID(pinned["version"]["slots"][0]["widget_id"])
+    ]
+    assert (copy.copied_from, copy.session_id, copy.created_by.model_dump()) == (
+        widget.id,
+        None,
+        AGENT,
+    )
     assert await call(agent, "get_dashboard", dashboard_id=created["dashboard"]["id"]) == pinned
     versions = await call(agent, "list_dashboard_versions", dashboard_id=created["dashboard"]["id"])
     assert [v["number"] for v in versions] == [1]

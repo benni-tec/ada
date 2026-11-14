@@ -28,8 +28,10 @@ class DashboardService(Protocol):
     async def pin_widget(
         self, id: Id, widget_id: Id, slot: str, expected_revision: int, actor: Actor
     ) -> DashboardVersion:
-        """Put a widget, e.g. one from a session, into a slot; the slot is added when the
-        dashboard has none of that name. The reference is kept, not a copy."""
+        """Put a copy of a widget, e.g. one from a session, into a slot; the slot is added
+        when the dashboard has none of that name. The copy has the same operator, type,
+        spec, title and note, no session, `copied_from` naming the original, and is
+        created by `actor`, so the dashboard's widget can change on its own."""
         ...
 
     async def set_default_time_range(

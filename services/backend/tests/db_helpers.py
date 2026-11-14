@@ -12,6 +12,7 @@ from uuid import uuid7
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 import factories
+from ada.adapters.db.agent_repositories import SqlAgentTurnRepository
 from ada.adapters.db.alert_repositories import SqlAlertRepository, SqlAlertRuleRepository
 from ada.adapters.db.pipeline_repositories import (
     SqlOperatorRepository,
@@ -30,6 +31,7 @@ from ada.adapters.db.workspace_repositories import (
     SqlWidgetRepository,
 )
 from ada.adapters.memory.repositories import (
+    MemoryAgentTurnRepository,
     MemoryAlertRepository,
     MemoryAlertRuleRepository,
     MemoryDashboardRepository,
@@ -53,6 +55,7 @@ from ada.core.models.sessions import EntryKind, SessionEntry
 from ada.core.models.time import TimeRange
 from ada.core.models.widgets import Widget
 from ada.core.ports.repositories import (
+    AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
     DashboardRepository,
@@ -82,6 +85,7 @@ class Repos:
     reports: ReportRepository
     alert_rules: AlertRuleRepository
     alerts: AlertRepository
+    agent_turns: AgentTurnRepository
 
 
 def memory_repos() -> Repos:
@@ -99,6 +103,7 @@ def memory_repos() -> Repos:
         MemoryReportRepository(store),
         MemoryAlertRuleRepository(store),
         MemoryAlertRepository(store),
+        MemoryAgentTurnRepository(store),
     )
 
 
@@ -116,6 +121,7 @@ def sql_repos(session: AsyncSession) -> Repos:
         SqlReportRepository(session),
         SqlAlertRuleRepository(session),
         SqlAlertRepository(session),
+        SqlAgentTurnRepository(session),
     )
 
 

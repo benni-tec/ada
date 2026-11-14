@@ -20,10 +20,11 @@ depends_on = []
 path = "ada.core.ports"
 depends_on = ["ada.core.models"]
 
-# Inbound ports: the use cases; called by entrypoints.
+# Inbound ports: the use cases; called by entrypoints. A use case may take an outbound
+# port its caller provides (AgentTurnService.run takes the agent's toolbox).
 [[modules]]
 path = "ada.core.services.ports"
-depends_on = ["ada.core.models"]
+depends_on = ["ada.core.models", "ada.core.ports"]
 
 [[modules]]
 path = "ada.core.services"
@@ -60,6 +61,8 @@ depends_on = [
     "ada.core.ports",
     "ada.core.services.ports",
     "ada.discovery",
+    # The in-platform agent's tools are the MCP tools, served in process.
+    "ada.entrypoints.mcp",
 ]
 
 [[modules]]

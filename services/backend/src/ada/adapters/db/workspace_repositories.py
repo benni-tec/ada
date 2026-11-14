@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from ada.adapters.db.support import (
     add_row,
     dump,
+    dump_all,
     fetch,
     json_object,
     oldest_first,
@@ -180,6 +181,7 @@ def _entry(row: SessionEntryRow) -> SessionEntry:
         ref=row.ref,
         actor=Actor.model_validate(row.actor),
         created_at=row.created_at,
+        context=row.context,
     )
 
 
@@ -230,6 +232,7 @@ class SqlSessionRepository(SessionRepository):
             ref=entry.ref,
             actor=dump(entry.actor),
             created_at=entry.created_at,
+            context=dump_all(entry.context),
         )
         await add_row(self.session, row)
 
@@ -250,6 +253,7 @@ def _widget(row: WidgetRow) -> Widget:
         note=row.note,
         created_by=Actor.model_validate(row.created_by),
         created_at=row.created_at,
+        copied_from=row.copied_from,
     )
 
 
@@ -273,6 +277,7 @@ class SqlWidgetRepository(WidgetRepository):
             note=widget.note,
             created_by=dump(widget.created_by),
             created_at=widget.created_at,
+            copied_from=widget.copied_from,
         )
         await add_row(self.session, row)
 

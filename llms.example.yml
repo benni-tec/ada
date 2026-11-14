@@ -1,0 +1,50 @@
+# The models of ADA's in-platform agent. Copy this file to config/llms.yml (git-ignored)
+# and keep the providers you have a key for. Without that file ADA runs without an agent:
+# messages are recorded, nobody answers them.
+#
+# Keys never go into this file. Each provider names the environment variable that holds
+# its key (`api_key_env`); put the keys in .env.local (git-ignored), which the full stack
+# passes to the backend and the worker. GET /api/llm/models says whether each key is set.
+#
+# The path is ADA_LLMS_CONFIG: moon sets it to config/llms.yml of the checkout, the
+# compose file to /config/llms.yml (the config/ directory, mounted). Model names below are
+# placeholders: use the ones your provider lists.
+
+providers:
+  # Gemini through its OpenAI-compatible endpoint.
+  gemini:
+    kind: openai-compatible
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+    api_key_env: GEMINI_API_KEY
+
+  # Or Gemini through Google's own API:
+  # gemini-native:
+  #   kind: gemini
+  #   api_key_env: GEMINI_API_KEY
+
+  # NVIDIA's hosted models, e.g. Nemotron (build.nvidia.com).
+  # nvidia:
+  #   kind: openai-compatible
+  #   base_url: https://integrate.api.nvidia.com/v1
+  #   api_key_env: NVIDIA_API_KEY
+
+  # OpenAI.
+  # openai:
+  #   kind: openai-compatible
+  #   base_url: https://api.openai.com/v1
+  #   api_key_env: OPENAI_API_KEY
+
+  # A vLLM server deployed on Modal: its OpenAI-compatible endpoint. Leave out
+  # api_key_env if the endpoint takes no key.
+  # modal:
+  #   kind: openai-compatible
+  #   base_url: https://<workspace>--<app>-serve.modal.run/v1
+  #   api_key_env: MODAL_VLLM_API_KEY
+
+models:
+  # Answers messages in sessions and in a dashboard's agent panel: "<provider>/<model>",
+  # the model name as the provider writes it (it may contain further slashes).
+  session_agent: gemini/<gemini-model>
+  # session_agent: nvidia/<nemotron-model>
+  # session_agent: openai/<openai-model>
+  # session_agent: modal/<served-model-name>

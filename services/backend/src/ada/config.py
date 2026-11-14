@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     """Read from the environment. The URLs are required so a misconfigured container
     stops at startup; moon sets the development values (services/backend/moon.yml)."""
 
-    model_config = SettingsConfigDict(extra="ignore")
+    # populate_by_name: callers pass llms_config by its name, the environment by its alias.
+    model_config = SettingsConfigDict(extra="ignore", populate_by_name=True)
 
     # Definitions: projects, operators, runs, dashboards. SQLAlchemy URL for psycopg 3.
     database_url: str = Field(min_length=1)
@@ -26,3 +27,7 @@ class Settings(BaseSettings):
     # The built widgets (services/widgets, `moon run widgets:build`), one <type>.html each,
     # served to the frontend and as MCP App resources. The image sets its own copy.
     widgets_dir: Path = SOURCE_WIDGETS_DIR
+
+    # The models file of the in-platform agent (llms.example.yml shows the format). A
+    # missing file means no agent, not an error.
+    llms_config: Path = Field(Path("llms.yml"), validation_alias="ADA_LLMS_CONFIG")

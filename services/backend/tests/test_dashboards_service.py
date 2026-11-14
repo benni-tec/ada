@@ -221,17 +221,48 @@ async def test_a_slot_needs_a_widget_of_the_same_project(world: World) -> None:
         )
 
 
-async def test_pinning_adds_a_slot_and_keeps_the_widget_by_reference(world: World) -> None:
+async def test_pinning_adds_a_slot_with_a_copy_of_the_widget(world: World) -> None:
+    session = factories.session(world.project_id)
+    original = await world.widget(
+        session_id=session.id, spec={"column": "value"}, note="Why", type="table"
+    )
+    pinner = factories.AGENT.model_copy(update={"name": "someone else"})
     dashboard = await world.run(lambda s: s.create(world.project_id, "Overview", AGENT))
-    widget = await world.widget()
 
-    version = await world.run(lambda s: s.pin_widget(dashboard.id, widget.id, "coverage", 1, AGENT))
+    version = await world.run(
+        lambda s: s.pin_widget(dashboard.id, original.id, "coverage", 1, pinner)
+    )
 
-    assert [(slot.name, slot.widget_id) for slot in version.slots] == [("coverage", widget.id)]
-    assert version.slots[0].layout == {"x": 0, "y": 0, "w": 6, "h": 4}
-    # The widget itself is untouched: no copy was made.
     store = await world.container.get(MemoryStore)
-    assert list(store.widgets) == [widget.id]
+    copy = store.widgets[version.slots[0].widget_id]  # type: ignore[index]
+    assert [slot.name for slot in version.slots] == ["coverage"]
+    assert version.slots[0].layout == {"x": 0, "y": 0, "w": 6, "h": 4}
+    assert copy.id != original.id
+    assert (copy.operator_id, copy.type, copy.spec, copy.title, copy.note) == (
+        original.operator_id,
+        original.type,
+        original.spec,
+        original.title,
+        original.note,
+    )
+    assert (copy.copied_from, copy.session_id, copy.created_by) == (original.id, None, pinner)
+    # The original is untouched and stays in its session.
+    assert store.widgets[original.id] == original
+
+
+async def test_a_copy_pinned_again_points_at_the_first_original(world: World) -> None:
+    original = await world.widget()
+    dashboard = await world.run(lambda s: s.create(world.project_id, "Overview", AGENT))
+    first = await world.run(lambda s: s.pin_widget(dashboard.id, original.id, "a", 1, AGENT))
+    copy_id = first.slots[0].widget_id
+    assert copy_id is not None
+
+    second = await world.run(lambda s: s.pin_widget(dashboard.id, copy_id, "b", 2, AGENT))
+
+    store = await world.container.get(MemoryStore)
+    again = store.widgets[second.slots[1].widget_id]  # type: ignore[index]
+    assert again.id not in (original.id, copy_id)
+    assert again.copied_from == original.id
 
 
 async def test_pinning_into_an_existing_slot_changes_its_widget_and_keeps_its_place(
@@ -244,11 +275,12 @@ async def test_pinning_into_an_existing_slot_changes_its_widget_and_keeps_its_pl
 
     version = await world.run(lambda s: s.pin_widget(dashboard.id, new.id, "main", 3, AGENT))
 
+    store = await world.container.get(MemoryStore)
     assert version.number == 3
-    assert [(slot.name, slot.widget_id) for slot in version.slots] == [
-        ("main", new.id),
-        ("side", other.id),
-    ]
+    assert [
+        (slot.name, store.widgets[slot.widget_id].copied_from)  # type: ignore[index]
+        for slot in version.slots
+    ] == [("main", new.id), ("side", other.id)]
     assert version.slots[0].layout == {"x": 0, "y": 0, "w": 6, "h": 4}
 
 
@@ -264,6 +296,8 @@ async def test_pinning_checks_revision_and_project(world: World) -> None:
     with pytest.raises(Invalid):
         await world.run(lambda s: s.pin_widget(dashboard.id, widget.id, "  ", 1, AGENT))
     assert await world.run(lambda s: s.versions(dashboard.id)) == []
+    # A refused pin copies nothing either.
+    assert len((await world.container.get(MemoryStore)).widgets) == 2
 
 
 async def test_the_default_time_range_is_a_revisioned_change_without_a_new_version(
@@ -311,13 +345,19 @@ async def test_every_new_version_is_announced_after_the_commit(world: World) -> 
         assert [e.type for e in await world.events()] == [EventType.DASHBOARD_CHANGED]
 
     events = await world.events()
-    assert [e.type for e in events] == [EventType.DASHBOARD_CHANGED] * 2
+    # The copy is a new widget, announced like any other.
+    assert [e.type for e in events] == [
+        EventType.DASHBOARD_CHANGED,
+        EventType.WIDGET_CREATED,
+        EventType.DASHBOARD_CHANGED,
+    ]
     assert events[0].payload == {"dashboard_id": str(dashboard.id), "version_id": None}
-    assert events[1].payload == {
+    assert events[1].payload == {"widget_id": str(version.slots[0].widget_id)}
+    assert events[2].payload == {
         "dashboard_id": str(dashboard.id),
         "version_id": str(version.id),
     }
-    assert events[1].project_id == world.project_id
+    assert events[2].project_id == world.project_id
 
 
 async def test_a_refused_edit_announces_nothing(world: World) -> None:

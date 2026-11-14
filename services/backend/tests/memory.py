@@ -14,6 +14,7 @@ from dishka import Provider, Scope, provide
 
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import (
+    MemoryAgentTurnRepository,
     MemoryAlertRepository,
     MemoryAlertRuleRepository,
     MemoryDashboardRepository,
@@ -28,11 +29,14 @@ from ada.adapters.memory.repositories import (
     MemorySourceLocks,
     MemoryStore,
     MemoryTemplateRepository,
+    MemoryTurnProgress,
     MemoryWidgetRepository,
 )
 from ada.adapters.memory.tasks import RecordingTaskDispatcher
+from ada.core.ports.agents import TurnProgress
 from ada.core.ports.events import EventBroadcaster, EventStream
 from ada.core.ports.repositories import (
+    AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
     DashboardRepository,
@@ -86,8 +90,10 @@ class MemoryRepositories(Provider):
     reports = provide(MemoryReportRepository, provides=ReportRepository)
     alert_rules = provide(MemoryAlertRuleRepository, provides=AlertRuleRepository)
     alerts = provide(MemoryAlertRepository, provides=AlertRepository)
+    agent_turns = provide(MemoryAgentTurnRepository, provides=AgentTurnRepository)
     source_checks = provide(MemorySourceCheckLog, provides=SourceCheckLog, scope=Scope.APP)
     source_locks = provide(MemorySourceLocks, provides=SourceLocks, scope=Scope.APP)
+    turn_progress = provide(MemoryTurnProgress, provides=TurnProgress, scope=Scope.APP)
 
 
 def memory_adapters() -> tuple[Provider, Provider]:

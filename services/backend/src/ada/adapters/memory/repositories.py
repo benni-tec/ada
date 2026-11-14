@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
+from ada.core.models.agents import AgentTurn, TurnPart, TurnStatus
 from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
@@ -20,7 +21,9 @@ from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionEntry
 from ada.core.models.sources import DataSource
 from ada.core.models.widgets import Widget
+from ada.core.ports.agents import TurnProgress
 from ada.core.ports.repositories import (
+    AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
     DashboardRepository,
@@ -57,6 +60,8 @@ class MemoryStore:
         self.report_versions: dict[Id, ReportVersion] = {}
         self.alert_rules: dict[Id, AlertRule] = {}
         self.alerts: dict[Id, Alert] = {}
+        self.agent_turns: dict[Id, AgentTurn] = {}
+        self.cancel_requests: set[Id] = set()
 
 
 def _get[K, M](records: dict[K, M], kind: str, id: K) -> M:
@@ -400,3 +405,82 @@ class MemorySourceCheckLog(SourceCheckLog):
         self, id: Id, at: datetime, probe_token: str | None, error: str
     ) -> None:
         await MemoryDataSourceRepository(self.store).record_check(id, at, probe_token, error)
+
+
+class MemoryAgentTurnRepository(AgentTurnRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def get(self, id: Id) -> AgentTurn:
+        return _get(self.store.agent_turns, "agent turn", id)
+
+    async def add(self, turn: AgentTurn) -> None:
+        await MemorySessionRepository(self.store).get(turn.session_id)
+        self.store.agent_turns[turn.id] = turn
+
+    async def list(self, session_id: Id) -> Sequence[AgentTurn]:
+        return [t for t in self.store.agent_turns.values() if t.session_id == session_id]
+
+    async def start(self, id: Id) -> bool:
+        turn = await self.get(id)
+        if turn.status is not TurnStatus.QUEUED:
+            return False
+        self.store.agent_turns[id] = turn.model_copy(update={"status": TurnStatus.RUNNING})
+        return True
+
+    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> None:
+        turn = await self.get(id)
+        self.store.agent_turns[id] = turn.model_copy(update={"parts": tuple(parts)})
+
+    async def finish(
+        self,
+        id: Id,
+        status: TurnStatus,
+        parts: Sequence[TurnPart],
+        error: str | None,
+        at: datetime,
+    ) -> AgentTurn:
+        turn = (await self.get(id)).model_copy(
+            update={"status": status, "parts": tuple(parts), "error": error, "finished_at": at}
+        )
+        self.store.agent_turns[id] = turn
+        return turn
+
+    async def request_cancel(self, id: Id, at: datetime) -> AgentTurn:
+        turn = await self.get(id)
+        if turn.status is TurnStatus.QUEUED:
+            self.store.cancel_requests.add(id)
+            turn = turn.model_copy(update={"status": TurnStatus.CANCELLED, "finished_at": at})
+            self.store.agent_turns[id] = turn
+        elif turn.status is TurnStatus.RUNNING:
+            self.store.cancel_requests.add(id)
+        return turn
+
+    async def cancel_requested(self, id: Id) -> bool:
+        await self.get(id)
+        return id in self.store.cancel_requests
+
+
+class MemoryTurnProgress(TurnProgress):
+    """Memory has no transactions; progress goes straight to the store."""
+
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def start(self, id: Id) -> bool:
+        return await MemoryAgentTurnRepository(self.store).start(id)
+
+    async def checkpoint(self, id: Id, parts: Sequence[TurnPart]) -> bool:
+        turns = MemoryAgentTurnRepository(self.store)
+        await turns.save_parts(id, parts)
+        return await turns.cancel_requested(id)
+
+    async def finish(
+        self,
+        id: Id,
+        status: TurnStatus,
+        parts: Sequence[TurnPart],
+        error: str | None,
+        at: datetime,
+    ) -> AgentTurn:
+        return await MemoryAgentTurnRepository(self.store).finish(id, status, parts, error, at)

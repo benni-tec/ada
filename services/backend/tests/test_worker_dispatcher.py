@@ -17,6 +17,7 @@ from ada.adapters.valkey.tasks import (
     CHECK_ALERT_RULE,
     EXECUTE,
     REFRESH_SOURCE,
+    RUN_TURN,
     ValkeyTaskDispatcher,
     stream_broker,
 )
@@ -57,22 +58,24 @@ class RecordingBroker(AsyncBroker):
 async def test_the_dispatcher_kicks_each_task_by_name_with_its_arguments() -> None:
     broker = RecordingBroker()
     dispatcher = ValkeyTaskDispatcher(broker)
-    source_id, run_id, rule_id = uuid7(), uuid7(), uuid7()
+    source_id, run_id, rule_id, turn_id = uuid7(), uuid7(), uuid7(), uuid7()
 
     await dispatcher.refresh_source(source_id)
     await dispatcher.refresh_source(source_id, force=True)
     await dispatcher.execute(run_id, "op_abc")
     await dispatcher.check_alert_rule(rule_id)
+    await dispatcher.run_turn(turn_id)
 
     assert broker.sent() == [
         (REFRESH_SOURCE, [], {"data_source_id": str(source_id), "force": False}),
         (REFRESH_SOURCE, [], {"data_source_id": str(source_id), "force": True}),
         (EXECUTE, [], {"run_id": str(run_id), "operator_id": "op_abc"}),
         (CHECK_ALERT_RULE, [], {"rule_id": str(rule_id)}),
+        (RUN_TURN, [], {"turn_id": str(turn_id)}),
     ]
 
 
-@pytest.mark.parametrize("name", [REFRESH_SOURCE, EXECUTE, CHECK_ALERT_RULE])
+@pytest.mark.parametrize("name", [REFRESH_SOURCE, EXECUTE, CHECK_ALERT_RULE, RUN_TURN])
 def test_the_names_kicked_are_the_tasks_the_worker_registers(
     unreachable_settings: Settings, name: str
 ) -> None:
