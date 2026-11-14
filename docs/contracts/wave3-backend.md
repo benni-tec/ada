@@ -166,3 +166,6 @@ None in routes, payloads or events. Additions the contract leaves open:
 - **The pipelines list includes alert conditions** (see Deviations).
 - **The models file is read once per process.** Changing it or a key means restarting the
   backend and the worker.
+- **The image runs as the user `ada` (uid 1000)**, so a `config/llms.yml` that only its
+  owner may read stops the backend at start ("could not be read as YAML: Permission
+  denied") on a Linux host; Docker Desktop's bind mounts do not have this problem.
