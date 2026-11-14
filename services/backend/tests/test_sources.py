@@ -1474,7 +1474,7 @@ async def test_token_pagination_keeps_params_and_joins_before_shaping() -> None:
             200,
             json={
                 "data": {"items": [{"id": page}]},
-                "nextPageToken": str(page + 1) if page < 3 else "",
+                **({"nextPageToken": str(page + 1)} if page < 3 else {}),
             },
         )
 
@@ -1613,3 +1613,41 @@ async def test_malformed_pagination_fails_before_sending(paginate: dict[str, Any
             source(format=DataFormat.JSON, options={"paginate": paginate}), TimeRange()
         )
     assert not server.requests
+
+
+async def test_paginated_get_only_uses_a_declared_probe() -> None:
+    server = Server(lambda request: httpx.Response(200, headers={"ETag": "first-page"}, json=5))
+    options: dict[str, Any] = {"paginate": {"token": "next", "param": "cursor"}}
+    reader = server.reader()
+    assert await reader.probe(source(options=options)) is None
+    assert not server.requests
+
+    options["probe"] = {"url": "https://x.test/version"}
+    token = await reader.probe(source(options=options))
+    assert token is not None and token.startswith("sha256:")
+    [request] = server.requests
+    assert (request.method, str(request.url)) == ("GET", "https://x.test/version")
+
+
+@pytest.mark.parametrize("last_page", [{"more": False}, {"more": None}, {}])
+async def test_page_pagination_requires_more_on_every_page(last_page: dict[str, Any]) -> None:
+    answers = iter(
+        [
+            {"data": [], "pagination": {"more": True}},
+            {"data": [], "pagination": last_page},
+        ]
+    )
+    server = Server(lambda request: httpx.Response(200, json=next(answers)))
+    declared = source(
+        format=DataFormat.JSON,
+        options={
+            "rows": "data",
+            "paginate": {"more": "pagination.more", "page": "page", "delay_seconds": 0},
+        },
+    )
+    if last_page:
+        await server.reader().fetch(declared, TimeRange())
+    else:
+        with pytest.raises(Invalid, match="no field 'pagination.more'"):
+            await server.reader().fetch(declared, TimeRange())
+    assert len(server.requests) == 2
