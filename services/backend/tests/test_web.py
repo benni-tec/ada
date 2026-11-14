@@ -166,6 +166,34 @@ async def test_web_tools_use_the_ports(unreachable_settings: Settings) -> None:
     assert ("extract", ("https://stat.fi/a", "t", ("field",))) in pages.calls
 
 
+async def test_oversized_web_calls_are_refused_before_they_are_counted_or_sent(
+    unreachable_settings: Settings,
+) -> None:
+    search, pages = FakeWebSearch(), FakePageReader()
+    calls = [
+        ("search_web", {"query": "q", "limit": 21}),
+        ("extract_table", {"url": PAGE, "instruction": "x" * 2001, "columns": ["c"]}),
+        ("extract_table", {"url": PAGE, "instruction": "i", "columns": ["c"] * 31}),
+        ("extract_table", {"url": PAGE, "instruction": "i", "columns": [""]}),
+    ]
+    async with mcp_client(unreachable_settings, FakeWeb(search, pages)) as (client, _):
+        results = [await client.call_tool(n, a, raise_on_error=False) for n, a in calls]
+
+    messages = [result.content[0].text for result in results]  # type: ignore[union-attr]
+    for message, expected in zip(
+        messages,
+        [
+            "less than or equal to 20",
+            "at most 2000 characters",
+            "at most 30 items",
+            "at least 1 character",
+        ],
+        strict=True,
+    ):
+        assert expected in message
+    assert (search.searches, pages.calls) == ([], [])
+
+
 async def test_web_tools_without_keys_fail_with_the_setting_named(
     unreachable_settings: Settings,
 ) -> None:

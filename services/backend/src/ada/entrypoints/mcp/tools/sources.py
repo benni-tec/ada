@@ -14,6 +14,7 @@ from ada.core.models.sources import (
 )
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.transactions import AfterCommit
+from ada.core.services.ports.agents import ResearchService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.mcp.injection import Inject
@@ -92,6 +93,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         service: FromDishka[SourceService],
         dispatcher: FromDishka[TaskDispatcher],
         after_commit: FromDishka[AfterCommit],
+        research: FromDishka[ResearchService],
         name: str | None = None,
         address: str | None = None,
         options: JsonObject | None = None,
@@ -116,6 +118,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             declared_schema=declared_schema,
         )
         if (before.address, before.options) != (updated.address, updated.options):
+            await _count_document_read(research, updated)
             # Queued after the commit: the worker must read the new address, not the old.
             after_commit.add(lambda: dispatcher.refresh_source(source_id, True))
         return updated
@@ -126,12 +129,22 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         source_id: Id,
         service: FromDishka[SourceService],
         dispatcher: FromDishka[TaskDispatcher],
+        research: FromDishka[ResearchService],
         force: bool = False,
     ) -> RefreshQueued:
         """Fetch a data source's data in the background and store it as a snapshot. Use it
         after register_source and whenever the data may have changed. It returns at once;
         the fetch runs in the worker. A source whose data did not change gets no new
-        snapshot. `force` skips the freshness check and the cheap probe for change."""
-        await service.get(source_id)
+        snapshot. `force` skips the freshness check and the cheap probe for change. In a
+        research session, refreshing a document source counts as a web call."""
+        await _count_document_read(research, await service.get(source_id))
         await dispatcher.refresh_source(source_id, force)
         return RefreshQueued(data_source_id=source_id, force=force)
+
+
+async def _count_document_read(research: ResearchService, source: DataSource) -> None:
+    """A document source is read through Context.dev, a paid call. The worker reads it,
+    outside the research turn that asks, so the call is counted here, when it is queued;
+    nothing is counted outside a research turn."""
+    if source.access_kind is AccessKind.DOCUMENT:
+        await research.use_web_call()

@@ -312,6 +312,7 @@ Named `<module>:<function>`; the dispatcher queues them by name
 | `ada.entrypoints.worker.tasks.alerts:check_due_alert_rules` | Every minute (scheduler) | Queues `check_alert_rule` for each rule `AlertService.due()` returns; a failure to queue one is logged and the others are still queued |
 | `ada.entrypoints.worker.tasks.system:record_heartbeat` | Every minute (scheduler) | Proves scheduler, queue and worker work (health) |
 | `ada.entrypoints.worker.tasks.agent:run_turn` | Queued by `AgentTurnService.post_message` after the commit (`TaskDispatcher.run_turn(turn_id)`) | `AgentTurnService.run(turn, InProcessToolbox(container))` with the application's container (see The agent). Never raises: everything is caught and logged, and a failure ends the turn `failed` |
+| `ada.entrypoints.worker.tasks.agent:recover_turns` | Every minute (scheduler) | `AgentTurnService.recover()`: fails a turn still running past its time limit plus a margin (its worker stopped) and announces a turn that ended unannounced (its worker stopped right after), with a research turn's report to its parent, once |
 
 ## Dashboards
 
