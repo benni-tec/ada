@@ -1,1 +1,7 @@
 @import 'tailwindcss';
+
+/* Widget frames take part in both schemes; matching them keeps their background
+   transparent instead of an opaque canvas when the schemes differ. */
+:root {
+  color-scheme: light dark;
+}
