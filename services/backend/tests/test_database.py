@@ -49,7 +49,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == [f"{n:04}" for n in range(1, 11)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(1, 12)]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -69,7 +69,7 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert instructions == ""
         # 0010 lets widgets read further inputs and keep a drawing error.
         columns = {c["name"] for c in inspect(engine).get_columns("widgets")}
-        assert {"inputs", "render_error"} <= columns
+        assert {"inputs", "render_error", "verdict"} <= columns
 
         command.downgrade(_config(database_url), "0001")
 
@@ -79,16 +79,17 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "agent_settings" not in inspector.get_table_names()
         assert "tool_call" not in {c["name"] for c in inspector.get_columns("session_entries")}
         assert "web_usage" not in inspector.get_table_names()
+        assert "session_attachments" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == [f"{n:04}" for n in range(2, 11)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(2, 12)]
     assert migrate(database_url) == []
 
 
-def test_migration_0006_keeps_existing_rows(database_url: str) -> None:
+def test_migrations_from_0006_keep_existing_rows(database_url: str) -> None:
     config = _config(database_url)
     command.upgrade(config, "0005")
-    project, source, session = uuid7(), uuid7(), uuid7()
+    project, source, session, dashboard = uuid7(), uuid7(), uuid7(), uuid7()
     engine = create_engine(database_url)
     try:
         with engine.begin() as connection:
@@ -109,10 +110,17 @@ def test_migration_0006_keeps_existing_rows(database_url: str) -> None:
             )
             connection.execute(
                 text(
-                    "INSERT INTO sessions (id, project_id, title, created_at, revision)"
-                    " VALUES (:s, :p, 'T', now(), 1)"
+                    "INSERT INTO dashboards (id, project_id, name, created_at, revision)"
+                    " VALUES (:d, :p, 'D', now(), 1)"
                 ),
-                {"s": session, "p": project},
+                {"d": dashboard, "p": project},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO sessions (id, project_id, title, panel_dashboard_id,"
+                    " created_at, revision) VALUES (:s, :p, 'T', :d, now(), 1)"
+                ),
+                {"s": session, "p": project, "d": dashboard},
             )
 
         command.upgrade(config, "head")
@@ -130,6 +138,12 @@ def test_migration_0006_keeps_existing_rows(database_url: str) -> None:
         assert tuple(source_row) == (None, None, None)
         assert tuple(session_row) == ("session", None, 0)
         assert tuple(settings) == (None,)
+        # 0011: the dashboard beside a session becomes its attachment.
+        with engine.connect() as connection:
+            attachment = connection.execute(
+                text("SELECT session_id, kind, ref FROM session_attachments")
+            ).one()
+        assert tuple(attachment) == (session, "dashboard", str(dashboard))
     finally:
         engine.dispose()
 
