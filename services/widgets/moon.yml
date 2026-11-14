@@ -20,7 +20,7 @@ fileGroups:
 
 tasks:
   dev:
-    description: "Serve one widget for development: WIDGET=<name> moon run widgets:dev"
+    description: "Serve every widget at http://localhost:5174/<type>.html, with /api forwarded to the backend"
     command: "vite"
     preset: "server"
 
@@ -34,6 +34,12 @@ tasks:
 
   typecheck:
     command: "tsc -b"
+    inputs:
+      - "@group(sources)"
+      - "@group(configs)"
+
+  test:
+    command: "vitest run"
     inputs:
       - "@group(sources)"
       - "@group(configs)"

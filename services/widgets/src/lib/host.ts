@@ -2,6 +2,8 @@
 // inside an MCP host, where data comes through tool calls instead of REST, changes this
 // file and nothing else.
 
+import type { Operator, Widget, WidgetData } from './types'
+
 export type WidgetContext = {
   widgetId: string
   /** The run to show; without one the server starts a new run. */
@@ -15,6 +17,13 @@ export function context(): WidgetContext | null {
   return widgetId ? { widgetId, runId: params.get('run') } : null
 }
 
+/** Calls back whenever the context changes, e.g. when the page swaps the run in the
+ * fragment without reloading the frame. Returns the unsubscribe function. */
+export function onContextChange(listener: () => void): () => void {
+  window.addEventListener('hashchange', listener)
+  return () => window.removeEventListener('hashchange', listener)
+}
+
 async function get<T>(path: string): Promise<T> {
   const response = await fetch(path)
   if (!response.ok) {
@@ -25,13 +34,19 @@ async function get<T>(path: string): Promise<T> {
 }
 
 /** The widget's definition: its type, title and spec. */
-export function fetchWidget<T>({ widgetId }: WidgetContext): Promise<T> {
-  return get(`/api/widgets/${widgetId}`)
+export function fetchWidget({ widgetId }: WidgetContext): Promise<Widget> {
+  return get(`/api/widgets/${encodeURIComponent(widgetId)}`)
 }
 
 /** The output of the widget's operator, with the scenario and stale flags. */
-export function fetchData<T>({ widgetId, runId }: WidgetContext, limit = 1000): Promise<T> {
+export function fetchData({ widgetId, runId }: WidgetContext, limit = 1000): Promise<WidgetData> {
   const query = new URLSearchParams({ limit: String(limit) })
   if (runId) query.set('run_id', runId)
-  return get(`/api/widgets/${widgetId}/data?${query}`)
+  return get(`/api/widgets/${encodeURIComponent(widgetId)}/data?${query}`)
+}
+
+/** The operator behind the widget, for the roles of its output (measures, bounds,
+ * suppression, time). The data itself carries column names and types only. */
+export function fetchOperator(operatorId: string): Promise<Operator> {
+  return get(`/api/operators/${encodeURIComponent(operatorId)}`)
 }
