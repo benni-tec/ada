@@ -195,8 +195,8 @@ test('a report opens at its latest version, frozen, every widget at the version�
   expect(screen.getByText('Mostly in the north.')).toBeInTheDocument()
   expect(screen.getByRole('complementary', { name: 'Below target' })).toHaveTextContent('Finding')
   expect(within(screen.getByRole('region', { name: 'Trend' })).getByText('By wellbeing services county')).toBeInTheDocument()
-  expect(await screen.findByTitle('Widget: Coverage by region')).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r2')
-  expect(await screen.findByTitle('Widget: Latest coverage')).toHaveAttribute('src', 'http://localhost:5174/value.html#widget=w2&run=r2')
+  expect(await screen.findByTitle('Widget: Coverage by region')).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r2&fit=content')
+  expect(await screen.findByTitle('Widget: Latest coverage')).toHaveAttribute('src', 'http://localhost:5174/value.html#widget=w2&run=r2&fit=content')
   // Full size, it opens over the report at the report's run.
   const card = screen.getByRole('article', { name: 'Coverage by region' })
   await waitFor(() => expect(within(card).getByRole('link', { name: 'Open full size' })).toHaveAttribute('href', '/projects/p1/reports/rep1?version=1.1.0&open=w1'))
@@ -216,9 +216,28 @@ test('a report opens at its latest version, frozen, every widget at the version�
   fireEvent.change(screen.getByLabelText('Version'), { target: { value: '1.0.0' } })
   await waitFor(() => expect(router.state.location.search).toEqual({ version: '1.0.0' }))
   expect(await screen.findByText(/You are reading version 1.0.0/)).toBeInTheDocument()
-  await waitFor(() => expect(screen.getByTitle('Widget: Coverage by region')).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r1'))
+  await waitFor(() => expect(screen.getByTitle('Widget: Coverage by region')).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r1&fit=content'))
   expect(screen.getByRole('complementary', { name: 'About this version' })).toHaveTextContent('Data periodAll periods')
   expect(screen.getByRole('link', { name: '1.1.0' })).toHaveAttribute('href', '/projects/p1/reports/rep1?version=1.1.0')
+})
+
+test('a text widget’s value opens the pipeline of the input it comes from', async () => {
+  serveReport({
+    'GET /api/widgets/w1': { ...chart, type: 'text', inputs: { gap: 'op_j' } },
+    'GET /api/operators/op_j/lineage': lineage.slice(0, 3),
+  })
+  renderAt('/projects/p1/reports/rep1?version=1.1.0')
+
+  const frame = (await screen.findByTitle('Widget: Coverage by region')) as HTMLIFrameElement
+  expect(frame.getAttribute('src')).toBe('http://localhost:5174/text.html#widget=w1&run=r2&fit=content')
+  act(() =>
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'ada:open-pipeline', input: 'gap' }, source: frame.contentWindow })),
+  )
+  const dialog = await screen.findByRole('dialog', { name: 'Pipeline of “Coverage by region”, input “gap”' })
+  const graph = await within(dialog).findByRole('group', { name: 'Operators, from the sources to the widget' })
+  expect(within(graph).getAllByRole('button').map((button) => button.dataset.operator)).toEqual(['op_s', 'op_r', 'op_j'])
+  expect(node(dialog, /the widget reads this/)).toHaveAttribute('data-operator', 'op_j')
+  expect(node(dialog, /the widget reads this/)).toHaveAttribute('aria-pressed', 'true')
 })
 
 test('the pipeline is read when its dialog opens: the graph, the details and a preview at the version’s run; a source shows its snapshot', async () => {

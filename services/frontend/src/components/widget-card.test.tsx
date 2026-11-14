@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { expect, test, vi } from 'vitest'
 
 import type { Widget } from '@/lib/api'
 import { LiveContext } from '@/lib/live'
@@ -42,9 +42,41 @@ test('a theme picked apart from the system’s goes to the frame, which cannot s
   )
   const { rerender } = render(frame('system', 'dark'))
   const element = screen.getByTitle('Widget: Screening')
-  expect(element.getAttribute('src')).toBe('http://localhost:5174/map.html#widget=w1&run=r1')
+  expect(element.getAttribute('src')).toBe('http://localhost:5174/map.html#widget=w1&run=r1&fit=content')
   rerender(frame('light', 'light'))
   // The same frame, its fragment changed: no reload.
   expect(screen.getByTitle('Widget: Screening')).toBe(element)
-  expect(element.getAttribute('src')).toBe('http://localhost:5174/map.html#widget=w1&run=r1&theme=light')
+  expect(element.getAttribute('src')).toBe('http://localhost:5174/map.html#widget=w1&run=r1&theme=light&fit=content')
+})
+
+test('a frame in a report or a session follows the height its widget posts; one with a height of its own does not', () => {
+  const opened = vi.fn()
+  const { rerender } = render(<WidgetFrame widget={widget} runId="r1" onOpenPipeline={opened} />)
+  const frame = screen.getByTitle('Widget: Screening') as HTMLIFrameElement
+  const box = frame.parentElement!
+  // The map's usual height until the widget says.
+  expect(box).toHaveStyle({ height: '420px' })
+  const post = (data: unknown, source: MessageEventSource | null = frame.contentWindow) =>
+    act(() => window.dispatchEvent(new MessageEvent('message', { data, source })))
+
+  post({ type: 'ada:resize', height: 512.3 })
+  expect(box).toHaveStyle({ height: '513px' })
+  // Within bounds: never collapsed, never longer than the limit.
+  post({ type: 'ada:resize', height: 0 })
+  expect(box).toHaveStyle({ height: '64px' })
+  post({ type: 'ada:resize', height: 99_999 })
+  expect(box).toHaveStyle({ height: '2400px' })
+  // Only its own frame speaks for it.
+  post({ type: 'ada:resize', height: 300 }, window)
+  expect(box).toHaveStyle({ height: '2400px' })
+
+  post({ type: 'ada:open-pipeline', input: 'gap' })
+  expect(opened).toHaveBeenCalledWith('gap')
+
+  // A widget's page: a fixed height, the widget fills it.
+  rerender(<WidgetFrame widget={widget} runId="r1" tall />)
+  const tall = screen.getByTitle('Widget: Screening') as HTMLIFrameElement
+  expect(tall.getAttribute('src')).not.toContain('fit=content')
+  act(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'ada:resize', height: 100 }, source: tall.contentWindow })))
+  expect(tall.parentElement).toHaveStyle({ height: '735px' })
 })
