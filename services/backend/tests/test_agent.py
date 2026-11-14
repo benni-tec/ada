@@ -31,6 +31,7 @@ from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.agents import AgentTurn, ProviderKind, ToolPart
 from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.base import Id
+from ada.core.models.judges import Finding, Outcome
 from ada.core.models.reports import Report, ReportVersion
 from ada.core.models.time import TimeRange
 from ada.core.models.web import SearchHit
@@ -55,7 +56,17 @@ from agent_support import (
     run_turn,
     say,
 )
-from api_support import FakeWeb, Overrides, dispatcher, events, new_project, send, serve
+from api_support import (
+    FakeWeb,
+    Judged,
+    Overrides,
+    dispatcher,
+    events,
+    new_project,
+    resolve,
+    send,
+    serve,
+)
 from fakes import FakeExplorer, FakeWebSearch
 from memory import memory_adapters
 
@@ -367,6 +378,48 @@ def test_the_prompt_lists_what_the_session_shows_beside_the_conversation(
         f'- report "Findings 1.1.0", ref {version.id}; run {run_id}',
         '- web_page "THL on screening", ref https://thl.fi/screening',
     ]
+
+
+def test_the_prompt_names_the_session_s_widgets_that_need_fixing(
+    client: TestClient,
+    project: dict[str, Any],
+    source: dict[str, Any],
+    session: dict[str, Any],
+    script: Script,
+) -> None:
+    operator = send(
+        client,
+        "POST",
+        f"/projects/{project['id']}/operators",
+        {"kind": "source", "data_source_id": source["id"]},
+        201,
+    )
+    path = f"/projects/{project['id']}/widgets"
+    body = {"operator_id": operator["id"], "session_id": session["id"]}
+    code = "export default function render(root, data, ada) {\n  root.textContent = 'x';\n}"
+    overlap = Finding(message="Labels overlap", excerpt="textContent", severity="warning")
+    resolve(client, Judged).then(Outcome.WARN, overlap)
+    judged = send(
+        client,
+        "POST",
+        path,
+        {**body, "type": "custom", "title": "Bars", "spec": {"code": code}},
+        201,
+    )
+    broken = send(client, "POST", path, {**body, "type": "table", "title": "Regions"}, 201)
+    drawn = send(client, "POST", path, {**body, "type": "table", "title": "Drawn"}, 201)
+    client.post(f"/api/widgets/{broken['id']}/render", json={"error": "rows is undefined"})
+    script.then(say("Fixing them."))
+
+    run(client, message(client, session, "Why is it empty?")["turn"]["id"])
+
+    instructions = script.calls[0][1].instructions or ""
+    assert (
+        f'"Bars", id {judged["id"]}: the judge\'s verdict on its code is warn: Labels overlap '
+        "(in `textContent`)"
+    ) in instructions
+    assert f'"Regions", id {broken["id"]}: it could not be drawn: rows is undefined' in instructions
+    assert drawn["id"] not in instructions
 
 
 def test_people_s_instructions_follow_ada_s_rules_in_order_and_are_cut(

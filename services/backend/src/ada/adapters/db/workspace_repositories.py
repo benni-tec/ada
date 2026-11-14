@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -28,6 +29,7 @@ from ada.adapters.db.tables import (
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.errors import NotFound
+from ada.core.models.judges import Verdict
 from ada.core.models.projects import Project
 from ada.core.models.schema import Schema
 from ada.core.models.sessions import EntryKind, Session, SessionAgent, SessionEntry
@@ -296,7 +298,12 @@ def _widget(row: WidgetRow) -> Widget:
         copied_from=row.copied_from,
         inputs=dict(row.inputs or {}),
         render_error=row.render_error,
+        verdict=Verdict.model_validate(row.verdict) if row.verdict is not None else None,
     )
+
+
+def _verdict(widget: Widget) -> dict[str, Any] | None:
+    return dump(widget.verdict) if widget.verdict is not None else None
 
 
 class SqlWidgetRepository(WidgetRepository):
@@ -322,6 +329,7 @@ class SqlWidgetRepository(WidgetRepository):
             copied_from=widget.copied_from,
             inputs=dict(widget.inputs),
             render_error=widget.render_error,
+            verdict=_verdict(widget),
         )
         await add_row(self.session, row)
 
@@ -337,6 +345,7 @@ class SqlWidgetRepository(WidgetRepository):
                 note=widget.note,
                 inputs=dict(widget.inputs),
                 render_error=widget.render_error,
+                verdict=_verdict(widget),
             )
         )
         if result.rowcount == 0:  # type: ignore[attr-defined]

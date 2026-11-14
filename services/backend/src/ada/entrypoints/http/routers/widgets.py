@@ -88,6 +88,21 @@ async def update_widget(
     )
 
 
+class RenderReport(Request):
+    """What the widget's frame found when it drew: the error, or null when it drew."""
+
+    error: str | None
+
+
+@router.post("/widgets/{widget_id}/render", status_code=status.HTTP_204_NO_CONTENT)
+async def report_render(
+    widget_id: Id, body: RenderReport, service: FromDishka[WidgetService]
+) -> None:
+    """Called by the widget's frame only. Kept as `render_error`, so the agent that wrote the
+    widget sees it; announced with `widget.updated` when it changed."""
+    await service.report_render(widget_id, body.error)
+
+
 @router.get("/widgets/{widget_id}/data")
 async def get_widget_data(
     widget_id: Id,

@@ -22,7 +22,11 @@ class WidgetService(Protocol):
     ) -> Widget:
         """A widget on an operator's output, and on further named `inputs` if given (each an
         operator of the project; see Widget.inputs). It is created from an operator id only; no
-        data passes through the caller. With a session id it is also recorded there."""
+        data passes through the caller. With a session id it is also recorded there.
+
+        A custom widget's code is reviewed by the project's judge, with a sample of every
+        input: a blocking verdict refuses it (Invalid, with the findings), any other is
+        stored on the widget."""
         ...
 
     async def update(
@@ -37,7 +41,16 @@ class WidgetService(Protocol):
         """Change a widget in place; what is left out stays. New `inputs` replace the old
         ones whole. A new spec replaces the old
         one whole and is checked against the operator like a new widget's. Copies on
-        dashboards are widgets of their own and do not change with it."""
+        dashboards are widgets of their own and do not change with it.
+
+        A change of spec, type or inputs clears `render_error`, and a custom widget's code
+        is reviewed again, as on create."""
+        ...
+
+    async def report_render(self, id: Id, error: str | None) -> None:
+        """What the widget's frame found when it drew: an error, or None when it drew. Kept
+        as `render_error` (cut at 2,000 characters) and announced only when it changed; no
+        session entry."""
         ...
 
     async def get(self, id: Id) -> Widget: ...

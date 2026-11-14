@@ -31,6 +31,7 @@ from ada.core.models.analysis import Rows
 from ada.core.models.base import Id
 from ada.core.models.errors import Invalid
 from ada.core.models.events import Event
+from ada.core.models.judges import Finding, JudgeContext, JudgeKind, Outcome, Verdict
 from ada.core.models.operators import (
     Operator,
     OperatorId,
@@ -62,6 +63,7 @@ from ada.core.ports.system import Clock
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.web import WebExplorer, WebSearch
 from ada.core.services.pipelines import listing
+from ada.core.services.ports.judges import JudgeService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sources import SourceService
@@ -281,6 +283,42 @@ class FakeSources(SourceService):
         return []
 
 
+@dataclass
+class Judged:
+    """What the fake judge was asked, and the verdicts it gives next (a pass when none is
+    queued)."""
+
+    calls: list[tuple[JudgeKind, str, JudgeContext]] = field(default_factory=list)
+    queued: list[tuple[Outcome, bool, tuple[Finding, ...]]] = field(default_factory=list)
+
+    def then(self, outcome: Outcome, *findings: Finding, blocking: bool = False) -> None:
+        self.queued.append((outcome, blocking, findings))
+
+
+class FakeJudges(JudgeService):
+    def __init__(self, judged: Judged, clock: Clock) -> None:
+        self.judged = judged
+        self.clock = clock
+
+    async def review(
+        self, project_id: Id, kind: JudgeKind, content: str, context: JudgeContext
+    ) -> Verdict:
+        self.judged.calls.append((kind, content, context))
+        outcome, blocking, findings = (
+            self.judged.queued.pop(0) if self.judged.queued else (Outcome.PASS, False, ())
+        )
+        return Verdict(
+            kind=kind,
+            outcome=outcome,
+            passed=outcome in (Outcome.PASS, Outcome.WARN),
+            blocking=blocking,
+            findings=findings,
+            model="fake/judge",
+            content_hash=f"{len(self.judged.calls)}",
+            checked_at=self.clock.now(),
+        )
+
+
 class Overrides(Provider):
     """Binds the fakes in place of the other workstreams' services, and a clock that
     stands still."""
@@ -291,6 +329,7 @@ class Overrides(Provider):
         super().__init__()
         self.clock = FixedClock()
         self.results = Results()
+        self.judged = Judged()
 
     @provide(scope=Scope.APP)
     def clock_(self) -> Clock:
@@ -300,9 +339,14 @@ class Overrides(Provider):
     def results_(self) -> Results:
         return self.results
 
+    @provide(scope=Scope.APP)
+    def judged_(self) -> Judged:
+        return self.judged
+
     pipelines = provide(FakePipelines, provides=PipelineService)
     runs = provide(FakeRuns, provides=RunService)
     sources = provide(FakeSources, provides=SourceService)
+    judges = provide(FakeJudges, provides=JudgeService)
 
 
 class FakeWeb(Provider):
