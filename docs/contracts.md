@@ -1717,14 +1717,21 @@ project's verdict lists.
 - **Attachments beside a session** (`components/attachments/*`) split the page half and
   half (`lg` and up; stacked below): the conversation, and the attachments as tabs under a
   bar that is black with white text in light mode and white with black text in dark mode.
+  The pane is open while something is attached and closed while nothing is (a strip of
+  the bar's colour with "Open the attachments"): it closes when the last attachment goes
+  and opens when one arrives; the person can close it ("Close the attachments") or open
+  it, empty too. Its left edge is a window splitter ("Resize the attachments", `lg` and
+  up): dragged, or focused and moved with the arrow keys (left widens, by 5%), Home and
+  End, between 25% and 75% of the width, remembered per browser (`localStorage`
+  `ada-attachments-width`).
   A tab has the kind's icon, the title (full in its tooltip, with who attached it) and an
   × "Detach <title>"; arrows, Home and End move between tabs. "Attach" opens a searchable
   chooser of the project's dashboards, reports (with a version), alert rules, sources,
   pipelines, other sessions and widgets (attached ones marked; picking one opens its
   tab), and a URL field for a web page. The open tab is remembered per session
   (`localStorage` `ada-session-tab:<id>`), else the newest opens; one an agent attaches
-  opens (`session.attachment_added`). With nothing attached the half says so, with
-  Attach. Views: a dashboard's grid read only, its empty slots offering "Add widget" into
+  opens (`session.attachment_added`). Opened with nothing attached, the half says so,
+  with Attach. Views: a dashboard's grid read only, its empty slots offering "Add widget" into
   the composer; a report version frozen at its run; an alert rule with its alerts; a
   source's provenance, freshness and rows; a pipeline's graph and rows; another session's
   record read only; a widget card at the session's run; a web page's title and an "Open"
