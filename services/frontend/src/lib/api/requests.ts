@@ -1,8 +1,8 @@
 // The REST calls of docs/contracts.md, on the typed client: paths, parameters, bodies and
 // answers are checked against the backend's OpenAPI schema.
 
-import { api, ApiFailure, type ApiError } from './client'
-import type { Id, Project, Session } from './models'
+import { api, ApiFailure, type ApiError, type Schemas } from './client'
+import type { DataSource, Id, Project, Session } from './models'
 
 type Answer<T> = { data?: T; error?: unknown; response: Response }
 
@@ -37,6 +37,25 @@ export const renameProject = (project: Project, name: string) =>
 
 export const listSources = (projectId: Id) =>
   unwrap(api.GET('/api/projects/{project_id}/sources', { params: { path: { project_id: projectId } } }))
+
+export type NewSource = Schemas['NewSource']
+/** What can change in a source; its access kind and format stay. */
+export type SourceChange = Omit<Schemas['SourceChange'], 'expected_revision'>
+
+export const registerSource = (projectId: Id, source: NewSource) =>
+  unwrap(api.POST('/api/projects/{project_id}/sources', { params: { path: { project_id: projectId } }, body: source }))
+
+export const updateSource = (source: DataSource, change: SourceChange) =>
+  unwrap(
+    api.PATCH('/api/sources/{source_id}', {
+      params: { path: { source_id: source.id } },
+      body: { ...change, expected_revision: source.revision },
+    }),
+  )
+
+/** Queues a refresh now, whatever the freshness policy says; the outcome comes as an event. */
+export const refreshSource = (id: Id) =>
+  unwrap(api.POST('/api/sources/{source_id}/refresh', { params: { path: { source_id: id } }, body: { force: true } }))
 
 // Sessions
 
