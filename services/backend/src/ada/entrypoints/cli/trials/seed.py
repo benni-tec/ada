@@ -15,6 +15,7 @@ from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.cli.trials import steps
+from ada.entrypoints.cli.trials.monitoring import create_monitoring
 from ada.entrypoints.cli.trials.sources import CTGOV, CTIS, SOURCES
 
 PROJECT = "Nordic cancer trials"
@@ -62,7 +63,12 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
         project_id = project.id
     async with container() as request:
         built = await _build(request, project_id, registered)
-        # Dashboard and monitoring builders receive project_id and this TrialSteps contract here.
+        session = next(
+            s
+            for s in await (await request.get(SessionService)).list(project_id)
+            if s.title == SESSION
+        )
+        await create_monitoring(request, project_id, session.id, registered, built, SEED)
     if refresh:
         for source in SOURCES:
             async with container() as request:

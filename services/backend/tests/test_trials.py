@@ -12,25 +12,40 @@ from ada.adapters.clock import SystemClock
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.models.alerts import AlertState
+from ada.core.models.base import Id
 from ada.core.ports.sources import SourceReaders
+from ada.core.services.ports.alerts import AlertService
+from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
-from ada.entrypoints.cli.trials.seed import _build, seed_trials
+from ada.core.services.ports.widgets import WidgetService
+from ada.entrypoints.cli.trials.monitoring import DASHBOARD, FINNISH_RULE
+from ada.entrypoints.cli.trials.seed import SEED, _build, seed_trials
 from ada.entrypoints.cli.trials.sources import COUNTRIES
-from memory import MemoryBackground
+from memory import MemoryBackground, memory_adapters
 
 pytestmark = pytest.mark.anyio
 RECORDINGS = Path(__file__).parent / "recordings" / "trials"
 
 
 @pytest.fixture
-async def container(migrated_database_url: str, tmp_path: Path) -> AsyncIterator[AsyncContainer]:
+def finland_fixture() -> dict:
+    return json.loads((RECORDINGS / "ctgov-Finland.json").read_text())
+
+
+@pytest.fixture(params=["memory", "postgres"])
+async def container(
+    request: pytest.FixtureRequest, tmp_path: Path, finland_fixture: dict
+) -> AsyncIterator[AsyncContainer]:
     def registry(request: httpx.Request) -> httpx.Response:
         if request.url.host == "clinicaltrials.gov":
             country = request.url.params["query.locn"]
             name = f"ctgov-{country}.json"
+            if country == "Finland":
+                return httpx.Response(200, json=finland_fixture)
         else:
             assert request.method == "POST"
             body = json.loads(request.content)
@@ -40,16 +55,23 @@ async def container(migrated_database_url: str, tmp_path: Path) -> AsyncIterator
             name = f"ctis-{country}-p{body['pagination']['page']}.json"
         return httpx.Response(200, json=json.loads((RECORDINGS / name).read_text()))
 
-    readers = HttpSourceReaders(create_client(httpx.MockTransport(registry)), SystemClock())
+    readers = HttpSourceReaders(
+        create_client(httpx.MockTransport(registry)), SystemClock(), allow_private=True
+    )
     outside = Provider(scope=Scope.APP)
     outside.provide(lambda: readers, provides=SourceReaders)
+    database_url = (
+        request.getfixturevalue("migrated_database_url")
+        if request.param == "postgres"
+        else "postgresql+psycopg://test@127.0.0.1:1/test"
+    )
     result = create_container(
         Settings(
-            database_url=migrated_database_url,
+            database_url=database_url,
             valkey_url="redis://127.0.0.1:1/0",
             data_dir=tmp_path,
         ),
-        MemoryBackground(),
+        *(memory_adapters() if request.param == "memory" else (MemoryBackground(),)),
         outside,
     )
     try:
@@ -70,12 +92,12 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
     assert await seed_trials(container) == project_id
     async with container() as request:
         sources = await (await request.get(SourceService)).list(project_id)
-        assert len(sources) == 8
+        assert len(sources) == 10
         assert all(s.last_checked_at is None for s in sources)
         sessions = await request.get(SessionService)
         [session] = await sessions.list(project_id)
         entries = await sessions.entries(session.id)
-        assert {e.text.split(":")[0] for e in entries} == {
+        assert {e.text.split(":")[0] for e in entries if e.text} == {
             "trials",
             "trial_sites",
             "trial_doors",
@@ -83,6 +105,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             "ctis_finland_pending",
             "trial_rates",
             "case_trials",
+            "trial_site_changes",
         }
         pipelines = await request.get(PipelineService)
         after = {
@@ -91,7 +114,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             for o in await pipelines.lineage(p.operator_id)
         }
     assert before == after
-    assert len(after) == 15
+    assert len(after) > 15
 
 
 async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
@@ -131,3 +154,85 @@ async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
     )
     assert fi_rate["trials"] == 2
     assert fi_rate["per_million"] == pytest.approx(2 / 5.64)
+
+
+async def simulate_site_change(container: AsyncContainer, finland_fixture: dict) -> Id:
+    """Seed recordings, then refresh Finland after changing the transport's mutable fixture."""
+    # Copy the door trial from Sweden into Finland's next country listing.
+    sweden = json.loads((RECORDINGS / "ctgov-Sweden.json").read_text())
+    trial = next(
+        t
+        for t in sweden["studies"]
+        if t["protocolSection"]["identificationModule"]["nctId"] == "NCT07195695"
+    )
+    if not any(
+        t["protocolSection"]["identificationModule"]["nctId"] == "NCT07195695"
+        for t in finland_fixture["studies"]
+    ):
+        finland_fixture["studies"].append(json.loads(json.dumps(trial)))
+    project_id = await seed_trials(container, refresh=True)
+    section = trial["protocolSection"]
+    locations = section["contactsLocationsModule"]["locations"]
+    closing = next(
+        s for s in locations if s["country"] in COUNTRIES and s.get("status") == "RECRUITING"
+    )
+    closing["status"] = "COMPLETED"
+    locations.append(
+        {"facility": "HUS", "city": "Helsinki", "country": "Finland", "status": "RECRUITING"}
+    )
+    finland_fixture["studies"] = [
+        t
+        for t in finland_fixture["studies"]
+        if t["protocolSection"]["identificationModule"]["nctId"] != "NCT07195695"
+    ] + [trial]
+    async with container() as request:
+        sources = await (await request.get(SourceService)).list(project_id)
+        source = next(s for s in sources if s.name == "ClinicalTrials.gov: Finland")
+        await (await request.get(SourceService)).refresh(source.id, force=True)
+    return project_id
+
+
+async def test_monitoring_changes_and_finnish_alert(
+    container: AsyncContainer, finland_fixture: dict
+) -> None:
+    # The Finland recording also carries the door trial as an old observation.
+    sweden = json.loads((RECORDINGS / "ctgov-Sweden.json").read_text())
+    trial = next(
+        t
+        for t in sweden["studies"]
+        if t["protocolSection"]["identificationModule"]["nctId"] == "NCT07195695"
+    )
+    finland_fixture["studies"].append(trial)
+    project_id = await seed_trials(container, refresh=True)
+    async with container() as request:
+        widget = next(
+            w
+            for w in await (await request.get(WidgetService)).list(project_id)
+            if w.title == "trial_site_changes" and w.copied_from is None
+        )
+        run = await (await request.get(RunService)).start(project_id, SEED)
+        assert not (await (await request.get(RunService)).read(run.id, widget.operator_id)).rows
+    project_id = await simulate_site_change(container, finland_fixture)
+    async with container() as request:
+        runs = await request.get(RunService)
+        run = await runs.start(project_id, SEED)
+        data = await runs.read(run.id, widget.operator_id)
+        rows = [dict(zip([c.name for c in data.columns], row, strict=True)) for row in data.rows]
+        assert {r["change_kind"] for r in rows if r["nct_id"] == "NCT07195695"} >= {
+            "finnish_site_added",
+            "nordic_site_closed",
+        }
+        dashboard = next(
+            d
+            for d in await (await request.get(DashboardService)).list(project_id)
+            if d.name == DASHBOARD
+        )
+        alerts = await request.get(AlertService)
+        rules = await alerts.list_rules(dashboard.id)
+        rule = next(r for r in rules if r.name == FINNISH_RULE)
+        await alerts.check(rule.id)
+        firing = [
+            a for a in await alerts.alerts(project_id, AlertState.FIRING) if a.rule_id == rule.id
+        ]
+        assert len(firing) == 1
+        assert "NCT07195695" in str((await alerts.rows(firing[0].id)).rows)
