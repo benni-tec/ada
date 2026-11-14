@@ -26,6 +26,7 @@ from ada.core.models.agents import (
     TurnStatus,
 )
 from ada.core.models.alerts import Alert, AlertRule, AlertState
+from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
 from ada.core.models.operators import Operator, OperatorId
@@ -285,4 +286,26 @@ class AlertRepository(Protocol):
 
     async def list(self, project_id: Id, state: AlertState | None = None) -> Sequence[Alert]:
         """Newest first."""
+        ...
+
+
+class AttachmentRepository(Protocol):
+    """What is attached to sessions. An attachment is only added or removed; a session has
+    each thing (kind and ref) attached at most once."""
+
+    async def get(self, id: Id) -> Attachment: ...
+    async def list(self, session_id: Id) -> Sequence[Attachment]: ...
+
+    async def add(self, attachment: Attachment) -> Attachment:
+        """Store the attachment, or return the stored one when the session already has the
+        same kind and ref attached: attaching twice is not an error. The session must
+        exist."""
+        ...
+
+    async def remove(self, id: Id) -> None:
+        """Remove an attachment; NotFound when there is none."""
+        ...
+
+    async def sessions_with(self, kind: AttachmentKind, ref: str) -> Sequence[Id]:
+        """The sessions that have this thing attached, in the order it was attached."""
         ...

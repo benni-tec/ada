@@ -23,12 +23,16 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from taskiq import InMemoryBroker
 
+import factories
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import MemoryStore
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.agents import AgentTurn, ProviderKind, ToolPart
+from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.base import Id
+from ada.core.models.reports import Report, ReportVersion
+from ada.core.models.time import TimeRange
 from ada.core.models.web import SearchHit
 from ada.core.ports.agents import ToolCallFailed, TurnProgress
 from ada.core.services.agents import service as agent_service
@@ -288,6 +292,81 @@ def test_context_is_checked_stored_with_the_message_and_reaches_the_prompt(
     assert f'"Regions", id {widget["id"]}' in instructions
     assert f'Session "Screening", id {session["id"]}' in instructions
     assert "Never state a number you did not read from a tool" in instructions
+
+
+def test_the_prompt_lists_what_the_session_shows_beside_the_conversation(
+    client: TestClient,
+    project: dict[str, Any],
+    session: dict[str, Any],
+    script: Script,
+) -> None:
+    dashboard = send(
+        client, "POST", f"/projects/{project['id']}/dashboards", {"name": "Screening"}, 201
+    )
+    # A rule with one firing alert, and a report: the memory store is all they need here.
+    assert client.portal is not None
+    memory = client.portal.call(container(client).get, MemoryStore)
+    project_id, at, run_id = UUID(project["id"]), factories.NOW, uuid7()
+    rule = AlertRule(
+        id=uuid7(),
+        project_id=project_id,
+        dashboard_id=UUID(dashboard["id"]),
+        name="Below target",
+        operator_id="op_measure",
+        formula={},
+        key_columns=("region",),
+        created_at=at,
+    )
+    alert = Alert(
+        id=uuid7(),
+        project_id=project_id,
+        rule_id=rule.id,
+        key={"region": "north"},
+        state=AlertState.FIRING,
+        since_run_id=run_id,
+        last_run_id=run_id,
+        started_at=at,
+    )
+    version = ReportVersion(
+        id=uuid7(),
+        report_id=uuid7(),
+        version="1.1.0",
+        run_id=run_id,
+        time_range=TimeRange(),
+        content={},
+        created_by=factories.AGENT,
+        created_at=at,
+    )
+    report = Report(
+        id=version.report_id,
+        project_id=project_id,
+        name="Findings",
+        latest_version_id=version.id,
+        created_at=at,
+    )
+    memory.alert_rules[rule.id], memory.alerts[alert.id] = rule, alert
+    memory.reports[report.id], memory.report_versions[version.id] = report, version
+    for kind, ref, title in [
+        ("dashboard", dashboard["id"], None),
+        ("alert_rule", str(rule.id), None),
+        # A report's id attaches its latest version.
+        ("report", str(report.id), None),
+        ("web_page", "https://thl.fi/screening", "THL on screening"),
+    ]:
+        body = {"kind": kind, "ref": ref, "title": title}
+        send(client, "POST", f"/sessions/{session['id']}/attachments", body, 201)
+    script.then(say("Noted."))
+
+    run(client, message(client, session, "What do I see?")["turn"]["id"])
+
+    lines = (script.calls[0][1].instructions or "").splitlines()
+    shown = lines.index(next(line for line in lines if line.startswith("Shown beside")))
+    assert lines[shown + 1 : shown + 5] == [
+        f'- dashboard "Screening", ref {dashboard["id"]}',
+        f'- alert_rule "Below target", ref {rule.id}; 1 active alert',
+        f'- report "Findings 1.1.0", ref {version.id}; run {run_id}',
+        '- web_page "THL on screening", ref https://thl.fi/screening',
+    ]
 
 
 def test_people_s_instructions_follow_ada_s_rules_in_order_and_are_cut(

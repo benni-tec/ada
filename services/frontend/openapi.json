@@ -496,6 +496,62 @@
         "title": "AlertView",
         "type": "object"
       },
+      "Attachment": {
+        "description": "Something shown beside a session, as a tab, and listed to its agent. A session has\neach thing attached at most once. An attachment is added or removed, never changed.",
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AttachmentKind"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "kind",
+          "ref",
+          "title",
+          "actor",
+          "created_at"
+        ],
+        "title": "Attachment",
+        "type": "object"
+      },
+      "AttachmentKind": {
+        "description": "What can be attached to a session. `ref` is the thing's id, unless said otherwise.",
+        "enum": [
+          "dashboard",
+          "report",
+          "alert_rule",
+          "source",
+          "operator",
+          "session",
+          "widget",
+          "web_page"
+        ],
+        "title": "AttachmentKind",
+        "type": "string"
+      },
       "CheckResult": {
         "properties": {
           "changed": {
@@ -909,7 +965,8 @@
           "agent_turn",
           "tool_call",
           "delegation",
-          "report"
+          "report",
+          "alert"
         ],
         "title": "EntryKind",
         "type": "string"
@@ -1449,6 +1506,35 @@
           "key_columns"
         ],
         "title": "NewAlertRule",
+        "type": "object"
+      },
+      "NewAttachment": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AttachmentKind"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "kind",
+          "ref"
+        ],
+        "title": "NewAttachment",
         "type": "object"
       },
       "NewDashboard": {
@@ -2986,16 +3072,6 @@
               }
             ]
           },
-          "panel_dashboard_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Id"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "parent_session_id": {
             "anyOf": [
               {
@@ -3064,36 +3140,20 @@
       },
       "SessionChange": {
         "additionalProperties": false,
-        "description": "Rename, or put a dashboard in the panel, or both. `panel_dashboard_id` set to null\nclears the panel; leaving it out keeps it.",
+        "description": "Rename. What is shown beside the conversation is the session's attachments\n(/sessions/{id}/attachments).",
         "properties": {
           "expected_revision": {
             "title": "Expected Revision",
             "type": "integer"
           },
-          "panel_dashboard_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Id"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
+            "title": "Title",
+            "type": "string"
           }
         },
         "required": [
-          "expected_revision"
+          "expected_revision",
+          "title"
         ],
         "title": "SessionChange",
         "type": "object"
@@ -6708,6 +6768,152 @@
           }
         },
         "summary": "Change Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/attachments": {
+      "get": {
+        "description": "What the session shows beside its conversation, oldest first.",
+        "operationId": "list_attachments_api_sessions__session_id__attachments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Attachment"
+                  },
+                  "title": "Response List Attachments Api Sessions  Session Id  Attachments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Attachments",
+        "tags": [
+          "sessions"
+        ]
+      },
+      "post": {
+        "description": "Attach a thing of the session's project, or a web page. Attaching what is attached\nalready answers with the attachment as it is.",
+        "operationId": "attach_api_sessions__session_id__attachments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAttachment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attachment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attach",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/attachments/{attachment_id}": {
+      "delete": {
+        "operationId": "detach_api_sessions__session_id__attachments__attachment_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attachment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Detach",
         "tags": [
           "sessions"
         ]

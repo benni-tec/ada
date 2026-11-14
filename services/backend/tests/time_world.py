@@ -13,10 +13,13 @@ import factories
 from ada.adapters.duckdb.store import DuckDbAnalysisStore
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import (
+    MemoryAlertRuleRepository,
+    MemoryAttachmentRepository,
     MemoryDashboardRepository,
     MemoryDataSourceRepository,
     MemoryOperatorRepository,
     MemoryProjectRepository,
+    MemoryReportRepository,
     MemoryRunRepository,
     MemorySessionRepository,
     MemorySnapshotRepository,
@@ -33,6 +36,7 @@ from ada.core.models.operators import Operator
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sources import DataSource
 from ada.core.models.time import TimeRange
+from ada.core.services.attachments.service import Attachments
 from ada.core.services.pipelines.runs import Runs
 from ada.core.services.pipelines.service import Pipelines
 from ada.core.services.sessions.service import Sessions
@@ -103,6 +107,8 @@ class World:
             self.clock,
         )
         sessions = MemorySessionRepository(memory)
+        dashboards = MemoryDashboardRepository(memory)
+        attachments = MemoryAttachmentRepository(memory)
         self.widgets = Widgets(
             self.widget_repository,
             self.operators,
@@ -111,9 +117,22 @@ class World:
             Sessions(
                 sessions,
                 projects,
-                MemoryDashboardRepository(memory),
+                dashboards,
                 self.operators,
                 self.widget_repository,
+                attachments,
+                Attachments(
+                    attachments,
+                    sessions,
+                    dashboards,
+                    MemoryReportRepository(memory),
+                    MemoryAlertRuleRepository(memory),
+                    self.data_sources,
+                    self.operators,
+                    self.widget_repository,
+                    self.events,
+                    self.clock,
+                ),
                 self.events,
                 self.clock,
             ),

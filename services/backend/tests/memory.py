@@ -18,6 +18,7 @@ from ada.adapters.memory.repositories import (
     MemoryAgentTurnRepository,
     MemoryAlertRepository,
     MemoryAlertRuleRepository,
+    MemoryAttachmentRepository,
     MemoryDashboardRepository,
     MemoryDataSourceRepository,
     MemoryLlmModelRepository,
@@ -45,6 +46,7 @@ from ada.core.ports.repositories import (
     AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
+    AttachmentRepository,
     DashboardRepository,
     DataSourceRepository,
     LlmModelRepository,
@@ -90,6 +92,7 @@ class MemoryRepositories(Provider):
     projects = provide(MemoryProjectRepository, provides=ProjectRepository)
     data_sources = provide(MemoryDataSourceRepository, provides=DataSourceRepository)
     sessions = provide(MemorySessionRepository, provides=SessionRepository)
+    attachments = provide(MemoryAttachmentRepository, provides=AttachmentRepository)
     operators = provide(MemoryOperatorRepository, provides=OperatorRepository)
     snapshots = provide(MemorySnapshotRepository, provides=SnapshotRepository)
     runs = provide(MemoryRunRepository, provides=RunRepository)

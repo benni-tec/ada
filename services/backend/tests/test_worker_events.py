@@ -413,18 +413,35 @@ def test_a_rest_request_answered_with_an_error_rolls_back_and_announces_nothing(
     # The repositories of the composition root: PostgreSQL.
     with TestClient(create_app(settings, MemoryBackground())) as client:
         project = send(client, "POST", "/projects", {"name": "P"}, 201)
-        session = send(client, "POST", f"/projects/{project['id']}/sessions", {"title": "Old"}, 201)
-        # Renames, then fails on the unknown dashboard: the rename must not stay.
-        response = client.patch(
-            f"/api/sessions/{session['id']}",
-            json={"title": "New", "panel_dashboard_id": str(uuid7()), "expected_revision": 1},
+        send(client, "POST", f"/projects/{project['id']}/sessions", {"title": "S"}, 201)
+        source = {
+            "name": "S",
+            "access_kind": "url",
+            "address": "https://example.test/data.csv",
+            "format": "csv",
+            "declared_schema": {"columns": [{"name": "region", "type": "text"}]},
+        }
+        send(client, "POST", f"/projects/{project['id']}/sources", source, 201)
+        pipelines = f"/projects/{project['id']}/pipelines"
+        [reading] = send(client, "GET", pipelines)
+        # Adds the transform, then fails on the unknown session to record it in: the
+        # transform must not stay.
+        response = client.post(
+            f"/api/projects/{project['id']}/operators",
+            json={
+                "kind": "transform",
+                "sql": "SELECT region FROM input_0",
+                "inputs": [reading["operator_id"]],
+                "session_id": str(uuid7()),
+            },
         )
-        title = send(client, "GET", f"/sessions/{session['id']}")["title"]
+        after = send(client, "GET", pipelines)
         container = client.app.state.dishka_container  # type: ignore[attr-defined]
         assert client.portal is not None
         bus = client.portal.call(container.get, MemoryEventBus)
 
-    assert (response.status_code, title) == (404, "Old")
+    assert (response.status_code, after) == (404, [reading])
+    assert response.json()["detail"].startswith("session ")
     # Only the successful requests announced anything.
     assert [e.type for e in bus.published] == [EventType.SESSION_CREATED]
 

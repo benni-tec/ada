@@ -3,6 +3,8 @@ SQL repositories that are easy to get wrong. The services' own tests run on the 
 repositories; what only the database has to get right is here."""
 
 import asyncio
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -20,6 +22,12 @@ from ada.adapters.db.agent_repositories import SqlTurnProgress
 from ada.adapters.db.base import Base
 from ada.adapters.db.migrate import _config, migrate
 from ada.adapters.db.workspace_repositories import SqlResearchCalls
+from ada.adapters.memory.repositories import (
+    MemoryAttachmentRepository,
+    MemoryProjectRepository,
+    MemorySessionRepository,
+    MemoryStore,
+)
 from ada.composition import create_container
 from ada.core.models.agents import (
     AgentTurn,
@@ -31,13 +39,18 @@ from ada.core.models.agents import (
     TurnStatus,
 )
 from ada.core.models.alerts import AlertState
+from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.errors import Conflict, NotFound
 from ada.core.models.operators import OperatorKind
 from ada.core.models.schema import GeoRole, Roles, Schema
 from ada.core.models.sessions import DashboardContext, PipelineContext, SessionAgent
 from ada.core.models.sources import FoundBy, FreshnessKind, FreshnessPolicy, Provenance
 from ada.core.models.time import Interval, TimeRange
-from ada.core.ports.repositories import ProjectRepository
+from ada.core.ports.repositories import (
+    AttachmentRepository,
+    ProjectRepository,
+    SessionRepository,
+)
 from conftest import settings_in
 from db_helpers import Repos, engine_for, make_world, unit_of_work
 from memory import MemoryBackground
@@ -376,10 +389,8 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         assert await repos.sessions.entries(session.id) == [first, later]
         assert await repos.widgets.list(world.project.id) == [original, copy]
         assert await repos.widgets.list_by_session(session.id) == [original]
-        updated = await repos.sessions.update(
-            session.model_copy(update={"panel_dashboard_id": dashboard.id}), 1
-        )
-    assert (updated.panel_dashboard_id, updated.revision) == (dashboard.id, 2)
+        updated = await repos.sessions.update(session.model_copy(update={"title": "New"}), 1)
+    assert (updated.title, updated.revision) == ("New", 2)
     # A research session's web calls, each committed at once; other sessions are not counted.
     calls = SqlResearchCalls(engine)
     assert [await calls.use(child.id, 2) for _ in range(3)] == [True, True, False]
@@ -391,6 +402,74 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         await scalar(engine, counted, id=child.id),
         await scalar(engine, counted, id=session.id),
     ) == (2, 0)
+
+
+@dataclass
+class Attaching:
+    projects: ProjectRepository
+    sessions: SessionRepository
+    attachments: AttachmentRepository
+
+
+@pytest.fixture(params=["memory", "database"])
+async def attaching(request: pytest.FixtureRequest) -> AsyncIterator[Attaching]:
+    """The repositories attachments need, in memory and on PostgreSQL: both behave alike."""
+    if request.param == "memory":
+        store = MemoryStore()
+        yield Attaching(
+            MemoryProjectRepository(store),
+            MemorySessionRepository(store),
+            MemoryAttachmentRepository(store),
+        )
+        return
+    url: str = request.getfixturevalue("migrated_database_url")
+    async with engine_for(url) as engine, unit_of_work(engine) as repos:
+        yield Attaching(repos.projects, repos.sessions, repos.attachments)
+
+
+async def test_a_session_has_each_thing_attached_once_in_the_order_attached(
+    attaching: Attaching,
+) -> None:
+    project = factories.project()
+    await attaching.projects.add(project)
+    session, other = factories.session(project.id), factories.session(project.id)
+    await attaching.sessions.add(session)
+    await attaching.sessions.add(other)
+
+    def attachment(session_id: Any, kind: AttachmentKind, ref: str, later: int = 0) -> Attachment:
+        return Attachment(
+            id=uuid7(),
+            session_id=session_id,
+            kind=kind,
+            ref=ref,
+            title=ref,
+            actor=factories.AGENT,
+            created_at=factories.NOW + timedelta(seconds=later),
+        )
+
+    dashboard = attachment(session.id, AttachmentKind.DASHBOARD, "d1")
+    page = attachment(session.id, AttachmentKind.WEB_PAGE, "https://stat.fi/", later=1)
+    elsewhere = attachment(other.id, AttachmentKind.DASHBOARD, "d1", later=2)
+    stored = [await attaching.attachments.add(a) for a in (dashboard, page, elsewhere)]
+    twice = await attaching.attachments.add(attachment(session.id, AttachmentKind.DASHBOARD, "d1"))
+
+    assert stored == [dashboard, page, elsewhere]
+    assert twice == dashboard
+    assert await attaching.attachments.list(session.id) == [dashboard, page]
+    assert await attaching.attachments.get(page.id) == page
+    assert await attaching.attachments.sessions_with(AttachmentKind.DASHBOARD, "d1") == [
+        session.id,
+        other.id,
+    ]
+    assert await attaching.attachments.sessions_with(AttachmentKind.REPORT, "d1") == []
+    await attaching.attachments.remove(page.id)
+    assert await attaching.attachments.list(session.id) == [dashboard]
+    with pytest.raises(NotFound) as error:
+        await attaching.attachments.remove(page.id)
+    assert error.value.kind == "attachment"
+    with pytest.raises(NotFound) as error:
+        await attaching.attachments.add(attachment(uuid7(), AttachmentKind.DASHBOARD, "d2"))
+    assert error.value.kind == "session"
 
 
 async def test_reporting_records_round_trip(engine: AsyncEngine) -> None:

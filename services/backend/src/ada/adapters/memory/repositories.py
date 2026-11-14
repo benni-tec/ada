@@ -18,6 +18,7 @@ from ada.core.models.agents import (
     TurnStatus,
 )
 from ada.core.models.alerts import Alert, AlertRule, AlertState
+from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
 from ada.core.models.errors import Conflict, NotFound
@@ -34,6 +35,7 @@ from ada.core.ports.repositories import (
     AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
+    AttachmentRepository,
     DashboardRepository,
     DataSourceRepository,
     LlmModelRepository,
@@ -59,6 +61,7 @@ class MemoryStore:
         self.data_sources: dict[Id, DataSource] = {}
         self.sessions: dict[Id, Session] = {}
         self.session_entries: list[SessionEntry] = []
+        self.attachments: dict[Id, Attachment] = {}
         self.operators: dict[OperatorId, Operator] = {}
         self.snapshots: dict[Id, Snapshot] = {}
         self.runs: dict[Id, Run] = {}
@@ -203,6 +206,34 @@ class MemorySessionRepository(SessionRepository):
 
     async def entries(self, session_id: Id) -> Sequence[SessionEntry]:
         return [e for e in self.store.session_entries if e.session_id == session_id]
+
+
+class MemoryAttachmentRepository(AttachmentRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def get(self, id: Id) -> Attachment:
+        return _get(self.store.attachments, "attachment", id)
+
+    async def list(self, session_id: Id) -> Sequence[Attachment]:
+        return [a for a in self.store.attachments.values() if a.session_id == session_id]
+
+    async def add(self, attachment: Attachment) -> Attachment:
+        _get(self.store.sessions, "session", attachment.session_id)
+        for stored in await self.list(attachment.session_id):
+            if (stored.kind, stored.ref) == (attachment.kind, attachment.ref):
+                return stored
+        self.store.attachments[attachment.id] = attachment
+        return attachment
+
+    async def remove(self, id: Id) -> None:
+        await self.get(id)
+        del self.store.attachments[id]
+
+    async def sessions_with(self, kind: AttachmentKind, ref: str) -> Sequence[Id]:
+        return [
+            a.session_id for a in self.store.attachments.values() if (a.kind, a.ref) == (kind, ref)
+        ]
 
 
 class MemoryOperatorRepository(OperatorRepository):

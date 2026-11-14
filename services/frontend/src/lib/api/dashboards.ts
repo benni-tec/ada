@@ -97,12 +97,13 @@ export async function startSessionFromDashboard(projectId: Id, dashboardId: Id, 
       body: { title, origin_dashboard_id: dashboardId },
     }),
   )
-  return unwrap(
-    api.PATCH('/api/sessions/{session_id}', {
+  await unwrap(
+    api.POST('/api/sessions/{session_id}/attachments', {
       params: { path: { session_id: session.id } },
-      body: { panel_dashboard_id: dashboardId, expected_revision: session.revision },
+      body: { kind: 'dashboard', ref: dashboardId },
     }),
   )
+  return session
 }
 
 export const dashboardKeys = {

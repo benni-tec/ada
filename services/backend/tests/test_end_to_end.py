@@ -51,6 +51,7 @@ from ada.core.ports.events import EventBroadcaster
 from ada.core.ports.sources import SourceReaders
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.services.ports.alerts import AlertService
+from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.reports import ReportService
@@ -569,6 +570,7 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
             firing = await alerts.alerts(project_id, AlertState.FIRING)
             current = await (await request.get(DashboardService)).current(dashboards[0].id)
             versions = await (await request.get(ReportService)).versions(reports[0].id)
+            shown = await (await request.get(AttachmentService)).list(sessions[0].id)
         assert [project.name for project in projects] == [DEMO_PROJECT]
         assert [source.name for source in sources] == [example.name for example in EXAMPLES]
         assert [(d.name, d.default_time_range) for d in dashboards] == [
@@ -587,7 +589,9 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
             "table",
         ]
         assert sum(widget.copied_from is not None for widget in widgets) == 2
-        assert len(sessions) == 1 and sessions[0].panel_dashboard_id == dashboards[0].id
+        assert len(sessions) == 1
+        # Seeding again attached nothing new.
+        assert [(a.kind, a.ref) for a in shown] == [("dashboard", str(dashboards[0].id))]
         assert len(rules) == 1
         # East Uusimaa, West Uusimaa, Vantaa and Kerava, and Helsinki are below 80 % in 2024.
         assert sorted(alert.key["county_code"] for alert in firing) == ["01", "03", "04", "90"]

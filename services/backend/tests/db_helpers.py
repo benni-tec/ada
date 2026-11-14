@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 import factories
 from ada.adapters.db.agent_repositories import SqlAgentTurnRepository
 from ada.adapters.db.alert_repositories import SqlAlertRepository, SqlAlertRuleRepository
+from ada.adapters.db.attachment_repositories import SqlAttachmentRepository
 from ada.adapters.db.pipeline_repositories import (
     SqlOperatorRepository,
     SqlRunRepository,
@@ -41,6 +42,7 @@ from ada.core.ports.repositories import (
     AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
+    AttachmentRepository,
     DashboardRepository,
     DataSourceRepository,
     OperatorRepository,
@@ -69,6 +71,7 @@ class Repos:
     alert_rules: AlertRuleRepository
     alerts: AlertRepository
     agent_turns: AgentTurnRepository
+    attachments: AttachmentRepository
 
 
 def sql_repos(session: AsyncSession) -> Repos:
@@ -86,6 +89,7 @@ def sql_repos(session: AsyncSession) -> Repos:
         SqlAlertRuleRepository(session),
         SqlAlertRepository(session),
         SqlAgentTurnRepository(session),
+        SqlAttachmentRepository(session),
     )
 
 

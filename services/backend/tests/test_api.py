@@ -188,24 +188,62 @@ def test_a_message_is_recorded_as_the_web_user_and_announced(
     assert added[-1].payload == {"session_id": session["id"], "entry_id": posted["entry"]["id"]}
 
 
-def test_a_session_shows_a_dashboard_of_its_own_project_in_its_panel(
-    client: TestClient, project: dict[str, Any], session: dict[str, Any]
+def test_a_session_attaches_things_of_its_project_once_and_detaches_them(
+    client: TestClient,
+    project: dict[str, Any],
+    session: dict[str, Any],
+    source_operator: dict[str, Any],
 ) -> None:
-    path = f"/api/sessions/{session['id']}"
+    path = f"/sessions/{session['id']}/attachments"
     own = send(client, "POST", f"/projects/{project['id']}/dashboards", {"name": "Own"}, 201)
     other = new_project(client, "Other")
     foreign = send(client, "POST", f"/projects/{other['id']}/dashboards", {"name": "X"}, 201)
+    url = "https://stat.fi/til/index.html"
 
-    shown = client.patch(path, json={"panel_dashboard_id": own["id"], "expected_revision": 1})
-    refused = client.patch(path, json={"panel_dashboard_id": foreign["id"], "expected_revision": 2})
-    # Null clears the panel, which is a change like any other.
-    cleared = client.patch(path, json={"panel_dashboard_id": None, "expected_revision": 2})
-    unchanged = client.patch(path, json={"expected_revision": 3})
+    dashboard = send(client, "POST", path, {"kind": "dashboard", "ref": own["id"]}, 201)
+    again = send(client, "POST", path, {"kind": "dashboard", "ref": own["id"]}, 201)
+    pipeline = send(client, "POST", path, {"kind": "operator", "ref": source_operator["id"]}, 201)
+    page = send(client, "POST", path, {"kind": "web_page", "ref": url}, 201)
+    refused = [
+        client.post(f"/api{path}", json=body).status_code
+        for body in (
+            {"kind": "dashboard", "ref": foreign["id"]},
+            {"kind": "dashboard", "ref": str(uuid7())},
+            {"kind": "web_page", "ref": "ftp://stat.fi/file.csv"},
+            {"kind": "session", "ref": session["id"]},
+            {"kind": "chart", "ref": "x"},
+        )
+    ]
+    detached = client.delete(f"/api{path}/{pipeline['id']}")
+    gone = client.delete(f"/api{path}/{pipeline['id']}")
+    # Renaming is what is left of changing a session.
+    changed = f"/api/sessions/{session['id']}"
+    renamed = client.patch(changed, json={"title": "New", "expected_revision": 1})
+    shown = {"title": "New", "expected_revision": 2, "panel_dashboard_id": own["id"]}
+    panel = client.patch(changed, json=shown)
 
-    assert shown.json()["panel_dashboard_id"] == own["id"]
-    assert refused.status_code == 422
-    assert (cleared.json()["panel_dashboard_id"], cleared.json()["revision"]) == (None, 3)
-    assert unchanged.status_code == 422
+    assert (dashboard["kind"], dashboard["title"], dashboard["actor"]) == ("dashboard", "Own", WEB)
+    assert again == dashboard
+    assert (pipeline["ref"], pipeline["title"]) == (source_operator["id"], "Sotkanet")
+    assert (page["ref"], page["title"]) == (url, "stat.fi")
+    assert refused == [422, 404, 422, 422, 422]
+    assert (detached.status_code, gone.status_code) == (204, 404)
+    assert send(client, "GET", path) == [dashboard, page]
+    assert client.get(f"/api/sessions/{uuid7()}/attachments").status_code == 404
+    changes = [e for e in events(client, project["id"]) if e.type.startswith("session.attach")]
+    assert [(e.type, e.payload["attachment_id"]) for e in changes] == [
+        ("session.attachment_added", dashboard["id"]),
+        ("session.attachment_added", pipeline["id"]),
+        ("session.attachment_added", page["id"]),
+        ("session.attachment_removed", pipeline["id"]),
+    ]
+    assert changes[0].payload == {
+        "session_id": session["id"],
+        "attachment_id": dashboard["id"],
+        "attachment": dashboard,
+    }
+    assert renamed.json()["title"] == "New" and "panel_dashboard_id" not in renamed.json()
+    assert panel.status_code == 422
 
 
 def test_operators_are_added_through_the_pipeline_service_and_recorded_in_the_session(
@@ -495,8 +533,9 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
     verbs = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
     verbs |= {"pin", "edit", "set", "show", "generate", "check", "build", "query", "search"}
     verbs |= {"read", "extract", "map", "watch", "unwatch", "delegate", "report"}
+    verbs |= {"attach", "detach"}
     injected = {"service", "projects", "pipelines", "sessions", "widgets", "runs", "dispatcher"}
-    injected |= {"exploration", "batches", "refreshes", "web", "research"}
+    injected |= {"exploration", "batches", "refreshes", "web", "research", "attachments"}
 
     for name, tool in tools.items():
         assert name.split("_")[0] in verbs, name
