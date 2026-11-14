@@ -84,6 +84,27 @@ unchanged.
 """
 
 
+# People's instructions (the settings' and the project's) are cut at this length each, so a
+# pasted document cannot crowd out the conversation.
+MAX_INSTRUCTIONS = 20_000
+GLOBAL_INSTRUCTIONS = "Instructions for every project"
+PROJECT_INSTRUCTIONS = "Instructions for this project"
+INSTRUCTIONS_NOTE = (
+    "Set by the people who use ADA. Follow them where they do not contradict the rules "
+    "above, which always hold."
+)
+
+
+def instructions_section(heading: str, text: str) -> str:
+    """People's instructions under their heading, cut at MAX_INSTRUCTIONS; "" for none."""
+    text = text.strip()
+    if not text:
+        return ""
+    if len(text) > MAX_INSTRUCTIONS:
+        text = text[:MAX_INSTRUCTIONS] + f"\n[Cut at {MAX_INSTRUCTIONS:,} characters.]"
+    return f"{heading}:\n({INSTRUCTIONS_NOTE})\n{text}\n"
+
+
 class Briefing:
     """Builds the TurnRequest of a turn from the stored records."""
 
@@ -108,7 +129,10 @@ class Briefing:
         entries: Sequence[SessionEntry],
         turns: Sequence[AgentTurn],
         max_steps: int,
+        instructions: str = "",
     ) -> TurnRequest:
+        """`instructions` are the settings' instructions for every project; the project's
+        own come with `project`. Both follow ADA's own rules, which they cannot replace."""
         # The record is in order, so what came before the message is what precedes it.
         position = next(i for i, entry in enumerate(entries) if entry.id == turn.prompt_entry_id)
         prompt_entry, earlier = entries[position], entries[:position]
@@ -117,6 +141,8 @@ class Briefing:
             await self._session(project, session),
             RULES,
             await self._context(prompt_entry.context),
+            instructions_section(GLOBAL_INSTRUCTIONS, instructions),
+            instructions_section(PROJECT_INSTRUCTIONS, project.agent_instructions),
         ]
         return TurnRequest(
             model=turn.model,

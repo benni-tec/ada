@@ -614,5 +614,7 @@ class MemoryAgentSettingsRepository(AgentSettingsRepository):
             else None
         )
         self.store.session_agent = ref
-        self.store.agent_settings = AgentSettings(revision=expected_revision + 1)
+        self.store.agent_settings = AgentSettings(
+            instructions=settings.instructions, revision=expected_revision + 1
+        )
         return await self.get()

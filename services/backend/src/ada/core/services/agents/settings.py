@@ -64,6 +64,7 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
             models=await self._catalog(providers, settings.session_agent),
             session_agent=settings.session_agent,
             secrets_available=self.secrets.available,
+            instructions=settings.instructions,
             revision=settings.revision,
         )
 
@@ -137,6 +138,16 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
         settings = await self.settings.get()
         await self.settings.update(
             settings.model_copy(update={"session_agent": model_id}), expected_revision
+        )
+        return await self.view()
+
+    async def set_instructions(
+        self, instructions: str, expected_revision: int
+    ) -> AgentSettingsView:
+        settings = await self.settings.get()
+        await self.settings.update(
+            settings.model_copy(update={"instructions": instructions.strip()}),
+            expected_revision,
         )
         return await self.view()
 

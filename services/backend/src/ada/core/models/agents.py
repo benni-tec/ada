@@ -65,6 +65,9 @@ class AgentSettings(DomainModel):
     # The model id that answers messages in sessions and dashboard panels; None without
     # one, and cleared when its model or provider is deleted.
     session_agent: str | None = None
+    # Free text for the session agent in every project (e.g. a pasted skill), added to its
+    # system prompt after ADA's own rules; "" for none.
+    instructions: str = ""
     revision: int = 1
 
 
@@ -97,7 +100,9 @@ class AgentSettingsView(DomainModel):
     session_agent: str | None = None
     # False when no master key is set (ADA_SECRET_KEY): API keys cannot be stored.
     secrets_available: bool
-    # The revision of AgentSettings, for setting the session agent.
+    # The instructions for the session agent in every project; "" for none.
+    instructions: str = ""
+    # The revision of AgentSettings, for setting the session agent or the instructions.
     revision: int
 
 

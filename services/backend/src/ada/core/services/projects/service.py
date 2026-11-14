@@ -25,11 +25,20 @@ class Projects(ProjectService):
     async def list(self) -> Sequence[Project]:
         return await self.projects.list()
 
-    async def rename(self, id: Id, name: str, expected_revision: int) -> Project:
+    async def update(
+        self,
+        id: Id,
+        expected_revision: int,
+        name: str | None = None,
+        agent_instructions: str | None = None,
+    ) -> Project:
         project = await self.projects.get(id)
-        return await self.projects.update(
-            project.model_copy(update={"name": _name(name)}), expected_revision
-        )
+        changes: dict[str, object] = {}
+        if name is not None:
+            changes["name"] = _name(name)
+        if agent_instructions is not None:
+            changes["agent_instructions"] = agent_instructions.strip()
+        return await self.projects.update(project.model_copy(update=changes), expected_revision)
 
 
 def _name(name: str) -> str:

@@ -16,9 +16,13 @@ class NewProject(Request):
     name: str
 
 
-class ProjectRename(Request):
-    name: str
+class ProjectChange(Request):
+    """Fields left out stay as they are."""
+
     expected_revision: int
+    name: str | None = None
+    # Free text for the session agent in this project, after ADA's own rules; "" for none.
+    agent_instructions: str | None = None
 
 
 @router.get("/projects")
@@ -37,7 +41,13 @@ async def get_project(project_id: Id, service: FromDishka[ProjectService]) -> Pr
 
 
 @router.patch("/projects/{project_id}")
-async def rename_project(
-    project_id: Id, body: ProjectRename, service: FromDishka[ProjectService]
+async def update_project(
+    project_id: Id, body: ProjectChange, service: FromDishka[ProjectService]
 ) -> Project:
-    return await service.rename(project_id, body.name, body.expected_revision)
+    """Rename it or set the session agent's instructions for it."""
+    return await service.update(
+        project_id,
+        body.expected_revision,
+        name=body.name,
+        agent_instructions=body.agent_instructions,
+    )

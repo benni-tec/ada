@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     context_dev_api_key: SecretStr | None = Field(
         None, validation_alias=AliasChoices("CONTEXT_DEV_API_KEY", "CONTEXT_API_KEY")
     )
+    # Context.dev credits the web tools and web sources may spend per project and day.
+    web_daily_credit_limit: int = 300
 
     def master_key(self) -> str | None:
         """ADA_SECRET_KEY, else the contents of ADA_SECRET_KEY_FILE; None when neither is
