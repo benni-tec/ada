@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from uuid import uuid7
 
 from ada.core.models.actors import Actor
-from ada.core.models.base import Id
+from ada.core.models.base import Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion, Slot
 from ada.core.models.errors import Conflict, Invalid
 from ada.core.models.events import Event, EventType
@@ -71,10 +71,40 @@ class Dashboards(DashboardService):
     ) -> DashboardVersion:
         dashboard = await self.dashboards.get(id)
         placed = await self._placed(dashboard, slots)
+        # Checked before anything is written, so a stale caller adds no copy either.
+        if dashboard.revision != expected_revision:
+            raise Conflict("dashboard", id, expected_revision, dashboard.revision)
+        # A widget that was never on this dashboard, e.g. one made in a session, comes in
+        # as the dashboard's own copy, as when it is pinned: once per widget, however many
+        # slots show it.
+        own = {
+            slot.widget_id
+            for version in await self.dashboards.versions(id)
+            for slot in version.slots
+            if slot.widget_id is not None
+        }
+        copies: dict[Id, Id] = {}
+        for slot in placed:
+            if slot.widget_id is None or slot.widget_id in own or slot.widget_id in copies:
+                continue
+            original = await self.widgets.get(slot.widget_id)
+            copies[slot.widget_id] = (await self._copy(original, actor)).id
+        placed = tuple(
+            slot.model_copy(update={"widget_id": copies[slot.widget_id]})
+            if slot.widget_id in copies
+            else slot
+            for slot in placed
+        )
         return await self._add_version(dashboard, placed, expected_revision, actor)
 
     async def pin_widget(
-        self, id: Id, widget_id: Id, slot: str, expected_revision: int, actor: Actor
+        self,
+        id: Id,
+        widget_id: Id,
+        slot: str,
+        expected_revision: int,
+        actor: Actor,
+        layout: JsonObject | None = None,
     ) -> DashboardVersion:
         dashboard = await self.dashboards.get(id)
         name = _slot_name(slot)
@@ -84,17 +114,25 @@ class Dashboards(DashboardService):
         original = await self.widgets.get(widget_id)
         if original.project_id != dashboard.project_id:
             raise Invalid("The widget belongs to another project than the dashboard")
-        copy = await self._copy(original, actor)
         current = await self.current(id)
         slots = list(current.slots) if current else []
+        pinned: JsonObject = {"widget_id": original.id}
+        if layout is not None:
+            pinned["layout"] = layout
         for index, existing in enumerate(slots):
             if existing.name == name:
-                # A pinned slot keeps its place; only what it shows changes.
-                slots[index] = existing.model_copy(update={"widget_id": copy.id})
+                # A pinned slot keeps its place unless given a layout; what it shows changes.
+                slots[index] = existing.model_copy(update=pinned)
                 break
         else:
-            slots.append(Slot(name=name, widget_id=copy.id))
+            slots.append(Slot(name=name).model_copy(update=pinned))
+        # Placed, and so checked, before the copy exists.
         placed = await self._placed(dashboard, slots)
+        copy = await self._copy(original, actor)
+        placed = tuple(
+            entry.model_copy(update={"widget_id": copy.id}) if entry.name == name else entry
+            for entry in placed
+        )
         return await self._add_version(dashboard, placed, expected_revision, actor)
 
     async def _copy(self, original: Widget, actor: Actor) -> Widget:

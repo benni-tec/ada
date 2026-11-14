@@ -407,8 +407,9 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
     client, _ = agent
     tools = {tool.name: tool for tool in await client.list_tools()}
     verbs = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
-    verbs |= {"pin", "edit", "set", "show", "generate", "check"}
+    verbs |= {"pin", "edit", "set", "show", "generate", "check", "build", "query"}
     injected = {"service", "projects", "pipelines", "sessions", "widgets", "runs", "dispatcher"}
+    injected |= {"exploration", "batches", "refreshes"}
 
     for name, tool in tools.items():
         assert name.split("_")[0] in verbs, name

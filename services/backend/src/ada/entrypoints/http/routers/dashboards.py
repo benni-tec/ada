@@ -4,7 +4,7 @@ from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, Response, status
 
-from ada.core.models.base import DomainModel, Id
+from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion, Slot
 from ada.core.models.runs import Run
 from ada.core.models.sessions import Session
@@ -40,6 +40,8 @@ class Pin(Request):
     widget_id: Id
     slot: str
     expected_revision: int
+    # Where the slot goes ({x, y, w, h}); left out, it keeps its place or goes last.
+    layout: JsonObject | None = None
 
 
 class DashboardChange(Request):
@@ -90,7 +92,8 @@ async def change_dashboard(
 async def edit_dashboard(
     dashboard_id: Id, body: SlotsEdit, service: FromDishka[DashboardService]
 ) -> DashboardView:
-    """Replace the slots. Adds a version and points the dashboard at it."""
+    """Replace the slots. Adds a version and points the dashboard at it. A widget of the
+    project that was never on this dashboard is copied onto it, as a pin copies it."""
     await service.edit(dashboard_id, body.slots, body.expected_revision, WEB)
     return await _view(service, dashboard_id)
 
@@ -101,7 +104,9 @@ async def pin_widget(
 ) -> DashboardView:
     """Put a copy of a widget in a slot, adding the slot when there is none of that name.
     The copy's `copied_from` names the original. Adds a version."""
-    await service.pin_widget(dashboard_id, body.widget_id, body.slot, body.expected_revision, WEB)
+    await service.pin_widget(
+        dashboard_id, body.widget_id, body.slot, body.expected_revision, WEB, layout=body.layout
+    )
     return await _view(service, dashboard_id)
 
 

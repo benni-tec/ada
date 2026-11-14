@@ -9,17 +9,26 @@ from ada.entrypoints.mcp import tools
 from ada.entrypoints.mcp.apps import register_widget_bundles
 from ada.entrypoints.mcp.injection import make_inject
 
+# What every agent reads first: how to work with ADA in few calls, and the one rule on
+# what it may show the person.
+INSTRUCTIONS = """\
+Tools for traceable data analysis: build pipelines of operators over data sources, and \
+show their results as widgets on dashboards and in reports.
+
+- Batch first: build a pipeline (sources, SQL steps, widgets) in one `build_pipeline` \
+call, and lay out a dashboard in one `edit_dashboard` call. The single-step tools are for \
+small changes.
+- Explore with `query_operator`. Its rows are for you only: never show or quote them to \
+the person.
+- Present results only through widgets (in a session or on a dashboard) and reports, so \
+every number the person sees can be traced to its pipeline.
+"""
+
 
 def create_mcp(container: AsyncContainer, widgets_dir: Path | None = None) -> FastMCP:
     """MCP server exposing ADA to agents, mounted at /mcp. With `widgets_dir`, the built
     widgets are served as MCP App resources."""
-    mcp = FastMCP(
-        "ADA",
-        instructions=(
-            "Tools for traceable data analysis: build pipelines of operators over data "
-            "sources, and show their results as widgets on dashboards and in reports."
-        ),
-    )
+    mcp = FastMCP("ADA", instructions=INSTRUCTIONS)
     inject = make_inject(container)
     for module in modules(tools):
         module.register(mcp, inject)

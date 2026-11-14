@@ -4,7 +4,7 @@ from datetime import date
 from dishka import FromDishka
 from fastmcp import FastMCP
 
-from ada.core.models.base import DomainModel, Id
+from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion, Slot
 from ada.core.models.sessions import Session
 from ada.core.models.time import TimeRange
@@ -49,8 +49,8 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     ) -> DashboardState:
         """Create an empty dashboard in a project: a live view of widgets that follows the
         latest data, unlike a session, which is a one-off exploration. Fill it with
-        `pin_widget`. Returns the dashboard with its id, its revision and its `url`: give
-        the url to the person."""
+        `edit_dashboard`, every widget in one call. Returns the dashboard with its id, its
+        revision and its `url`: give the url to the person."""
         dashboard = await service.create(project_id, name, calling_agent())
         return await _state(service, dashboard.id)
 
@@ -91,18 +91,24 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         slot: str,
         expected_revision: int,
         service: FromDishka[DashboardService],
+        layout: JsonObject | None = None,
     ) -> DashboardState:
-        """Show a widget, e.g. one you made in a session, on a dashboard. The dashboard gets
+        """Show one widget, e.g. one you made in a session, on a dashboard; to lay out
+        several at once use `edit_dashboard`, in one call. The dashboard gets
         its own copy of the widget (same operator, type, spec, title and note), so either
         can be changed later without the other; the copy names the original in
         `copied_from`. It reads the same pipeline, so make sure that pipeline's sources
         have freshness policies, or the dashboard will not stay current.
 
         `slot` names the place on the dashboard. A slot that exists changes its widget and
-        keeps its position; a new name adds a slot after the others. Both must be in the
-        same project. `expected_revision` is the dashboard's revision from `get_dashboard`.
-        Adds a dashboard version and returns the dashboard as it is now."""
-        await service.pin_widget(dashboard_id, widget_id, slot, expected_revision, calling_agent())
+        keeps its position; a new name adds a slot after the others. `layout`
+        (`{"x": 0-11, "y": row, "w": columns, "h": rows}` on a 12-column grid) places the
+        slot instead. Both must be in the same project. `expected_revision` is the
+        dashboard's revision from `get_dashboard`. Adds a dashboard version and returns
+        the dashboard as it is now."""
+        await service.pin_widget(
+            dashboard_id, widget_id, slot, expected_revision, calling_agent(), layout=layout
+        )
         return await _state(service, dashboard_id)
 
     @mcp.tool
@@ -113,13 +119,18 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         expected_revision: int,
         service: FromDishka[DashboardService],
     ) -> DashboardState:
-        """Replace all slots of a dashboard at once, e.g. to reorder, resize or remove
-        some; to add one widget use `pin_widget`. Start from the slots `get_dashboard`
+        """Lay out a whole dashboard in one call: replace all its slots at once, to add,
+        reorder, resize or remove widgets. Prefer one call with every slot to several
+        pins: each call adds one dashboard version. Start from the slots `get_dashboard`
         returned. Each slot has a unique `name`, an optional `widget_id` and an optional
         `layout` on a 12-column grid: `{"x": 0-11, "y": row, "w": columns, "h": rows}`.
         Layout keys you leave out are filled in: a card is 6 columns wide and 4 rows tall
-        and goes beside the previous one, or on a new row when that is full. Adds a
-        dashboard version."""
+        and goes beside the previous one, or on a new row when that is full.
+
+        `widget_id` may be any widget of the dashboard's project, e.g. one you made in a
+        session or with `build_pipeline`: a widget not yet on this dashboard is copied
+        onto it (`copied_from` names the original), as `pin_widget` does.
+        `expected_revision` is the dashboard's revision from `get_dashboard`."""
         await service.edit(dashboard_id, slots, expected_revision, calling_agent())
         return await _state(service, dashboard_id)
 

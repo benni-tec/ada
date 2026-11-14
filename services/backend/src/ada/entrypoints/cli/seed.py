@@ -228,7 +228,12 @@ async def _demo(request: AsyncContainer, project_id: Id, sources: dict[str, Data
         await sessions.record_operator(
             session.id, survival.id, "Finland's lung cancer survival, men and women", SEED
         )
-    existing = {(w.operator_id, w.type, w.title): w for w in await widgets.list(project_id)}
+    # The session's widgets: the dashboard holds copies of them (copied_from).
+    project_widgets = await widgets.list(project_id)
+    existing = {
+        (w.operator_id, w.type, w.title): w for w in project_widgets if w.session_id == session.id
+    }
+    original = {w.id: w.copied_from or w.id for w in project_widgets}
 
     async def widget(
         operator: Operator, type: str, title: str, spec: JsonObject, note: str
@@ -272,9 +277,9 @@ async def _demo(request: AsyncContainer, project_id: Id, sources: dict[str, Data
         Slot(name="By county", widget_id=table.id, layout={"x": 7, "y": 0, "w": 5, "h": 6}),
     )
     current = await dashboards.current(dashboard.id)
-    if current is None or [(s.name, s.widget_id) for s in current.slots] != [
-        (s.name, s.widget_id) for s in slots
-    ]:
+    if current is None or [
+        (s.name, original.get(s.widget_id) if s.widget_id else None) for s in current.slots
+    ] != [(s.name, s.widget_id) for s in slots]:
         await dashboards.edit(dashboard.id, slots, dashboard.revision, SEED)
         dashboard = await dashboards.get(dashboard.id)
     if session.panel_dashboard_id != dashboard.id:

@@ -555,7 +555,15 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
             "Map",
             "By county",
         ]
-        assert sorted(widget.type for widget in widgets) == ["line-chart", "map", "table"]
+        # The session's three, and the dashboard's copies of the map and the table.
+        assert sorted(widget.type for widget in widgets) == [
+            "line-chart",
+            "map",
+            "map",
+            "table",
+            "table",
+        ]
+        assert sum(widget.copied_from is not None for widget in widgets) == 2
         assert len(sessions) == 1 and sessions[0].panel_dashboard_id == dashboards[0].id
         assert len(rules) == 1
         # East Uusimaa, West Uusimaa, Vantaa and Kerava, and Helsinki are below 80 % in 2024.
