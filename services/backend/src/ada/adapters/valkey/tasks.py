@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 REFRESH_SOURCE = "ada.entrypoints.worker.tasks.sources:refresh_source"
 EXECUTE = "ada.entrypoints.worker.tasks.runs:execute"
 CHECK_ALERT_RULE = "ada.entrypoints.worker.tasks.alerts:check_alert_rule"
+RUN_TURN = "ada.entrypoints.worker.tasks.agent:run_turn"
 
 
 def stream_broker(valkey_url: str) -> RedisStreamBroker:
@@ -59,6 +60,9 @@ class ValkeyTaskDispatcher(TaskDispatcher):
 
     async def check_alert_rule(self, rule_id: Id) -> None:
         await self._kick(CHECK_ALERT_RULE, rule_id=str(rule_id))
+
+    async def run_turn(self, turn_id: Id) -> None:
+        await self._kick(RUN_TURN, turn_id=str(turn_id))
 
     async def _kick(self, name: str, **arguments: object) -> None:
         # Raises when the task could not be queued: the caller asked for work to happen, so

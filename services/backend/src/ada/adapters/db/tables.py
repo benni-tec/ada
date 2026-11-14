@@ -38,6 +38,8 @@ from ada.adapters.db.base import Base
 type Json = dict[str, Any]
 
 _timestamp = DateTime(timezone=True)
+# Defined out here: inside SessionEntryRow, `text` is its column.
+_empty_list = text("'[]'::jsonb")
 
 
 def _project() -> Mapped[UUID]:
@@ -152,6 +154,29 @@ class SessionEntryRow(Base):
     ref: Mapped[str | None] = mapped_column(Text)
     actor: Mapped[Json] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(_timestamp)
+    # What a message is about: the domain model's context items as JSON.
+    context: Mapped[list[Json]] = mapped_column(JSONB, server_default=_empty_list)
+
+
+class AgentTurnRow(Base):
+    """The in-platform agent's turns. Written by the worker as the turn runs, outside any
+    revision; `cancel_requested` is the one column someone else writes."""
+
+    __tablename__ = "agent_turns"
+    __table_args__ = (Index("ix_agent_turns_session_created", "session_id", "created_at"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("sessions.id", ondelete="CASCADE"))
+    prompt_entry_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("session_entries.id", ondelete="CASCADE")
+    )
+    model: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16))
+    parts: Mapped[list[Json]] = mapped_column(JSONB)
+    error: Mapped[str | None] = mapped_column(Text)
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+    finished_at: Mapped[datetime | None] = mapped_column(_timestamp)
 
 
 class OperatorRow(Base):
@@ -259,6 +284,10 @@ class WidgetRow(Base):
     note: Mapped[str] = mapped_column(Text)
     created_by: Mapped[Json] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(_timestamp)
+    # The widget a dashboard's copy was made from; the copy outlives a deleted original.
+    copied_from: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("widgets.id", ondelete="SET NULL")
+    )
 
 
 class ReportRow(Base):

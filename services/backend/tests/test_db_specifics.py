@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 import db_helpers
 import factories
+from ada.adapters.db.agent_repositories import SqlTurnProgress
+from ada.core.models.agents import AgentTurn, TextPart, TurnStatus
 from ada.core.models.errors import Conflict, NotFound
 from ada.core.models.operators import OperatorKind
 from ada.core.models.time import Interval
@@ -494,3 +496,63 @@ async def test_an_alert_key_is_matched_exactly_and_only_for_its_rule(engine: Asy
         assert await repos.alerts.find(rules[0].id, key) == alert
         assert await repos.alerts.find(rules[1].id, key) is None
         assert await repos.alerts.find(rules[0].id, {**key, "year": "2024"}) is None
+
+
+async def test_a_running_turn_commits_its_progress_on_its_own(engine: AsyncEngine) -> None:
+    async with unit_of_work(engine) as repos:
+        world = await make_world(repos)
+        session = factories.session(world.project.id)
+        await repos.sessions.add(session)
+        entry = db_helpers.entry(session.id)
+        await repos.sessions.add_entry(entry)
+        turn = AgentTurn(
+            id=uuid7(),
+            session_id=session.id,
+            prompt_entry_id=entry.id,
+            model="gemini/flash",
+            created_at=factories.NOW,
+        )
+        await repos.agent_turns.add(turn)
+    progress = SqlTurnProgress(engine)
+
+    # The worker's own unit of work is open the whole time, as in the run_turn task.
+    async with unit_of_work(engine) as worker:
+        await worker.agent_turns.get(turn.id)
+        assert await progress.start(turn.id) is True
+        # Someone presses stop, in a request of their own; it does not wait for the turn.
+        async with unit_of_work(engine) as request:
+            await asyncio.wait_for(request.agent_turns.request_cancel(turn.id, factories.NOW), 5)
+        stop = await progress.checkpoint(turn.id, (TextPart(text="Partly"),))
+        async with unit_of_work(engine) as reader:
+            seen = await reader.agent_turns.get(turn.id)
+        finished = await progress.finish(
+            turn.id, TurnStatus.CANCELLED, seen.parts, None, factories.NOW
+        )
+
+    assert stop is True
+    assert (seen.status, seen.parts) == (TurnStatus.RUNNING, (TextPart(text="Partly"),))
+    assert finished.status is TurnStatus.CANCELLED
+    assert await scalar(engine, "SELECT status FROM agent_turns") == "cancelled"
+
+
+async def test_a_turn_goes_with_its_session(engine: AsyncEngine) -> None:
+    async with unit_of_work(engine) as repos:
+        world = await make_world(repos)
+        session = factories.session(world.project.id)
+        await repos.sessions.add(session)
+        entry = db_helpers.entry(session.id)
+        await repos.sessions.add_entry(entry)
+        await repos.agent_turns.add(
+            AgentTurn(
+                id=uuid7(),
+                session_id=session.id,
+                prompt_entry_id=entry.id,
+                model="m/x",
+                created_at=factories.NOW,
+            )
+        )
+
+    async with engine.begin() as connection:
+        await connection.execute(text("DELETE FROM sessions"))
+
+    assert await scalar(engine, "SELECT count(*) FROM agent_turns") == 0

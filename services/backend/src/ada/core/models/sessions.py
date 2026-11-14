@@ -1,8 +1,12 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import Annotated, Literal
+
+from pydantic import Field
 
 from ada.core.models.actors import Actor
 from ada.core.models.base import DomainModel, Id
+from ada.core.models.operators import OperatorId
 
 
 class Session(DomainModel):
@@ -26,6 +30,37 @@ class EntryKind(StrEnum):
     OPERATOR = "operator"
     # A widget shown in the session.
     WIDGET = "widget"
+    # The in-platform agent's answer to a message; `ref` is the AgentTurn's id. Added when
+    # the turn is queued, so the record orders it right after the message it answers.
+    AGENT_TURN = "agent_turn"
+
+
+class PipelineContext(DomainModel):
+    """A message about a pipeline: the agent builds on this operator."""
+
+    kind: Literal["pipeline"] = "pipeline"
+    operator_id: OperatorId
+
+
+class DashboardContext(DomainModel):
+    """A message about a dashboard: what the agent makes goes there, into `slot` if named."""
+
+    kind: Literal["dashboard"] = "dashboard"
+    dashboard_id: Id
+    slot: str | None = None
+
+
+class WidgetContext(DomainModel):
+    """A message about a widget the person points at."""
+
+    kind: Literal["widget"] = "widget"
+    widget_id: Id
+
+
+# What a message is about, besides its text: the chips of the chat input.
+type Context = Annotated[
+    PipelineContext | DashboardContext | WidgetContext, Field(discriminator="kind")
+]
 
 
 class SessionEntry(DomainModel):
@@ -42,3 +77,5 @@ class SessionEntry(DomainModel):
     ref: str | None = None
     actor: Actor
     created_at: datetime
+    # For a message: what it is about (a pipeline, a dashboard and slot, a widget).
+    context: tuple[Context, ...] = ()

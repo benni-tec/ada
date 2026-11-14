@@ -1,5 +1,6 @@
 from dishka import Provider, Scope, provide
 
+from ada.adapters.db.agent_repositories import SqlAgentTurnRepository, SqlTurnProgress
 from ada.adapters.db.alert_repositories import SqlAlertRepository, SqlAlertRuleRepository
 from ada.adapters.db.pipeline_repositories import (
     SqlOperatorRepository,
@@ -19,7 +20,9 @@ from ada.adapters.db.workspace_repositories import (
     SqlSourceLocks,
     SqlWidgetRepository,
 )
+from ada.core.ports.agents import TurnProgress
 from ada.core.ports.repositories import (
+    AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
     DashboardRepository,
@@ -55,10 +58,13 @@ class RepositoryProvider(Provider):
     reports = provide(SqlReportRepository, provides=ReportRepository)
     alert_rules = provide(SqlAlertRuleRepository, provides=AlertRuleRepository)
     alerts = provide(SqlAlertRepository, provides=AlertRepository)
+    agent_turns = provide(SqlAgentTurnRepository, provides=AgentTurnRepository)
 
     source_locks = provide(SqlSourceLocks, provides=SourceLocks)
     # Its own connection per record, from the engine, not the request's session.
     source_checks = provide(SqlSourceCheckLog, provides=SourceCheckLog, scope=Scope.APP)
+    # A running turn's progress, likewise on connections of its own.
+    turn_progress = provide(SqlTurnProgress, provides=TurnProgress, scope=Scope.APP)
 
 
 provider = RepositoryProvider()
