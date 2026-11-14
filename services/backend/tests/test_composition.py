@@ -1,6 +1,9 @@
+from pathlib import Path
+
 import pytest
 from dishka.integrations.fastapi import FastapiProvider
 
+from ada.adapters.db.workspace_repositories import SqlProjectRepository
 from ada.composition import create_container, providers
 from ada.config import Settings
 from ada.core.ports.repositories import ProjectRepository
@@ -22,9 +25,9 @@ async def test_the_container_resolves_bound_and_unbuilt_ports(
     container = create_container(unreachable_settings, FastapiProvider())
     try:
         async with container() as request:
-            # Bound to a real implementation.
-            projects = await request.get(ProjectRepository)
-            assert await projects.list() == []
+            # Bound to a real implementation. Resolving it opens no connection yet, so
+            # this works with the database down.
+            assert isinstance(await request.get(ProjectRepository), SqlProjectRepository)
             # Not implemented yet: resolving works, using it says what is missing.
             pipelines = await request.get(PipelineService)
             with pytest.raises(NotImplementedError, match="PipelineService"):
@@ -33,12 +36,17 @@ async def test_the_container_resolves_bound_and_unbuilt_ports(
         await container.close()
 
 
-async def test_memory_repositories_share_one_store_across_requests(
-    unreachable_settings: Settings,
+async def test_repositories_store_through_the_request_session_and_commit_with_it(
+    migrated_database_url: str, tmp_path: Path
 ) -> None:
     import factories
 
-    container = create_container(unreachable_settings, FastapiProvider())
+    settings = Settings(
+        database_url=migrated_database_url,
+        valkey_url="redis://127.0.0.1:1/0",
+        data_dir=tmp_path / "data",
+    )
+    container = create_container(settings, FastapiProvider())
     try:
         project = factories.project()
         async with container() as request:
