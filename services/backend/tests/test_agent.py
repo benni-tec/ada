@@ -496,7 +496,8 @@ def test_a_turn_is_cancelled_while_queued_or_at_its_next_step(
     # The tool call the model asked for was not made.
     assert (stopped.status, stopped.parts, len(script.calls)) == ("cancelled", (), 1)
     finished = turn_events(client, session, "agent.turn_finished")
-    assert [e.payload["status"] for e in finished] == ["cancelled", "cancelled"]
+    # The running one is announced as it stops and again once settled.
+    assert [e.payload["status"] for e in finished] == ["cancelled"] * 3
 
 
 def test_a_failing_or_unreachable_provider_ends_the_turn_as_failed(

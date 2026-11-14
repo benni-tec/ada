@@ -209,15 +209,13 @@ class AgentTurns(AgentTurnService):
         if await self.progress.abandon(turn.id, ABANDONED, self.clock.now()) is not None:
             await self._ended_apart(turn.id)
 
-    async def _ended_apart(self, id: Id) -> bool:
+    async def _ended_apart(self, id: Id) -> None:
         """`ended`, in a unit of work of its own: the caller's has committed already, or
-        runs on for the length of a turn. False when it failed and rolled back."""
+        runs on for the length of a turn."""
         try:
             await self.units.run(AgentTurnService, lambda turns: turns.ended(id))
         except Exception:
             logger.exception("Announcing the end of agent turn %s failed", id)
-            return False
-        return True
 
     async def _queue(
         self, session: Session, entry: SessionEntry, catalog: ModelList, model: str | None = None
@@ -335,10 +333,12 @@ class AgentTurns(AgentTurnService):
             # Failed meanwhile, as if its worker had stopped; that ending was announced.
             logger.warning("Agent turn %s was failed while it still ran", id)
             return await self.turn_records.get(id)
+        # Before settling, so that a broadcast that fails leaves the turn to the recovery.
+        # Settling announces it again: clients take a second finished event as the first.
+        await self.broadcaster.publish(self._finished(session.project_id, finished))
         # Apart, so that a report that fails is not committed as settled with this task:
-        # the recovery retries it. The turn is shown finished meanwhile.
-        if not await self._ended_apart(id):
-            await self.broadcaster.publish(self._finished(session.project_id, finished))
+        # the recovery retries it.
+        await self._ended_apart(id)
         return finished
 
     async def _report_end(self, session: Session, turn: AgentTurn) -> None:
