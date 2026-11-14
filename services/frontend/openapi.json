@@ -914,6 +914,33 @@
         "title": "EntryKind",
         "type": "string"
       },
+      "Finding": {
+        "properties": {
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "default": "error",
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "excerpt"
+        ],
+        "title": "Finding",
+        "type": "object"
+      },
       "FoundBy": {
         "description": "How an agent came upon a source: the web search and its scope.",
         "properties": {
@@ -1178,6 +1205,198 @@
       },
       "JsonObject": {
         "additionalProperties": true,
+        "type": "object"
+      },
+      "JudgeDefaults": {
+        "description": "The global settings of one kind, beside the global LLM registry.",
+        "properties": {
+          "instructions": {
+            "default": "",
+            "title": "Instructions",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/JudgeKind"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "revision": {
+            "default": 0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "strictness": {
+            "$ref": "#/components/schemas/Strictness",
+            "default": "warn"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "JudgeDefaults",
+        "type": "object"
+      },
+      "JudgeDefaultsChange": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are. `model_id` null clears the model (reviews are then\nunchecked); `instructions` \"\" clears them.",
+        "properties": {
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "strictness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Strictness"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "JudgeDefaultsChange",
+        "type": "object"
+      },
+      "JudgeKind": {
+        "enum": [
+          "text_widget",
+          "widget_code"
+        ],
+        "title": "JudgeKind",
+        "type": "string"
+      },
+      "JudgeOverrideChange": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are; null inherits the global default again.",
+        "properties": {
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "strictness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Strictness"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "JudgeOverrideChange",
+        "type": "object"
+      },
+      "JudgeSettings": {
+        "description": "What review uses in a project: the defaults with the project's overrides applied.",
+        "properties": {
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/JudgeKind"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "overridden": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Overridden",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "revision": {
+            "default": 0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "strictness": {
+            "$ref": "#/components/schemas/Strictness"
+          }
+        },
+        "required": [
+          "project_id",
+          "kind",
+          "strictness",
+          "model_id",
+          "instructions"
+        ],
+        "title": "JudgeSettings",
         "type": "object"
       },
       "Liveness": {
@@ -2150,6 +2369,16 @@
           "agent"
         ],
         "title": "OperatorKind",
+        "type": "string"
+      },
+      "Outcome": {
+        "enum": [
+          "pass",
+          "warn",
+          "fail",
+          "unchecked"
+        ],
+        "title": "Outcome",
         "type": "string"
       },
       "OutputKind": {
@@ -3472,6 +3701,15 @@
         "title": "StoredFile",
         "type": "object"
       },
+      "Strictness": {
+        "enum": [
+          "off",
+          "warn",
+          "block"
+        ],
+        "title": "Strictness",
+        "type": "string"
+      },
       "Template": {
         "properties": {
           "content": {
@@ -3784,6 +4022,73 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "Verdict": {
+        "properties": {
+          "blocking": {
+            "title": "Blocking",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "findings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/JudgeKind"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "kind",
+          "outcome",
+          "passed",
+          "blocking",
+          "content_hash",
+          "checked_at"
+        ],
+        "title": "Verdict",
+        "type": "object"
+      },
       "VersionBump": {
         "enum": [
           "major",
@@ -3897,6 +4202,16 @@
           "type": {
             "title": "Type",
             "type": "string"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -5575,6 +5890,115 @@
         ]
       }
     },
+    "/api/projects/{project_id}/judges": {
+      "get": {
+        "description": "What the judges use in the project, one per kind, with the fields it overrides.",
+        "operationId": "get_project_judges_api_projects__project_id__judges_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JudgeSettings"
+                  },
+                  "title": "Response Get Project Judges Api Projects  Project Id  Judges Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project Judges",
+        "tags": [
+          "judges"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/judges/{kind}": {
+      "put": {
+        "operationId": "override_project_judge_api_projects__project_id__judges__kind__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JudgeKind"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JudgeOverrideChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JudgeSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Override Project Judge",
+        "tags": [
+          "judges"
+        ]
+      }
+    },
     "/api/projects/{project_id}/operators": {
       "post": {
         "operationId": "add_operator_api_projects__project_id__operators_post",
@@ -6177,6 +6601,86 @@
         "summary": "Create Template",
         "tags": [
           "reports"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/verdicts": {
+      "get": {
+        "description": "The project's widgets with a verdict (`Widget.verdict`), newest verdict first.",
+        "operationId": "list_verdicts_api_projects__project_id__verdicts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/JudgeKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outcome",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Outcome"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Widget"
+                  },
+                  "title": "Response List Verdicts Api Projects  Project Id  Verdicts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Verdicts",
+        "tags": [
+          "judges"
         ]
       }
     },
@@ -7023,6 +7527,85 @@
         },
         "summary": "Set Agent Instructions",
         "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/judges": {
+      "get": {
+        "description": "The global settings of every kind of judge, beside the LLM registry.",
+        "operationId": "get_judge_defaults_api_settings_judges_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JudgeDefaults"
+                  },
+                  "title": "Response Get Judge Defaults Api Settings Judges Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Judge Defaults",
+        "tags": [
+          "judges",
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/judges/{kind}": {
+      "put": {
+        "operationId": "set_judge_defaults_api_settings_judges__kind__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JudgeKind"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JudgeDefaultsChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JudgeDefaults"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Judge Defaults",
+        "tags": [
+          "judges",
           "settings"
         ]
       }
@@ -7980,6 +8563,67 @@
         },
         "summary": "Get Widget Data",
         "tags": [
+          "widgets"
+        ]
+      }
+    },
+    "/api/widgets/{widget_id}/review": {
+      "post": {
+        "description": "Review a text or custom widget again, in the request: on `run_id`, else on a new run.\nThe widget comes back with its verdict.",
+        "operationId": "review_widget_api_widgets__widget_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "widget_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Widget Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Widget"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Widget",
+        "tags": [
+          "judges",
           "widgets"
         ]
       }
