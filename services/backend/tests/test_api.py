@@ -283,6 +283,21 @@ def test_a_widget_carries_no_data_and_reads_it_in_a_run(
     assert foreign.status_code == 422
 
 
+def test_a_file_is_uploaded_once_per_content(client: TestClient, project: dict[str, Any]) -> None:
+    path = f"/api/projects/{project['id']}/files?filename=Handout.PDF"
+    first = client.post(
+        path, content=b"%PDF-1.7 handout", headers={"Content-Type": "application/pdf"}
+    )
+    again = client.post(path, content=b"%PDF-1.7 handout")
+    empty = client.post(path, content=b"")
+
+    assert first.status_code == 201
+    assert first.json() == again.json()
+    assert first.json()["address"].startswith(f"upload://{project['id']}/")
+    assert first.json()["address"].endswith(".pdf") and first.json()["size"] == 16
+    assert empty.status_code == 422
+
+
 def test_a_widget_is_changed_in_place_and_its_spec_checked(
     client: TestClient, project: dict[str, Any], source_operator: dict[str, Any]
 ) -> None:

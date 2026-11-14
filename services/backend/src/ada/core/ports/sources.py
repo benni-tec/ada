@@ -3,7 +3,7 @@ from typing import Protocol
 
 from ada.core.models.analysis import FetchedData
 from ada.core.models.base import Id
-from ada.core.models.sources import AccessKind, DataSource
+from ada.core.models.sources import AccessKind, DataSource, StoredFile
 from ada.core.models.time import TimeRange
 
 
@@ -24,6 +24,17 @@ class SourceReader(Protocol):
 class SourceReaders(Protocol):
     def for_kind(self, kind: AccessKind) -> SourceReader:
         """The reader for an access kind. Raises Invalid when none is installed."""
+        ...
+
+
+class FileStore(Protocol):
+    """Files uploaded to ADA, for sources that read a file nobody hosts. Stored once per
+    content, so uploading the same file again gives the same address."""
+
+    async def put(self, project_id: Id, content: bytes, suffix: str) -> StoredFile: ...
+
+    async def get(self, address: str) -> bytes:
+        """The file at an upload:// address. Raises NotFound when there is none."""
         ...
 
 

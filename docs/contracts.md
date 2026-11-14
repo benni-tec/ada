@@ -242,8 +242,23 @@ gives the declared (empty) table.
   (`<url> is not a readable PDF: ...`) and one that needs a password (`<url> is an
   encrypted PDF ...`) are `Invalid`; the refresh fails and records the message as the
   source's `last_error`.
-- Scanned pages are not read (no OCR); the national cancer strategy (64 pages, 1.7 MB)
-  takes about two seconds to extract either way.
+- Scanned pages are not read by pdfplumber (no OCR); the national cancer strategy (64
+  pages, 1.7 MB) takes about two seconds to extract either way.
+- **Engines** (`options.engine`, `DocumentEngine`): `"pdfplumber"` (default, local) or
+  `"context.dev"`: the PDF is sent as raw bytes to Context.dev's `POST /v1/parse`
+  (`adapters/sources/context_dev.py`, key from `CONTEXT_DEV_API_KEY` or `CONTEXT_API_KEY`,
+  `Settings.context_dev_api_key`), which answers with Markdown and `<!-- page N -->`
+  markers. `pages` are the Markdown between the markers; `tables` are the rows of every
+  Markdown table (header first, the separator line skipped, `\|` kept as a pipe), with
+  the same columns as pdfplumber's. A scan (`PDF_IMAGES_ONLY`) is parsed again with OCR.
+  A missing key, refused key, no credits, or a file over 50 MiB are readable `Invalid`s;
+  busy (429/503) or unreachable is `Unavailable`. Charts come out as loose numbers, not
+  tables: read them, do not trust them as data.
+- **Uploads**: a PDF nobody hosts is sent as the raw body of
+  `POST /projects/{id}/files?filename=…` (up to 50 MiB) and stored once per content under
+  the data directory (`LocalFileStore`, `files/<project>/<sha256><suffix>`). The answer's
+  `address` (`upload://<project>/<sha256>.pdf`) is a document source's address: read from
+  the store instead of fetched, and its probe never changes.
 
 ### Periods and pushdown
 
@@ -699,6 +714,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | --- | --- |
 | `GET /projects`, `POST /projects {name}` | List; create |
 | `GET /projects/{id}`, `PATCH /projects/{id} {name, expected_revision}` | Read; rename |
+| `POST /projects/{id}/files?filename=` | Upload a file (raw body, up to 50 MiB) for a document source: `{address, sha256, size}` (201) |
 | `GET /projects/{id}/sources`, `POST /projects/{id}/sources` | List; register (`name, access_kind, address, format`, optional `options, freshness, declared_schema`) |
 | `GET /sources/{id}`, `PATCH /sources/{id} {expected_revision, ...}` | Read; update the given fields. A changed address or options queues a forced refresh |
 | `POST /sources/{id}/refresh {force?, wait?, timeout_seconds?}` | Queue a refresh; answers 202 `{data_source_id, force}`. With `wait` the fetch runs in the request (at most `timeout_seconds`, default 30, up to 60) and answers 200 `RefreshOutcome {data_source_id, status, snapshot, error}` (see Sources) |

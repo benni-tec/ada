@@ -35,6 +35,7 @@ from ada.adapters.sources.examples import (
     STATFIN_CANCER_DEATHS,
     ExampleSource,
 )
+from ada.adapters.sources.files import LocalFileStore
 from ada.adapters.sources.http import (
     USER_AGENT,
     HttpSourceReaders,
@@ -682,10 +683,21 @@ class Documents:
         memory.projects[project.id] = project
         self.project_id = project.id
         self.answer = STRATEGY_PDF
-        self.server = Server(lambda request: httpx.Response(200, content=self.answer))
+        # What Context.dev's parse API answers: the status and the JSON body.
+        self.parsed: tuple[int, dict[str, Any]] = (200, {"success": True, "markdown": MARKDOWN})
+        self.server = Server(self._answer)
         self.store = DuckDbAnalysisStore(data_dir)
-        readers = HttpSourceReaders(create_client(httpx.MockTransport(self.server)), FixedClock())
+        self.files = LocalFileStore(data_dir)
+        readers = HttpSourceReaders(
+            create_client(httpx.MockTransport(self.server)), FixedClock(), self.files, "ctxt_test"
+        )
         self.service, _ = data_sources(memory, readers, self.store, FixedClock())
+
+    def _answer(self, request: httpx.Request) -> httpx.Response:
+        if request.url.host == "api.context.dev":
+            status, body = self.parsed
+            return httpx.Response(status, json=body)
+        return httpx.Response(200, content=self.answer)
 
     async def register(self, **changes: Any) -> DataSource:
         arguments: dict[str, Any] = {
@@ -753,6 +765,61 @@ async def test_a_pdf_is_fetched_and_extracted_as_pages_or_as_table_rows(
         (2, 1, 2, ["Uusimaa", "13,300"]),
     ]
     assert [r.method for r in documents.server.requests] == ["GET", "GET"]
+
+
+MARKDOWN = """# Handout
+
+<!-- page 1 -->
+## Delays in access to care
+
+<!-- page 2 -->
+Time to treatment
+
+| Step | Private | Public |
+| --- | ---: | ---: |
+| First contact | 42 | 43 |
+| Specialist \\| visit | 147 | 204 |
+
+Not a table any more.
+"""
+
+
+async def test_an_uploaded_pdf_is_parsed_by_context_dev_into_pages_or_table_rows(
+    documents: Documents,
+) -> None:
+    stored = await documents.files.put(documents.project_id, STRATEGY_PDF, ".pdf")
+    again = await documents.files.put(documents.project_id, STRATEGY_PDF, ".pdf")
+    engine = {"engine": "context.dev"}
+
+    pages = await documents.rows(await documents.register(address=stored.address, options=engine))
+    tables = await documents.rows(
+        await documents.register(address=stored.address, options=engine | {"extract": "tables"})
+    )
+
+    # Stored once per content; the file is read from the store, never fetched.
+    assert again == stored and stored.address.startswith("upload://")
+    assert pages == [
+        (1, "## Delays in access to care"),
+        (2, MARKDOWN.split("<!-- page 2 -->")[1].strip()),
+    ]
+    assert tables == [
+        (2, 1, 1, ["Step", "Private", "Public"]),
+        (2, 1, 2, ["First contact", "42", "43"]),
+        (2, 1, 3, ["Specialist | visit", "147", "204"]),
+    ]
+    parse = [r for r in documents.server.requests if r.url.host == "api.context.dev"]
+    assert [r.url.path for r in parse] == ["/v1/parse", "/v1/parse"]
+    assert parse[0].headers["authorization"] == "Bearer ctxt_test"
+    assert parse[0].content == STRATEGY_PDF
+    # Context.dev's refusals are the source's readable last error.
+    documents.parsed = (402, {"message": "Insufficient credits"})
+    broke = await documents.register(
+        address=stored.address, options=engine | {"extract": "tables"}, name="B"
+    )
+    with pytest.raises(Invalid, match="no credits left: Insufficient credits"):
+        await documents.service.refresh(broke.id)
+    with pytest.raises(Invalid, match="options.engine must be one of"):
+        await documents.register(options={"engine": "magic"})
 
 
 async def test_a_pdf_that_cannot_be_read_fails_the_refresh_readably(

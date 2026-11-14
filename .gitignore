@@ -16,3 +16,5 @@ __pycache__
 /data
 # Agent worktrees.
 .claude/
+# Documents handed out at meetings, dropped in the checkout to upload to ADA.
+/*.pdf

@@ -3143,6 +3143,30 @@
         "title": "SourcePart",
         "type": "object"
       },
+      "StoredFile": {
+        "description": "A file uploaded to ADA, to be read by a source at `address`.",
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "address",
+          "sha256",
+          "size"
+        ],
+        "title": "StoredFile",
+        "type": "object"
+      },
       "Template": {
         "properties": {
           "content": {
@@ -5015,6 +5039,60 @@
         "summary": "Project Events",
         "tags": [
           "events"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/files": {
+      "post": {
+        "description": "Upload a file nobody hosts, e.g. a PDF handed out at a meeting, as the raw request\nbody. Register a source on the returned `address` (a document source for a PDF). The\nsame content gives the same address; files are kept under the data directory.",
+        "operationId": "upload_file_api_projects__project_id__files_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filename",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredFile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload File",
+        "tags": [
+          "sources"
         ]
       }
     },

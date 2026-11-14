@@ -60,6 +60,39 @@ def document_extract(options: JsonObject) -> DocumentExtract:
         raise Invalid(f"options.extract must be one of {modes}, not {value!r}") from None
 
 
+class DocumentEngine(StrEnum):
+    """Who turns a document source's PDF into rows: `options.engine`."""
+
+    # Locally, in the reader's process (pdfplumber). The default.
+    PDFPLUMBER = "pdfplumber"
+    # Context.dev's parse API (CONTEXT_DEV_API_KEY): the PDF is sent there and comes back
+    # as Markdown, whose page markers and tables become the rows. Better on complex layouts.
+    CONTEXT_DEV = "context.dev"
+
+
+def document_engine(options: JsonObject) -> DocumentEngine:
+    """The engine a document source's options ask for; pdfplumber by default."""
+    value = options.get("engine", DocumentEngine.PDFPLUMBER.value)
+    try:
+        return DocumentEngine(value)
+    except ValueError:
+        engines = ", ".join(repr(engine.value) for engine in DocumentEngine)
+        raise Invalid(f"options.engine must be one of {engines}, not {value!r}") from None
+
+
+# The address of a file uploaded to ADA (POST /projects/{id}/files) instead of fetched:
+# upload://<project id>/<sha256><suffix>. The content never changes, so neither does it.
+UPLOAD_SCHEME = "upload://"
+
+
+class StoredFile(DomainModel):
+    """A file uploaded to ADA, to be read by a source at `address`."""
+
+    address: str
+    sha256: str
+    size: int
+
+
 class FreshnessKind(StrEnum):
     # Refreshed only when asked.
     MANUAL = "manual"

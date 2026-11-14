@@ -36,13 +36,14 @@ from typing import Any, Literal
 import httpx
 from pydantic import Field, ValidationError
 
+from ada.adapters.sources.context_dev import ContextDevParser
 from ada.adapters.sources.document import DocumentReader
 from ada.core.models.analysis import FetchedData
-from ada.core.models.base import DomainModel
+from ada.core.models.base import DomainModel, Id
 from ada.core.models.errors import Invalid, Unavailable
-from ada.core.models.sources import AccessKind, DataSource
+from ada.core.models.sources import AccessKind, DataSource, StoredFile
 from ada.core.models.time import TimeRange
-from ada.core.ports.sources import SourceReader, SourceReaders
+from ada.core.ports.sources import FileStore, SourceReader, SourceReaders
 from ada.core.ports.system import Clock
 
 # Names us to the services we read, as their terms usually ask.
@@ -177,17 +178,38 @@ class HttpSourceReaders(SourceReaders):
     """The installed readers: URL, request and document sources, which all go over HTTP.
     Browser sources come later."""
 
-    def __init__(self, client: httpx.AsyncClient, clock: Clock) -> None:
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        clock: Clock,
+        files: FileStore | None = None,
+        context_dev_key: str | None = None,
+    ) -> None:
         self.readers: dict[AccessKind, SourceReader] = {
             kind: HttpReader(client, clock, kind) for kind in HTTP_KINDS
         }
-        self.readers[AccessKind.DOCUMENT] = DocumentReader(self.readers[AccessKind.URL])
+        self.readers[AccessKind.DOCUMENT] = DocumentReader(
+            self.readers[AccessKind.URL],
+            files or _NoUploads(),
+            ContextDevParser(client, context_dev_key),
+            clock,
+        )
 
     def for_kind(self, kind: AccessKind) -> SourceReader:
         try:
             return self.readers[kind]
         except KeyError:
             raise Invalid(f"Reading {kind.value} sources is not installed yet") from None
+
+
+class _NoUploads(FileStore):
+    """For readers made without a file store, e.g. in tests that never upload."""
+
+    async def put(self, project_id: Id, content: bytes, suffix: str) -> StoredFile:
+        raise Invalid("Uploading files is not available here")
+
+    async def get(self, address: str) -> bytes:
+        raise Invalid("Uploaded files are not available here")
 
 
 def _options(source: DataSource) -> HttpOptions:

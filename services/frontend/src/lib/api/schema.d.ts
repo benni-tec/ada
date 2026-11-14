@@ -484,6 +484,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload File
+         * @description Upload a file nobody hosts, e.g. a PDF handed out at a meeting, as the raw request
+         *     body. Register a source on the returned `address` (a document source for a PDF). The
+         *     same content gives the same address; files are kept under the data directory.
+         */
+        post: operations["upload_file_api_projects__project_id__files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/operators": {
         parameters: {
             query?: never;
@@ -2349,6 +2371,18 @@ export interface components {
             /** Url */
             url?: string | null;
         };
+        /**
+         * StoredFile
+         * @description A file uploaded to ADA, to be read by a source at `address`.
+         */
+        StoredFile: {
+            /** Address */
+            address: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size */
+            size: number;
+        };
         /** Template */
         Template: {
             /** @default {} */
@@ -3476,6 +3510,39 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_file_api_projects__project_id__files_post: {
+        parameters: {
+            query?: {
+                filename?: string;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredFile"];
                 };
             };
             /** @description Validation Error */

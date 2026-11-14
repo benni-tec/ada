@@ -20,6 +20,7 @@ from ada.core.models.sources import (
     FreshnessKind,
     FreshnessPolicy,
     RefreshResult,
+    document_engine,
     document_extract,
 )
 from ada.core.models.time import Interval, TimeRange
@@ -524,6 +525,7 @@ def _check_document(source: DataSource) -> None:
     if not is_document:
         return
     extract = document_extract(source.options)
+    document_engine(source.options)
     expected = [column.name for column in DOCUMENT_COLUMNS[extract]]
     declared = source.declared_schema
     if declared is None or [column.name for column in declared.columns] != expected:

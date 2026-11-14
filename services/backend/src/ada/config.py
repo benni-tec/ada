@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # services/widgets/dist of this checkout, for a backend running from source.
@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # key can be stored.
     secret_key: SecretStr | None = Field(None, validation_alias="ADA_SECRET_KEY")
     secret_key_file: Path | None = Field(None, validation_alias="ADA_SECRET_KEY_FILE")
+    # Context.dev's API key, for document sources with `options.engine: "context.dev"`.
+    context_dev_api_key: SecretStr | None = Field(
+        None, validation_alias=AliasChoices("CONTEXT_DEV_API_KEY", "CONTEXT_API_KEY")
+    )
 
     def master_key(self) -> str | None:
         """ADA_SECRET_KEY, else the contents of ADA_SECRET_KEY_FILE; None when neither is

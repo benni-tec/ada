@@ -1,13 +1,17 @@
 from collections.abc import Sequence
+from pathlib import PurePath
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, Response, status
+from fastapi import Request as HttpRequest
 from pydantic import Field
 
 from ada.core.models.base import DomainModel, Id, JsonObject
+from ada.core.models.errors import Invalid
 from ada.core.models.schema import Schema
-from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy
+from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy, StoredFile
+from ada.core.ports.sources import FileStore
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.transactions import AfterCommit
 from ada.core.services.ports.projects import ProjectService
@@ -81,6 +85,30 @@ async def register_source(
         freshness=body.freshness,
         declared_schema=body.declared_schema,
     )
+
+
+# As much as Context.dev's parse API accepts.
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+
+@router.post("/projects/{project_id}/files", status_code=status.HTTP_201_CREATED)
+async def upload_file(
+    project_id: Id,
+    request: HttpRequest,
+    projects: FromDishka[ProjectService],
+    files: FromDishka[FileStore],
+    filename: str = "",
+) -> StoredFile:
+    """Upload a file nobody hosts, e.g. a PDF handed out at a meeting, as the raw request
+    body. Register a source on the returned `address` (a document source for a PDF). The
+    same content gives the same address; files are kept under the data directory."""
+    await projects.get(project_id)
+    content = await request.body()
+    if not content:
+        raise Invalid("The upload is empty: send the file as the request body")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise Invalid(f"Files up to {MAX_UPLOAD_BYTES // (1024 * 1024)} MiB can be uploaded")
+    return await files.put(project_id, content, PurePath(filename).suffix)
 
 
 @router.get("/sources/{source_id}")
