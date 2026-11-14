@@ -38,6 +38,8 @@ export type WidgetData = Schemas['WidgetData']
 export type EventType =
   | 'session.created'
   | 'session.entry_added'
+  | 'session.attachment_added'
+  | 'session.attachment_removed'
   | 'widget.created'
   | 'widget.updated'
   | 'run.started'
