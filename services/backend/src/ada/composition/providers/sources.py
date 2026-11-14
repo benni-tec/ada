@@ -28,12 +28,23 @@ class SourceProvider(Provider):
 
     @provide(scope=Scope.APP)
     async def readers(
-        self, clock: Clock, pages: PageReader, calls: ResearchCalls, limits: ResearchLimits
+        self,
+        clock: Clock,
+        pages: PageReader,
+        calls: ResearchCalls,
+        limits: ResearchLimits,
+        settings: Settings,
     ) -> AsyncIterator[SourceReaders]:
         # One HTTP client for the process, so its connections are pooled; it is closed with
         # the container. Kept out of the container itself, so nothing else picks it up.
         async with create_client() as client:
-            yield HttpSourceReaders(client, clock, ResearchPages(pages, calls, limits))
+            yield HttpSourceReaders(
+                client,
+                clock,
+                ResearchPages(pages, calls, limits),
+                allow_private=settings.allow_private_sources,
+                max_bytes=settings.source_max_bytes,
+            )
 
     @provide(scope=Scope.REQUEST)
     def sources(

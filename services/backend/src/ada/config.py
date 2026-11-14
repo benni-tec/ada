@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     # Paid web tool calls (Exa and Context.dev) a research session may make.
     research_web_calls: int = 40
 
+    # URL and request sources read public addresses only; true lets them read loopback and
+    # private ones too, for local development and tests. Never in production: addresses
+    # come from the web through the research agent.
+    allow_private_sources: bool = False
+    # The most a URL or request source may answer, in bytes once decoded.
+    source_max_bytes: int = Field(50_000_000, gt=0)
+
     def master_key(self) -> str | None:
         """ADA_SECRET_KEY, else the contents of ADA_SECRET_KEY_FILE; None when neither is
         set. A file that is named but cannot be read is an error, not a missing key."""

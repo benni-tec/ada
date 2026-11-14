@@ -392,7 +392,9 @@ async def test_a_refetched_period_replaces_the_stored_one(
 ) -> None:
     clock = FixedClock(TODAY)
     replay = Replay()
-    readers = HttpSourceReaders(create_client(httpx.MockTransport(replay)), clock)
+    readers = HttpSourceReaders(
+        create_client(httpx.MockTransport(replay)), clock, allow_private=True
+    )
     store = DuckDbAnalysisStore(tmp_path / "data")
     years = TimeRange(start=date(2023, 1, 1), end=date(2024, 12, 31))
     policy = FreshnessPolicy(
@@ -462,7 +464,7 @@ async def test_two_runs_that_want_the_same_missing_periods_fetch_them_once(
         await asyncio.sleep(0.2)
         return replay(request)
 
-    readers = HttpSourceReaders(create_client(httpx.MockTransport(slow)), clock)
+    readers = HttpSourceReaders(create_client(httpx.MockTransport(slow)), clock, allow_private=True)
     store = DuckDbAnalysisStore(tmp_path / "data")
     years = TimeRange(start=date(2023, 1, 1), end=date(2024, 12, 31))
     only_2024 = TimeRange(start=date(2024, 1, 1), end=date(2024, 12, 31))

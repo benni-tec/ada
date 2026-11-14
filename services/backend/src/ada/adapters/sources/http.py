@@ -23,14 +23,21 @@ has its own keys (ada.core.services.sources.shaping).
 
 A URL source is always read with GET; `method` and `body` belong to request sources.
 
+Addresses come from people and from the research agent, which takes them from the web, so
+every request, redirects included, goes only to public addresses unless the platform
+allows private ones (local development and tests), and an answer is read up to a limit.
+
 Time ranges. The readers send what the options say and nothing more. A source that can be
 asked for some periods only declares `pushdown` in its options, and the source service
 writes the requested periods into `params` or `body` before it calls the reader
 (ada.core.services.sources.pushdown), so the reader needs no notion of periods.
 """
 
+import asyncio
 import hashlib
+import ipaddress
 import json
+import socket
 from typing import Any, Literal
 
 import httpx
@@ -51,6 +58,9 @@ USER_AGENT = "ADA/0.1 (traceable data analysis; +https://github.com/benni-tec/ad
 HTTP_KINDS = (AccessKind.URL, AccessKind.REQUEST)
 # Statistics APIs can take a while to assemble a table, but not minutes.
 TIMEOUT = httpx.Timeout(60.0, connect=10.0)
+MAX_REDIRECTS = 10
+# Far above any statistics table or boundary file the demo reads.
+MAX_BYTES = 50_000_000
 
 type Method = Literal["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 type Params = dict[str, str | int | float | list[str | int | float]]
@@ -90,12 +100,21 @@ class HttpReader(SourceReader):
     """Reads URL sources (GET the address) or request sources (method, headers and body
     from the options)."""
 
-    def __init__(self, client: httpx.AsyncClient, clock: Clock, kind: AccessKind) -> None:
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        clock: Clock,
+        kind: AccessKind,
+        allow_private: bool = False,
+        max_bytes: int = MAX_BYTES,
+    ) -> None:
         if kind not in (AccessKind.URL, AccessKind.REQUEST):
             raise ValueError(f"HTTP reads URL and request sources, not {kind.value}")
         self.client = client
         self.clock = clock
         self.kind = kind
+        self.allow_private = allow_private
+        self.max_bytes = max_bytes
 
     async def fetch(self, source: DataSource, time_range: TimeRange) -> FetchedData:
         # The time range is already in the options where the source can take it (see the
@@ -160,18 +179,58 @@ class HttpReader(SourceReader):
     async def _send(
         self, method: str, url: str | httpx.URL, ok: bool = True, **kwargs: Any
     ) -> httpx.Response:
-        """Send one request. Raises SourceUnavailable when it fails, and when the answer is
-        an error unless `ok` is False."""
-        try:
-            response = await self.client.request(method, url, **kwargs)
-        except httpx.HTTPError as error:
-            reason = str(error) or type(error).__name__
-            raise SourceUnavailable(f"{method} {url} failed: {reason}") from error
-        if ok and response.is_error:
-            raise SourceUnavailable(
-                f"{method} {url} answered {response.status_code} {response.reason_phrase}"
-            )
-        return response
+        """Send one request, following redirects here so each address is checked before it
+        is asked. Raises SourceUnavailable when it fails, and when the answer is an error
+        unless `ok` is False."""
+        request = self.client.build_request(method, url, **kwargs)
+        for _ in range(MAX_REDIRECTS + 1):
+            if not self.allow_private:
+                await _check_public(request.url)
+            try:
+                response = await self.client.send(request, stream=True, follow_redirects=False)
+                try:
+                    if response.next_request is not None:
+                        request = response.next_request
+                        continue
+                    if ok and response.is_error:
+                        raise SourceUnavailable(
+                            f"{method} {url} answered {response.status_code}"
+                            f" {response.reason_phrase}"
+                        )
+                    return await self._read(response, f"{method} {url}")
+                finally:
+                    await response.aclose()
+            except httpx.HTTPError as error:
+                reason = str(error) or type(error).__name__
+                raise SourceUnavailable(f"{method} {url} failed: {reason}") from error
+        raise SourceUnavailable(f"{method} {url} redirected more than {MAX_REDIRECTS} times")
+
+    async def _read(self, response: httpx.Response, call: str) -> httpx.Response:
+        """The answer with its whole body, which may be at most max_bytes once decoded."""
+        too_large = SourceUnavailable(
+            f"{call} answered more than {self.max_bytes:,} bytes, the most a source may have"
+        )
+        length = response.headers.get("content-length", "")
+        if length.isdigit() and int(length) > self.max_bytes:
+            raise too_large
+        content = bytearray()
+        async for chunk in response.aiter_bytes():
+            content += chunk
+            if len(content) > self.max_bytes:
+                raise too_large
+        # The body is decoded already: the headers must no longer say how it was encoded.
+        headers = [
+            (name, value)
+            for name, value in response.headers.multi_items()
+            if name not in ("content-encoding", "content-length")
+        ]
+        return httpx.Response(
+            response.status_code,
+            headers=headers,
+            content=bytes(content),
+            request=response.request,
+            extensions=response.extensions,
+        )
 
 
 class HttpSourceReaders(SourceReaders):
@@ -179,10 +238,15 @@ class HttpSourceReaders(SourceReaders):
     a page reader is given."""
 
     def __init__(
-        self, client: httpx.AsyncClient, clock: Clock, pages: PageReader | None = None
+        self,
+        client: httpx.AsyncClient,
+        clock: Clock,
+        pages: PageReader | None = None,
+        allow_private: bool = False,
+        max_bytes: int = MAX_BYTES,
     ) -> None:
         self.readers: dict[AccessKind, SourceReader] = {
-            kind: HttpReader(client, clock, kind) for kind in HTTP_KINDS
+            kind: HttpReader(client, clock, kind, allow_private, max_bytes) for kind in HTTP_KINDS
         }
         if pages is not None:
             self.readers[AccessKind.DOCUMENT] = DocumentReader(pages, clock)
@@ -210,3 +274,21 @@ def _url(source: DataSource, options: HttpOptions) -> httpx.URL:
         return httpx.URL(source.address).copy_merge_params(options.params)
     except httpx.InvalidURL as error:
         raise Invalid(f"The address of source {source.name} is not a URL: {error}") from None
+
+
+async def _check_public(url: httpx.URL) -> None:
+    """Raises Invalid unless every address the host resolves to is public: not loopback,
+    private, link-local (cloud metadata services), multicast or unspecified."""
+    port = url.port or (443 if url.scheme == "https" else 80)
+    try:
+        found = await asyncio.get_running_loop().getaddrinfo(
+            url.host, port, type=socket.SOCK_STREAM
+        )
+    except OSError as error:
+        raise SourceUnavailable(f"{url.host} could not be resolved: {error}") from None
+    for *_, address in found:
+        ip = ipaddress.ip_address(address[0])
+        if ip.is_multicast or not ip.is_global:
+            raise Invalid(
+                f"{url.host} is not a public address ({ip}); sources read public addresses only"
+            )
