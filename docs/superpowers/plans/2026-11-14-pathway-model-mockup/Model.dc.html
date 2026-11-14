@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pathway model card</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#1d4ed8}a:hover{color:#1e3a8a}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 100vh; box-sizing: border-box; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.45; color: #171717; background: #fafafa">
+
+<div role="note" style="background: #b91c1c; color: #ffffff; font-size: 13px; font-weight: 500; padding: 6px 16px; display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+<span>Educational use only. Do not enter patient data.</span>
+</div>
+
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 24px; border-bottom: 1px solid #e5e5e5; background: #ffffff">
+<button type="button" aria-label="Toggle sidebar" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid #e5e5e5; border-radius: 8px; background: #ffffff; color: #404040"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 3v18"></path></svg></button>
+<span style="font-weight: 600">Nordic cancer care</span>
+<span style="color: #737373">/ Models</span>
+</div>
+
+<div style="max-width: 1240px; margin: 0 auto; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 6px; color: #525252; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3v18h18"></path><path d="m7 15 4-4 3 3 5-6"></path></svg>
+<span>Model</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+<h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em">Patient pathway model</h1>
+<span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f4f4f5; color: #404040; border: 1px solid #e5e5e5">v2 · immutable · built from pinned snapshots</span>
+</div>
+</div>
+
+<nav aria-label="Model views" style="display: flex; flex-wrap: wrap; gap: 28px; border-bottom: 1px solid #e5e5e5">
+<a href="Model.dc.html" aria-current="page" style="padding: 12px 2px; margin-bottom: -1px; border-bottom: 2px solid #171717; color: #171717; font-weight: 600; text-decoration: none">Model card</a>
+<a href="Main.dc.html" style="padding: 12px 2px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #737373; font-weight: 500; text-decoration: none">Evaluation</a>
+<a href="Population.dc.html" style="padding: 12px 2px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #737373; font-weight: 500; text-decoration: none">Population</a>
+</nav>
+
+<p style="margin: 0; color: #525252; max-width: 860px">Nordic baseline, Finnish education gradient, international delay effects. Each arrow carries exactly one parameter, so no effect is counted twice. When the stage is known, the stage mix is skipped.</p>
+
+<section style="background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Structure</h2>
+<div style="overflow-x: auto">
+<div style="position: relative; width: 1144px; height: 648px">
+<svg role="img" aria-label="From Site, sex, age band to Nordic baseline" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 232px; top: 32px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-1" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-1)"></path></svg>
+<svg role="img" aria-label="From Education and care route to Stage mix, skipped when the stage is known" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 232px; top: 176px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-2" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-2)"></path></svg>
+<svg role="img" aria-label="From Days from trigger to treatment to Waiting effect after the trigger" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 232px; top: 320px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-3" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-3)"></path></svg>
+<svg role="img" aria-label="From Days before the trigger to Waiting effect before the trigger, a toggle" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 232px; top: 464px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6 6"><defs><marker id="dc-arrow-head-filled-4" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-4)"></path></svg>
+<svg role="img" aria-label="From Nordic baseline to Excess hazard" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 552px; top: 32px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-5" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-5)"></path></svg>
+<svg role="img" aria-label="From Stage mix to Excess hazard" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 552px; top: 176px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-6" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-6)"></path></svg>
+<svg role="img" aria-label="From Waiting effect after the trigger to Excess hazard" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 552px; top: 320px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-7" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-7)"></path></svg>
+<svg role="img" aria-label="From Waiting effect before the trigger to Excess hazard, when the toggle is on" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 552px; top: 464px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6 6"><defs><marker id="dc-arrow-head-filled-8" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-8)"></path></svg>
+<svg role="img" aria-label="From Education, direct effect to Excess hazard, analyst view only" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 552px; top: 608px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6 6"><defs><marker id="dc-arrow-head-filled-9" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-9)"></path></svg>
+<svg role="img" aria-label="From Finland residual to Excess hazard, a toggle" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 1057px; top: 464px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6 6"><defs><marker id="dc-arrow-head-filled-10" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 87 4 L 4 4" marker-end="url(#dc-arrow-head-filled-10)"></path></svg>
+<svg role="img" aria-label="From Excess hazard to Alive at 5 years" width="87" height="8" viewBox="0 0 87 8" preserveAspectRatio="none" style="position: absolute; left: 840px; top: 176px; width: 87px; height: 8px; overflow: visible; fill: none; stroke: #737373; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-11" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#737373" stroke="none" style="stroke: none; fill: #737373; fill: context-stroke"/></marker></defs><path d="M 0 4 L 83 4" marker-end="url(#dc-arrow-head-filled-11)"></path></svg>
+<div style="position: absolute; left: 0px; top: 0px; width: 232px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #f4f4f5; border: 1px solid #d4d4d4; border-radius: 10px"><span><b>Site, sex, age band</b><br>input</span></div>
+<div style="position: absolute; left: 0px; top: 144px; width: 232px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #f4f4f5; border: 1px solid #d4d4d4; border-radius: 10px"><span><b>Education, care route</b><br>input</span></div>
+<div style="position: absolute; left: 0px; top: 288px; width: 232px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #f4f4f5; border: 1px solid #d4d4d4; border-radius: 10px"><span><b>Days, trigger → treatment</b><br>beyond target, capped at 16 weeks</span></div>
+<div style="position: absolute; left: 0px; top: 432px; width: 232px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #f4f4f5; border: 1px solid #d4d4d4; border-radius: 10px"><span><b>Days before the trigger</b><br>beyond target</span></div>
+<div style="position: absolute; left: 320px; top: 0px; width: 232px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #ffffff; border: 1px solid #d4d4d4; border-radius: 10px"><span><b>Nordic baseline</b><br>Norway, Sweden; by stage from Norway</span></div>
+<div style="position: absolute; left: 320px; top: 144px; width: 232px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #ffffff; border: 1px solid #d4d4d4; border-radius: 10px"><span><b>Stage mix</b><br>Zai OR; route as in Maringe</span></div>
+<div style="position: absolute; left: 320px; top: 288px; width: 232px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #ffffff; border: 1px solid #d4d4d4; border-radius: 10px"><span><b>Waiting effect, after trigger</b><br>Hanna, Heiden</span></div>
+<div style="position: absolute; left: 320px; top: 432px; width: 232px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #ffffff; border: 1px dashed #a3a3a3; border-radius: 10px"><span><b>Waiting effect, before trigger</b><br>Sud per day; toggle, default off</span></div>
+<div style="position: absolute; left: 320px; top: 576px; width: 232px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #ffffff; border: 1px dashed #a3a3a3; border-radius: 10px"><span><b>Education, direct</b><br>Zai HR; analyst view only</span></div>
+<div style="position: absolute; left: 640px; top: 0px; width: 200px; height: 648px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #ffffff; border: 2px solid #171717; border-radius: 10px"><span><b>Excess hazard</b><br>one parameter<br>per arrow</span></div>
+<div style="position: absolute; left: 928px; top: 144px; width: 216px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 10px"><span><b>Alive at 5 years</b><br>now vs on target</span></div>
+<div style="position: absolute; left: 928px; top: 432px; width: 216px; height: 72px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #ffffff; border: 1px dashed #a3a3a3; border-radius: 10px"><span><b>Finland residual</b><br>per site and sex; toggle, default on</span></div>
+</div>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px">
+<section style="flex: 1 1 360px; min-width: 0; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Trigger criteria, lung</h2>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<strong style="font-size: 13px">Suspicion → imaging <span style="font-weight: 400; color: #737373">· Sweden</span></strong>
+<ul style="margin: 0; padding-left: 18px; color: #404040; display: flex; flex-direction: column; gap: 2px">
+<li>New airway symptoms for 6 weeks, smoker or ex-smoker over 40</li>
+<li>Chest or shoulder pain without another explanation</li>
+<li>Haemoptysis</li>
+</ul>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<strong style="font-size: 13px">Well-founded suspicion → pathway <span style="font-weight: 400; color: #737373">· Norway, Sweden</span></strong>
+<ul style="margin: 0; padding-left: 18px; color: #404040; display: flex; flex-direction: column; gap: 2px">
+<li>Imaging finding suggesting lung cancer (both)</li>
+<li>Metastasis or biopsy elsewhere suggesting lung origin (both)</li>
+<li>Repeated haemoptysis, even with a normal X-ray (Sweden)</li>
+<li>Superior vena cava obstruction (Sweden)</li>
+<li>Recurrent laryngeal nerve palsy (Sweden)</li>
+</ul>
+</div>
+<p style="margin: 0; font-size: 12px; color: #737373">Helsedirektoratet, pakkeforløp lungekreft (3 July 2026); RCC, SVF lungcancer v1.4 (2024-11-05). Denmark to load. Finland has no national criteria.</p>
+</section>
+
+<section style="flex: 1 1 360px; min-width: 0; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Standard times, lung (calendar days)</h2>
+<table style="width: 100%; border-collapse: collapse; font-size: 13px">
+<thead><tr style="text-align: left; color: #525252; border-bottom: 1px solid #e5e5e5"><th scope="col" style="padding: 6px 8px 6px 0; font-weight: 500">Step</th><th scope="col" style="padding: 6px 8px; font-weight: 500">Norway</th><th scope="col" style="padding: 6px 8px; font-weight: 500">Sweden</th><th scope="col" style="padding: 6px 8px; font-weight: 500">Denmark</th><th scope="col" style="padding: 6px 0 6px 8px; font-weight: 500">Target</th></tr></thead>
+<tbody>
+<sc-for list="{{times}}" as="t" hint-placeholder-count="6">
+<tr style="border-bottom: 1px solid #f0f0f0"><td style="padding: 6px 8px 6px 0">{{t.step}}</td><td style="padding: 6px 8px">{{t.no}}</td><td style="padding: 6px 8px">{{t.se}}</td><td style="padding: 6px 8px; color: #737373">{{t.dk}}</td><td style="padding: 6px 0 6px 8px; font-weight: 600">{{t.target}}</td></tr>
+</sc-for>
+</tbody>
+</table>
+<p style="margin: 0; font-size: 12px; color: #737373">Sweden counts from the decision on well-founded suspicion, Norway from the referral received. The target is the median of the countries that define the step; the whole-pathway deadline is the primary one.</p>
+</section>
+</div>
+
+<section style="background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Parameters and where they come from</h2>
+<div style="overflow-x: auto">
+<table style="width: 100%; min-width: 860px; border-collapse: collapse; font-size: 13px">
+<thead>
+<tr style="text-align: left; color: #525252; border-bottom: 1px solid #e5e5e5">
+<th scope="col" style="padding: 8px 10px 8px 0; font-weight: 500">Arrow</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500">Estimate</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500">Source</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500">Scale</th>
+<th scope="col" style="padding: 8px 0 8px 10px; font-weight: 500">Evidence</th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{params}}" as="p" hint-placeholder-count="9">
+<tr style="border-bottom: 1px solid #f0f0f0; vertical-align: top">
+<td style="padding: 10px 10px 10px 0; font-weight: 500">{{p.arrow}}</td>
+<td style="padding: 10px">{{p.estimate}}</td>
+<td style="padding: 10px; color: #404040">{{p.source}}</td>
+<td style="padding: 10px; color: #525252">{{p.scale}}</td>
+<td style="padding: 10px 0 10px 10px"><span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: {{p.bg}}; border: 1px solid {{p.border}}; color: {{p.fg}}">{{p.grade}}</span></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px">
+<section style="flex: 1 1 340px; min-width: 0; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Two settings, shown as a range</h2>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px">
+<li><strong>Finland residual</strong> (default on): the part of the Finnish shortfall that timing and education do not explain, as one factor per site and sex.</li>
+<li><strong>Days before the trigger count</strong> (default off): Sud's per-day rate on the days lost before imaging. An assumption; part of it is lead time.</li>
+</ul>
+</section>
+<section style="flex: 1 1 340px; min-width: 0; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Validation</h2>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px">
+<li style="display: flex; justify-content: space-between; gap: 12px"><span>Deadlines and days behind against hand calculations</span><span style="color: #737373">unit tests</span></li>
+<li style="display: flex; justify-content: space-between; gap: 12px"><span>Average Finnish profile lands on NORDCAN Finland; the residual is reported</span><span style="color: #737373">after build</span></li>
+<li style="display: flex; justify-content: space-between; gap: 12px"><span>Education gap vs Pokhrel 2010 survival by education</span><span style="color: #737373">after build</span></li>
+<li style="display: flex; justify-content: space-between; gap: 12px"><span>Delay effect vs Hanna's worked examples</span><span style="color: #737373">after build</span></li>
+<li style="display: flex; justify-content: space-between; gap: 12px"><span>Discrimination and calibration curves</span><span style="color: #9a3412">not possible: no patient-level data</span></li>
+</ul>
+</section>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1720}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var grades = {
+      standard: { bg: '#f0fdf4', border: '#bbf7d0', fg: '#166534' },
+      meta: { bg: '#eff6ff', border: '#bfdbfe', fg: '#1e3a8a' },
+      registry: { bg: '#f4f4f5', border: '#e5e5e5', fg: '#262626' },
+      cohort: { bg: '#f4f4f5', border: '#e5e5e5', fg: '#262626' },
+      assumption: { bg: '#fff7ed', border: '#fed7aa', fg: '#9a3412' },
+      pending: { bg: '#ffffff', border: '#d4d4d4', fg: '#525252' }
+    };
+    var rows = [
+      { arrow: 'Trigger criteria', estimate: 'Suspicion and well-founded suspicion, lung', source: 'Helsedirektoratet 2026; RCC 2024', scale: 'criteria', g: 'standard', grade: 'national standard' },
+      { arrow: 'Target times', estimate: 'Median of Norway and Sweden per step; 43 days trigger → treatment', source: 'Helsedirektoratet 2026; RCC 2024', scale: 'days', g: 'standard', grade: 'national standard' },
+      { arrow: 'First-contact wait', estimate: '2–7 days elsewhere vs 14 in Finland', source: 'Khalife 2025 (survey, n = 42)', scale: 'days', g: 'assumption', grade: 'assumption' },
+      { arrow: 'Nordic baseline', estimate: '5-year relative survival by site, sex, age band; by stage from Norway', source: 'NORDCAN 2020–2024; Cancer Registry of Norway', scale: 'net survival', g: 'pending', grade: 'to load' },
+      { arrow: 'Education → stage', estimate: 'Stage IV OR 1.10 (men), 1.15 (women); colorectal 1.09–1.10', source: 'Zai 2025, Fig. 2', scale: 'odds ratio', g: 'registry', grade: 'registry, 469,522' },
+      { arrow: 'Waiting after trigger, colectomy', estimate: 'HR 1.06 (1.01–1.12) per 4 weeks, 4–16 weeks total', source: 'Hanna 2020', scale: 'overall → excess', g: 'meta', grade: 'meta-analysis' },
+      { arrow: 'Waiting after trigger, colorectal adjuvant', estimate: 'HR 1.13 (1.09–1.17) per 4 weeks', source: 'Hanna 2020', scale: 'overall → excess', g: 'meta', grade: 'meta-analysis' },
+      { arrow: 'Waiting after trigger, lung surgery', estimate: 'Worse beyond 12 weeks from the diagnostic CT; Hanna 1.06 (0.93–1.19) as the alternative', source: 'Heiden 2021 (VA, 96 % men); Hanna 2020', scale: 'overall → excess', g: 'cohort', grade: 'one cohort' },
+      { arrow: 'Waiting before trigger', estimate: '0.0056 per day; ±8 % as pseudo-SD', source: 'Sud 2020', scale: 'overall', g: 'assumption', grade: 'assumption' },
+      { arrow: 'Education, direct', estimate: 'HR 1.13 (men), 1.14 (women); lung women 1.22 (1.12–1.33)', source: 'Zai 2025, Fig. 4', scale: 'cancer-specific', g: 'registry', grade: 'registry, 469,522' },
+      { arrow: 'Finland residual', estimate: 'One factor per site and sex, solved at build', source: 'NORDCAN Finland; Yle/Kuittinen medians (preliminary)', scale: 'excess hazard', g: 'pending', grade: 'to compute' }
+    ];
+    var times = [
+      { step: 'Suspicion → pathway decision', no: '–', se: '11', dk: 'to load', target: '11' },
+      { step: 'Referral → first specialist visit', no: '7', se: '–', dk: 'to load', target: '7' },
+      { step: 'First visit → work-up complete', no: '21', se: '–', dk: 'to load', target: '21' },
+      { step: 'Work-up → surgery or radiotherapy', no: '14', se: '–', dk: 'to load', target: '14' },
+      { step: 'Work-up → drug treatment', no: '7', se: '–', dk: 'to load', target: '7' },
+      { step: 'Trigger → treatment start (surgery, RT)', no: '42', se: '44', dk: 'to load', target: '43' },
+      { step: 'Trigger → treatment start (drugs)', no: '35', se: '40', dk: 'to load', target: '38' }
+    ];
+    return {
+      times: times,
+      params: rows.map(function (r) {
+        var c = grades[r.g];
+        return { arrow: r.arrow, estimate: r.estimate, source: r.source, scale: r.scale, grade: r.grade, bg: c.bg, border: c.border, fg: c.fg };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

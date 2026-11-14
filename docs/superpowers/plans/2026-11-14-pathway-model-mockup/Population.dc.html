@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pathway model population view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#1d4ed8}a:hover{color:#1e3a8a}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 100vh; box-sizing: border-box; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.45; color: #171717; background: #fafafa">
+
+<div role="note" style="background: #b91c1c; color: #ffffff; font-size: 13px; font-weight: 500; padding: 6px 16px; display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+<span>Educational use only. Do not enter patient data.</span>
+</div>
+
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 24px; border-bottom: 1px solid #e5e5e5; background: #ffffff">
+<button type="button" aria-label="Toggle sidebar" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid #e5e5e5; border-radius: 8px; background: #ffffff; color: #404040"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 3v18"></path></svg></button>
+<span style="font-weight: 600">Nordic cancer care</span>
+<span style="color: #737373">/ Models</span>
+</div>
+
+<div style="max-width: 1240px; margin: 0 auto; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 6px; color: #525252; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3v18h18"></path><path d="m7 15 4-4 3 3 5-6"></path></svg>
+<span>Model</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+<h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em">Patient pathway model</h1>
+<span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa">Illustrative numbers: a back-of-envelope calculation, not the built model</span>
+</div>
+</div>
+
+<nav aria-label="Model views" style="display: flex; flex-wrap: wrap; gap: 28px; border-bottom: 1px solid #e5e5e5">
+<a href="Model.dc.html" style="padding: 12px 2px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #737373; font-weight: 500; text-decoration: none">Model card</a>
+<a href="Main.dc.html" style="padding: 12px 2px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #737373; font-weight: 500; text-decoration: none">Evaluation</a>
+<a href="Population.dc.html" aria-current="page" style="padding: 12px 2px; margin-bottom: -1px; border-bottom: 2px solid #171717; color: #171717; font-weight: 600; text-decoration: none">Population</a>
+</nav>
+
+<p style="margin: 0; color: #525252; max-width: 860px">How much of Finland's survival shortfall waiting times can explain. Start from the Nordic level, add Finland's extra days at the published rate, and compare with Finland's observed survival. What is left is not timing.</p>
+
+<section style="background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Lung cancer, men: alive at 5 years, out of 100</h2>
+<p style="margin: 0; font-size: 15px">Timing explains <strong>about half</strong> of the gap. The other half is treatment access, stage at diagnosis, smoking and registry practice.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<sc-for list="{{bars}}" as="b" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: minmax(160px, 260px) minmax(0, 1fr) 56px; align-items: center; gap: 12px">
+<div style="display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 500">{{b.label}}</span><span style="font-size: 12px; color: #737373">{{b.note}}</span></div>
+<div style="position: relative; height: 26px; background: #f4f4f5; border-radius: 4px">
+<div style="position: absolute; left: 0; top: 0; bottom: 0; width: {{b.w}}; background: {{b.color}}; border-radius: 4px"></div>
+</div>
+<span style="font-size: 20px; font-weight: 700; text-align: right; color: {{b.color}}">{{b.value}}</span>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<div style="flex: 1 1 240px; padding: 12px; border-radius: 8px; background: #f4f4f5; font-size: 13px"><strong>Explained by timing: 6 of 100</strong><br>88 extra days at Hanna's rate of 1.06 per 4 weeks, applied to the whole excess. An upper bound: Hanna measured waits after diagnosis only.</div>
+<div style="flex: 1 1 240px; padding: 12px; border-radius: 8px; background: #fff7ed; border: 1px solid #fed7aa; font-size: 13px"><strong>Not explained: 5 of 100</strong><br>The Finland residual. It becomes the default setting on the evaluation page, so patient figures match Finnish survival.</div>
+</div>
+<p style="margin: 0; font-size: 12px; color: #737373">Nordic level: the mean of Sweden and Norway, as the National Cancer Strategy defines it. Finland: NORDCAN 2020–2024. Extra days: 155 in Finland against 67 in Denmark (Yle MOT 2025, unpublished study). The built model computes this per site and sex from the parameter table.</p>
+</section>
+
+<section style="background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Where the days go, lung cancer, symptoms to treatment</h2>
+<p style="margin: 0; color: #525252">Finland loses most of its days before diagnosis. Those are system levers, not something a clinician can hurry for one patient.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{countries}}" as="c" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 90px minmax(0, 1fr) 64px; align-items: center; gap: 12px">
+<span style="font-size: 13px; font-weight: 500">{{c.name}}</span>
+<div style="display: flex; height: 22px; border-radius: 4px; overflow: hidden; background: #f4f4f5; width: {{c.w}}">
+<div style="width: {{c.p}}; background: #d4d4d4" title="patient"></div>
+<div style="width: {{c.g}}; background: #737373" title="primary care"></div>
+<div style="width: {{c.s}}; background: #404040" title="specialised care"></div>
+</div>
+<span style="font-size: 13px; font-weight: 600; text-align: right">{{c.total}} d</span>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #525252">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 2px; background: #d4d4d4"></span>Patient, before first contact</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 2px; background: #737373"></span>Primary care</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 2px; background: #404040"></span>Specialised care</span>
+</div>
+<p style="margin: 0; font-size: 12px; color: #737373">Finland's split from the same study (more than 50, 41 and 58 days). Sweden's and Denmark's splits are not published yet, so only their totals are shown. Levers in the functions and scenarios plan: appointment access, nurse-ordered imaging, direct CT from primary care.</p>
+</section>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var bars = [
+      { label: 'Nordic level', note: 'mean of Sweden and Norway', value: 29, color: '#1d4ed8' },
+      { label: 'Nordic level with Finnish waits', note: '88 extra days at the published rate', value: 23, color: '#404040' },
+      { label: 'Finland, observed', note: 'NORDCAN 2020–2024', value: 18, color: '#c2410c' }
+    ].map(function (b) { return { label: b.label, note: b.note, value: b.value, color: b.color, w: (b.value / 40 * 100) + '%' }; });
+    var countries = [
+      { name: 'Finland', total: 155, p: 52, g: 41, s: 58 },
+      { name: 'Sweden', total: 107, p: 0, g: 0, s: 0 },
+      { name: 'Denmark', total: 67, p: 0, g: 0, s: 0 }
+    ].map(function (c) {
+      var known = c.p + c.g + c.s;
+      var pct = function (x) { return (known ? x / c.total * 100 : 0) + '%'; };
+      return { name: c.name, total: c.total, w: (c.total / 155 * 100) + '%', p: pct(c.p), g: pct(c.g), s: pct(c.s) };
+    });
+    return { bars: bars, countries: countries };
+  }
+}
+</script>
+</body>
+</html>
