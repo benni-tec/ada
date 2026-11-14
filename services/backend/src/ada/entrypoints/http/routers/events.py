@@ -6,7 +6,7 @@ from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
-from ada.composition.providers.background import EventStream
+from ada.core.ports.events import EventStream
 
 router = APIRouter(route_class=DishkaRoute, tags=["events"])
 

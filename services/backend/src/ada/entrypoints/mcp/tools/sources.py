@@ -6,10 +6,7 @@ from fastmcp import FastMCP
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.schema import Schema
 from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy
-
-# The contract has refreshes queued through this port, which tach.toml does not yet let
-# entrypoints depend on; integration should allow it (or add an inbound port) and drop this.
-from ada.core.ports.tasks import TaskDispatcher  # tach-ignore
+from ada.core.ports.tasks import TaskDispatcher
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.mcp.injection import Inject

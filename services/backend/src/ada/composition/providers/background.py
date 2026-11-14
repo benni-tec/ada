@@ -9,11 +9,6 @@ from ada.config import Settings
 from ada.core.ports.events import EventPublisher, EventStream
 from ada.core.ports.tasks import TaskDispatcher
 
-# Re-exported for the entrypoints: tach.toml lets them depend on the composition root but
-# not on ada.core.ports, and the event stream (HTTP) and the dispatcher (worker) are ports
-# they resolve from the container.
-__all__ = ["EventPublisher", "EventStream", "TaskDispatcher", "provider"]
-
 
 class BackgroundProvider(Provider):
     """Live events and handing work to the worker, both through Valkey. The API, the worker

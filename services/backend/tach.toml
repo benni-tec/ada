@@ -33,13 +33,16 @@ depends_on = ["ada.core.models", "ada.core.ports", "ada.core.services.ports"]
 path = "ada.adapters"
 depends_on = ["ada.core.ports", "ada.core.models"]
 
-# Entrypoints reach services and adapters only through the container.
+# Entrypoints reach services and adapters only through the container. They may name
+# outbound ports too: some are resolved from the container as they are (the event stream,
+# the task dispatcher), and their models are in the ports' signatures.
 [[modules]]
 path = "ada.entrypoints.http"
 depends_on = [
     "ada.composition",
     "ada.config",
     "ada.core.models",
+    "ada.core.ports",
     "ada.core.services.ports",
     # The MCP app is mounted into the HTTP app.
     "ada.entrypoints.mcp", "ada.discovery",
@@ -47,11 +50,17 @@ depends_on = [
 
 [[modules]]
 path = "ada.entrypoints.mcp"
-depends_on = ["ada.core.models", "ada.core.services.ports", "ada.discovery"]
+depends_on = ["ada.core.models", "ada.core.ports", "ada.core.services.ports", "ada.discovery"]
 
 [[modules]]
 path = "ada.entrypoints.worker"
-depends_on = ["ada.composition", "ada.config", "ada.core.services.ports", "ada.discovery"]
+depends_on = [
+    "ada.composition",
+    "ada.config",
+    "ada.core.ports",
+    "ada.core.services.ports",
+    "ada.discovery",
+]
 
 [[modules]]
 path = "ada.entrypoints.cli"

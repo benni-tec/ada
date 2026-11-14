@@ -3,7 +3,7 @@ from uuid import UUID
 
 from dishka.integrations.taskiq import FromDishka
 
-from ada.composition.providers.background import TaskDispatcher
+from ada.core.ports.tasks import TaskDispatcher
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.worker.registry import task
 
