@@ -56,6 +56,25 @@ test('names the source and its fetch time under the numbers', async () => {
   expect(sources).toHaveTextContent(/fetched .*2026/)
 })
 
+test('a custom widget lists each source once, with the fetch time any input knows', async () => {
+  const fixed = { operator_id: 'op2', name: 'Kainuu', address: 'https://example.test/k', fetched_at: '2026-11-14T10:00:00Z' }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://ada.test')
+      if (url.pathname === '/api/widgets/w1') return json(widget({ type: 'custom', inputs: { gap: 'op_2' } }))
+      // The gap input has not read Kainuu, so its answer has no fetch time for it.
+      const sources = url.searchParams.get('input') === 'gap' ? [{ ...fixed, fetched_at: null }] : [fixed]
+      return json(coverage({ sources }))
+    }),
+  )
+  show()
+
+  const sources = await screen.findByRole('list', { name: 'Sources' })
+  expect(within(sources).getAllByRole('listitem')).toHaveLength(1)
+  expect(sources).toHaveTextContent(/fetched .*2026/)
+})
+
 test('marks simulated and stale data', async () => {
   serve({ data: coverage({ is_scenario: true, is_stale: true }) })
   show()

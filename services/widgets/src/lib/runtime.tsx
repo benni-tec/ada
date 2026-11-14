@@ -10,7 +10,7 @@ import {
   readFromMcpHost,
   type WidgetContext,
 } from './host'
-import { MAIN_INPUT, type Roles, type Widget, type WidgetData } from './types'
+import { MAIN_INPUT, type Roles, type Widget, type WidgetData, type WidgetSource } from './types'
 
 import './styles.css'
 
@@ -67,14 +67,17 @@ async function withInputs(loaded: Loaded, ctx: WidgetContext | null): Promise<Lo
   }
   const stale = Object.values(inputs).some((input) => input.is_stale)
   // Each answer names the sources of its own input; the footer lists them all, once each.
-  const sources = [
-    ...new Map(
-      Object.values(inputs)
-        .flatMap((input) => input.sources ?? [])
-        .map((source) => [source.operator_id, source] as const),
-    ).values(),
-  ]
-  return { ...loaded, data: { ...main, is_stale: stale, sources }, roles: main.output.roles ?? {}, inputs }
+  // An input that did not read a source has not fixed it, so a fetch time wins.
+  const sources = new Map<string, WidgetSource>()
+  for (const source of Object.values(inputs).flatMap((input) => input.sources ?? [])) {
+    if (!sources.get(source.operator_id)?.fetched_at) sources.set(source.operator_id, source)
+  }
+  return {
+    ...loaded,
+    data: { ...main, is_stale: stale, sources: [...sources.values()] },
+    roles: main.output.roles ?? {},
+    inputs,
+  }
 }
 
 /** Loads the widget named in the URL fragment and its data, shows loading and error
