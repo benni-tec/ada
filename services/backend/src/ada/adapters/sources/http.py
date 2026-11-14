@@ -41,9 +41,10 @@ import hashlib
 import ipaddress
 import json
 import socket
+import zlib
 from collections.abc import Iterable
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import httpcore
 import httpx
@@ -70,6 +71,8 @@ TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 MAX_REDIRECTS = 10
 # Far above any statistics table or boundary file the demo reads.
 MAX_BYTES = 50_000_000
+# The content encodings asked for, which the readers undo within MAX_BYTES (_Inflate).
+ENCODINGS = ("gzip", "deflate")
 
 type Method = Literal["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 type Params = dict[str, str | int | float | list[str | int | float]]
@@ -103,7 +106,7 @@ def create_client(
     if transport is None and not allow_private:
         transport = _public_transport()
     return httpx.AsyncClient(
-        headers={"User-Agent": USER_AGENT},
+        headers={"User-Agent": USER_AGENT, "Accept-Encoding": ", ".join(ENCODINGS)},
         timeout=TIMEOUT,
         follow_redirects=True,
         transport=transport,
@@ -229,8 +232,20 @@ class HttpReader(SourceReader):
         head = response.request.method == "HEAD"
         if not head and length.isdigit() and int(length) > self.max_bytes:
             raise too_large
+        # Decoded here, since httpx's decoders take no limit and a few kilobytes of gzip
+        # can hold gigabytes. Last applied, first undone.
+        encodings = response.headers.get_list("content-encoding", split_commas=True)
+        decoders = [
+            _Inflate(name, self.max_bytes, too_large)
+            for name in reversed([encoding.strip().lower() for encoding in encodings])
+            if name in ENCODINGS
+        ]
         content = bytearray()
-        async for chunk in response.aiter_bytes():
+        # The bytes as sent. aiter_raw would refuse them for an answer that a test transport
+        # built from bytes, which httpx reads (and decodes) at once.
+        async for chunk in cast(httpx.AsyncByteStream, response.stream):
+            for decoder in decoders:
+                chunk = decoder.decode(chunk)
             content += chunk
             if len(content) > self.max_bytes:
                 raise too_large
@@ -247,6 +262,39 @@ class HttpReader(SourceReader):
             request=response.request,
             extensions=response.extensions,
         )
+
+
+class _Inflate:
+    """Undoes one gzip or deflate encoding, raising `too_large` once it would give more
+    than `limit` bytes, before it holds them."""
+
+    def __init__(self, encoding: str, limit: int, too_large: Exception) -> None:
+        self.encoding = encoding
+        self.wbits = zlib.MAX_WBITS | 16 if encoding == "gzip" else zlib.MAX_WBITS
+        self.inflater = zlib.decompressobj(self.wbits)
+        self.limit = limit
+        self.too_large = too_large
+        self.size = 0
+
+    def decode(self, data: bytes) -> bytes:
+        decoded = bytearray()
+        while data and not self.inflater.eof:
+            try:
+                piece = self.inflater.decompress(data, self.limit - self.size + 1)
+            except zlib.error as error:
+                if self.size == 0 and self.wbits == zlib.MAX_WBITS:
+                    # Deflate is meant to have zlib's header; some servers leave it out.
+                    self.wbits = -zlib.MAX_WBITS
+                    self.inflater = zlib.decompressobj(self.wbits)
+                    continue
+                message = f"the answer is not valid {self.encoding}: {error}"
+                raise httpx.DecodingError(message) from None
+            self.size += len(piece)
+            if self.size > self.limit:
+                raise self.too_large
+            decoded += piece
+            data = self.inflater.unconsumed_tail
+        return bytes(decoded)
 
 
 class HttpSourceReaders(SourceReaders):

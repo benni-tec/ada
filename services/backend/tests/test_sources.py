@@ -3,10 +3,13 @@ into a table, and the example registrations against their recorded answers."""
 
 import asyncio
 import csv
+import gzip
 import io
 import json
 import socket
 import time
+import tracemalloc
+import zlib
 from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -760,6 +763,33 @@ async def test_an_answer_over_the_size_limit_is_refused() -> None:
     # The probe's HEAD request has no body, whatever length GET's would have.
     tagged = Server(lambda r: httpx.Response(200, headers={"ETag": "v", "Content-Length": "101"}))
     assert await tagged.reader(max_bytes=100).probe(source()) == "etag:v"
+
+
+async def test_an_encoded_answer_is_decoded_within_the_size_limit() -> None:
+    layered = gzip.compress(zlib.compress(b"a\n1\n"))
+    # About 200 bytes that hold 20 MB of zeros.
+    bomb = gzip.compress(gzip.compress(bytes(20_000_000)))
+
+    def encoded(content: bytes, encoding: str) -> Server:
+        headers = {"Content-Encoding": encoding}
+        # A stream, as from the network: httpx decodes `content` when it is given.
+        stream = httpx.ByteStream(content)
+        return Server(lambda request: httpx.Response(200, headers=headers, stream=stream))
+
+    fetched = await encoded(layered, "deflate, gzip").reader().fetch(source(), TimeRange())
+    tracemalloc.start()
+    try:
+        with pytest.raises(SourceUnavailable, match="more than 100,000 bytes"):
+            await encoded(bomb, "gzip, gzip").reader(max_bytes=100_000).fetch(
+                source(), TimeRange()
+            )
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert fetched.content == b"a\n1\n"
+    # Refused while decoding, not after the 20 MB are in memory.
+    assert peak < 2_000_000
 
 
 async def test_the_probe_reads_a_declared_field_or_hashes_the_answer() -> None:
