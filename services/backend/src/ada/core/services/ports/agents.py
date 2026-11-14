@@ -170,7 +170,8 @@ class ResearchService(Protocol):
         ...
 
     async def use_source_read(self, source: DataSource) -> None:
-        """Count, as use_web_call, a paid read of the source (a web source, or a document
-        Context.dev parses) that the running research turn queues for the worker, which
-        reads it outside the turn. Nothing is counted outside a research turn."""
+        """Count, as use_web_call, a read of the source that the running research turn
+        queues for the worker, which reads it outside the turn: of a web source, or of any
+        document, since the turn may switch it to Context.dev before the worker reads it.
+        Nothing is counted outside a research turn."""
         ...
