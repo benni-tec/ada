@@ -23,8 +23,9 @@ from ada.core.ports.repositories import (
 )
 from ada.core.ports.system import Clock
 from ada.core.services.pipelines import listing
-from ada.core.services.pipelines.fusion import QueryNode, compose
+from ada.core.services.pipelines.fusion import QueryNode, SnapshotNode, compose
 from ada.core.services.pipelines.schemas import (
+    SOURCE_KEY,
     Columns,
     check_fits,
     check_unique,
@@ -92,7 +93,28 @@ class Pipelines(PipelineService):
         id = operator_identity(project_id, OperatorKind.HISTORY, params, (upstream.id,))
         if existing := await self._find(id):
             return existing
-        columns = await self.columns.of(upstream)
+        anchor = await self.columns.source_snapshot(upstream)
+        snapshots = sorted(
+            (
+                s
+                for s in await self.columns.snapshots.list(upstream.id)
+                if s.parameters_key == SOURCE_KEY
+                and (s.fetched_at, s.id) <= (anchor.fetched_at, anchor.id)
+            ),
+            key=lambda s: (s.fetched_at, s.id),
+            reverse=True,
+        )[:last]
+        columns = await self.store.describe(
+            compose(
+                QueryNode(
+                    id,
+                    " UNION ALL BY NAME ".join(
+                        f"SELECT * FROM input_{i}" for i in range(len(snapshots))
+                    ),
+                    tuple(SnapshotNode(s) for s in snapshots),
+                )
+            )
+        )
         if any(c.name.lower() in {"snapshot_at", "snapshot_rank"} for c in columns):
             raise Invalid("Source history reserves the columns snapshot_at and snapshot_rank")
         return await self.operators.add(
