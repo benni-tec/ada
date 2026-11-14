@@ -172,6 +172,28 @@ class SessionEntryRow(Base):
     tool_call: Mapped[Json | None] = mapped_column(JSONB)
 
 
+class SessionAttachmentRow(Base):
+    """What is attached to a session, shown beside it as tabs and listed to its agent."""
+
+    __tablename__ = "session_attachments"
+    __table_args__ = (
+        UniqueConstraint("session_id", "kind", "ref", name="uq_session_attachments_ref"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("sessions.id", ondelete="CASCADE"), index=True
+    )
+    # The AttachmentKind; `ref` is the thing's id (an operator id for a pipeline, a URL for
+    # a web page). Not a foreign key: the service checks it, and a deleted thing shows as
+    # gone.
+    kind: Mapped[str] = mapped_column(String(16))
+    ref: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(Text, server_default="")
+    actor: Mapped[Json] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+
+
 class AgentTurnRow(Base):
     """The in-platform agent's turns. Written by the worker as the turn runs, outside any
     revision; `cancel_requested` is the one column someone else writes."""
@@ -358,6 +380,8 @@ class WidgetRow(Base):
     # Further inputs by name ({name: operator id}); not foreign keys, checked by the service.
     inputs: Mapped[Json] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     render_error: Mapped[str | None] = mapped_column(Text)
+    # A judge's review of what the agent wrote (a custom widget's code): a Verdict as JSON.
+    verdict: Mapped[Json | None] = mapped_column(JSONB)
 
 
 class ReportRow(Base):
