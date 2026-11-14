@@ -7,6 +7,7 @@ import json
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid7
@@ -20,6 +21,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 import factories
+from ada.adapters.db.workspace_repositories import SqlSourceLocks
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import (
     MemoryDataSourceRepository,
@@ -63,6 +65,7 @@ from ada.core.models.sources import (
     Provenance,
 )
 from ada.core.models.time import TimeRange
+from ada.core.models.web import Monitor
 from ada.core.ports.sources import SourceReaders
 from ada.core.ports.web import PageReader
 from ada.core.services.ports.projects import ProjectService
@@ -71,6 +74,7 @@ from ada.core.services.sources.service import DataSources, source_operator_id
 from ada.core.services.sources.shaping import shape
 from api_support import dispatcher, new_project, send, serve
 from conftest import settings_in
+from db_helpers import Repos, engine_for, unit_of_work
 from fakes import (
     RECORDINGS,
     FakeAnalysisStore,
@@ -847,10 +851,30 @@ async def test_watching_again_replaces_the_monitor_and_unwatch_clears_it(
     await documents.service.watch(source.id)
     unwatched = await documents.service.unwatch(source.id)
 
-    assert [call[0] for call in pages.calls] == ["watch", "unwatch", "watch", "unwatch"]
-    assert pages.calls[1] == ("unwatch", ("mon_1",))
+    assert [call[0] for call in pages.calls] == ["watch", "watch", "unwatch", "unwatch"]
+    assert pages.calls[2] == ("unwatch", ("mon_1",))
     assert (unwatched.monitor_id, unwatched.freshness.kind) == (None, FreshnessKind.MANUAL)
     assert source.id not in documents.memory.monitor_secrets
+
+
+class FailingWatch(FakePageReader):
+    async def watch(self, url: str, webhook_url: str) -> Monitor:
+        raise Unavailable("the monitor service is down")
+
+
+async def test_a_failed_replacement_keeps_the_old_monitor(documents: World) -> None:
+    source = await documents.register(access_kind=AccessKind.DOCUMENT, format=DataFormat.JSON)
+    before = await documents.service.watch(source.id)
+    sealed = documents.memory.monitor_secrets[source.id]
+    failing = FailingWatch()
+    documents.service.pages = failing
+
+    with pytest.raises(Unavailable):
+        await documents.service.watch(source.id)
+
+    assert await documents.service.get(source.id) == before
+    assert documents.memory.monitor_secrets[source.id] == sealed
+    assert failing.calls == []
 
 
 async def test_watch_without_public_url_fails_clearly(
@@ -909,7 +933,18 @@ def test_hook_good_signature_queues_forced_refresh(watched: tuple[TestClient, st
     assert "test-secret" not in response.text
 
 
-@pytest.mark.parametrize("header", [None, "", "t=1", "t=x,v1=00", "garbage"])
+@pytest.mark.parametrize(
+    "header",
+    [
+        None,
+        "",
+        "t=1",
+        "t=x,v1=00",
+        "garbage",
+        f"t={9 * 10**399},v1=00",
+        "t=" + "9" * 5000 + ",v1=00",
+    ],
+)
 def test_hook_rejects_bad_signature(watched: tuple[TestClient, str], header: str | None) -> None:
     client, source_id = watched
     headers = {} if header is None else {"x-context-signature": header}
@@ -940,3 +975,50 @@ def test_hook_unknown_source_is_404(watched: tuple[TestClient, str]) -> None:
 
     assert (unwatched.status_code, unknown.status_code) == (404, 404)
     assert dispatcher(client).refreshes == []
+
+
+async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str) -> None:
+    pages = FakePageReader()
+    secrets = FernetSecretBox(KEY)
+
+    def service(repos: Repos) -> DataSources:
+        session = repos.data_sources.session  # type: ignore[attr-defined]
+        readers = FakeSourceReaders({AccessKind.DOCUMENT: FakeSourceReader()})
+        return DataSources(
+            repos.projects,
+            repos.data_sources,
+            repos.operators,
+            repos.snapshots,
+            readers,
+            MemorySourceCheckLog(MemoryStore()),
+            FakeAnalysisStore(),
+            MemoryEventBus(),
+            FixedClock(),
+            SqlSourceLocks(session),
+            pages,
+            secrets,
+            PUBLIC_URL,
+        )
+
+    async with engine_for(migrated_database_url) as engine:
+        async with unit_of_work(engine) as repos:
+            project = factories.project()
+            await repos.projects.add(project)
+            source = await service(repos).register(
+                project.id, "Page", AccessKind.DOCUMENT, PAGE, DataFormat.JSON
+            )
+            watched = await service(repos).watch(source.id)
+        async with unit_of_work(engine) as repos:
+            column = await repos.data_sources.monitor_secret_encrypted(source.id)
+            verified = await service(repos).verify_push(
+                source.id,
+                b"{}",
+                context_signature("test-secret", b"{}", int(time.time())),
+                datetime.now(UTC),
+            )
+
+    assert column is not None and column != "test-secret"
+    assert secrets.decrypt(column) == "test-secret"
+    assert verified
+    assert (watched.monitor_id, watched.freshness.kind) == ("mon_1", FreshnessKind.PUSH)
+    assert "test-secret" not in watched.model_dump_json()

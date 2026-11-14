@@ -326,22 +326,30 @@ class DataSources(SourceService):
             raise NotConfigured(
                 "watching needs a master key to keep the monitor secret (ADA_SECRET_KEY)"
             )
+        # Held to the end of the transaction: two watches of one source would otherwise each
+        # create a monitor, and the one that loses the write could never be deleted.
+        await self.locks.hold(id)
         source = await self.sources.get(id)
-        if source.monitor_id is not None:
-            await self.unwatch(id)
-            source = await self.sources.get(id)
+        old = source.monitor_id
         webhook = f"{self.public_url.rstrip('/')}/api/hooks/context/{id}"
         monitor = await self.pages.watch(source.address, webhook)
         try:
             sealed = self.secrets.encrypt(monitor.secret.get_secret_value())
             await self.sources.set_monitor(id, monitor.id, sealed)
-            return await self._set_freshness(source, FreshnessKind.PUSH)
+            watched = await self._set_freshness(source, FreshnessKind.PUSH)
         except Exception:
             # Without this the monitor would keep firing at a source that does not know it.
             await self.pages.unwatch(monitor.id)
             raise
+        if old is not None:
+            try:
+                await self.pages.unwatch(old)
+            except Exception:
+                logger.warning("The replaced monitor %s of source %s was not deleted", old, id)
+        return watched
 
     async def unwatch(self, id: Id) -> DataSource:
+        await self.locks.hold(id)
         source = await self.sources.get(id)
         if source.monitor_id is None:
             return source
