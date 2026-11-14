@@ -7,6 +7,7 @@ import { IconButton } from '@/components/icon-action'
 import { ErrorNotice } from '@/components/notices'
 import { Textarea } from '@/components/ui/textarea'
 import { isActive, withLiveParts } from '@/lib/agent-turns'
+import { withSettings } from '@/lib/settings-sections'
 import {
   agentKeys,
   cancelTurn,
@@ -103,7 +104,7 @@ export function Composer({
             connected over MCP can read them. To have the platform’s agent answer, add a provider with its key and pick
             the session agent in{' '}
             {projectId ? (
-              <Link to="/projects/$projectId/settings" params={{ projectId }} className="underline underline-offset-2">
+              <Link to="." search={withSettings('models')} resetScroll={false} className="underline underline-offset-2">
                 Settings
               </Link>
             ) : (

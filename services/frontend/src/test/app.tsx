@@ -31,7 +31,8 @@ export function serveApi(routes: Record<string, Handler | unknown>) {
     const url = new URL(request.url)
     const route = routes[`${request.method} ${url.pathname}`]
     if (route === undefined) return json({ detail: `No fake for ${request.method} ${url.pathname}` }, 404)
-    const body = request.method === 'GET' ? undefined : await request.json().catch(() => undefined)
+    // A clone, so a handler can still read a body that is not JSON (an upload).
+    const body = request.method === 'GET' ? undefined : await request.clone().json().catch(() => undefined)
     const result = typeof route === 'function' ? await (route as Handler)(body, request) : route
     return result instanceof Response ? result : json(result)
   })
@@ -110,7 +111,7 @@ export const web: Actor = { kind: 'user', name: 'web' }
 export const claude: Actor = { kind: 'external_agent', name: 'Claude Desktop' }
 
 export function project(overrides: Partial<Project> = {}): Project {
-  return { id: 'p1', name: 'Screening', created_at: '2026-11-01T09:00:00Z', revision: 1, ...overrides }
+  return { id: 'p1', name: 'Screening', created_at: '2026-11-01T09:00:00Z', agent_instructions: '', revision: 1, ...overrides }
 }
 
 export function session(overrides: Partial<Session> = {}): Session {

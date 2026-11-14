@@ -397,8 +397,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Rename Project */
-        patch: operations["rename_project_api_projects__project_id__patch"];
+        /**
+         * Update Project
+         * @description Rename it or set the session agent's instructions for it.
+         */
+        patch: operations["update_project_api_projects__project_id__patch"];
         trace?: never;
     };
     "/api/projects/{project_id}/alert-rules": {
@@ -883,6 +886,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/agent-instructions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Agent Instructions
+         * @description The session agent's instructions for every project; 409 on a stale revision (the
+         *     settings' revision, shared with the session agent).
+         */
+        put: operations["set_agent_instructions_api_settings_agent_instructions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/llm-models": {
         parameters: {
             query?: never;
@@ -968,6 +992,23 @@ export interface paths {
         get?: never;
         /** Set Session Agent */
         put: operations["set_session_agent_api_settings_session_agent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/web": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Web Settings */
+        get: operations["get_web_settings_api_settings_web_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1182,11 +1223,23 @@ export interface components {
          * @enum {string}
          */
         ActorKind: "user" | "agent" | "external_agent" | "system";
+        /** AgentInstructions */
+        AgentInstructions: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Instructions */
+            instructions: string;
+        };
         /**
          * AgentSettingsView
          * @description Everything the settings page shows about the agent, in one read.
          */
         AgentSettingsView: {
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
             /**
              * @default {
              *       "models": []
@@ -1973,6 +2026,11 @@ export interface components {
          */
         Project: {
             /**
+             * Agent Instructions
+             * @default
+             */
+            agent_instructions: string;
+            /**
              * Created At
              * Format: date-time
              */
@@ -1986,12 +2044,17 @@ export interface components {
              */
             revision: number;
         };
-        /** ProjectRename */
-        ProjectRename: {
+        /**
+         * ProjectChange
+         * @description Fields left out stay as they are.
+         */
+        ProjectChange: {
+            /** Agent Instructions */
+            agent_instructions?: string | null;
             /** Expected Revision */
             expected_revision: number;
             /** Name */
-            name: string;
+            name?: string | null;
         };
         /**
          * ProviderChange
@@ -2493,6 +2556,16 @@ export interface components {
          * @enum {string}
          */
         VersionBump: "major" | "minor" | "patch";
+        /**
+         * WebSettings
+         * @description What the web tools may do, from the platform's configuration (read only).
+         */
+        WebSettings: {
+            /** Context Dev Configured */
+            context_dev_configured: boolean;
+            /** Daily Credit Limit */
+            daily_credit_limit: number;
+        };
         /**
          * Widget
          * @description A display of one operator's output. It never holds data: it fetches the output of
@@ -3327,7 +3400,7 @@ export interface operations {
             };
         };
     };
-    rename_project_api_projects__project_id__patch: {
+    update_project_api_projects__project_id__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -3338,7 +3411,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProjectRename"];
+                "application/json": components["schemas"]["ProjectChange"];
             };
         };
         responses: {
@@ -4428,6 +4501,39 @@ export interface operations {
             };
         };
     };
+    set_agent_instructions_api_settings_agent_instructions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentInstructions"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSettingsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_model_api_settings_llm_models_post: {
         parameters: {
             query?: never;
@@ -4616,6 +4722,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_web_settings_api_settings_web_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebSettings"];
                 };
             };
         };

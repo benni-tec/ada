@@ -52,7 +52,7 @@ export function AgentSettingsSection() {
   const { data: settings, error, isPending } = useQuery(agentSettingsQuery())
   return (
     <SettingsSection
-      title="Agents"
+      title="Models and providers"
       description="Shared by all projects: the providers and their keys, their models, and the model that answers in sessions."
     >
       {isPending ? (

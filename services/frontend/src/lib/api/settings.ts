@@ -47,8 +47,46 @@ export const deleteModel = (id: string) =>
 export const setSessionAgent = (modelId: string | null, expectedRevision: number) =>
   unwrap(api.PUT('/api/settings/session-agent', { body: { model_id: modelId, expected_revision: expectedRevision } }))
 
+/** The session agent's instructions for every project; shares the settings' revision. */
+export const setAgentInstructions = (instructions: string, expectedRevision: number) =>
+  unwrap(api.PUT('/api/settings/agent-instructions', { body: { instructions, expected_revision: expectedRevision } }))
+
+/** Whether a Context.dev key is set, and the daily credit budget per project (read only). */
+export type WebSettings = Schemas['WebSettings']
+export const getWebSettings = () => unwrap(api.GET('/api/settings/web'))
+
+/** The session agent's instructions for this project ("" for none). */
+export const setProjectInstructions = (projectId: Id, instructions: string, expectedRevision: number) =>
+  unwrap(
+    api.PATCH('/api/projects/{project_id}', {
+      params: { path: { project_id: projectId } },
+      body: { agent_instructions: instructions, expected_revision: expectedRevision },
+    }),
+  )
+
+/** What `POST /projects/{id}/files` answers: the address a document source reads it from. */
+export type StoredFile = Schemas['StoredFile']
+
+/** Uploads a file as the raw body; the schema describes no body, so this is plain fetch. */
+export async function uploadFile(projectId: Id, file: File): Promise<StoredFile> {
+  const url = new URL(`/api/projects/${encodeURIComponent(projectId)}/files`, window.location.origin)
+  url.searchParams.set('filename', file.name)
+  const response = await globalThis.fetch(
+    new Request(url, { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/octet-stream' } }),
+  )
+  const body: unknown = await response.json().catch(() => undefined)
+  if (!response.ok) {
+    const error = body as ApiError | undefined
+    throw new ApiFailure(response.status, typeof error?.detail === 'string' ? error : undefined)
+  }
+  return body as StoredFile
+}
+
 export const settingsKeys = {
   agent: () => ['settings', 'agent'] as const,
+  web: () => ['settings', 'web'] as const,
 }
 
 export const agentSettingsQuery = () => queryOptions({ queryKey: settingsKeys.agent(), queryFn: getAgentSettings })
+
+export const webSettingsQuery = () => queryOptions({ queryKey: settingsKeys.web(), queryFn: getWebSettings })

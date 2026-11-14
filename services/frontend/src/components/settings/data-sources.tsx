@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from '@tanstack/react-router'
-import { CircleAlert, Pencil, Plus, RefreshCw } from 'lucide-react'
+import { CircleAlert, FileUp, Pencil, Plus, RefreshCw } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 
 import { IconButton } from '@/components/icon-action'
@@ -15,6 +15,8 @@ import {
   registerSource,
   sourcesQuery,
   updateSource,
+  uploadFile,
+  webSettingsQuery,
   type AccessKind,
   type DataFormat,
   type DataSource,
@@ -30,8 +32,8 @@ const isConflict = (error: unknown) => error instanceof ApiFailure && error.isCo
 
 /**
  * This project's data sources: where each reads from, how fresh it is kept and how its
- * last refresh went; added, edited and refreshed here. The sidebar links to each one
- * (`#source-<id>`).
+ * last refresh went; added (or uploaded, for a PDF), edited and refreshed here. A link
+ * names one with `#source-<id>`.
  */
 export function DataSourcesSection({ projectId }: { projectId: Id }) {
   const { data: sources, error, isPending } = useQuery(sourcesQuery(projectId))
@@ -135,18 +137,132 @@ function SourceItem({ projectId, source, marked }: { projectId: Id; source: Data
 }
 
 function AddSource({ projectId }: { projectId: Id }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState<'source' | 'upload' | null>(null)
   if (!open)
     return (
-      <Button variant="outline" className="self-start" onClick={() => setOpen(true)}>
-        <Plus aria-hidden="true" />
-        Add data source
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => setOpen('source')}>
+          <Plus aria-hidden="true" />
+          Add data source
+        </Button>
+        <Button variant="outline" onClick={() => setOpen('upload')}>
+          <FileUp aria-hidden="true" />
+          Upload a PDF
+        </Button>
+      </div>
     )
   return (
     <div className="max-w-xl rounded-lg border p-4">
-      <SourceForm projectId={projectId} onDone={() => setOpen(false)} />
+      {open === 'source' ? (
+        <SourceForm projectId={projectId} onDone={() => setOpen(null)} />
+      ) : (
+        <UploadPdf projectId={projectId} onDone={() => setOpen(null)} />
+      )}
     </div>
+  )
+}
+
+type Engine = 'pdfplumber' | 'context.dev'
+type Extract = 'pages' | 'tables'
+
+/**
+ * A PDF nobody hosts: posted as the body of `POST /projects/{id}/files`, then registered
+ * as a document source on the address that answers, read by the chosen engine.
+ */
+function UploadPdf({ projectId, onDone }: { projectId: Id; onDone: () => void }) {
+  const queryClient = useQueryClient()
+  const web = useQuery(webSettingsQuery())
+  const [file, setFile] = useState<File | null>(null)
+  const [name, setName] = useState('')
+  const [engine, setEngine] = useState<Engine>('pdfplumber')
+  const [extract, setExtract] = useState<Extract>('pages')
+
+  const upload = useMutation({
+    mutationFn: async (chosen: File) => {
+      const stored = await uploadFile(projectId, chosen)
+      return registerSource(projectId, {
+        name: name.trim(),
+        access_kind: 'document',
+        format: 'pdf',
+        address: stored.address,
+        options: { engine, extract },
+      })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: keys.sources(projectId) })
+      onDone()
+    },
+  })
+
+  const choose = (chosen: File | null) => {
+    setFile(chosen)
+    // The file's name, until one is typed.
+    if (chosen && name.trim() === '') setName(chosen.name.replace(/\.pdf$/i, ''))
+  }
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    if (file && name.trim() !== '' && !upload.isPending) upload.mutate(file)
+  }
+
+  return (
+    <form onSubmit={onSubmit} aria-label="Upload a PDF" className="flex flex-col gap-3">
+      <h3 className="font-semibold">Upload a PDF</h3>
+      <Field label="PDF file" hint="Up to 50 MiB. The same file uploaded twice is stored once.">
+        {({ id, describedBy }) => (
+          <Input
+            id={id}
+            type="file"
+            accept="application/pdf,.pdf"
+            aria-describedby={describedBy}
+            onChange={(event) => choose(event.target.files?.[0] ?? null)}
+          />
+        )}
+      </Field>
+      <Field label="Name">
+        {({ id }) => <Input id={id} value={name} required onChange={(event) => setName(event.target.value)} />}
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="Engine"
+          hint={
+            engine === 'context.dev' && web.data && !web.data.context_dev_configured
+              ? 'No Context.dev key is configured: reading it will fail.'
+              : undefined
+          }
+        >
+          {({ id, describedBy }) => (
+            <select
+              id={id}
+              aria-describedby={describedBy}
+              className={selectClass}
+              value={engine}
+              onChange={(event) => setEngine(event.target.value as Engine)}
+            >
+              <option value="pdfplumber">Local (pdfplumber)</option>
+              <option value="context.dev">Context.dev (better tables, OCR)</option>
+            </select>
+          )}
+        </Field>
+        <Field label="Extract">
+          {({ id }) => (
+            <select id={id} className={selectClass} value={extract} onChange={(event) => setExtract(event.target.value as Extract)}>
+              <option value="pages">Pages: the text of each page</option>
+              <option value="tables">Tables: the rows of each table</option>
+            </select>
+          )}
+        </Field>
+      </div>
+      {upload.error && <ErrorNotice error={upload.error} prefix="Not added:" />}
+      <div className="flex gap-2">
+        <Button type="submit" disabled={upload.isPending || !file || name.trim() === ''}>
+          {upload.isPending ? 'Uploading…' : 'Upload and add'}
+        </Button>
+        <Button type="button" variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   )
 }
 

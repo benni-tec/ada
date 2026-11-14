@@ -5,8 +5,9 @@ import type { AgentSettings, DataSource, LlmProvider } from '@/lib/api'
 
 import { json, models, project, renderAt, serveApi } from './app'
 
-// The settings page (docs/contracts/settings.md): the agent shared by all projects, and
-// the project's data sources.
+// The settings modal (docs/contracts.md, "Settings"): what all projects share (models and
+// providers, agent instructions, the web) and this project's (data sources, its
+// instructions), over whatever page is open.
 
 function provider(overrides: Partial<LlmProvider> = {}): LlmProvider {
   return {
@@ -27,6 +28,7 @@ function settings(overrides: Partial<AgentSettings> = {}): AgentSettings {
     models: models(),
     session_agent: 'gemini/flash',
     secrets_available: true,
+    instructions: '',
     revision: 3,
     ...overrides,
   }
@@ -62,29 +64,142 @@ function serveSettings(overrides: Record<string, unknown> = {}) {
     'GET /api/projects/p1/alerts': [],
     'GET /api/projects/p1/sources': [source()],
     'GET /api/settings/agent': settings(),
+    'GET /api/settings/web': { context_dev_configured: true, daily_credit_limit: 300 },
     ...overrides,
   })
 }
 
-const agents = () => screen.findByRole('region', { name: 'Agents' })
+const dialog = () => screen.findByRole('dialog', { name: 'Settings' })
+const agents = () => screen.findByRole('region', { name: 'Models and providers' })
 const dataSources = () => screen.findByRole('region', { name: 'Data sources' })
+const navGroup = async (name: string) =>
+  within(within(await dialog()).getByRole('navigation', { name: 'Settings sections' })).getByRole('group', { name })
 
-test('the gear at the bottom of the sidebar opens the settings', async () => {
+test('the gear opens the settings over the page; the side navigation switches sections; Escape closes them', async () => {
   serveSettings()
   renderAt('/projects/p1')
 
-  const link = await screen.findByRole('link', { name: 'Settings' })
-  expect(link).toHaveAttribute('href', '/projects/p1/settings')
-  fireEvent.click(link)
+  const gear = await screen.findByRole('link', { name: 'Settings' })
+  expect(gear).toHaveAttribute('href', '/projects/p1?settings=models')
+  fireEvent.click(gear)
 
-  expect(await screen.findByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
-  expect(document.querySelector('[data-page-type="settings"]')).toHaveTextContent('Settings')
-  await waitFor(() => expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('data-active'))
-  expect(within(await agents()).getByText(/Shared by all projects/)).toBeInTheDocument()
+  expect(await within(await dialog()).findByRole('region', { name: 'Models and providers' })).toBeInTheDocument()
+  await waitFor(() => expect(gear).toHaveAttribute('data-active'))
+  const global = await navGroup('Global')
+  expect(global).toHaveTextContent('Shared by all projects')
+  expect(within(global).getByRole('link', { name: 'Models and providers' })).toHaveAttribute('aria-current', 'page')
+  expect(await navGroup('This project')).toHaveTextContent('Screening')
+
+  fireEvent.click(within(global).getByRole('link', { name: 'Web' }))
+  const web = await screen.findByRole('region', { name: 'Web' })
+  expect(await within(web).findByText('Context.dev credits per project per day')).toBeInTheDocument()
+  expect(within(web).getByText('300')).toBeInTheDocument()
+  expect(within(web).getByText('Configured')).toBeInTheDocument()
+
+  fireEvent.click(within(await navGroup('This project')).getByRole('link', { name: 'Data sources' }))
   expect(await within(await dataSources()).findByRole('listitem', { name: 'Sotkanet screening' })).toHaveAttribute(
     'id',
     'source-ds1',
   )
+
+  // The overview is still beneath; Escape returns to it.
+  fireEvent.keyDown(await dialog(), { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(gear).not.toHaveAttribute('data-active')
+})
+
+test('the old settings address opens the modal, at the data source it names', async () => {
+  serveSettings()
+  renderAt('/projects/p1/settings#source-ds1')
+
+  const item = await within(await dataSources()).findByRole('listitem', { name: 'Sotkanet screening' })
+  expect(item).toHaveAttribute('data-marked')
+  expect(within(await navGroup('This project')).getByRole('link', { name: 'Data sources' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+})
+
+test('the instructions for every project and for this project are saved with their revisions', async () => {
+  const put: unknown[] = []
+  const patched: unknown[] = []
+  let current = settings()
+  let currentProject = project()
+  serveSettings({
+    'GET /api/settings/agent': () => current,
+    'PUT /api/settings/agent-instructions': (body: { instructions: string }) => {
+      put.push(body)
+      current = { ...current, instructions: body.instructions, revision: 4 }
+      return current
+    },
+    'GET /api/projects/p1': () => currentProject,
+    'PATCH /api/projects/p1': (body: { agent_instructions: string }) => {
+      patched.push(body)
+      currentProject = { ...currentProject, agent_instructions: body.agent_instructions, revision: 2 }
+      return currentProject
+    },
+  })
+  renderAt('/projects/p1?settings=agent-instructions')
+
+  const everyProject = await screen.findByRole('form', { name: 'Instructions for every project' })
+  fireEvent.change(within(everyProject).getByLabelText('Instructions for every project'), {
+    target: { value: 'Use the Context.dev skill.' },
+  })
+  fireEvent.click(within(everyProject).getByRole('button', { name: 'Save' }))
+  expect(await within(everyProject).findByRole('status')).toHaveTextContent('Saved')
+  expect(put).toEqual([{ instructions: 'Use the Context.dev skill.', expected_revision: 3 }])
+
+  fireEvent.click(within(await navGroup('This project')).getByRole('link', { name: 'Agent instructions' }))
+  const thisProject = await screen.findByRole('form', { name: 'Instructions for this project' })
+  fireEvent.change(within(thisProject).getByLabelText('Instructions for this project'), {
+    target: { value: 'Answer in English.' },
+  })
+  fireEvent.click(within(thisProject).getByRole('button', { name: 'Save' }))
+  expect(await within(thisProject).findByRole('status')).toHaveTextContent('Saved')
+  expect(patched).toEqual([{ agent_instructions: 'Answer in English.', expected_revision: 1 }])
+  expect(within(thisProject).getByLabelText('Instructions for this project')).toHaveValue('Answer in English.')
+})
+
+test('“Upload a PDF” posts the file, then registers a document source on its address', async () => {
+  const uploads: { filename: string | null; content: string }[] = []
+  const registered: unknown[] = []
+  let sources = [source()]
+  serveSettings({
+    'GET /api/projects/p1/sources': () => sources,
+    'POST /api/projects/p1/files': async (_body: unknown, request: Request) => {
+      uploads.push({ filename: new URL(request.url).searchParams.get('filename'), content: await request.text() })
+      return json({ address: 'upload://p1/abc.pdf', sha256: 'abc', size: 9 }, 201)
+    },
+    'POST /api/projects/p1/sources': (body: unknown) => {
+      registered.push(body)
+      const added = source({ id: 'ds2', name: 'Strategy', access_kind: 'document', format: 'pdf', address: 'upload://p1/abc.pdf' })
+      sources = [...sources, added]
+      return json(added, 201)
+    },
+  })
+  renderAt('/projects/p1?settings=data-sources')
+
+  const section = await dataSources()
+  fireEvent.click(await within(section).findByRole('button', { name: 'Upload a PDF' }))
+  const form = within(section).getByRole('form', { name: 'Upload a PDF' })
+  const file = new File(['%PDF-1.7'], 'Strategy.pdf', { type: 'application/pdf' })
+  fireEvent.change(within(form).getByLabelText('PDF file'), { target: { files: [file] } })
+  expect(within(form).getByLabelText('Name')).toHaveValue('Strategy')
+  fireEvent.change(within(form).getByLabelText('Engine'), { target: { value: 'context.dev' } })
+  fireEvent.change(within(form).getByLabelText('Extract'), { target: { value: 'tables' } })
+  fireEvent.click(within(form).getByRole('button', { name: 'Upload and add' }))
+
+  expect(await within(section).findByRole('listitem', { name: 'Strategy' })).toBeInTheDocument()
+  expect(uploads).toEqual([{ filename: 'Strategy.pdf', content: '%PDF-1.7' }])
+  expect(registered).toEqual([
+    {
+      name: 'Strategy',
+      access_kind: 'document',
+      format: 'pdf',
+      address: 'upload://p1/abc.pdf',
+      options: { engine: 'context.dev', extract: 'tables' },
+    },
+  ])
 })
 
 test('a provider added with a key shows “Key stored”, and the key is never shown again', async () => {
@@ -100,7 +215,7 @@ test('a provider added with a key shows “Key stored”, and the key is never s
       return json(added, 201)
     },
   })
-  renderAt('/projects/p1/settings')
+  renderAt('/projects/p1?settings=models')
 
   const section = await agents()
   fireEvent.click(await within(section).findByRole('button', { name: 'Add provider' }))
@@ -138,7 +253,7 @@ test('picking the session agent saves it with the settings’ revision; unavaila
       return current
     },
   })
-  renderAt('/projects/p1/settings')
+  renderAt('/projects/p1?settings=models')
 
   const picker = await within(await agents()).findByLabelText('Session agent')
   expect(picker).toHaveValue('gemini/flash')
@@ -151,7 +266,7 @@ test('picking the session agent saves it with the settings’ revision; unavaila
 
 test('without ADA_SECRET_KEY the page says keys cannot be stored, and key fields are disabled', async () => {
   serveSettings({ 'GET /api/settings/agent': settings({ secrets_available: false }) })
-  renderAt('/projects/p1/settings')
+  renderAt('/projects/p1?settings=models')
 
   const section = await agents()
   const note = await within(section).findByRole('note')
@@ -173,7 +288,7 @@ test('a data source changed by someone else meanwhile is read again, and saving 
       return current
     },
   })
-  renderAt('/projects/p1/settings')
+  renderAt('/projects/p1?settings=data-sources')
 
   const item = await within(await dataSources()).findByRole('listitem', { name: 'Sotkanet screening' })
   // Someone else renames it after the page read it.

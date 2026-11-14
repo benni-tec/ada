@@ -105,7 +105,7 @@ test('the overview counts the project’s items, and the sidebar lists them unde
   const links = within(nav()).getAllByRole('link').map((link) => link.textContent)
   expect(links.indexOf('Alerts1 active')).toBeLessThan(links.indexOf('Overview'))
   expect(within(nav()).queryByRole('group', { name: 'Data sources' })).not.toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/projects/p1/settings')
+  expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/projects/p1?settings=models')
 })
 
 test('the sidebar collapses to icons and opens again, and creates sessions and dashboards, marking the current one', async () => {
