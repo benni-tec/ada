@@ -54,6 +54,16 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         - "line-chart": `x` (default: the time role's start, else the first date column),
           `y`, one column (default: the first measure role, else the first numeric
           column), `series`, a column whose values split the lines, e.g. a region.
+        - "map", a choropleth of one value per region: `value` (default: the first
+          measure role, else the first numeric column), `geometry` (default "geometry":
+          the region outlines as GeoJSON, joined from the boundaries reference source),
+          `label` (default: a column "name"). Needs a geography role at one level; shows
+          each region's latest period.
+
+        A widget whose operator lacks what its type needs is refused, with every problem
+        named: a column the spec names must exist (and be numeric where a number is
+        shown), and a map needs a geography role and its outlines. Declare roles on the
+        transform (`add_transform`) or pick another type.
 
         A widget marks simulated and outdated data by itself.
 

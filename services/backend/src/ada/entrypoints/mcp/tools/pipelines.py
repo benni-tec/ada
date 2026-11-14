@@ -71,6 +71,11 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
         `roles` says which output columns are the period, the region code and the measures
         with their confidence bounds; declare them when later steps or widgets depend on it.
+        A step whose SQL aggregates rows (GROUP BY, an aggregate or window function,
+        DISTINCT, UNION) may not declare a measure with bounds (`lower`, `upper`): the
+        interval of an aggregate is not an aggregate of the intervals. Declare the measure
+        without bounds instead. A time role's `grain` (year, quarter, month) says what
+        every period spans.
         `materialize` stores the result instead of recomputing it; leave it off unless the
         step is expensive. The same SQL over the same inputs returns the existing operator.
 
