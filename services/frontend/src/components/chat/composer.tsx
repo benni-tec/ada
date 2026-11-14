@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { IconButton } from '@/components/icon-action'
 import { ErrorNotice } from '@/components/notices'
 import { Textarea } from '@/components/ui/textarea'
+import { Vahti } from '@/components/vahti/vahti'
 import { isActive, withLiveParts } from '@/lib/agent-turns'
 import {
   agentKeys,
@@ -54,6 +55,7 @@ export function Composer({
   const noteId = useId()
   const input = useRef<HTMLTextAreaElement>(null)
   const [text, setText] = useState('')
+  const [focused, setFocused] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
   // A message was recorded and the server said nobody will answer it.
   const [unanswered, setUnanswered] = useState(false)
@@ -113,49 +115,65 @@ export function Composer({
           </span>
         </p>
       )}
-      <div className="flex flex-col gap-2 rounded-xl border bg-background p-2 shadow-xs focus-within:ring-3 focus-within:ring-ring/50">
-        <DraftChips chips={draft.chips} onRemove={draft.removeChip} />
-        <label htmlFor={inputId} className="sr-only">
-          Message
-        </label>
-        <Textarea
-          ref={input}
-          id={inputId}
-          value={text}
-          rows={2}
-          aria-describedby={agent === 'no' ? noteId : undefined}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            // Enter sends; Shift+Enter is a new line; Enter that ends a composition (an
-            // IME choosing characters) is not a send.
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault()
-              submit()
-            }
+      {/* Vahti peeks over the box while someone writes, and ducks while the agent answers. */}
+      <div className="relative">
+        <span
+          aria-hidden="true"
+          data-up={focused && text.trim() !== '' && !isActive(activeTurn)}
+          className="vahti-perch pointer-events-none absolute right-6 bottom-full z-0"
+        >
+          <Vahti pose="peek" size={34} label="" filter={false} look={[-3, 5]} />
+        </span>
+        <div
+          className="relative z-10 flex flex-col gap-2 rounded-xl border bg-background p-2 shadow-xs focus-within:ring-3 focus-within:ring-ring/50"
+          onFocus={() => setFocused(true)}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false)
           }}
-          placeholder={agent === 'no' ? 'Add a note or a question to the session' : 'Ask the agent, or say what to show'}
-          className="max-h-48 min-h-10 resize-none border-0 bg-transparent px-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
-        />
-        <div className="flex items-center gap-1">
-          {tools}
-          {models.data && model && agent === 'yes' && (
-            <ModelPicker models={models.data} value={model} onChange={setPicked} />
-          )}
-          <span className="flex-1" />
-          {activeTurn && isActive(activeTurn) && (
-            <IconButton
-              label="Stop the agent"
-              variant="outline"
-              size="icon-sm"
-              disabled={stop.isPending}
-              onClick={() => stop.mutate(activeTurn.id)}
-            >
-              <Square className="fill-current" />
+        >
+          <DraftChips chips={draft.chips} onRemove={draft.removeChip} />
+          <label htmlFor={inputId} className="sr-only">
+            Message
+          </label>
+          <Textarea
+            ref={input}
+            id={inputId}
+            value={text}
+            rows={2}
+            aria-describedby={agent === 'no' ? noteId : undefined}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter sends; Shift+Enter is a new line; Enter that ends a composition (an
+              // IME choosing characters) is not a send.
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                submit()
+              }
+            }}
+            placeholder={agent === 'no' ? 'Add a note or a question to the session' : 'Ask the agent, or say what to show'}
+            className="max-h-48 min-h-10 resize-none border-0 bg-transparent px-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+          <div className="flex items-center gap-1">
+            {tools}
+            {models.data && model && agent === 'yes' && (
+              <ModelPicker models={models.data} value={model} onChange={setPicked} />
+            )}
+            <span className="flex-1" />
+            {activeTurn && isActive(activeTurn) && (
+              <IconButton
+                label="Stop the agent"
+                variant="outline"
+                size="icon-sm"
+                disabled={stop.isPending}
+                onClick={() => stop.mutate(activeTurn.id)}
+              >
+                <Square className="fill-current" />
+              </IconButton>
+            )}
+            <IconButton label="Send" type="submit" variant="default" size="icon-sm" disabled={send.isPending || text.trim() === ''}>
+              <ArrowUp />
             </IconButton>
-          )}
-          <IconButton label="Send" type="submit" variant="default" size="icon-sm" disabled={send.isPending || text.trim() === ''}>
-            <ArrowUp />
-          </IconButton>
+          </div>
         </div>
       </div>
       {send.error && <ErrorNotice error={send.error} prefix="Not sent:" />}
