@@ -102,8 +102,6 @@ tasks:
 
   format:
     command: "uv run ruff format --check ."
-    options:
-      envFile: "/.env.local"
     inputs:
       - "@group(sources)"
       - "@group(tests)"
