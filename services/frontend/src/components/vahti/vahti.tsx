@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useEffect, useId, useRef, useState, type RefObject } from 'react'
 
 import './vahti.css'
 
@@ -30,7 +30,7 @@ const PAPER = 'var(--vahti-paper)'
 const EYE = 'var(--vahti-eye)'
 const line = { fill: 'none', stroke: INK, strokeLinecap: 'round', strokeLinejoin: 'round' } as const
 
-function Eyes({ look }: { look: [number, number] }) {
+function Eyes({ look, shift }: { look: [number, number]; shift?: [number, number] }) {
   const [dx, dy] = look
   const eyes: [number, number, number, number][] = [
     [49, 62, 10, 12],
@@ -41,14 +41,45 @@ function Eyes({ look }: { look: [number, number] }) {
       {eyes.map(([cx, cy, rx, ry]) => (
         <ellipse key={cx} cx={cx} cy={cy} rx={rx} ry={ry} fill={EYE} stroke="var(--vahti-pupil)" strokeWidth={2} />
       ))}
-      {eyes.map(([cx, cy]) => (
-        <g key={cx}>
-          <circle cx={cx + dx} cy={cy + dy} r={4.6} fill="var(--vahti-pupil)" />
-          <circle cx={cx + dx - 1.6} cy={cy + dy - 1.8} r={1.3} fill={EYE} />
-        </g>
-      ))}
+      <g className="v-pupils" style={shift ? { transform: `translate(${shift[0]}px, ${shift[1]}px)` } : undefined}>
+        {eyes.map(([cx, cy]) => (
+          <g key={cx}>
+            <circle cx={cx + dx} cy={cy + dy} r={4.6} fill="var(--vahti-pupil)" />
+            <circle cx={cx + dx - 1.6} cy={cy + dy - 1.8} r={1.3} fill={EYE} />
+          </g>
+        ))}
+      </g>
     </g>
   )
+}
+
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/** Pupil offset (in drawing units, at most 3.5) toward the pointer, once per frame. */
+function usePointerLook(target: RefObject<SVGSVGElement | null>, on: boolean): [number, number] | undefined {
+  const [shift, setShift] = useState<[number, number]>()
+  useEffect(() => {
+    if (!on || reducedMotion()) return
+    let frame = 0
+    const move = (event: PointerEvent) => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const box = target.current?.getBoundingClientRect()
+        if (!box) return
+        const x = event.clientX - (box.left + box.width / 2)
+        const y = event.clientY - (box.top + box.height / 2)
+        const length = Math.hypot(x, y) || 1
+        const reach = Math.min(3.5, length / 40)
+        setShift([(x / length) * reach, (y / length) * reach])
+      })
+    }
+    window.addEventListener('pointermove', move, { passive: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('pointermove', move)
+    }
+  }, [target, on])
+  return shift
 }
 
 function Legs() {
@@ -240,6 +271,8 @@ export function Vahti({
   label,
   filter = true,
   rule = false,
+  look,
+  follow = false,
   className,
 }: {
   pose: VahtiPose
@@ -248,8 +281,14 @@ export function Vahti({
   filter?: boolean
   /** Peek only: draw the line it peeks over. */
   rule?: boolean
+  /** Peek only: where the pupils point, in drawing units (default: down at the line). */
+  look?: [number, number]
+  /** Peek only: the pupils follow the pointer around the page. */
+  follow?: boolean
   className?: string
 }) {
+  const svg = useRef<SVGSVGElement>(null)
+  const shift = usePointerLook(svg, follow && pose === 'peek')
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const text = label ?? LABEL[pose]
   const a11y = text ? { role: 'img', 'aria-label': text } : { 'aria-hidden': true }
@@ -264,13 +303,20 @@ export function Vahti({
 
   if (pose === 'peek') {
     return (
-      <svg className={cls} viewBox="22 4 76 74" width={size} height={(size * 74) / 76} {...a11y}>
-        {defs && <defs>{defs}</defs>}
-        <g filter={ink}>
-          <path d={TUFT_L} fill={INK} />
-          <path d={TUFT_R} fill={INK} />
-          <path d={PEEK_BODY} fill={INK} />
-          <Eyes look={[0, 4]} />
+      <svg ref={svg} className={cls} viewBox="22 4 76 74" width={size} height={(size * 74) / 76} {...a11y}>
+        <defs>
+          {defs}
+          <clipPath id={`line-${id}`}>
+            <rect x={0} y={-40} width={120} height={116} />
+          </clipPath>
+        </defs>
+        <g clipPath={`url(#line-${id})`}>
+          <g className="v-head" filter={ink}>
+            <path d={TUFT_L} fill={INK} />
+            <path d={TUFT_R} fill={INK} />
+            <path d={PEEK_BODY} fill={INK} />
+            <Eyes look={look ?? [0, 4]} shift={shift} />
+          </g>
         </g>
         {rule && <path d="M22 76 H98" stroke={INK} strokeWidth={4} />}
       </svg>
@@ -290,7 +336,7 @@ export function Vahti({
 export function AdaMark({ size = 28, className }: { size?: number; className?: string }) {
   return (
     <span className={`inline-flex items-end gap-1.5 leading-none ${className ?? ''}`} aria-label="ADA" role="img">
-      <Vahti pose="peek" size={size} label="" filter={false} rule />
+      <Vahti pose="peek" size={size} label="" filter={false} rule follow className="vahti--rise" />
       <span aria-hidden="true" className="font-bold tracking-tighter" style={{ fontSize: size * 0.82 }}>
         ada
       </span>

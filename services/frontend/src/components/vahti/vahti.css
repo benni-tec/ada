@@ -26,6 +26,26 @@
   animation: v-z 3s ease-in-out infinite;
 }
 
+/* The wordmark's Vahti climbs up over its line once, when the page opens. */
+.vahti--rise .v-head {
+  animation: v-rise 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) 0.2s 1 backwards;
+}
+.vahti .v-pupils {
+  transition: transform 0.12s ease-out;
+}
+
+/* Perched behind the chat box: ducked, it hides under the box's top edge. */
+.vahti-perch {
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+.vahti-perch[data-up='true'] {
+  transform: translateY(22%);
+}
+
+@keyframes v-rise {
+  from { transform: translateY(100%); }
+}
 @keyframes v-blink {
   0%, 94%, 100% { transform: scaleY(1); }
   97% { transform: scaleY(0.08); }
@@ -44,7 +64,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vahti * {
+  .vahti *,
+  .vahti-perch {
     animation: none !important;
+    transition: none !important;
   }
 }

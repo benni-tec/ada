@@ -1,9 +1,10 @@
-import { createFileRoute, Outlet, useMatches } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet, useMatches } from '@tanstack/react-router'
 
 import { Hint } from '@/components/icon-action'
 import { ConnectionIndicator, ProjectLive } from '@/components/live'
 import { ProjectSidebar } from '@/components/project-sidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { AdaMark } from '@/components/vahti/vahti'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { WidgetModal } from '@/components/widget-modal'
 import { pageOf } from '@/lib/page'
@@ -37,6 +38,9 @@ function ProjectLayout() {
             <Hint label="Toggle the sidebar" side="right">
               <SidebarTrigger />
             </Hint>
+            <Link to="/" aria-label="ADA: all projects" className="ml-1 rounded-md px-1 py-0.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">
+              <AdaMark size={22} />
+            </Link>
             <div className="flex-1" />
             {/* A frozen page never changes, so it says so itself instead of claiming "Live". */}
             {!frozen && <ConnectionIndicator />}
