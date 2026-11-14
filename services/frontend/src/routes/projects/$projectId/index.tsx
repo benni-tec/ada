@@ -5,6 +5,7 @@ import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { Provenance, Time } from '@/components/provenance'
+import { ReportsSection } from '@/components/reports/reports-section'
 import {
   createSession,
   getProject,
@@ -46,6 +47,8 @@ function ProjectPage() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-8">
           <Sessions projectId={projectId} />
+          {/* Wave 2: reports (workstream H). */}
+          <ReportsSection projectId={projectId} />
           <Widgets projectId={projectId} />
         </div>
         <Sources projectId={projectId} />

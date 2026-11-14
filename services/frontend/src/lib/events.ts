@@ -1,6 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query'
 
-import { keys, type EventType, type LiveEvent } from '@/lib/api'
+import { keys, reportKeys, type EventType, type LiveEvent } from '@/lib/api'
 
 /** What the page does about one live event. */
 export type Effects = {
@@ -79,8 +79,14 @@ export function effectsOf(event: LiveEvent): Effects {
       if (dashboard) invalidate.push(keys.dashboard(dashboard))
       break
     }
-    // Reports and alerts have no views yet (wave 2).
-    case 'report.version_created':
+    case 'report.version_created': {
+      // The project's list, and the report's record and versions (a new latest version).
+      invalidate.push(reportKeys.reports(projectId))
+      const report = id(payload, 'report_id')
+      if (report) invalidate.push(reportKeys.report(report))
+      break
+    }
+    // Alerts have no views yet (wave 2).
     case 'alert.firing':
     case 'alert.resolved':
       break
