@@ -40,16 +40,17 @@ export function DashboardPanel({
 
   return (
     <aside aria-label="Dashboard" className="flex min-h-0 min-w-0 flex-1 flex-col border-t lg:border-t-0 lg:border-l">
-      {/* Black in both themes: it marks where the dashboard begins, apart from the chat. */}
-      <header className="flex h-11 shrink-0 items-center gap-2 bg-black px-3 text-white">
+      {/* The page's strongest contrast in either theme (black on light, white on dark): it
+          marks where the dashboard begins, apart from the chat. */}
+      <header className="flex h-11 shrink-0 items-center gap-2 bg-black px-3 text-white dark:bg-white dark:text-black">
         <LayoutDashboard aria-hidden="true" className="size-4 shrink-0" />
-        <span className="text-xs font-medium tracking-wide text-white/70 uppercase">Dashboard</span>
+        <span className="text-xs font-medium tracking-wide text-white/70 uppercase dark:text-black/60">Dashboard</span>
         <h2 className="min-w-0 truncate text-sm font-semibold">
           {view.data ? (
             <Link
               to="/projects/$projectId/dashboards/$dashboardId"
               params={{ projectId: view.data.dashboard.project_id, dashboardId }}
-              className="rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              className="rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none dark:focus-visible:ring-black"
             >
               {name}
             </Link>
@@ -62,7 +63,7 @@ export function DashboardPanel({
           label="Detach the dashboard"
           onClick={onDetach}
           disabled={detaching}
-          className="text-white hover:bg-white/15 hover:text-white focus-visible:ring-white/60 dark:hover:bg-white/15"
+          className="text-white hover:bg-white/15 hover:text-white focus-visible:ring-white/60 dark:text-black dark:hover:bg-black/10 dark:hover:text-black dark:focus-visible:ring-black/50"
         >
           <X />
         </IconButton>

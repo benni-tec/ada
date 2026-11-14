@@ -171,7 +171,6 @@ function DashboardPage() {
                     {sameAsDefault ? ' (the dashboard’s default)' : ''} · version {shown?.number ?? 'none yet'}
                     {layout !== null && !old && ' · unsaved layout changes'}
                   </p>
-                  <AlertBadges dashboardId={dashboardId} />
                 </>
               }
               actions={
@@ -209,6 +208,8 @@ function DashboardPage() {
                       <Sparkles />
                     </IconButton>
                   )}
+                  {/* Last, at the top right: what needs attention on this dashboard. */}
+                  <AlertBadges projectId={projectId} dashboardId={dashboardId} />
                 </>
               }
             />

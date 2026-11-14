@@ -13,6 +13,7 @@ import {
 } from '@/lib/api'
 
 import { DashboardRuleList } from './alert-rules'
+import { severityPillClasses, worstActive } from './labels'
 
 const filters: { state: AlertState | null; label: string }[] = [
   { state: null, label: 'All' },
@@ -76,6 +77,8 @@ function DashboardAlerts({
 }) {
   const headingId = useId()
   const { dashboard } = group
+  // The count's colour is that of the most severe active alert: red only for critical.
+  const worst = worstActive(group.rules.flatMap((rule) => alerts.get(rule.id) ?? []))
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3 rounded-lg border bg-card p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -84,8 +87,8 @@ function DashboardAlerts({
             {dashboard.name}
           </Link>
         </h2>
-        {active > 0 && (
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-950 dark:text-red-200">
+        {active > 0 && worst && (
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${severityPillClasses[worst]}`}>
             {active} active
           </span>
         )}

@@ -42,6 +42,7 @@ import {
   sessionsQuery,
   type Id,
 } from '@/lib/api'
+import { severityPillClasses, worstActive } from '@/components/alerts/labels'
 import { pageTypes, type PageTypeName } from '@/lib/page-types'
 
 import { CreateDialog } from './create-dialog'
@@ -330,10 +331,12 @@ function Reports({ projectId }: { projectId: Id }) {
   )
 }
 
-/** One page, not a list: the dashboards' rules and alerts, with the active alerts counted. */
+/** One page, not a list: the dashboards' rules and alerts, with the active alerts counted.
+ * The count takes the colour of the most severe of them: red only once one is critical. */
 function Alerts({ projectId }: { projectId: Id }) {
   const { data: firing } = useQuery(alertFeedQuery(projectId, 'firing'))
   const count = firing?.length ?? 0
+  const worst = firing ? worstActive(firing) : null
   const Icon = pageTypes.alerts.icon
   return (
     <SidebarMenuItem>
@@ -343,8 +346,8 @@ function Alerts({ projectId }: { projectId: Id }) {
           <span>Alerts</span>
         </Link>
       </SidebarMenuButton>
-      {count > 0 && (
-        <SidebarMenuBadge className="bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200">
+      {count > 0 && worst && (
+        <SidebarMenuBadge className={severityPillClasses[worst]} data-severity={worst}>
           {count}
           <span className="sr-only"> active</span>
         </SidebarMenuBadge>

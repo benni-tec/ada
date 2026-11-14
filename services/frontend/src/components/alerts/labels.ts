@@ -30,6 +30,25 @@ export function countBySeverity(views: readonly AlertView[]): [Severity, number]
   return severities.filter((severity) => counts.has(severity)).map((severity) => [severity, counts.get(severity) ?? 0])
 }
 
+/** The most severe of the active alerts, or null when none is active. */
+export function worstActive(views: readonly AlertView[]): Severity | null {
+  return countBySeverity(views)[0]?.[0] ?? null
+}
+
+/** Pills (count badges) by severity: red only for critical, amber for warnings. */
+export const severityPillClasses: Record<Severity, string> = {
+  critical: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
+  warning: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
+  info: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200',
+}
+
+/** Text of an active alert or count by severity, matching the pills. */
+export const severityTextClasses: Record<Severity, string> = {
+  critical: 'font-medium text-red-700 dark:text-red-400',
+  warning: 'font-medium text-amber-700 dark:text-amber-400',
+  info: 'font-medium text-sky-700 dark:text-sky-400',
+}
+
 /** "2 critical, 1 warning" */
 export function countsText(counts: readonly [Severity, number][]): string {
   return counts.map(([severity, count]) => `${count} ${severityLabels[severity].toLowerCase()}`).join(', ')

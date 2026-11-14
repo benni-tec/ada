@@ -20,7 +20,7 @@ import {
 
 import { AlertTable } from './alert-table'
 import { asFormula, describe } from './formula'
-import { intervalText } from './labels'
+import { intervalText, severityTextClasses } from './labels'
 import { RuleEditor } from './rule-editor'
 import { SeverityBadge } from './severity'
 
@@ -156,7 +156,7 @@ function RuleRow({ projectId, rule, alerts }: { projectId: Id; rule: AlertRule; 
         )}
         {check.error && <ErrorNotice error={check.error} prefix="The check failed:" />}
       </TableCell>
-      <TableCell className={active > 0 ? 'font-medium text-red-700 dark:text-red-400' : 'text-muted-foreground'}>
+      <TableCell className={active > 0 ? severityTextClasses[rule.severity] : 'text-muted-foreground'}>
         {active > 0 ? `${active} active` : alerts.length > 0 ? `${alerts.length} ended` : 'None'}
       </TableCell>
       <TableCell className="w-0">

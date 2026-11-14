@@ -94,8 +94,14 @@ test('the slots on the grid all read one run of the dashboard’s range, which t
   let patched: unknown
   serveDashboard({
     'GET /api/dashboards/d1/alerts': [
-      { alert: { id: 'a1', project_id: 'p1', rule_id: 'r1', state: 'firing' }, rule: { id: 'r1', severity: 'critical' } },
-      { alert: { id: 'a2', project_id: 'p1', rule_id: 'r1', state: 'firing' }, rule: { id: 'r1', severity: 'critical' } },
+      {
+        alert: { id: 'a1', project_id: 'p1', rule_id: 'r1', state: 'firing', key: { region: 'north' }, started_at: '2026-11-01T09:00:00Z' },
+        rule: { id: 'r1', name: 'Coverage below target', severity: 'critical' },
+      },
+      {
+        alert: { id: 'a2', project_id: 'p1', rule_id: 'r1', state: 'firing', key: { region: 'south' }, started_at: '2026-11-01T09:00:00Z' },
+        rule: { id: 'r1', name: 'Coverage below target', severity: 'critical' },
+      },
     ],
     'PATCH /api/dashboards/d1': (body: unknown) => {
       patched = body
@@ -116,8 +122,14 @@ test('the slots on the grid all read one run of the dashboard’s range, which t
   expect(within(cells[2]).getByText(/Empty slot/)).toBeInTheDocument()
   expect(screen.getByText(/Showing 2020 to 2024 \(the dashboard’s default\)/)).toBeInTheDocument()
 
-  // The header: active alerts by severity, and a report from this dashboard.
-  expect(await screen.findByRole('link', { name: /2 active alerts: 2 critical/ })).toHaveAttribute('href', '/projects/p1/alerts')
+  // The header: a bell with the active alerts, red as one is critical, opening their list.
+  const bell = await screen.findByRole('button', { name: '2 active alerts: 2 critical' })
+  expect(bell).toHaveAttribute('data-severity', 'critical')
+  fireEvent.click(bell)
+  const active = await screen.findByRole('list', { name: 'Active alerts' })
+  expect(within(active).getAllByRole('listitem')).toHaveLength(2)
+  expect(screen.getByRole('link', { name: 'Open all alerts' })).toHaveAttribute('href', '/projects/p1/alerts')
+  fireEvent.keyDown(active, { key: 'Escape' })
   expect(screen.getByRole('link', { name: 'Generate report' })).toHaveAttribute('href', '/projects/p1/reports/new?dashboard=d1')
 
   // A range that ends before it starts is refused; a new one starts a run every widget reads.

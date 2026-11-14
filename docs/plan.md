@@ -223,6 +223,36 @@ the new rules (explore with `query_operator` but never present its rows; batch w
 `build_pipeline` and one `edit_dashboard`). The acceptance check is the goal 3 analysis
 rebuilt with the new tools.
 
+## Wave 6: custom widgets and session attachments (planned)
+
+Decided with the user:
+
+- **Custom widgets** (`type: "custom"`, `spec: {code, css?, libraries?}`): an agent writes how
+  to draw, never the data. The code is an ES module, `export default function render(root,
+  data, ada)`; `data` is `{columns, rows, roles, run, flags}` from the widget's operator,
+  `ada` gives the theme, size and resize, new data, the platform's number and date formats,
+  the pinned libraries (d3, Vega-Lite) and `error()`. It runs in an iframe that cannot reach
+  ADA's API or the network: the card fetches the data and hands it in. Checked at creation
+  (a module with a default export; no `fetch`, `XMLHttpRequest`, `WebSocket`, `import()`,
+  `eval`; at most 64 KB; a literal array of numbers is a warning). A render error is stored
+  on the widget and returned by a new `get_widget`, so the agent fixes it with
+  `update_widget`; the platform agent sees it in its next turn. Cards say "custom" and the
+  pipeline dialog shows the code; a report version freezes the code.
+- **Session attachments**: the single dashboard beside a session becomes a list of
+  attachments (table `session_attachments`, migrating `panel_dashboard_id`): dashboard,
+  report (a version, frozen), alert rule (with its active alerts; new alerts post an entry
+  in the session), data source, pipeline (operator), document, another session, a widget
+  from elsewhere, a web page. The right half shows one at a time as tabs (the bar black on
+  light, white on dark), each with an ×; the briefing lists them for the agent;
+  `attach_to_session` / `detach_from_session` as MCP tools; a dashboard or report created
+  from a session is attached to it.
+
+| Agent | Builds |
+| --- | --- |
+| Custom widgets | the type and its checks, the sandbox runtime and the `ada` API, error reporting and `get_widget`, freezing in reports |
+| Attachments (backend) | table and migration, service, REST and MCP, briefing, alert entries in the session |
+| Attachments (frontend) | the tabs beside a session, one view per kind, attaching from the sidebar and from cards |
+
 ## Functions (later)
 
 A project defines functions: a parameterised pipeline with typed inputs. A `call` operator
@@ -267,5 +297,6 @@ statistic operators; document and browser sources; alert pipelines; data-quality
 Foundation ──▶ A  B  C  D  E  F ──▶ Integration 1 ──▶ G  H  I  J ──▶ Integration 2 (all done)
 ──▶ Pipeline view ──▶ Wave 3 (backend, frontend) ──▶ Integration 3 (all done)
 ──▶ Bottom-up invalidation (proposed) ──▶ Test consolidation (done) ──▶ Settings page (done)
-──▶ Wave 4 (MCP, documents, widgets) ──▶ Integration 4 (done) ──▶ Functions (later)
+──▶ Wave 4 (MCP, documents, widgets) ──▶ Integration 4 (done) ──▶ Wave 5 (web, sessions, settings)
+──▶ Wave 6 (custom widgets, attachments) ──▶ Functions (later)
 ```

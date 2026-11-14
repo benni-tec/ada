@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { alertRowsQuery, type AlertView } from '@/lib/api'
 import { cell, cellText, isLong } from '@/lib/cells'
 
-import { keyText } from './labels'
+import { keyText, severityTextClasses } from './labels'
 
 /** What the people reading it call an alert's state: it is active, or it has ended. */
 const stateText = (view: AlertView) => (view.alert.state === 'firing' ? 'Active' : 'Ended')
@@ -47,7 +47,7 @@ function AlertRow({ view }: { view: AlertView }) {
     <>
       <TableRow data-state={open ? 'selected' : undefined}>
         <TableCell className="font-medium">{keyText(alert.key)}</TableCell>
-        <TableCell className={active ? 'font-medium text-red-700 dark:text-red-400' : 'text-muted-foreground'}>
+        <TableCell className={active ? severityTextClasses[view.rule.severity] : 'text-muted-foreground'}>
           {stateText(view)}
         </TableCell>
         <TableCell className="text-muted-foreground">
