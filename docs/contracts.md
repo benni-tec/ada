@@ -952,8 +952,7 @@ sections:
   replaces it. Each entry is `#source-<id>`, scrolled to and marked when the address
   names it.
 
-The agent settings' calls are hand-written in `lib/api/settings.ts` (TEMPORARY, until the
-schema is regenerated with the settings routes).
+The agent settings' calls are in `lib/api/settings.ts`, on the typed client.
 
 ### Dashboards and the panel beside a session
 
@@ -1014,8 +1013,7 @@ has the footer and pipeline view of "Widgets" above, at its page's run.
 
 The API types are generated from the backend's OpenAPI schema (`Schemas[...]`, the typed
 `api` client in `lib/api/client.ts`); the agent's calls are in `lib/api/agent.ts`, the
-agent settings' in `lib/api/settings.ts` (hand-written until the schema has them, with
-their key `settingsKeys`). Only
+agent settings' in `lib/api/settings.ts` (with their key `settingsKeys`). Only
 the live stream's types are written by hand (`lib/api/models.ts`), since the schema does
 not describe it.
 

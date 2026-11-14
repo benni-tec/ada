@@ -198,6 +198,15 @@ downstream, marking operators broken where they no longer fit; live views follow
 newest operator, report versions stay on theirs; schema drift found at refresh is
 recorded and flagged, not rebased automatically.
 
+## Settings page (done)
+
+The agent is configured on a settings page (bottom of the project sidebar) instead of in
+`llms.yml`: providers, their API keys (encrypted in the database with a master key from
+`ADA_SECRET_KEY` or `ADA_SECRET_KEY_FILE`; `moon run :dev` generates one into
+`.env.local`), models and the session agent, shared by all projects. The page also lists
+the project's data sources, to add, edit and refresh. One backend and one frontend agent;
+the contract is folded into `docs/contracts.md`.
+
 ## Test consolidation (last)
 
 Merge test files that test the same thing (`test_http` with `test_api_http`, `test_mcp`
