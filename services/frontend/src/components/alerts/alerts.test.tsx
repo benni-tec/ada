@@ -372,15 +372,15 @@ test('the badges say when nothing fires', async () => {
   expect(await screen.findByRole('status')).toHaveTextContent('No alerts firing')
 })
 
-test('the project page has an alerts section linking to the feed', async () => {
+test('the sidebar counts the firing alerts beside the way to the feed', async () => {
   alertsApi({
     'GET /api/projects/p1/sessions': [],
     'GET /api/projects/p1/sources': [],
   })
   renderAt('/projects/p1')
 
-  const section = await screen.findByRole('region', { name: 'Alerts' })
-  expect(await within(section).findByText('firing')).toBeInTheDocument()
-  expect(within(section).getByText('Critical')).toBeInTheDocument()
-  expect(within(section).getByRole('link', { name: 'Alert feed and rules' })).toHaveAttribute('href', '/projects/p1/alerts')
+  const nav = await screen.findByRole('navigation', { name: 'Project' })
+  const group = within(nav).getByRole('group', { name: 'Alerts' })
+  expect(within(group).getByRole('link', { name: 'Feed and rules' })).toHaveAttribute('href', '/projects/p1/alerts')
+  expect(await within(group).findByText(/firing/)).toBeInTheDocument()
 })

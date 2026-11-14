@@ -126,8 +126,9 @@ test('shows the latest version with its widgets pinned to its run', async () => 
     'http://localhost:5174/value.html#widget=w2&run=r2',
   )
   expect(screen.getByText('By wellbeing services county')).toBeInTheDocument()
-  const open = screen.getAllByRole('link', { name: 'Open this widget at the report’s run' })[0]
-  expect(open).toHaveAttribute('href', '/projects/p1/widgets/w1?run=r2')
+  // Full size, it opens over the report at the report's run (WidgetModal).
+  const open = within(screen.getByRole('article', { name: 'Coverage by region' })).getByRole('link', { name: 'Open full size' })
+  await waitFor(() => expect(open.getAttribute('href')).toMatch(/[?&]open=w1/))
 
   // What pins the numbers, and where they come from.
   const facts = screen.getByRole('complementary', { name: 'About this version' })
@@ -155,10 +156,9 @@ test('a report says its numbers are frozen instead of claiming to be live', asyn
   expect(await screen.findByText(/Data fetched/)).toBeInTheDocument()
   expect(screen.queryByLabelText(/Live updates/)).not.toBeInTheDocument()
 
-  // The trail says this is a report, and which one.
-  const trail = screen.getByRole('navigation', { name: 'Breadcrumb' })
-  expect(within(trail).getByText('Report')).toBeInTheDocument()
-  expect(await within(trail).findByText('Screening findings')).toHaveAttribute('aria-current', 'page')
+  // Its type is said above its title, where the breadcrumbs were.
+  expect(document.querySelector('[data-page-type="report"]')).toHaveTextContent('Report')
+  expect(screen.getByRole('heading', { level: 1, name: 'Screening findings' })).toBeInTheDocument()
 })
 
 test('opening a report names its latest version in the address', async () => {
@@ -198,48 +198,46 @@ test('says so when the version does not exist', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('This report has no version 9.9.9.')
 })
 
-test('every widget’s pipeline is one line in its card, and nothing is previewed until it is opened', async () => {
+test('every widget’s card opens its pipeline, and nothing of it is read until it is opened', async () => {
   const fetch = serveReport({ 'GET /api/projects/p1/sources': [] })
   renderAt('/projects/p1/reports/rep1')
 
   const card = await screen.findByRole('article', { name: 'Coverage by region' })
-  expect(
-    await within(card).findByRole('button', { name: 'Pipeline: Sotkanet → 1 step → line chart' }),
-  ).toBeInTheDocument()
-  const asked = fetch.mock.calls.map(([input]) => new URL(input instanceof Request ? input.url : String(input)).pathname)
-  expect(asked.filter((path) => path.includes('/rows') || path.startsWith('/api/runs/'))).toEqual([])
+  const opener = within(card).getByRole('button', { name: 'Pipeline' })
+  const asked = () => fetch.mock.calls.map(([input]) => new URL(input instanceof Request ? input.url : String(input)).pathname)
+  expect(asked().filter((path) => path.includes('/rows') || path.includes('/lineage') || path.startsWith('/api/runs/'))).toEqual([])
 
-  fireEvent.click(within(card).getByRole('button', { name: /^Pipeline:/ }))
+  fireEvent.click(opener)
   const dialog = await screen.findByRole('dialog', { name: 'Pipeline of “Coverage by region”' })
-  fireEvent.click(within(dialog).getByRole('button', { name: /^Source: Sotkanet/ }))
+  fireEvent.click(await within(dialog).findByRole('button', { name: /^Source: Sotkanet/ }))
   // From the version's sources list: the address the data came from.
   expect(within(dialog).getByRole('complementary', { name: 'Details' })).toHaveTextContent(
     'https://sotkanet.test/3621.csv',
   )
 })
 
-test('lists the project’s reports on its page', async () => {
+test('the sidebar lists the project’s reports, newest first, and offers to generate one', async () => {
   serveApi({
     'GET /api/projects/p1': project(),
     'GET /api/projects/p1/sessions': [session()],
-    'GET /api/projects/p1/widgets': [],
     'GET /api/projects/p1/sources': [],
     'GET /api/projects/p1/reports': [
       report,
-      { ...report, id: 'rep2', name: 'Monthly coverage', session_id: null, dashboard_id: 'd1' },
+      { ...report, id: 'rep2', name: 'Monthly coverage', session_id: null, dashboard_id: 'd1', created_at: '2026-11-09T09:00:00Z' },
     ],
   })
   renderAt('/projects/p1')
 
-  const section = await screen.findByRole('region', { name: 'Reports' })
-  const findings = await within(section).findByRole('link', { name: /Screening findings/ })
-  expect(findings).toHaveAttribute('href', '/projects/p1/reports/rep1')
-  expect(findings).toHaveTextContent('From the session “Why did coverage drop?”')
-  expect(within(section).getByRole('link', { name: /Monthly coverage/ })).toHaveTextContent('From a dashboard')
-  expect(within(section).getByRole('link', { name: 'Generate from a dashboard' })).toHaveAttribute(
-    'href',
-    '/projects/p1/reports/new',
-  )
+  const nav = await screen.findByRole('navigation', { name: 'Project' })
+  const reports = within(nav).getByRole('group', { name: 'Reports' })
+  await waitFor(() => expect(within(reports).getAllByRole('link')).toHaveLength(3))
+  expect(within(reports).getAllByRole('link').map((link) => link.textContent)).toEqual([
+    '',
+    'Monthly coverage',
+    'Screening findings',
+  ])
+  expect(within(reports).getByRole('link', { name: 'Screening findings' })).toHaveAttribute('href', '/projects/p1/reports/rep1')
+  expect(within(reports).getByRole('link', { name: 'Generate a report' })).toHaveAttribute('href', '/projects/p1/reports/new')
 })
 
 test('generates a report from a dashboard and opens it', async () => {

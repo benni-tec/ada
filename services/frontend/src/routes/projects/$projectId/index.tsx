@@ -1,32 +1,37 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useId, useState, type FormEvent, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { CircleAlert } from 'lucide-react'
+import { useId, type ReactNode } from 'react'
 
-import { ProjectAlerts } from '@/components/alerts/project-alerts'
-import { DashboardsSection } from '@/components/dashboards/dashboards-section'
+import { describeRange } from '@/components/dashboards/ranges'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
-import { Provenance, Time } from '@/components/provenance'
-import { ReportsSection } from '@/components/reports/reports-section'
+import { PageHeader } from '@/components/page-header'
+import { Time } from '@/components/provenance'
 import {
-  createSession,
+  alertFeedQuery,
+  dashboardsQuery,
   getProject,
   keys,
   projectQuery,
-  projectWidgetsQuery,
   renameProject,
+  reportsQuery,
   sessionsQuery,
   sourcesQuery,
   type DataSource,
   type Id,
-  type Session,
 } from '@/lib/api'
+import { pageTypes, type PageTypeName } from '@/lib/page-types'
 import { useRevisedUpdate } from '@/lib/revisions'
 
 export const Route = createFileRoute('/projects/$projectId/')({
   component: ProjectPage,
 })
 
+/**
+ * The project at a glance: how much of each it holds, what happened lately, and the state
+ * of its data sources. Everything is listed in the sidebar; this page does not repeat it.
+ */
 function ProjectPage() {
   const { projectId } = Route.useParams()
   const { data: project, error, isPending } = useQuery(projectQuery(projectId))
@@ -40,24 +45,26 @@ function ProjectPage() {
     alsoInvalidate: [keys.projects()],
   })
 
-  if (isPending) return <Loading what="the project" />
-  if (error) return <ErrorNotice error={error} prefix="The project cannot be loaded:" />
+  if (isPending)
+    return (
+      <div className="p-6">
+        <Loading what="the project" />
+      </div>
+    )
+  if (error)
+    return (
+      <div className="p-6">
+        <ErrorNotice error={error} prefix="The project cannot be loaded:" />
+      </div>
+    )
 
   return (
-    <div className="flex flex-col gap-8">
-      <EditableTitle value={project.name} label="project name" {...rename} />
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-8">
-          <Sessions projectId={projectId} />
-          <DashboardsSection projectId={projectId} />
-          <ReportsSection projectId={projectId} />
-          <Widgets projectId={projectId} />
-        </div>
-        <div className="flex flex-col gap-8">
-          {/* Alerts (wave 2, workstream I) */}
-          <ProjectAlerts projectId={projectId} />
-          <Sources projectId={projectId} />
-        </div>
+    <div className="flex flex-col gap-8 p-4 md:p-6">
+      <PageHeader type="project" title={<EditableTitle value={project.name} label="project name" {...rename} />} />
+      <Counts projectId={projectId} />
+      <div className="grid gap-8 xl:grid-cols-2">
+        <RecentSessions projectId={projectId} />
+        <Sources projectId={projectId} />
       </div>
     </div>
   )
@@ -75,125 +82,89 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-const listClass =
-  'divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800'
-
-function Sessions({ projectId }: { projectId: Id }) {
-  const { data: sessions, error, isPending } = useQuery(sessionsQuery(projectId))
+/** One number per kind, with the kind's icon; alerts lead to the feed. */
+function Counts({ projectId }: { projectId: Id }) {
+  const sessions = useQuery(sessionsQuery(projectId))
+  const dashboards = useQuery(dashboardsQuery(projectId))
+  const reports = useQuery(reportsQuery(projectId))
+  const firing = useQuery(alertFeedQuery(projectId, 'firing'))
+  const sources = useQuery(sourcesQuery(projectId))
+  const count = (data: unknown[] | undefined) => (data ? String(data.length) : '…')
   return (
-    <Section title="Sessions">
-      <CreateSession projectId={projectId} />
+    <ul aria-label="In this project" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+      <Count type="session" label="Sessions" value={count(sessions.data)} />
+      <Count type="dashboard" label="Dashboards" value={count(dashboards.data)} />
+      <Count type="report" label="Reports" value={count(reports.data)} />
+      <Count
+        type="alerts"
+        label="Alerts firing"
+        value={count(firing.data)}
+        link={
+          <Link to="/projects/$projectId/alerts" params={{ projectId }} className="text-xs underline underline-offset-2">
+            Feed and rules
+          </Link>
+        }
+      />
+      <Count type="source" label="Data sources" value={count(sources.data)} />
+    </ul>
+  )
+}
+
+function Count({ type, label, value, link }: { type: PageTypeName; label: string; value: string; link?: ReactNode }) {
+  const Icon = pageTypes[type].icon
+  return (
+    <li className="flex flex-col gap-1 rounded-lg border bg-card p-4">
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Icon aria-hidden="true" className="size-3.5" />
+        {label}
+      </span>
+      <span className="text-2xl font-semibold tabular-nums">{value}</span>
+      {link}
+    </li>
+  )
+}
+
+const listClass = 'divide-y rounded-lg border'
+
+function RecentSessions({ projectId }: { projectId: Id }) {
+  const { data, error, isPending } = useQuery(sessionsQuery(projectId))
+  const { data: dashboards } = useQuery(dashboardsQuery(projectId))
+  const recent = [...(data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5)
+  const names = new Map((dashboards ?? []).map((dashboard) => [dashboard.id, dashboard]))
+  return (
+    <Section title="Recent sessions">
       {isPending ? (
         <Loading what="sessions" />
       ) : error ? (
         <ErrorNotice error={error} prefix="The sessions cannot be loaded:" />
-      ) : sessions.length === 0 ? (
-        <p className="text-sm text-neutral-500">No sessions yet.</p>
+      ) : recent.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No sessions yet. Start one with the + beside “Sessions”.</p>
       ) : (
         <ul className={listClass}>
-          {sessions.map((session) => (
-            <li key={session.id}>
-              <Link
-                to="/projects/$projectId/sessions/$sessionId"
-                params={{ projectId, sessionId: session.id }}
-                className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-neutral-50 focus-visible:bg-neutral-50 dark:hover:bg-neutral-900 dark:focus-visible:bg-neutral-900"
-              >
-                <span className="font-medium">{session.title}</span>
-                <span className="text-xs text-neutral-500">
-                  <Time value={session.created_at} />
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
-  )
-}
-
-function CreateSession({ projectId }: { projectId: Id }) {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const inputId = useId()
-  const [title, setTitle] = useState('')
-  const create = useMutation({
-    mutationFn: (value: string) => createSession(projectId, value),
-    onSuccess: async (session) => {
-      setTitle('')
-      await queryClient.invalidateQueries({ queryKey: keys.sessions(projectId) })
-      await navigate({
-        to: '/projects/$projectId/sessions/$sessionId',
-        params: { projectId, sessionId: session.id },
-      })
-    },
-  })
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    if (title.trim() !== '') create.mutate(title.trim())
-  }
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
-      <label htmlFor={inputId} className="text-sm font-medium">
-        New session
-      </label>
-      <div className="flex gap-2">
-        <input
-          id={inputId}
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder="The question to explore"
-          className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-        />
-        <button
-          type="submit"
-          disabled={create.isPending || title.trim() === ''}
-          className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-        >
-          {create.isPending ? 'Creating…' : 'Start session'}
-        </button>
-      </div>
-      {create.error && <ErrorNotice error={create.error} prefix="Not created:" />}
-    </form>
-  )
-}
-
-/** Every widget of the project, newest first, made in a session or not. */
-function Widgets({ projectId }: { projectId: Id }) {
-  const { data: sessions = [] } = useQuery(sessionsQuery(projectId))
-  const { data, error, isPending } = useQuery(projectWidgetsQuery(projectId))
-  const widgets = [...(data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))
-  const sessionTitles = new Map(sessions.map((session: Session) => [session.id, session.title]))
-
-  return (
-    <Section title="Widgets">
-      {isPending ? (
-        <Loading what="widgets" />
-      ) : error ? (
-        <ErrorNotice error={error} prefix="The widgets cannot be loaded:" />
-      ) : widgets.length === 0 ? (
-        <p className="text-sm text-neutral-500">No widgets yet. Agents create them in sessions.</p>
-      ) : (
-        <ul className={listClass}>
-          {widgets.map((widget) => (
-            <li key={widget.id} className="flex flex-col gap-1 px-4 py-3">
-              <div className="flex items-center justify-between gap-4">
+          {recent.map((session) => {
+            const beside = session.panel_dashboard_id ? names.get(session.panel_dashboard_id) : undefined
+            return (
+              <li key={session.id}>
                 <Link
-                  to="/projects/$projectId/widgets/$widgetId"
-                  params={{ projectId, widgetId: widget.id }}
-                  className="font-medium hover:underline"
+                  to="/projects/$projectId/sessions/$sessionId"
+                  params={{ projectId, sessionId: session.id }}
+                  className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/50 focus-visible:bg-muted/50"
                 >
-                  {widget.title || 'Untitled widget'}
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium">{session.title}</span>
+                    {beside && (
+                      <span className="truncate text-xs text-muted-foreground">
+                        With {beside.name} ({describeRange(beside.default_time_range)})
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    <Time value={session.created_at} />
+                  </span>
                 </Link>
-                <span className="font-mono text-xs text-neutral-500">{widget.type}</span>
-              </div>
-              <Provenance actor={widget.created_by} at={widget.created_at} note={widget.note} />
-              {widget.session_id && sessionTitles.has(widget.session_id) && (
-                <p className="text-xs text-neutral-500">In “{sessionTitles.get(widget.session_id)}”</p>
-              )}
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       )}
     </Section>
@@ -207,6 +178,7 @@ const accessLabels: Record<DataSource['access_kind'], string> = {
   document: 'Document',
 }
 
+/** Each source with where it reads from and how fresh it is; the sidebar links here. */
 function Sources({ projectId }: { projectId: Id }) {
   const { data: sources, error, isPending } = useQuery(sourcesQuery(projectId))
   return (
@@ -216,21 +188,21 @@ function Sources({ projectId }: { projectId: Id }) {
       ) : error ? (
         <ErrorNotice error={error} prefix="The data sources cannot be loaded:" />
       ) : sources.length === 0 ? (
-        <p className="text-sm text-neutral-500">No data sources yet. Agents register them over MCP.</p>
+        <p className="text-sm text-muted-foreground">No data sources yet. Agents register them over MCP.</p>
       ) : (
         <ul className={listClass}>
           {sources.map((source) => (
-            <li key={source.id} className="flex flex-col gap-1 px-4 py-3 text-sm">
+            <li key={source.id} id={`source-${source.id}`} className="flex scroll-mt-4 flex-col gap-1 px-4 py-3 text-sm target:bg-muted/50">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium">{source.name}</span>
-                <span className="text-xs text-neutral-500">
+                <span className="text-xs text-muted-foreground">
                   {accessLabels[source.access_kind]} · {source.format.toUpperCase()}
                 </span>
               </div>
-              <p className="truncate font-mono text-xs text-neutral-500" title={source.address}>
+              <p className="truncate font-mono text-xs text-muted-foreground" title={source.address}>
                 {source.address}
               </p>
-              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+              <p className="text-xs text-muted-foreground">
                 Refresh: {source.freshness.kind}
                 {source.last_checked_at && (
                   <>
@@ -239,7 +211,8 @@ function Sources({ projectId }: { projectId: Id }) {
                 )}
               </p>
               {source.last_error && (
-                <p className="text-xs text-amber-800 dark:text-amber-300">
+                <p className="flex items-start gap-1 text-xs text-amber-800 dark:text-amber-300">
+                  <CircleAlert aria-hidden="true" className="mt-px size-3.5 shrink-0" />
                   Last refresh failed: {source.last_error}. Widgets on it show stale data.
                 </p>
               )}

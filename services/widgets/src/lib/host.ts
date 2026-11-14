@@ -23,6 +23,24 @@ export function context(): WidgetContext | null {
   return widgetId ? { widgetId, runId: params.get('run') } : null
 }
 
+/**
+ * Light or dark as the page that frames the widget says (`#…&theme=light|dark`), when the
+ * person picked one there: inside a frame `prefers-color-scheme` follows the system, not
+ * the page. Without the parameter the widget follows the system, as the page then does.
+ * Applied now and whenever the fragment changes, so a theme switch needs no reload.
+ */
+export function followTheme(): () => void {
+  const apply = () => {
+    const theme = new URLSearchParams(window.location.hash.slice(1)).get('theme')
+    const root = document.documentElement
+    if (theme === 'light' || theme === 'dark') root.dataset.theme = theme
+    else delete root.dataset.theme
+  }
+  apply()
+  window.addEventListener('hashchange', apply)
+  return () => window.removeEventListener('hashchange', apply)
+}
+
 /** Calls back whenever the context changes, e.g. when the page swaps the run in the
  * fragment without reloading the frame. Returns the unsubscribe function. */
 export function onContextChange(listener: () => void): () => void {

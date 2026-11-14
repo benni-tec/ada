@@ -1,10 +1,15 @@
+import { Check, Pencil, X } from 'lucide-react'
 import { useId, useState, type FormEvent } from 'react'
 
+import { Input } from '@/components/ui/input'
+
+import { IconButton } from './icon-action'
 import { ConflictNotice } from './notices'
 
 /**
- * A heading that can be renamed in place. Saving goes through a revision check; after a
- * conflict the editor stays open with the person's text, next to what the record is now.
+ * A heading that can be renamed in place: a pencil beside it opens the editor, Enter saves
+ * and Escape cancels. Saving goes through a revision check; after a conflict the editor
+ * stays open with the person's text, next to what the record is now.
  */
 export function EditableTitle({
   value,
@@ -44,46 +49,44 @@ export function EditableTitle({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-2">
       {draft === null ? (
-        <div className="flex flex-wrap items-baseline gap-3">
-          <h1 className="text-2xl font-semibold break-words">{value}</h1>
-          <button
-            type="button"
-            onClick={() => setDraft(value)}
-            className="rounded text-sm text-neutral-600 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-neutral-400"
-          >
-            Rename
-          </button>
+        <div className="flex min-w-0 items-center gap-1">
+          <h1 className="min-w-0 text-2xl font-semibold break-words">{value}</h1>
+          <IconButton label="Rename" onClick={() => setDraft(value)} className="text-muted-foreground">
+            <Pencil />
+          </IconButton>
         </div>
       ) : (
-        <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
+        <form onSubmit={submit} className="flex min-w-0 items-center gap-1">
           <label htmlFor={inputId} className="sr-only">
             New {label}
           </label>
-          <input
+          <Input
             id={inputId}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => event.key === 'Escape' && cancel()}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                // Only the editor closes, not a dialog around it.
+                event.stopPropagation()
+                cancel()
+              }
+            }}
             autoFocus
-            className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-lg dark:border-neutral-700 dark:bg-neutral-900"
+            className="h-9 min-w-0 flex-1 text-lg font-semibold md:text-lg"
           />
-          <button
-            type="submit"
-            disabled={pending || draft.trim() === ''}
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-          >
-            {pending ? 'Saving…' : 'Save'}
-          </button>
-          <button type="button" onClick={cancel} className="rounded-md px-3 py-1.5 text-sm">
-            Cancel
-          </button>
+          <IconButton label="Save" type="submit" disabled={pending || draft.trim() === ''}>
+            <Check />
+          </IconButton>
+          <IconButton label="Cancel" onClick={cancel}>
+            <X />
+          </IconButton>
         </form>
       )}
       {conflict && <ConflictNotice message={conflict} onDismiss={reset} />}
       {error && (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}

@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import type { Operator } from '@/lib/api'
 
 import { layoutGraph, NODE_HEIGHT, NODE_WIDTH } from './graph'
-import { columnRoles, sqlHeadline, summary } from './labels'
+import { columnRoles, sqlHeadline } from './labels'
 
 function operator(id: string, kind: Operator['kind'], inputs: string[] = [], params: Record<string, unknown> = {}): Operator {
   return {
@@ -87,14 +87,6 @@ test('names a query by its leading comment, else by its first words', () => {
     'SELECT b.county_code, b.name,…',
   )
   expect(sqlHeadline('/* note */ SELECT   *\n FROM input_0')).toBe('SELECT * FROM input_0')
-})
-
-test('sums a pipeline up in one line: its sources, its steps and the widget', () => {
-  const names: Record<string, string> = { op_s: 'Sotkanet screening', op_r: 'Sotkanet regions' }
-  const sourceOf = (op: Operator) => (names[op.id] ? { name: names[op.id], address: '' } : undefined)
-  expect(summary(lineage, 'map', sourceOf)).toBe('Sotkanet screening, Sotkanet regions → 3 steps → map')
-  expect(summary([screening, join], 'line-chart', sourceOf)).toBe('Sotkanet screening → 1 step → line chart')
-  expect(summary([screening], 'table', sourceOf)).toBe('Sotkanet screening → table')
 })
 
 test('says what each column means by the roles', () => {

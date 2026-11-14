@@ -5,6 +5,7 @@ import { useId, useState, type FormEvent } from 'react'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { Time } from '@/components/provenance'
 import { SystemStatus } from '@/components/system-status'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { createProject, keys, projectsQuery } from '@/lib/api'
 
 export const Route = createFileRoute('/')({
@@ -15,8 +16,14 @@ function Projects() {
   const { data: projects, error, isPending } = useQuery(projectsQuery())
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
+    <div className="min-h-svh">
+      <header className="flex h-12 items-center gap-2 border-b px-4">
+        <span className="text-lg font-semibold">ADA</span>
+        <span className="flex-1" />
+        <ThemeToggle />
+      </header>
+      <main className="flex flex-col gap-8 p-4 md:p-6">
+      <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-semibold">Projects</h1>
         <p className="mt-2 text-neutral-600 dark:text-neutral-400">
           Each project holds its data sources, the sessions that explore them and the widgets they produced.
@@ -61,6 +68,7 @@ function Projects() {
         </h2>
         <SystemStatus />
       </section>
+      </main>
     </div>
   )
 }

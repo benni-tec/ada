@@ -58,23 +58,6 @@ export function shortName(operator: Operator, source?: SourceInfo): string {
   }
 }
 
-const widgetTypes: Record<string, string> = { 'line-chart': 'line chart' }
-
-/**
- * The pipeline in one line, as the collapsed footer shows it: "Sotkanet screening → 2
- * steps → map". Steps are the operators that are not sources.
- */
-export function summary(operators: readonly Operator[], widgetType: string, sourceOf: (operator: Operator) => SourceInfo | undefined): string {
-  const sources = operators.filter((operator) => operator.kind === 'source')
-  const names = [...new Set(sources.map((operator) => shortName(operator, sourceOf(operator))))]
-  const steps = operators.length - sources.length
-  return [
-    names.join(', ') || 'No source',
-    ...(steps > 0 ? [`${steps} step${steps === 1 ? '' : 's'}`] : []),
-    widgetTypes[widgetType] ?? widgetType,
-  ].join(' → ')
-}
-
 /** What each column means by the output's roles, e.g. "Measure" or "Lower bound of value". */
 export function columnRoles(roles: Roles): Map<string, string[]> {
   const meanings = new Map<string, string[]>()

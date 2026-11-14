@@ -1,53 +1,53 @@
-import { useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link, Outlet, useMatches } from '@tanstack/react-router'
+import { createFileRoute, Outlet, useMatches } from '@tanstack/react-router'
 
+import { Hint } from '@/components/icon-action'
 import { ConnectionIndicator, ProjectLive } from '@/components/live'
-import { projectQuery } from '@/lib/api'
+import { ProjectSidebar } from '@/components/project-sidebar'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { WidgetModal } from '@/components/widget-modal'
 import { pageOf } from '@/lib/page'
+
+type Search = {
+  /** A widget shown full size in a modal over the page (WidgetModal). */
+  open?: string
+}
 
 // The layout of everything inside a project. It holds the project's live stream, so
 // moving between the project, its sessions and its widgets keeps one connection.
 export const Route = createFileRoute('/projects/$projectId')({
+  // Every page of the project takes `?open=`, so a widget opens over whatever page it is on.
+  validateSearch: (search: Record<string, unknown>): Search =>
+    typeof search.open === 'string' && search.open !== '' ? { open: search.open } : {},
   component: ProjectLayout,
 })
 
 function ProjectLayout() {
   const { projectId } = Route.useParams()
-  const { data: project } = useQuery(projectQuery(projectId))
-  // Each page names its own steps of the trail, and says whether its data is frozen.
-  const { Crumb, frozen } = pageOf(useMatches())
+  const { frozen } = pageOf(useMatches())
 
   return (
     <ProjectLive projectId={projectId}>
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <nav aria-label="Breadcrumb" className="text-sm text-neutral-600 dark:text-neutral-400">
-            <ol className="flex flex-wrap items-center gap-1">
-              <li>
-                <Link to="/" className="hover:underline">
-                  Projects
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li>
-                <Link
-                  to="/projects/$projectId"
-                  params={{ projectId }}
-                  activeOptions={{ exact: true }}
-                  activeProps={{ 'aria-current': 'page' }}
-                  className="hover:underline"
-                >
-                  {project?.name ?? 'Project'}
-                </Link>
-              </li>
-              {Crumb && <Crumb />}
-            </ol>
-          </nav>
-          {/* A frozen page never changes, so it says so itself instead of claiming "Live". */}
-          {!frozen && <ConnectionIndicator />}
-        </div>
-        <Outlet />
-      </div>
+      <SidebarProvider>
+        <ProjectSidebar projectId={projectId} />
+        {/* The page scrolls inside, under a bar that stays: a session keeps its composer
+            at the bottom, and a widget opened over a page leaves its scroll where it was. */}
+        <SidebarInset className="h-svh overflow-hidden">
+          <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+            <Hint label="Toggle the sidebar" side="right">
+              <SidebarTrigger />
+            </Hint>
+            <div className="flex-1" />
+            {/* A frozen page never changes, so it says so itself instead of claiming "Live". */}
+            {!frozen && <ConnectionIndicator />}
+            <ThemeToggle />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto" data-page-scroll>
+            <Outlet />
+          </div>
+        </SidebarInset>
+        <WidgetModal projectId={projectId} />
+      </SidebarProvider>
     </ProjectLive>
   )
 }

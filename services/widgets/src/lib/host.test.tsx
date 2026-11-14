@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { coverage, widget } from '@/test/samples'
 import { Any } from '@/widgets/any/any'
 
+import { followTheme } from './host'
 import { WidgetRuntime } from './runtime'
 
 type Sent = { jsonrpc: string; id?: number; method: string; params?: Record<string, unknown> }
@@ -54,4 +55,21 @@ test('inside an MCP host the widget comes from the tool result and its data from
   expect(sent[2].params).toEqual({ name: 'get_widget_data', arguments: { widget_id: 'w1', limit: 1000 } })
   // No REST: the host's iframe may not share the API's origin.
   expect(fetch).not.toHaveBeenCalled()
+})
+
+test('the widget takes the theme the page names in the fragment, and follows it when it changes', () => {
+  window.location.hash = '#widget=w1&theme=dark'
+  const stop = followTheme()
+  expect(document.documentElement.dataset.theme).toBe('dark')
+
+  window.location.hash = '#widget=w1&theme=light'
+  window.dispatchEvent(new HashChangeEvent('hashchange'))
+  expect(document.documentElement.dataset.theme).toBe('light')
+
+  // None named: the system decides, as it does for the page.
+  window.location.hash = '#widget=w1'
+  window.dispatchEvent(new HashChangeEvent('hashchange'))
+  expect(document.documentElement.dataset.theme).toBeUndefined()
+  stop()
+  window.location.hash = ''
 })

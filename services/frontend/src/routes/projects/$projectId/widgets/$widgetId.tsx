@@ -1,19 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 
+import { GoToSession } from '@/components/dashboards/pin-to-dashboard'
 import { ErrorNotice, Loading } from '@/components/notices'
+import { PageHeader } from '@/components/page-header'
 import { WidgetCard } from '@/components/widget-card'
 import { widgetQuery } from '@/lib/api'
 import { useProjectRun, type CardRun } from '@/lib/view-run'
-import { WidgetCrumb } from '@/components/breadcrumbs'
 
 type Search = {
   /** Show the widget at this run instead of starting a new one. */
   run?: string
 }
 
+/**
+ * One widget on its own page: the address MCP tools give for widgets made outside a
+ * session, kept for such direct links. In the app a widget opens full size in a modal
+ * over the page instead (`?open=`), so closing it returns to where one was.
+ */
 export const Route = createFileRoute('/projects/$projectId/widgets/$widgetId')({
-  staticData: { crumb: WidgetCrumb },
   validateSearch: (search: Record<string, unknown>): Search =>
     typeof search.run === 'string' && search.run !== '' ? { run: search.run } : {},
   component: WidgetPage,
@@ -30,26 +35,24 @@ function WidgetPage() {
     ? { id: run, frozen: true, what: 'the run named in this page’s address' }
     : { id: own.data?.id ?? null, frozen: false, what: 'This page’s current run' }
 
-  if (isPending) return <Loading what="the widget" />
-  if (error) return <ErrorNotice error={error} prefix="The widget cannot be loaded:" />
+  if (isPending)
+    return (
+      <div className="p-6">
+        <Loading what="the widget" />
+      </div>
+    )
+  if (error)
+    return (
+      <div className="p-6">
+        <ErrorNotice error={error} prefix="The widget cannot be loaded:" />
+      </div>
+    )
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="sr-only">{widget.title || 'Widget'}</h1>
+    <div className="flex flex-col gap-4 p-4 md:p-6">
+      <PageHeader type="widget" title={widget.title || 'Untitled widget'} actions={<GoToSession widget={widget} />} />
       {own.error && <ErrorNotice error={own.error} prefix="The data cannot be read:" />}
-      <WidgetCard widget={widget} run={shown} tall linkToWidget={false} />
-      {widget.session_id && (
-        <p className="text-sm">
-          <Link
-            to="/projects/$projectId/sessions/$sessionId"
-            params={{ projectId, sessionId: widget.session_id }}
-            search={{ widget: widget.id }}
-            className="text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
-          >
-            Show it in its session
-          </Link>
-        </p>
-      )}
+      <WidgetCard widget={widget} run={shown} tall openable={false} />
     </div>
   )
 }

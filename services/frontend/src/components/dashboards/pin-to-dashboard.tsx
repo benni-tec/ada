@@ -1,15 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { MessagesSquare, Pin } from 'lucide-react'
 import { useId, useState, type FormEvent } from 'react'
 
-import { AddToDashboardIcon, iconActionClass, SessionIcon, WithTooltip } from '@/components/icon-action'
+import { Hint, IconButton } from '@/components/icon-action'
 import { ErrorNotice } from '@/components/notices'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   createDashboard,
   dashboardKeys,
   dashboardsQuery,
   getDashboard,
+  keys,
   pinWidget,
+  widgetQuery,
   type Dashboard,
   type Widget,
 } from '@/lib/api'
@@ -17,13 +22,13 @@ import {
 const NEW = 'new'
 
 const fieldClass =
-  'min-w-0 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900'
+  'h-8 min-w-0 rounded-lg border border-input bg-transparent px-2 text-sm dark:bg-input/30'
 
 /**
- * Pins a widget to a dashboard of its project: a reference, so the dashboard keeps
- * showing the widget's pipeline at the latest run. The dashboard can be a new one. The
- * pin is made on the dashboard as it is now, since adding a slot cannot clash with what
- * others did meanwhile.
+ * Pins a widget to a dashboard of its project. The backend pins a copy (`copied_from`
+ * names the original), so the dashboard's widget can be changed on its own and the
+ * session's stays as it was. The dashboard can be a new one. The pin is made on the
+ * dashboard as it is now, since adding a slot cannot clash with what others did meanwhile.
  *
  * An icon in the card's footer line; the chooser and the outcome open as rows of their own
  * below that line (`basis-full`, last in the footer's wrapping row), so the line stays one.
@@ -57,6 +62,8 @@ export function PinToDashboard({ widget }: { widget: Widget }) {
       setOpen(false)
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.list(widget.project_id) })
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.view(dashboard.id) })
+      // The copy is a new widget of the project.
+      void queryClient.invalidateQueries({ queryKey: keys.projectWidgets(widget.project_id) })
     },
   })
 
@@ -70,26 +77,20 @@ export function PinToDashboard({ widget }: { widget: Widget }) {
   const row = 'order-last basis-full'
   return (
     <>
-      <WithTooltip label="Add to dashboard">
-        {(labelledBy) => (
-          <button
-            type="button"
-            aria-labelledby={labelledBy}
-            aria-expanded={open}
-            aria-controls={open ? formId : undefined}
-            onClick={() => {
-              pin.reset()
-              setOpen((value) => !value)
-            }}
-            className={iconActionClass}
-          >
-            <AddToDashboardIcon />
-          </button>
-        )}
-      </WithTooltip>
+      <IconButton
+        label="Add to dashboard"
+        aria-expanded={open}
+        aria-controls={open ? formId : undefined}
+        onClick={() => {
+          pin.reset()
+          setOpen((value) => !value)
+        }}
+      >
+        <Pin />
+      </IconButton>
       {pin.isSuccess && (
-        <p role="status" className={`${row} pb-1 text-xs text-green-800 dark:text-green-300`}>
-          Pinned to{' '}
+        <p role="status" className={`${row} px-1 pb-1 text-xs text-green-800 dark:text-green-300`}>
+          A copy is pinned to{' '}
           <Link
             to="/projects/$projectId/dashboards/$dashboardId"
             params={{ projectId: pin.data.project_id, dashboardId: pin.data.id }}
@@ -104,7 +105,7 @@ export function PinToDashboard({ widget }: { widget: Widget }) {
           id={formId}
           onSubmit={submit}
           aria-label={`Pin ${widget.title || 'widget'} to a dashboard`}
-          className={`${row} flex flex-col gap-2 border-t border-neutral-200 py-2 text-sm dark:border-neutral-800`}
+          className={`${row} flex flex-col gap-2 border-t px-1 py-2 text-sm`}
         >
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
@@ -131,26 +132,24 @@ export function PinToDashboard({ widget }: { widget: Widget }) {
                 <label htmlFor={newNameId} className="text-xs font-medium">
                   Name of the new dashboard
                 </label>
-                <input id={newNameId} value={newName} onChange={(event) => setNewName(event.target.value)} className={fieldClass} />
+                <Input id={newNameId} value={newName} onChange={(event) => setNewName(event.target.value)} className="h-8" />
               </div>
             )}
             <div className="flex flex-col gap-1">
               <label htmlFor={slotId} className="text-xs font-medium">
                 Slot name
               </label>
-              <input id={slotId} value={slot} onChange={(event) => setSlot(event.target.value)} className={fieldClass} />
+              <Input id={slotId} value={slot} onChange={(event) => setSlot(event.target.value)} className="h-8" />
             </div>
-            <button
-              type="submit"
-              disabled={!ready || pin.isPending}
-              className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-            >
+            <Button type="submit" size="sm" disabled={!ready || pin.isPending}>
+              <Pin data-icon="inline-start" aria-hidden="true" />
               {pin.isPending ? 'Pinning…' : 'Pin'}
-            </button>
+            </Button>
           </div>
-          <p className="text-xs text-neutral-500">
-            An existing slot of that name shows this widget instead; a new name adds a slot. The dashboard keeps reading the
-            widget’s data sources, so they need a refresh policy to stay current.
+          <p className="text-xs text-muted-foreground">
+            The dashboard gets a copy of this widget, which can then be changed on its own. An existing slot of that name
+            shows it instead; a new name adds a slot. The dashboard keeps reading the widget’s data sources, so they need a
+            refresh policy to stay current.
           </p>
           {dashboards.error && <ErrorNotice error={dashboards.error} prefix="The dashboards cannot be loaded:" />}
           {pin.error && <ErrorNotice error={pin.error} prefix="Not pinned:" />}
@@ -161,36 +160,38 @@ export function PinToDashboard({ widget }: { widget: Widget }) {
 }
 
 /**
- * On a dashboard: back to the session the widget was made in, scrolled to it. A widget
- * made outside a session keeps the icon, disabled, and its tooltip says why: an icon that
- * comes and goes between cards would leave people wondering what they are missing. It
- * stays focusable (`aria-disabled`, not `disabled`), so the keyboard reaches the reason.
+ * On a dashboard: back to the session the widget was made in, scrolled to it. A widget on
+ * a dashboard is usually a copy made by pinning, which has no session of its own: the way
+ * back then follows `copied_from` to the original and opens its session at it.
+ *
+ * Neither made in a session: the icon stays, disabled, and its tooltip says why; an icon
+ * that comes and goes between cards would leave people wondering what they are missing.
+ * It stays focusable (`aria-disabled`), so the keyboard reaches the reason.
  */
 export function GoToSession({ widget }: { widget: Widget }) {
-  if (!widget.session_id) {
+  const copiedFrom = widget.session_id ? null : (widget.copied_from ?? null)
+  const original = useQuery({ ...widgetQuery(copiedFrom ?? ''), enabled: copiedFrom !== null })
+  const source = widget.session_id ? widget : original.data?.session_id ? original.data : null
+
+  if (!source) {
     return (
-      <WithTooltip label="Not made in a session">
-        {(labelledBy) => (
-          <button type="button" aria-labelledby={labelledBy} aria-disabled="true" className={iconActionClass}>
-            <SessionIcon />
-          </button>
-        )}
-      </WithTooltip>
+      <IconButton label="Go to the session it came from" unavailable={original.isLoading ? 'Looking for the session…' : 'Not made in a session'}>
+        <MessagesSquare />
+      </IconButton>
     )
   }
   return (
-    <WithTooltip label="Go to the session it came from">
-      {(labelledBy) => (
+    <Hint label="Go to the session it came from">
+      <Button asChild variant="ghost" size="icon-sm">
         <Link
           to="/projects/$projectId/sessions/$sessionId"
-          params={{ projectId: widget.project_id, sessionId: widget.session_id! }}
-          search={{ widget: widget.id }}
-          aria-labelledby={labelledBy}
-          className={iconActionClass}
+          params={{ projectId: source.project_id, sessionId: source.session_id! }}
+          search={{ widget: source.id }}
+          aria-label="Go to the session it came from"
         >
-          <SessionIcon />
+          <MessagesSquare />
         </Link>
-      )}
-    </WithTooltip>
+      </Button>
+    </Hint>
   )
 }
