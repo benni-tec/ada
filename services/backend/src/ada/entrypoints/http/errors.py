@@ -2,9 +2,9 @@ from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from ada.core.models.errors import Conflict, Invalid, NotFound
+from ada.core.models.errors import Conflict, Invalid, NotFound, Unavailable
 
-DOMAIN_ERRORS = (NotFound, Conflict, Invalid)
+DOMAIN_ERRORS = (NotFound, Conflict, Invalid, Unavailable)
 
 
 def response_for(error: Exception) -> JSONResponse:
@@ -22,6 +22,9 @@ def response_for(error: Exception) -> JSONResponse:
                 },
                 status.HTTP_409_CONFLICT,
             )
+        case Unavailable():
+            # Nothing is wrong with the request; the client may retry it later.
+            return JSONResponse({"detail": str(error)}, status.HTTP_503_SERVICE_UNAVAILABLE)
         case _:
             return JSONResponse({"detail": str(error)}, status.HTTP_422_UNPROCESSABLE_CONTENT)
 

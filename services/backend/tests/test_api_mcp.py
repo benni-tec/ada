@@ -14,6 +14,7 @@ from mcp.types import Implementation
 
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.models.errors import Unavailable
 from ada.entrypoints.mcp import actor
 from ada.entrypoints.mcp.server import create_mcp
 from memory import memory_adapters
@@ -232,6 +233,17 @@ async def test_refreshing_an_unknown_source_is_an_error(client: Client, seen: Se
     with pytest.raises(ToolError, match="not found"):
         await call(client, "refresh_source", source_id=str(uuid7()))
     assert (await seen.dispatcher()).refreshes == []
+
+
+async def test_a_refresh_that_cannot_be_queued_says_to_retry_later(
+    client: Client, seen: Seen, source: dict[str, Any]
+) -> None:
+    async def unreachable(data_source_id: UUID, force: bool = False) -> None:
+        raise Unavailable("The task queue could not be reached: connection refused")
+
+    (await seen.dispatcher()).refresh_source = unreachable  # type: ignore[method-assign]
+    with pytest.raises(ToolError, match=r"could not be reached: .*try again later"):
+        await call(client, "refresh_source", source_id=source["id"])
 
 
 # Pipelines

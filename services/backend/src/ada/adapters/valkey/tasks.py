@@ -2,10 +2,12 @@ import logging
 
 from redis.exceptions import RedisError
 from taskiq import AsyncBroker
+from taskiq.exceptions import SendTaskError
 from taskiq.kicker import AsyncKicker
 from taskiq_redis import RedisStreamBroker
 
 from ada.core.models.base import Id
+from ada.core.models.errors import Unavailable
 from ada.core.models.operators import OperatorId
 from ada.core.ports.tasks import TaskDispatcher
 
@@ -59,6 +61,10 @@ class ValkeyTaskDispatcher(TaskDispatcher):
         await self._kick(CHECK_ALERT_RULE, rule_id=str(rule_id))
 
     async def _kick(self, name: str, **arguments: object) -> None:
-        # Raises (taskiq's SendTaskError) when the task could not be queued: the caller asked
-        # for work to happen, so silently dropping it would be wrong.
-        await AsyncKicker(name, self.broker, labels={}).kiq(**arguments)
+        # Raises when the task could not be queued: the caller asked for work to happen, so
+        # silently dropping it would be wrong.
+        try:
+            await AsyncKicker(name, self.broker, labels={}).kiq(**arguments)
+        except SendTaskError as error:
+            reason = str(error.__cause__ or error) or type(error).__name__
+            raise Unavailable(f"The task queue could not be reached: {reason}") from error

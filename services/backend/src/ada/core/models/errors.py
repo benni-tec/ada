@@ -24,3 +24,8 @@ class Conflict(Exception):
 class Invalid(Exception):
     """The request is well-formed but breaks a rule of the model, e.g. an input binding
     whose schema does not match, or SQL that does not parse."""
+
+
+class Unavailable(Exception):
+    """An external dependency (a data source, the task queue) could not be reached or
+    answered with an error. Nothing is wrong with the request; retrying later may work."""

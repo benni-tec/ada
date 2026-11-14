@@ -11,7 +11,6 @@ import pytest
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from taskiq import AsyncBroker, BrokerMessage
-from taskiq.exceptions import SendTaskError
 from taskiq_redis import RedisStreamBroker
 
 from ada.adapters.valkey.tasks import (
@@ -23,6 +22,7 @@ from ada.adapters.valkey.tasks import (
 )
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.models.errors import Unavailable
 from ada.core.ports.tasks import TaskDispatcher
 from ada.entrypoints.worker import create_broker
 from test_worker_tasks import FakeRunService, FakeSourceService, fakes
@@ -120,7 +120,7 @@ async def test_queueing_fails_loudly_when_valkey_is_unreachable(
     # Starting does not fail: the API must come up while Valkey is down.
     await dispatcher.startup()
     try:
-        with pytest.raises(SendTaskError):
+        with pytest.raises(Unavailable, match="task queue could not be reached"):
             await dispatcher.refresh_source(uuid7())
     finally:
         await dispatcher.shutdown()

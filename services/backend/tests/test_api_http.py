@@ -12,6 +12,7 @@ from ada.adapters.memory.repositories import MemoryStore
 from ada.adapters.memory.tasks import RecordingTaskDispatcher
 from ada.config import Settings
 from ada.core.models.dashboards import Dashboard
+from ada.core.models.errors import Unavailable
 from ada.core.models.events import Event
 from ada.core.ports.tasks import TaskDispatcher
 from ada.entrypoints.http.app import create_app
@@ -226,6 +227,18 @@ def test_refreshing_a_source_queues_a_task_and_answers_202(
     assert forced.status_code == 202
     assert [force for _, force in dispatcher(client).refreshes] == [False, True]
     assert str(dispatcher(client).refreshes[0][0]) == source["id"]
+
+
+def test_a_refresh_that_cannot_be_queued_answers_503(
+    client: TestClient, source: dict[str, Any]
+) -> None:
+    async def unreachable(data_source_id: UUID, force: bool = False) -> None:
+        raise Unavailable("The task queue could not be reached: connection refused")
+
+    dispatcher(client).refresh_source = unreachable  # type: ignore[method-assign]
+    response = client.post(f"/api/sources/{source['id']}/refresh")
+    assert response.status_code == 503
+    assert response.json() == {"detail": "The task queue could not be reached: connection refused"}
 
 
 # Sessions

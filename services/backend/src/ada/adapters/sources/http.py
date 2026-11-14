@@ -32,7 +32,7 @@ from pydantic import Field, ValidationError
 
 from ada.core.models.analysis import FetchedData
 from ada.core.models.base import DomainModel
-from ada.core.models.errors import Invalid
+from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.sources import AccessKind, DataSource
 from ada.core.models.time import TimeRange
 from ada.core.ports.sources import SourceReader, SourceReaders
@@ -62,7 +62,7 @@ class HttpOptions(DomainModel):
     probe: ProbeOptions | None = None
 
 
-class SourceUnavailable(Exception):
+class SourceUnavailable(Unavailable):
     """The source could not be reached or answered with an error. Its message is what the
     source records as its last error, so it says which request failed and how."""
 
