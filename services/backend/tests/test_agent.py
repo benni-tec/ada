@@ -48,6 +48,7 @@ from ada.core.services.ports.agents import AgentTurnService, ResearchService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
+from ada.core.services.sessions.service import Sessions
 from ada.entrypoints.mcp.agent import CLIENT, LEFT_OUT, RESEARCH_TOOLS, InProcessToolbox
 from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.worker import create_broker
@@ -1205,10 +1206,16 @@ async def test_research_whose_worker_died_is_ended_and_reported_by_the_recovery(
             parent = await (await request.get(SessionService)).create(project.id, "S")
         running = await research_turn(app_container, parent.id, "Survival")
         ended = await research_turn(app_container, parent.id, "Deaths")
-        # Both workers stopped: one while its turn ran, one right after it ended.
+        reported = await research_turn(app_container, parent.id, "Births")
+        # The workers stopped: one while its turn ran, one right after report_back stored
+        # its report (before the turn stored the call), one right after its turn ended.
         progress, now = await app_container.get(TurnProgress), overrides.clock.now()
-        for turn in (running, ended):
+        for turn in (running, ended, reported):
             assert await progress.start(turn.id, now)
+        async with app_container() as request:
+            await (await request.get(SessionService)).record_report(
+                reported.session_id, "Births by region.", Actor(kind=ActorKind.AGENT, name=MODEL)
+            )
         await progress.finish(
             ended.id, TurnStatus.DONE, (AnswerText(text="No deaths table."),), None, now
         )
@@ -1231,12 +1238,57 @@ async def test_research_whose_worker_died_is_ended_and_reported_by_the_recovery(
     finally:
         await broker.shutdown()
 
-    assert early == []
+    assert early == ["Births by region."]
     assert (failed.status, failed.error) == ("failed", agent_service.ABANDONED)
     assert reports == [
+        "Births by region.",
         f"Research failed: {agent_service.ABANDONED}",
         "No deaths table.\n\n(incomplete: ended without a report)",
     ]
+
+
+async def test_a_research_report_that_failed_is_posted_once_by_the_recovery(
+    migrated_database_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    script, clock = Script(), FixedClock()
+    clocks = Provider(scope=Scope.APP)
+    clocks.provide(lambda: clock, provides=Clock)
+    settings = settings_in(tmp_path, migrated_database_url)
+    container = create_container(settings, MemoryBackground(), clocks, AgentOverrides(script))
+    record, failures = Sessions.record_report, [ConnectionError("The database went away")]
+
+    async def record_then_fail(self: Sessions, *args: Any) -> Any:
+        entry = await record(self, *args)
+        if failures:
+            raise failures.pop()
+        return entry
+
+    async def reports() -> list[str]:
+        async with container() as request:
+            entries = await (await request.get(SessionService)).entries(parent.id)
+        return [entry.text for entry in entries if entry.kind is EntryKind.REPORT]
+
+    try:
+        await configure(container, config())
+        async with container() as request:
+            project = await (await request.get(ProjectService)).create("P")
+            parent = await (await request.get(SessionService)).create(project.id, "S")
+        turn = await research_turn(container, parent.id, "Survival")
+        monkeypatch.setattr(Sessions, "record_report", record_then_fail)
+        script.then(say("No survival table."))
+        await run_turn(container, turn.id)
+        lost = await reports()
+        clock.advance(seconds=agent_service.TURN_MARGIN.total_seconds() + 1)
+        for _ in range(2):
+            async with container() as request:
+                await (await request.get(AgentTurnService)).recover()
+        recovered = await reports()
+    finally:
+        await container.close()
+
+    # The report written before the failure was rolled back with the turn's settling.
+    assert (failures, lost) == ([], [])
+    assert recovered == ["No survival table.\n\n(incomplete: ended without a report)"]
 
 
 class StalledSearch(FakeWebSearch):

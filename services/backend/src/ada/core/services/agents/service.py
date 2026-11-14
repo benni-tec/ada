@@ -72,8 +72,6 @@ WAIT_POLL = 1.0
 TURN_MARGIN = timedelta(minutes=1)
 ABANDONED = "The turn did not end in time; the worker running it has probably stopped"
 
-# The tool that ends a research turn with its report.
-REPORT_BACK = "report_back"
 INCOMPLETE = "(incomplete: ended without a report)"
 
 
@@ -181,6 +179,7 @@ class AgentTurns(AgentTurnService):
         turn = await self.turn_records.get(id)
         session = await self.sessions.get(turn.session_id)
         await self.events.publish(self._finished(session.project_id, turn))
+        # A report that fails raises on and rolls the settling back: the recovery retries.
         await self._report_end(session, turn)
 
     async def recover(self) -> None:
@@ -210,13 +209,15 @@ class AgentTurns(AgentTurnService):
         if await self.progress.abandon(turn.id, ABANDONED, self.clock.now()) is not None:
             await self._ended_apart(turn.id)
 
-    async def _ended_apart(self, id: Id) -> None:
+    async def _ended_apart(self, id: Id) -> bool:
         """`ended`, in a unit of work of its own: the caller's has committed already, or
-        runs on for the length of a turn."""
+        runs on for the length of a turn. False when it failed and rolled back."""
         try:
             await self.units.run(AgentTurnService, lambda turns: turns.ended(id))
         except Exception:
             logger.exception("Announcing the end of agent turn %s failed", id)
+            return False
+        return True
 
     async def _queue(
         self, session: Session, entry: SessionEntry, catalog: ModelList, model: str | None = None
@@ -334,21 +335,31 @@ class AgentTurns(AgentTurnService):
             # Failed meanwhile, as if its worker had stopped; that ending was announced.
             logger.warning("Agent turn %s was failed while it still ran", id)
             return await self.turn_records.get(id)
-        await self.broadcaster.publish(self._finished(session.project_id, finished))
-        if await self.turn_records.settle(id):
-            await self._report_end(session, finished)
+        # Apart, so that a report that fails is not committed as settled with this task:
+        # the recovery retries it. The turn is shown finished meanwhile.
+        if not await self._ended_apart(id):
+            await self.broadcaster.publish(self._finished(session.project_id, finished))
         return finished
 
     async def _report_end(self, session: Session, turn: AgentTurn) -> None:
         """The research turn on the brief, when it did not report back, reports how it
         ended: its final text, marked incomplete, or its failure. Only whoever settles the
-        turn calls this, so it happens once. A person's follow-ups in the research session
-        are a conversation of their own: they report only by calling report_back."""
-        if session.agent is not SessionAgent.RESEARCH or _reported(turn):
+        turn calls this, in the same unit of work, so it happens once. A person's follow-ups
+        in the research session are a conversation of their own: they report only by
+        calling report_back."""
+        parent_id = session.parent_session_id
+        if session.agent is not SessionAgent.RESEARCH or parent_id is None:
             return
         entries = await self.sessions.entries(session.id)
         brief = next((entry for entry in entries if entry.kind is EntryKind.MESSAGE), None)
         if brief is None or turn.prompt_entry_id != brief.id:
+            return
+        # The parent's record says whether it reported, not the turn's parts: report_back
+        # commits its report before the turn stores the call's result.
+        if any(
+            entry.kind is EntryKind.REPORT and entry.ref == str(session.id)
+            for entry in await self.sessions.entries(parent_id)
+        ):
             return
         if turn.status is TurnStatus.DONE:
             text = f"{_final_text(turn) or 'It gave no answer.'}\n\n{INCOMPLETE}"
@@ -357,11 +368,7 @@ class AgentTurns(AgentTurnService):
         else:
             # Cancelled by a person, who knows.
             return
-        try:
-            await self.post_report(session.id, text, _agent(turn.model))
-        except Exception:
-            # The turn has ended either way; a lost report must not undo that.
-            logger.exception("Reporting the end of research turn %s failed", turn.id)
+        await self.post_report(session.id, text, _agent(turn.model))
 
     def _finished(self, project_id: Id, turn: AgentTurn) -> Event:
         return self._event(
@@ -460,15 +467,6 @@ class _Recorder(TurnSink):
 
 def _agent(model: str) -> Actor:
     return Actor(kind=ActorKind.AGENT, name=model)
-
-
-def _reported(turn: AgentTurn) -> bool:
-    return any(
-        isinstance(part, ToolPart)
-        and part.tool_name == REPORT_BACK
-        and part.state is ToolState.OUTPUT_AVAILABLE
-        for part in turn.parts
-    )
 
 
 def _final_text(turn: AgentTurn) -> str:
