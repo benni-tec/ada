@@ -5,8 +5,10 @@ from dishka import Provider, Scope, provide
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.core.ports.sources import SourceReaders
 from ada.core.ports.system import Clock
+from ada.core.services.ports.refreshes import RefreshService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.sources.service import DataSources
+from ada.core.services.sources.waiting import WaitingRefreshes
 
 
 class SourceProvider(Provider):
@@ -20,6 +22,7 @@ class SourceProvider(Provider):
             yield HttpSourceReaders(client, clock)
 
     sources = provide(DataSources, provides=SourceService, scope=Scope.REQUEST)
+    refreshes = provide(WaitingRefreshes, provides=RefreshService, scope=Scope.REQUEST)
 
 
 provider = SourceProvider()

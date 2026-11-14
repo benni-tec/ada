@@ -1,6 +1,7 @@
 """Sources: registering, refreshing by freshness policy, the HTTP readers, shaping an answer
 into a table, and the example registrations against their recorded answers."""
 
+import asyncio
 import csv
 import io
 import json
@@ -8,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -56,9 +58,11 @@ from ada.core.models.sources import (
 from ada.core.models.time import TimeRange
 from ada.core.ports.sources import SourceReaders
 from ada.core.services.ports.projects import ProjectService
+from ada.core.services.ports.refreshes import RefreshStatus, SnapshotSummary
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.sources.service import DataSources, source_operator_id
 from ada.core.services.sources.shaping import shape
+from ada.core.services.sources.waiting import WaitingRefreshes
 from conftest import settings_in
 from fakes import (
     RECORDINGS,
@@ -310,6 +314,44 @@ async def test_a_failed_fetch_keeps_the_old_snapshot_and_token_and_records_the_e
     world.reader.content = b"region,value\nHelsinki,80.1\n"
     await world.service.refresh(source.id, force=True)
     assert (await world.service.get(source.id)).last_error is None
+
+
+async def test_a_refresh_waited_for_says_how_it_went_instead_of_raising(world: World) -> None:
+    refreshes = WaitingRefreshes(world.service, MemorySnapshotRepository(world.memory))
+    source = await world.register()
+
+    fetched = await refreshes.refresh_now(source.id)
+    unchanged = await refreshes.refresh_now(source.id, force=True)
+    world.reader.content = RuntimeError("GET https://example.test/data.csv answered 503")
+    failed = await refreshes.refresh_now(source.id, force=True)
+
+    [snapshot] = world.snapshots(source)
+    summary = SnapshotSummary(
+        id=snapshot.id, row_count=snapshot.row_count, fetched_at=snapshot.fetched_at
+    )
+    assert (fetched.status, fetched.snapshot, fetched.error) == (
+        RefreshStatus.FETCHED,
+        summary,
+        None,
+    )
+    assert (unchanged.status, unchanged.snapshot) == (RefreshStatus.UNCHANGED, summary)
+    # The last good snapshot stays current; the failure is recorded as for the worker.
+    assert (failed.status, failed.snapshot, failed.error) == (
+        RefreshStatus.FAILED,
+        summary,
+        "GET https://example.test/data.csv answered 503",
+    )
+    assert (await world.service.get(source.id)).last_error == failed.error
+
+    async def hanging(*arguments: Any) -> None:
+        await asyncio.sleep(30)
+
+    with patch.object(world.reader, "fetch", hanging):
+        slow = await refreshes.refresh_now(source.id, force=True, timeout_seconds=1)
+    assert slow.status is RefreshStatus.FAILED
+    assert slow.error is not None and "longer than 1 s" in slow.error
+    with pytest.raises(Invalid):
+        await refreshes.refresh_now(source.id, timeout_seconds=61)
 
 
 async def test_content_that_does_not_fit_the_options_fails_the_refresh(world: World) -> None:
