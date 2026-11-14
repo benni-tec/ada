@@ -688,6 +688,17 @@
             "title": "Source",
             "type": "string"
           },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
           "url": {
             "anyOf": [
               {

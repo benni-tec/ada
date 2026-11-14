@@ -1906,6 +1906,8 @@ export interface components {
             run_id?: string | null;
             /** Source */
             source: string;
+            /** Source Id */
+            source_id?: string | null;
             /** Url */
             url?: string | null;
         };

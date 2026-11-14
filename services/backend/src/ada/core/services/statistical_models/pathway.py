@@ -59,6 +59,7 @@ SWEDEN = Citation(
     grade=EvidenceGrade.STANDARD,
     url="https://kunskapsbanken.cancercentrum.se/globalassets/cancerdiagnoser/lunga-och-lungsack/vardforlopp/svf-lungcancer.pdf",
     country="Sweden",
+    source_id="01a1db1c-e73f-75a4-b294-20172adf3bc0",
 )
 SWEDEN_SUSPICION = SWEDEN.model_copy(
     update={
@@ -128,6 +129,7 @@ NORDCAN = Citation(
     url="https://canapi.iarc.who.int/api/nordcan/v2/961/survival/population/5/1_2/208_246",
     operator_id="op_fbd206c1d7b01ba0e8be5e09598bb74f",
     run_id="01a1db11-d2fa-7782-95dd-aa41a3277464",
+    source_id="01a1da4c-1a05-76a4-a931-7075fec66d53",
 )
 NORWAY_CRC = Citation(
     source="Helsedirektoratet, Pakkeforløp for tykk- og endetarmskreft (last revised 3 July 2026)",
@@ -164,6 +166,7 @@ SWEDEN_CRC = Citation(
     grade=EvidenceGrade.STANDARD,
     url="https://kunskapsbanken.cancercentrum.se/globalassets/cancerdiagnoser/tjock--och-andtarm-anal/vardforlopp/svf-tjock-andtarmscancer.pdf",
     country="Sweden",
+    source_id="01a1db1c-e785-76a8-a206-9c34a094e33a",
 )
 SWEDEN_PANCREAS = Citation(
     source="Regionala cancercentrum, SVF cancer i bukspottkörteln och periampullärt, version 3.2 "
@@ -180,6 +183,7 @@ SWEDEN_PANCREAS = Citation(
     grade=EvidenceGrade.STANDARD,
     url="https://kunskapsbanken.cancercentrum.se/globalassets/cancerdiagnoser/bukspottkortel/vardforlopp/svf-bukspottkortelcancer.pdf",
     country="Sweden",
+    source_id="01a1db1c-e7b1-721d-9e02-a0379411cde7",
 )
 HANNA_CRC = HANNA.model_copy(
     update={
