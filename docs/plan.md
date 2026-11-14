@@ -100,7 +100,7 @@ on edits, filled the contract gaps the frontend found, moved the frontend onto t
 generated types, served the widgets over REST and as MCP Apps, and added `ada seed-demo`.
 `docs/contracts.md` describes the result and lists the known issues wave 2 starts from.
 
-## Wave 2: dashboards, reports, alerts (four agents at once)
+## Wave 2: dashboards, reports, alerts (four agents at once) (done)
 
 Starts from the integrated wave 1. The tables already exist from the foundation.
 
@@ -114,7 +114,25 @@ Starts from the integrated wave 1. The tables already exist from the foundation.
 G, H and I each add their own repository, router and tool files, so they stay apart.
 J touches the pipeline service from wave 1 and must be merged last.
 
-A second integration step follows, as after wave 1.
+### Integration 2 (one agent, after wave 2) (done)
+
+Merged G, H, I and J in that order and regenerated the API types and route tree. Besides
+the merge it:
+
+- unfroze what the workstreams asked for: `ReportService.sources` and `ReportSource`;
+  `AlertService.update_rule` for every field, with `Change[T]` telling "unchanged" from
+  "clear"; `Alert.condition_operator_id` and `Alert.pipeline_run_id` (migration `0002`);
+- joined the frontend pieces: alert badges and "Generate report" on the dashboard page,
+  the report form on the generated client, dashboards that reload their frames once, maps
+  in the `any` bundle;
+- let the tool-name and composition tests follow wave 2 (the alert check is
+  `check_alert_rule`) and documented maps and the interval guard in the MCP tools;
+- fixed a race found in the browser: two widgets reading one run both fetched a missing
+  period, and the second insert failed; `SourceLocks` now serializes fetches of a source;
+- extended `tests/test_end_to_end.py` with the wave 2 slice and `ada seed-demo` with a
+  ready demo (map, dashboard, report, alert rule, line chart);
+- folded the four wave 2 contract files into `docs/contracts.md`, with the known issues
+  the next wave starts from.
 
 ## Later, not planned here
 
@@ -135,5 +153,5 @@ pipelines; data-quality alerts.
 ## Order
 
 ```
-Foundation ──▶ A  B  C  D  E  F ──▶ Integration 1 ──▶ G  H  I  J ──▶ Integration 2
+Foundation ──▶ A  B  C  D  E  F ──▶ Integration 1 ──▶ G  H  I  J ──▶ Integration 2 (all done)
 ```

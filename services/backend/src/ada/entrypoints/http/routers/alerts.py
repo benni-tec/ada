@@ -20,7 +20,7 @@ class NewAlertRule(Request):
     name: str
     # The measure pipeline: the operator whose rows the formula is evaluated on.
     operator_id: OperatorId
-    # The condition as a formula tree (docs/contracts/wave2-alerts.md).
+    # The condition as a formula tree (docs/contracts.md, "Alerts").
     formula: JsonObject
     # The columns that identify what a row is about; one alert per key.
     key_columns: list[str]

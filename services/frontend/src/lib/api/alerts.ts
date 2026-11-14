@@ -1,4 +1,4 @@
-// Alert rules, the alert feed and checks (docs/contracts/wave2-alerts.md), on the typed client.
+// Alert rules, the alert feed and checks (docs/contracts.md, "Alerts"), on the typed client.
 
 import { queryOptions } from '@tanstack/react-query'
 

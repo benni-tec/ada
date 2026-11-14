@@ -1,4 +1,4 @@
-"""Reports, their versions and sources lists, and templates (docs/contracts/wave2-reports.md)."""
+"""Reports, their versions and sources lists, and templates (docs/contracts.md, "Reports")."""
 
 from collections.abc import Sequence
 

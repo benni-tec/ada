@@ -1,7 +1,9 @@
 # ADA
 
 Agentic data analysis: an agent builds pipelines of operators over data sources, and their
-results are shown as widgets on live dashboards and in versioned reports. Everything is
+results are shown as widgets (values, tables, line charts, maps) on live dashboards with a
+time range, in versioned reports that list their sources, and as alerts when a condition
+on a measure holds. Everything is
 reachable over MCP as well as through the web frontend, so an agent in your own client and
 the agent inside the platform work on the same project.
 
@@ -55,10 +57,16 @@ To debug a service in an IDE instead, start only the infrastructure with
 
 ### Demo data
 
-`ada seed-demo` creates the project "Nordic cancer care" with three public sources
-(Sotkanet, Statistics Finland, NORDCAN), unless it exists; `--refresh` also queues a fetch
-of each for the worker. From source: `cd services/backend && uv run ada seed-demo` with the
-environment of `services/backend/moon.yml`; in the full stack:
+`ada seed-demo` creates the project "Nordic cancer care" with five public sources
+(Sotkanet's screening data and region codes, Statistics Finland's cancer deaths and county
+boundaries, NORDCAN) and a ready demo on them: a map and a table of breast cancer
+screening participation by wellbeing services county on the dashboard "Screening
+participation", an alert rule for counties below 80 %, a session that made them, and a
+line chart of lung cancer survival in Finland. Running it again adds only what is
+missing. `--refresh` fetches the demo's data at once (a handful of requests to the free
+public APIs), generates a report of the dashboard, checks the alert rule, and queues the
+other sources for the worker. From source: `cd services/backend && uv run ada seed-demo`
+with the environment of `services/backend/moon.yml`; in the full stack:
 `docker compose exec backend ada seed-demo --refresh`.
 
 ## Running the full stack
@@ -99,8 +107,9 @@ import crosses a boundary (`services/backend/tach.toml`).
 
 Two stores, with different jobs:
 
-- **PostgreSQL** holds definitions: projects, operators, runs, dashboards, reports. Access
-  goes through SQLAlchemy; Alembic migrations live in `ada/adapters/db/migrations`.
+- **PostgreSQL** holds definitions: projects, operators, runs, dashboards, reports,
+  alerts. Access goes through SQLAlchemy; Alembic migrations live in
+  `ada/adapters/db/migrations`.
 - **Parquet files queried with DuckDB** hold analysis data. A snapshot is written once and
   never changed, and every process reads the files with its own in-memory DuckDB, so the
   API and the workers do not contend for one database file.
@@ -125,6 +134,7 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `DATABASE_URL` | SQLAlchemy URL of the PostgreSQL database, e.g. `postgresql+psycopg://…` |
 | `VALKEY_URL` | Valkey URL, e.g. `redis://…` |
 | `DATA_DIR` | Directory for snapshots (default `data`; `/data` in the image) |
+| `WIDGETS_DIR` | The built widgets (default `services/widgets/dist` of the checkout; `/app/widgets` in the image) |
 
 There are no users and no authentication yet: whoever can reach the gateway can use the
 API and the MCP endpoint. Do not expose it publicly as it is.

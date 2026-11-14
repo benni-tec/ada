@@ -1,4 +1,4 @@
-// The formula tree of an alert rule, as the server takes it (docs/contracts/wave2-alerts.md),
+// The formula tree of an alert rule, as the server takes it (docs/contracts.md, "Alerts"),
 // and the edits the builder makes to it. Every edit returns a new tree; ids never change, so
 // a server error that names a node keeps pointing at the same node while it is edited.
 
