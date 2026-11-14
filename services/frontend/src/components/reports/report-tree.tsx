@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
 import { ErrorNotice, Loading } from '@/components/notices'
@@ -105,22 +104,11 @@ function WidgetBlockView({ widgetId, caption, pinned }: { widgetId: Id; caption:
   if (error) return <ErrorNotice error={error} prefix="A widget cannot be loaded:" />
   return (
     <figure className="flex flex-col gap-1">
-      <WidgetCard widget={widget} run={pinned} linkToWidget={false} />
-      <div className="rounded-lg border border-neutral-200 dark:border-neutral-800">
-        {caption && (
-          <figcaption className="px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300">{caption}</figcaption>
-        )}
-        <p className="px-4 py-2 text-xs [&:not(:first-child)]:border-t [&:not(:first-child)]:border-neutral-200 dark:[&:not(:first-child)]:border-neutral-800">
-          <Link
-            to="/projects/$projectId/widgets/$widgetId"
-            params={{ projectId: widget.project_id, widgetId: widget.id }}
-            search={{ run: pinned.id }}
-            className="text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
-          >
-            Open this widget at the report’s run
-          </Link>
-        </p>
-      </div>
+      {/* Opened full size, it stays at the report's run: the card hands its run to the modal. */}
+      <WidgetCard widget={widget} run={pinned} />
+      {caption && (
+        <figcaption className="rounded-lg border px-4 py-2 text-sm text-muted-foreground">{caption}</figcaption>
+      )}
     </figure>
   )
 }

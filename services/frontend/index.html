@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ADA</title>
+    <script>
+      // The theme before the first paint (lib/theme.tsx keeps it afterwards), so a dark
+      // page does not flash light.
+      try {
+        const theme = localStorage.getItem('ada-theme')
+        const dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.classList.toggle('dark', dark)
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

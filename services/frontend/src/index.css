@@ -5,10 +5,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Widget frames take part in both schemes; matching them keeps their background
-   transparent instead of an opaque canvas when the schemes differ. */
+/* The page's scheme is the theme's (lib/theme.tsx), not the system's. Widget frames
+   inherit it: a frame's `prefers-color-scheme` follows its element's scheme, and matching
+   schemes keep the frame's background transparent instead of an opaque canvas. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -87,6 +88,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);

@@ -169,30 +169,38 @@ function serveReport(overrides: Record<string, unknown> = {}) {
 
 async function openPipeline() {
   const card = await screen.findByRole('article', { name: 'Screening by county' })
-  const opener = await within(card).findByRole('button', { name: /^Pipeline:/ })
-  await waitFor(() => expect(opener).toBeEnabled())
+  const opener = await within(card).findByRole('button', { name: 'Pipeline' })
   opener.focus()
   fireEvent.click(opener)
-  return { card, opener, dialog: await screen.findByRole('dialog', { name: 'Pipeline of “Screening by county”' }) }
+  const dialog = await screen.findByRole('dialog', { name: 'Pipeline of “Screening by county”' })
+  // The pipeline is read when the dialog opens.
+  await within(dialog).findByRole('group', { name: 'Operators, from the sources to the widget' })
+  return { card, opener, dialog }
 }
 
 const node = (dialog: HTMLElement, name: RegExp) => within(dialog).getByRole('button', { name })
 
-test('the footer sums the pipeline up in one line, with the sources as the report recorded them', async () => {
-  serveReport()
+test('the footer opens the pipeline with one button, and reads it only then', async () => {
+  const fetch = serveReport()
   renderAt('/projects/p1/reports/rep1?version=1.1.0')
 
   const card = await screen.findByRole('article', { name: 'Screening by county' })
   const footer = card.querySelector('footer')!
-  expect(
-    await within(footer).findByRole('button', {
-      name: 'Pipeline: Sotkanet screening, Sotkanet regions → 3 steps → map',
-    }),
-  ).toHaveAttribute('aria-haspopup', 'dialog')
-  // Not on a dashboard: the action is adding it to one.
+  const opener = within(footer).getByRole('button', { name: 'Pipeline' })
+  expect(opener).toHaveAttribute('aria-haspopup', 'dialog')
+  // Not on a dashboard: the action is adding it to one; and it opens full size.
   expect(within(footer).getByRole('button', { name: 'Add to dashboard' })).toBeInTheDocument()
-  // H's panel below the card is gone; the footer replaces it.
-  expect(screen.queryByText('Pipeline', { selector: 'summary' })).not.toBeInTheDocument()
+  expect(within(footer).getByRole('link', { name: 'Open full size' })).toHaveAttribute(
+    'href',
+    '/projects/p1/reports/rep1?version=1.1.0&open=w1',
+  )
+  const lineageReads = () => fetch.mock.calls.filter(([request]) => String((request as Request).url).endsWith('/lineage'))
+  expect(lineageReads()).toHaveLength(0)
+
+  fireEvent.click(opener)
+  const dialog = await screen.findByRole('dialog', { name: 'Pipeline of “Screening by county”' })
+  expect(await within(dialog).findByRole('button', { name: /the widget reads this/ })).toBeInTheDocument()
+  expect(lineageReads()).toHaveLength(1)
 })
 
 test('the dialog draws the graph, starts at the widget’s operator and previews it in the version’s run', async () => {
@@ -310,7 +318,7 @@ test('the dialog keeps the focus inside, closes on Escape and gives the focus ba
 
   fireEvent.keyDown(dialog, { key: 'Escape' })
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  expect(opener).toHaveFocus()
+  await waitFor(() => expect(opener).toHaveFocus())
   expect(opener.closest('[inert]')).toBeNull()
 
   // The close button does the same.
@@ -368,7 +376,8 @@ test('on a dashboard the preview follows the dashboard’s run and opening it st
   const { dialog, card } = await openPipeline()
 
   // The project's sources as they are now, outside a report.
-  expect(within(card).getByRole('button', { name: /^Pipeline: Sotkanet screening \(now\), Sotkanet regions/ })).toBeInTheDocument()
+  expect(within(dialog).getByRole('button', { name: /^Source: Sotkanet screening \(now\)/ })).toBeInTheDocument()
+  expect(card).toBeInTheDocument()
   expect(dialog).toHaveAccessibleDescription('The dashboard’s current run, follows new data (run r1).')
   expect(await within(dialog).findByText('op_t-2')).toBeInTheDocument()
   expect(reads).toEqual(['r1 op_t 50'])
@@ -384,18 +393,15 @@ test('a dashboard card links back to its session instead of offering to pin it',
   expect(back).toHaveAttribute('href', '/projects/p1/sessions/s1?widget=w1')
   expect(within(card).queryByRole('button', { name: 'Add to dashboard' })).not.toBeInTheDocument()
 
-  // The tooltip is the name, shown on hover and focus, and Escape hides it.
-  const tip = within(card).getByRole('tooltip', { hidden: true })
-  expect(tip).toHaveTextContent('Go to the session it came from')
-  expect(tip).not.toBeVisible()
-  fireEvent.mouseEnter(back.parentElement!)
-  expect(tip).toBeVisible()
-  fireEvent.mouseLeave(back.parentElement!)
-  expect(tip).not.toBeVisible()
-  act(() => back.focus())
-  expect(tip).toBeVisible()
+  // The tooltip says the same as the name, on hover and on focus; Escape hides it.
+  fireEvent.pointerMove(back)
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('Go to the session it came from')
   fireEvent.keyDown(back, { key: 'Escape' })
-  expect(tip).not.toBeVisible()
+  await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
+  act(() => back.focus())
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('Go to the session it came from')
+  fireEvent.keyDown(back, { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
 })
 
 test('a widget made outside a session has the way back disabled, saying why', async () => {
@@ -411,14 +417,16 @@ test('a widget made outside a session has the way back disabled, saying why', as
   renderAt('/projects/p1/dashboards/d1')
 
   const card = await screen.findByRole('article', { name: 'Screening by county' })
-  await within(card).findByRole('button', { name: /^Pipeline:/ })
   expect(within(card).queryByRole('link', { name: 'Go to the session it came from' })).not.toBeInTheDocument()
   const disabled = within(card).getByRole('button', { name: 'Not made in a session' })
   expect(disabled).toHaveAttribute('aria-disabled', 'true')
   // Still reachable by the keyboard, which then shows why.
   act(() => disabled.focus())
   expect(disabled).toHaveFocus()
-  expect(within(card).getByRole('tooltip')).toHaveTextContent('Not made in a session')
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('Not made in a session')
+  // Pressing it does nothing.
+  fireEvent.click(disabled)
+  expect(disabled).toHaveFocus()
 })
 
 // The widget page

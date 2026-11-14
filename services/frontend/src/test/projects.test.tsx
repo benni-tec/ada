@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
-import { claude, json, project, renderAt, serveApi, session, widget } from './app'
+import { json, project, renderAt, serveApi, session } from './app'
 
 const health = { status: 'ok', api: 'ok', database: 'ok', queue: 'ok', worker: 'ok', analysis_store: 'ok' }
 
@@ -53,46 +53,48 @@ test('shows the detail of a failed call', async () => {
   expect(await screen.findByText(/The database is not reachable/)).toBeInTheDocument()
 })
 
-test('shows a project with its sessions, widgets and sources', async () => {
+test('the project page is an overview: counts, recent sessions and the sources’ state', async () => {
   serveApi({
     'GET /api/projects/p1': project(),
     'GET /api/projects/p1/sessions': [session()],
-    'GET /api/projects/p1/widgets': [widget({ created_by: claude, note: 'Coverage per region over time' })],
-    'GET /api/projects/p1/sources': [
-      {
-        id: 'd1',
-        project_id: 'p1',
-        name: 'Screening coverage',
-        access_kind: 'url',
-        address: 'https://example.org/coverage.csv',
-        format: 'csv',
-        options: {},
-        freshness: { kind: 'ttl', ttl_seconds: 86400, latest_period_ttl_seconds: null },
-        declared_schema: null,
-        created_at: '2026-11-01T09:00:00Z',
-        last_checked_at: null,
-        last_probe_token: null,
-        last_error: 'HTTP 503',
-        revision: 1,
-      },
-    ],
+    'GET /api/projects/p1/dashboards': [],
+    'GET /api/projects/p1/reports': [],
+    'GET /api/projects/p1/alerts': [],
+    'GET /api/projects/p1/sources': [source],
   })
 
   renderAt('/projects/p1')
 
-  const sessions = await screen.findByRole('region', { name: 'Sessions' })
-  expect(await within(sessions).findByRole('link', { name: /Why did coverage drop\?/ })).toHaveAttribute(
+  expect(await screen.findByRole('heading', { name: 'Screening', level: 1 })).toBeInTheDocument()
+  const counts = screen.getByRole('list', { name: 'In this project' })
+  await waitFor(() => expect(counts).toHaveTextContent('Sessions1'))
+  expect(counts).toHaveTextContent('Data sources1')
+  const recent = screen.getByRole('region', { name: 'Recent sessions' })
+  expect(await within(recent).findByRole('link', { name: /Why did coverage drop\?/ })).toHaveAttribute(
     'href',
     '/projects/p1/sessions/s1',
   )
-  const widgets = screen.getByRole('region', { name: 'Widgets' })
-  expect(await within(widgets).findByRole('link', { name: 'Coverage by region' })).toHaveAttribute(
-    'href',
-    '/projects/p1/widgets/w1',
-  )
-  expect(within(widgets).getByText('Claude Desktop')).toBeInTheDocument()
   const sources = screen.getByRole('region', { name: 'Data sources' })
   expect(await within(sources).findByText('Screening coverage')).toBeInTheDocument()
   expect(within(sources).getByText(/Last refresh failed: HTTP 503/)).toBeInTheDocument()
+  // Widgets are no longer listed here: they live in their sessions and dashboards.
+  expect(screen.queryByRole('region', { name: 'Widgets' })).not.toBeInTheDocument()
   expect(screen.getByRole('status', { name: 'Live updates: Connecting' })).toBeInTheDocument()
 })
+
+const source = {
+  id: 'd1',
+  project_id: 'p1',
+  name: 'Screening coverage',
+  access_kind: 'url',
+  address: 'https://example.org/coverage.csv',
+  format: 'csv',
+  options: {},
+  freshness: { kind: 'ttl', ttl_seconds: 86400, latest_period_ttl_seconds: null },
+  declared_schema: null,
+  created_at: '2026-11-01T09:00:00Z',
+  last_checked_at: null,
+  last_probe_token: null,
+  last_error: 'HTTP 503',
+  revision: 1,
+}

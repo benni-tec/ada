@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Pencil, Plus, RefreshCw } from 'lucide-react'
 import { useId, useState } from 'react'
+
+import { IconButton } from '@/components/icon-action'
+import { Button } from '@/components/ui/button'
 
 import { ErrorNotice, Loading } from '@/components/notices'
 import { Time } from '@/components/provenance'
@@ -20,8 +24,6 @@ import { SeverityBadge } from './severity'
 
 const listClass =
   'divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800'
-const buttonClass =
-  'rounded-md border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800'
 
 /** Every dashboard of the project with its alert rules, where rules are added and edited. */
 export function AlertRules({ projectId }: { projectId: Id }) {
@@ -55,9 +57,10 @@ function DashboardRuleList({ projectId, group }: { projectId: Id; group: Dashboa
           {group.dashboard.name}
         </h3>
         {!adding && (
-          <button type="button" className={buttonClass} onClick={() => setAdding(true)}>
+          <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
+            <Plus data-icon="inline-start" aria-hidden="true" />
             New rule
-          </button>
+          </Button>
         )}
       </div>
       {adding && <RuleEditor projectId={projectId} dashboardId={group.dashboard.id} onDone={() => setAdding(false)} />}
@@ -110,13 +113,13 @@ function RuleItem({ projectId, rule }: { projectId: Id; rule: AlertRule }) {
             Disabled
           </span>
         )}
-        <div className="ml-auto flex gap-2">
-          <button type="button" className={buttonClass} disabled={check.isPending} onClick={() => check.mutate()}>
-            {check.isPending ? 'Checking…' : 'Check now'}
-          </button>
-          <button type="button" className={buttonClass} onClick={() => setEditing(true)}>
-            Edit
-          </button>
+        <div className="ml-auto flex gap-1">
+          <IconButton label="Check now" disabled={check.isPending} onClick={() => check.mutate()}>
+            <RefreshCw className={check.isPending ? 'animate-spin motion-reduce:animate-none' : undefined} />
+          </IconButton>
+          <IconButton label="Edit" onClick={() => setEditing(true)}>
+            <Pencil />
+          </IconButton>
         </div>
       </div>
       <p className="text-sm">

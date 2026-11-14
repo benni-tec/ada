@@ -1,4 +1,8 @@
 import { Link } from '@tanstack/react-router'
+import { Eye, RotateCcw } from 'lucide-react'
+
+import { Hint, IconButton } from '@/components/icon-action'
+import { Button } from '@/components/ui/button'
 
 import { Provenance } from '@/components/provenance'
 import type { Dashboard, DashboardVersion } from '@/lib/api'
@@ -43,32 +47,29 @@ export function VersionHistory({
               </span>
             </div>
             <Provenance actor={version.created_by} at={version.created_at} />
-            <div className="flex gap-3 text-xs">
+            <div className="flex gap-1">
               {shown ? (
-                <span aria-current="true" className="text-neutral-500">
+                <span aria-current="true" className="text-xs text-muted-foreground">
                   Showing
                 </span>
               ) : (
-                <Link
-                  to="/projects/$projectId/dashboards/$dashboardId"
-                  params={{ projectId: dashboard.project_id, dashboardId: dashboard.id }}
-                  search={current ? {} : { version: version.number }}
-                  aria-label={`View version ${version.number}`}
-                  className="text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
-                >
-                  View
-                </Link>
+                <Hint label={`View version ${version.number}`}>
+                  <Button asChild variant="ghost" size="icon-sm">
+                    <Link
+                      to="/projects/$projectId/dashboards/$dashboardId"
+                      params={{ projectId: dashboard.project_id, dashboardId: dashboard.id }}
+                      search={current ? {} : { version: version.number }}
+                      aria-label={`View version ${version.number}`}
+                    >
+                      <Eye />
+                    </Link>
+                  </Button>
+                </Hint>
               )}
               {!current && (
-                <button
-                  type="button"
-                  disabled={restoring}
-                  onClick={() => onRestore(version)}
-                  aria-label={`Restore version ${version.number}`}
-                  className="text-blue-700 underline-offset-2 hover:underline disabled:opacity-50 dark:text-blue-400"
-                >
-                  Restore
-                </button>
+                <IconButton label={`Restore version ${version.number}`} disabled={restoring} onClick={() => onRestore(version)}>
+                  <RotateCcw />
+                </IconButton>
               )}
             </div>
           </li>

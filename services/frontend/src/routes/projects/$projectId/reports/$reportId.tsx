@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useId, type ReactNode } from 'react'
 
 import { ErrorNotice, Loading } from '@/components/notices'
+import { PageType } from '@/components/page-header'
 import { Provenance } from '@/components/provenance'
 import { ReportTree } from '@/components/reports/report-tree'
 import { SourcesList } from '@/components/reports/sources-list'
@@ -20,7 +21,6 @@ import {
   type Report,
   type ReportVersion,
 } from '@/lib/api'
-import { ReportCrumb } from '@/components/breadcrumbs'
 
 type Search = {
   /** The version shown, as its number, e.g. "1.2.0"; the latest without it. */
@@ -28,7 +28,7 @@ type Search = {
 }
 
 export const Route = createFileRoute('/projects/$projectId/reports/$reportId')({
-  staticData: { crumb: ReportCrumb, frozen: true },
+  staticData: { frozen: true },
   validateSearch: (search: Record<string, unknown>): Search =>
     typeof search.version === 'string' && search.version !== '' ? { version: search.version } : {},
   component: ReportPage,
@@ -56,17 +56,31 @@ function ReportPage() {
     }
   }, [asked, latestNumber, navigate, projectId, reportId])
 
-  if (report.isPending || versions.isPending) return <Loading what="the report" />
-  if (report.error) return <ErrorNotice error={report.error} prefix="The report cannot be loaded:" />
-  if (versions.error) return <ErrorNotice error={versions.error} prefix="The versions cannot be loaded:" />
+  if (report.isPending || versions.isPending)
+    return (
+      <div className="p-6">
+        <Loading what="the report" />
+      </div>
+    )
+  if (report.error || versions.error)
+    return (
+      <div className="p-6">
+        {report.error ? (
+          <ErrorNotice error={report.error} prefix="The report cannot be loaded:" />
+        ) : (
+          <ErrorNotice error={versions.error} prefix="The versions cannot be loaded:" />
+        )}
+      </div>
+    )
 
   const sorted = [...versions.data].sort((a, b) => compareVersions(b.version, a.version))
   const latest = latestOf(report.data, versions.data)
   const shown = asked ? sorted.find((version) => version.version === asked) : latest
 
   return (
-    <article aria-labelledby="report-title" className="flex flex-col gap-6">
+    <article aria-labelledby="report-title" className="flex flex-col gap-6 p-4 md:p-6">
       <header className="flex flex-col gap-3">
+        <PageType type="report" />
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1 id="report-title" className="text-2xl font-semibold">
             {report.data.name}

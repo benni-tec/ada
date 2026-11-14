@@ -1,9 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { SquareArrowOutUpRight } from 'lucide-react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { Modal } from '@/components/modal'
+import { ErrorNotice, Loading } from '@/components/notices'
+import { Button } from '@/components/ui/button'
 import {
-  errorMessage,
   keys,
   lineageQuery,
   operatorRowsQuery,
@@ -16,7 +18,7 @@ import {
 } from '@/lib/api'
 import type { CardRun } from '@/lib/view-run'
 
-import { kindLabels, shortName, summary, type SourceInfo } from './labels'
+import { kindLabels, shortName, type SourceInfo } from './labels'
 import { OperatorDetails } from './operator-details'
 import { PipelineGraph } from './pipeline-graph'
 import { PREVIEW_ROWS, RowsPreview } from './rows-preview'
@@ -42,43 +44,29 @@ function useSourceOf(projectId: string, recorded: CardRun['sources']) {
 }
 
 /**
- * The widget's pipeline in one line at the left of the card's footer, e.g. "Pipeline:
- * Sotkanet screening → 2 steps → map", which opens it as a graph. Every card has one:
- * whoever doubts a number can follow it back to its source and fetch time, in the card's
- * own run.
+ * "Pipeline" at the left of the card's footer: one button that opens the widget's
+ * pipeline as a graph. Every card has one: whoever doubts a number can follow it back to
+ * its source and fetch time, in the card's own run. The pipeline is read only when the
+ * dialog opens, so a page of cards asks for none.
  */
 export function PipelineAccess({ widget, run }: { widget: Widget; run: CardRun }) {
-  const lineage = useQuery(lineageQuery(widget.operator_id))
-  const sourceOf = useSourceOf(widget.project_id, run.sources)
   const [open, setOpen] = useState(false)
-  const line = lineage.isPending
-    ? 'loading…'
-    : lineage.error
-      ? `cannot be loaded: ${errorMessage(lineage.error)}`
-      : summary(lineage.data, widget.type, sourceOf)
-
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         aria-haspopup="dialog"
-        disabled={!lineage.isSuccess}
         onClick={() => setOpen(true)}
-        title={`Open the pipeline: ${line}`}
-        className="group flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-1 text-left text-xs text-neutral-600 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 disabled:cursor-default disabled:hover:bg-transparent dark:text-neutral-400 dark:hover:bg-neutral-800"
+        className="text-muted-foreground"
       >
-        <span className="shrink-0 font-medium text-neutral-800 dark:text-neutral-200">Pipeline:</span>{' '}
-        <span className="truncate group-enabled:group-hover:underline">{line}</span>
-      </button>
-      {open && lineage.isSuccess && (
-        <PipelineDialog
-          widget={widget}
-          run={run}
-          operators={lineage.data}
-          sourceOf={sourceOf}
-          onClose={() => setOpen(false)}
-        />
-      )}
+        Pipeline
+        <SquareArrowOutUpRight aria-hidden="true" data-icon="inline-end" />
+      </Button>
+      {/* What is left of the line, so the icon actions sit at the right. */}
+      <span className="flex-1" />
+      {open && <PipelineDialog widget={widget} run={run} onClose={() => setOpen(false)} />}
     </>
   )
 }
@@ -98,25 +86,50 @@ function RunLine({ run }: { run: CardRun }) {
   )
 }
 
+/** The pipeline dialog. The pipeline is read when it opens. */
+function PipelineDialog({ widget, run, onClose }: { widget: Widget; run: CardRun; onClose: () => void }) {
+  const lineage = useQuery(lineageQuery(widget.operator_id))
+  const sourceOf = useSourceOf(widget.project_id, run.sources)
+  return (
+    <Modal title={`Pipeline of “${widget.title || 'Untitled widget'}”`} description={<RunLine run={run} />} onClose={onClose}>
+      {lineage.isPending ? (
+        <div className="p-4">
+          <Loading what="the pipeline" />
+        </div>
+      ) : lineage.error ? (
+        <div className="p-4">
+          <ErrorNotice error={lineage.error} prefix="The pipeline cannot be loaded:" />
+        </div>
+      ) : (
+        <PipelineView widget={widget} run={run} operators={lineage.data} sourceOf={sourceOf} />
+      )}
+    </Modal>
+  )
+}
+
 /**
  * The pipeline as a graph, the selected operator's details beside it and its first rows in
  * the card's run below. The widget's operator is selected first: it is what the card shows.
  */
-function PipelineDialog({
+function PipelineView({
   widget,
   run,
   operators,
   sourceOf,
-  onClose,
 }: {
   widget: Widget
   run: CardRun
   operators: readonly Operator[]
   sourceOf: (operator: Operator) => SourceInfo | undefined
-  onClose: () => void
 }) {
   const queryClient = useQueryClient()
   const previewId = useId()
+  const view = useRef<HTMLDivElement>(null)
+  // The pipeline arrives after the dialog opened: the focus then moves to the widget's
+  // operator, the node the dialog is about (until then the dialog had only its ×).
+  useEffect(() => {
+    view.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+  }, [])
   const [selectedId, setSelectedId] = useState<OperatorId>(widget.operator_id)
   const byId = useMemo(() => new Map(operators.map((operator) => [operator.id, operator])), [operators])
   const selected = byId.get(selectedId) ?? operators[operators.length - 1]
@@ -137,44 +150,25 @@ function PipelineDialog({
   }, [read, unfixed, run.id, queryClient])
 
   return (
-    <Modal title={`Pipeline of “${widget.title || 'Untitled widget'}”`} description={<RunLine run={run} />} onClose={onClose}>
-      <div className="grid h-full min-h-0 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] lg:grid-rows-[minmax(0,1fr)_minmax(9rem,18rem)] lg:overflow-hidden">
-        <section aria-label="Graph" className="flex h-80 min-h-0 flex-col lg:h-auto">
-          <PipelineGraph
-            operators={operators}
-            target={widget.operator_id}
-            selected={selected.id}
-            onSelect={setSelectedId}
-            sourceOf={sourceOf}
-          />
-        </section>
-        <aside
-          aria-label="Details"
-          className="min-h-0 border-t border-neutral-200 p-4 lg:overflow-y-auto lg:border-t-0 lg:border-l dark:border-neutral-800"
-        >
-          <OperatorDetails
-            operator={selected}
-            run={stored.data ?? null}
-            sourceOf={sourceOf}
-            nameOf={nameOf}
-          />
-        </aside>
-        <section
-          aria-labelledby={previewId}
-          className="flex h-72 min-h-0 flex-col border-t border-neutral-200 lg:col-span-2 lg:h-auto dark:border-neutral-800"
-        >
-          <h3 id={previewId} className="px-3 pt-2 text-sm font-semibold">
-            Preview: {nameOf(selected.id)}
-          </h3>
-          <RowsPreview
-            key={selected.id}
-            runId={run.id}
-            operatorId={selected.id}
-            total={snapshot.data?.row_count}
-          />
-        </section>
-      </div>
-    </Modal>
+    <div ref={view} className="grid h-full min-h-0 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] lg:grid-rows-[minmax(0,1fr)_minmax(9rem,18rem)] lg:overflow-hidden">
+      <section aria-label="Graph" className="flex h-80 min-h-0 flex-col lg:h-auto">
+        <PipelineGraph
+          operators={operators}
+          target={widget.operator_id}
+          selected={selected.id}
+          onSelect={setSelectedId}
+          sourceOf={sourceOf}
+        />
+      </section>
+      <aside aria-label="Details" className="min-h-0 border-t p-4 lg:overflow-y-auto lg:border-t-0 lg:border-l">
+        <OperatorDetails operator={selected} run={stored.data ?? null} sourceOf={sourceOf} nameOf={nameOf} />
+      </aside>
+      <section aria-labelledby={previewId} className="flex h-72 min-h-0 flex-col border-t lg:col-span-2 lg:h-auto">
+        <h3 id={previewId} className="px-3 pt-2 text-sm font-semibold">
+          Preview: {nameOf(selected.id)}
+        </h3>
+        <RowsPreview key={selected.id} runId={run.id} operatorId={selected.id} total={snapshot.data?.row_count} />
+      </section>
+    </div>
   )
 }
-

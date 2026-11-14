@@ -3,8 +3,9 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
-// Whole routes render with many requests each; on a busy machine one second is too short.
-configure({ asyncUtilTimeout: 5000 })
+// Whole routes render with many requests each, and the first render of a file also
+// compiles the lazily loaded routes: on a busy machine one second is far too short.
+configure({ asyncUtilTimeout: 15_000 })
 
 // The router scrolls to the top on navigation; jsdom does not implement scrolling.
 window.scrollTo = () => {}
