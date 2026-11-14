@@ -1,6 +1,6 @@
 from dishka import Provider, Scope, provide
 
-from ada.composition.unbuilt import unbuilt
+from ada.core.services.dashboards.service import Dashboards
 from ada.core.services.ports.dashboards import DashboardService
 
 
@@ -9,7 +9,7 @@ class DashboardProvider(Provider):
 
     scope = Scope.REQUEST
 
-    dashboards = provide(unbuilt(DashboardService))
+    dashboards = provide(Dashboards, provides=DashboardService)
 
 
 provider = DashboardProvider()

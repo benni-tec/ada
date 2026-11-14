@@ -1,6 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query'
 
-import { keys, type EventType, type LiveEvent } from '@/lib/api'
+import { dashboardKeys, keys, type EventType, type LiveEvent } from '@/lib/api'
 
 /** What the page does about one live event. */
 export type Effects = {
@@ -75,6 +75,8 @@ export function effectsOf(event: LiveEvent): Effects {
       break
     }
     case 'dashboard.changed': {
+      // Also created, or its time range changed: the project's list shows both.
+      invalidate.push(dashboardKeys.list(projectId))
       const dashboard = id(payload, 'dashboard_id')
       if (dashboard) invalidate.push(keys.dashboard(dashboard))
       break

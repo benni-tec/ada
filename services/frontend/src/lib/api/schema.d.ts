@@ -4,6 +4,126 @@
  */
 
 export interface paths {
+    "/api/dashboard-versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Version */
+        get: operations["get_version_api_dashboard_versions__version_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboards/{dashboard_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dashboard */
+        get: operations["get_dashboard_api_dashboards__dashboard_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change Dashboard
+         * @description Set the range shown until a viewer changes it.
+         */
+        patch: operations["change_dashboard_api_dashboards__dashboard_id__patch"];
+        trace?: never;
+    };
+    "/api/dashboards/{dashboard_id}/pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin Widget
+         * @description Put a widget in a slot, adding the slot when there is none of that name. Adds a
+         *     version.
+         */
+        post: operations["pin_widget_api_dashboards__dashboard_id__pins_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboards/{dashboard_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Dashboard Run
+         * @description The cut a viewer looks at: one run for the time range (default: the dashboard's),
+         *     which every widget on the dashboard reads.
+         */
+        post: operations["start_dashboard_run_api_dashboards__dashboard_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboards/{dashboard_id}/slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit Dashboard
+         * @description Replace the slots. Adds a version and points the dashboard at it.
+         */
+        put: operations["edit_dashboard_api_dashboards__dashboard_id__slots_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboards/{dashboard_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Versions
+         * @description Every version, oldest first.
+         */
+        get: operations["list_versions_api_dashboards__dashboard_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -112,6 +232,24 @@ export interface paths {
         head?: never;
         /** Rename Project */
         patch: operations["rename_project_api_projects__project_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{project_id}/dashboards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Dashboards */
+        get: operations["list_dashboards_api_projects__project_id__dashboards_get"];
+        put?: never;
+        /** Create Dashboard */
+        post: operations["create_dashboard_api_projects__project_id__dashboards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/projects/{project_id}/events": {
@@ -475,6 +613,67 @@ export interface components {
          */
         ColumnType: "text" | "integer" | "number" | "boolean" | "date" | "timestamp" | "json";
         /**
+         * Dashboard
+         * @description A live view that follows the latest run. Its content lives in its versions; this
+         *     record only points at the current one.
+         */
+        Dashboard: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            current_version_id?: components["schemas"]["Id"] | null;
+            /** @default {} */
+            default_time_range: components["schemas"]["TimeRange"];
+            id: components["schemas"]["Id"];
+            /** Name */
+            name: string;
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+        };
+        /** DashboardChange */
+        DashboardChange: {
+            default_time_range: components["schemas"]["TimeRange"];
+            /** Expected Revision */
+            expected_revision: number;
+        };
+        /**
+         * DashboardVersion
+         * @description Immutable. Every edit of a dashboard adds one.
+         */
+        DashboardVersion: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            dashboard_id: components["schemas"]["Id"];
+            id: components["schemas"]["Id"];
+            /** Number */
+            number: number;
+            /**
+             * Slots
+             * @default []
+             */
+            slots: components["schemas"]["Slot"][];
+            template_id?: components["schemas"]["Id"] | null;
+        };
+        /**
+         * DashboardView
+         * @description A dashboard with the version it points at, which is what a client shows. The
+         *     revision to send back with the next write is `dashboard.revision`.
+         */
+        DashboardView: {
+            dashboard: components["schemas"]["Dashboard"];
+            version: components["schemas"]["DashboardVersion"] | null;
+        };
+        /**
          * DataFormat
          * @enum {string}
          */
@@ -623,6 +822,15 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** NewDashboard */
+        NewDashboard: {
+            /** Name */
+            name: string;
+        };
+        /** NewDashboardRun */
+        NewDashboardRun: {
+            time_range?: components["schemas"]["TimeRange"] | null;
+        };
         /** NewInput */
         NewInput: {
             default: components["schemas"]["OperatorId"];
@@ -767,6 +975,14 @@ export interface components {
          * @enum {string}
          */
         OutputKind: "table" | "document" | "result";
+        /** Pin */
+        Pin: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Slot */
+            slot: string;
+            widget_id: components["schemas"]["Id"];
+        };
         /**
          * Project
          * @description The top-level container. Everything else belongs to exactly one project.
@@ -948,6 +1164,29 @@ export interface components {
             text: string;
         };
         /**
+         * Slot
+         * @description A place on a dashboard or in a template.
+         */
+        Slot: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** @default {} */
+            layout: components["schemas"]["JsonObject"];
+            /** Name */
+            name: string;
+            widget_id?: components["schemas"]["Id"] | null;
+        };
+        /** SlotsEdit */
+        SlotsEdit: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Slots */
+            slots: components["schemas"]["Slot"][];
+        };
+        /**
          * SourceChange
          * @description Fields left out stay as they are.
          */
@@ -1060,6 +1299,239 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_version_api_dashboard_versions__version_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dashboard_api_dashboards__dashboard_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_dashboard_api_dashboards__dashboard_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pin_widget_api_dashboards__dashboard_id__pins_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Pin"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_dashboard_run_api_dashboards__dashboard_id__runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NewDashboardRun"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_dashboard_api_dashboards__dashboard_id__slots_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlotsEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_api_dashboards__dashboard_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardVersion"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -1268,6 +1740,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dashboards_api_projects__project_id__dashboards_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_dashboard_api_projects__project_id__dashboards_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDashboard"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
                 };
             };
             /** @description Validation Error */

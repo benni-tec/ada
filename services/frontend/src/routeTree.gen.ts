@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectsProjectIdRouteRouteImport } from './routes/projects/$projectId/route'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as ProjectsProjectIdDashboardsDashboardIdRouteImport } from './routes/projects/$projectId/dashboards/$dashboardId'
 import { Route as ProjectsProjectIdSessionsSessionIdRouteImport } from './routes/projects/$projectId/sessions/$sessionId'
 import { Route as ProjectsProjectIdWidgetsWidgetIdRouteImport } from './routes/projects/$projectId/widgets/$widgetId'
 
@@ -30,6 +31,12 @@ const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ProjectsProjectIdRouteRoute,
 } as any)
+const ProjectsProjectIdDashboardsDashboardIdRoute =
+  ProjectsProjectIdDashboardsDashboardIdRouteImport.update({
+    id: '/dashboards/$dashboardId',
+    path: '/dashboards/$dashboardId',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
 const ProjectsProjectIdSessionsSessionIdRoute =
   ProjectsProjectIdSessionsSessionIdRouteImport.update({
     id: '/sessions/$sessionId',
@@ -47,12 +54,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/dashboards/$dashboardId': typeof ProjectsProjectIdDashboardsDashboardIdRoute
   '/projects/$projectId/sessions/$sessionId': typeof ProjectsProjectIdSessionsSessionIdRoute
   '/projects/$projectId/widgets/$widgetId': typeof ProjectsProjectIdWidgetsWidgetIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/dashboards/$dashboardId': typeof ProjectsProjectIdDashboardsDashboardIdRoute
   '/projects/$projectId/sessions/$sessionId': typeof ProjectsProjectIdSessionsSessionIdRoute
   '/projects/$projectId/widgets/$widgetId': typeof ProjectsProjectIdWidgetsWidgetIdRoute
 }
@@ -61,6 +70,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/dashboards/$dashboardId': typeof ProjectsProjectIdDashboardsDashboardIdRoute
   '/projects/$projectId/sessions/$sessionId': typeof ProjectsProjectIdSessionsSessionIdRoute
   '/projects/$projectId/widgets/$widgetId': typeof ProjectsProjectIdWidgetsWidgetIdRoute
 }
@@ -70,12 +80,14 @@ export interface FileRouteTypes {
     | '/'
     | '/projects/$projectId'
     | '/projects/$projectId/'
+    | '/projects/$projectId/dashboards/$dashboardId'
     | '/projects/$projectId/sessions/$sessionId'
     | '/projects/$projectId/widgets/$widgetId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/projects/$projectId'
+    | '/projects/$projectId/dashboards/$dashboardId'
     | '/projects/$projectId/sessions/$sessionId'
     | '/projects/$projectId/widgets/$widgetId'
   id:
@@ -83,6 +95,7 @@ export interface FileRouteTypes {
     | '/'
     | '/projects/$projectId'
     | '/projects/$projectId/'
+    | '/projects/$projectId/dashboards/$dashboardId'
     | '/projects/$projectId/sessions/$sessionId'
     | '/projects/$projectId/widgets/$widgetId'
   fileRoutesById: FileRoutesById
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
+    '/projects/$projectId/dashboards/$dashboardId': {
+      id: '/projects/$projectId/dashboards/$dashboardId'
+      path: '/dashboards/$dashboardId'
+      fullPath: '/projects/$projectId/dashboards/$dashboardId'
+      preLoaderRoute: typeof ProjectsProjectIdDashboardsDashboardIdRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
     '/projects/$projectId/sessions/$sessionId': {
       id: '/projects/$projectId/sessions/$sessionId'
       path: '/sessions/$sessionId'
@@ -134,6 +154,7 @@ declare module '@tanstack/react-router' {
 
 interface ProjectsProjectIdRouteRouteChildren {
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
+  ProjectsProjectIdDashboardsDashboardIdRoute: typeof ProjectsProjectIdDashboardsDashboardIdRoute
   ProjectsProjectIdSessionsSessionIdRoute: typeof ProjectsProjectIdSessionsSessionIdRoute
   ProjectsProjectIdWidgetsWidgetIdRoute: typeof ProjectsProjectIdWidgetsWidgetIdRoute
 }
@@ -141,6 +162,8 @@ interface ProjectsProjectIdRouteRouteChildren {
 const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
   {
     ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
+    ProjectsProjectIdDashboardsDashboardIdRoute:
+      ProjectsProjectIdDashboardsDashboardIdRoute,
     ProjectsProjectIdSessionsSessionIdRoute:
       ProjectsProjectIdSessionsSessionIdRoute,
     ProjectsProjectIdWidgetsWidgetIdRoute:
