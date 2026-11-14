@@ -36,6 +36,7 @@ export function EvaluationTab({ modelId, version }: { modelId: Id; version: Mode
     modality: 'surgery',
     presentation: [],
     days: {},
+    treatment_started: false,
     toggles: {},
   })
   const evaluate = useMutation({ mutationFn: (body: EvaluationInputs) => evaluateModel(modelId, body) })

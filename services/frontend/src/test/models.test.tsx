@@ -15,6 +15,7 @@ const model: StatisticalModel = {
   description: 'Whether a presentation would start a Nordic fast-track pathway.',
   kind: 'patient_pathway',
   latest_version: 1,
+  auto_run: false,
   created_by: web,
   created_at: '2026-11-14T10:00:00Z',
 }
