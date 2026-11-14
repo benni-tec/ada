@@ -55,11 +55,7 @@ export function SessionRecord({
           ) : entry.kind === 'operator' ? (
             <OperatorEntry entry={entry} />
           ) : entry.kind === 'delegation' ? (
-            <DelegationEntry
-              entry={entry}
-              projectId={projectId}
-              reported={entries.some((other) => other.kind === 'report' && other.ref === entry.ref)}
-            />
+            <DelegationEntry entry={entry} projectId={projectId} />
           ) : entry.kind === 'report' ? (
             <ReportEntry entry={entry} projectId={projectId} />
           ) : (
@@ -139,9 +135,9 @@ const delegationStates: Record<DelegationState, { label: string; icon: typeof Ci
 }
 
 /** Work handed to a research agent: a card to its session, with how it is going. */
-function DelegationEntry({ entry, projectId, reported }: { entry: SessionEntry; projectId: Id; reported: boolean }) {
-  const { data: turns } = useQuery({ ...sessionTurnsQuery(entry.ref ?? ''), enabled: !!entry.ref })
-  const state = turns ? delegationStates[delegationState(turns, reported)] : null
+function DelegationEntry({ entry, projectId }: { entry: SessionEntry; projectId: Id }) {
+  const { data: turns, isError } = useQuery({ ...sessionTurnsQuery(entry.ref ?? ''), enabled: !!entry.ref })
+  const state = turns ? delegationStates[delegationState(turns)] : null
   return (
     <div className="flex flex-col gap-1 rounded-lg border bg-card px-4 py-3 text-sm">
       <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -160,6 +156,7 @@ function DelegationEntry({ entry, projectId, reported }: { entry: SessionEntry; 
         ) : (
           <span className="font-medium">{entry.text}</span>
         )}
+        {isError && <span className="shrink-0 text-xs text-muted-foreground">Status unavailable</span>}
         {state && (
           <span className="flex shrink-0 items-center gap-1 text-xs">
             <state.icon aria-hidden="true" className={`size-3.5 ${state.className}`} />

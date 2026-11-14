@@ -420,7 +420,7 @@ test('a delegation is a card linking to the research session with its state; the
 test('the Research action sends the draft as a brief to the research route', async () => {
   const sent: unknown[] = []
   serveSession({
-    'GET /api/llm/models': models({ research_agent: 'gemini/pro' }),
+    // The default configuration: a session agent and no research agent of its own.
     'POST /api/sessions/s1/research': (body: unknown) => {
       sent.push(body)
       return json(session({ id: 's2', agent: 'research', parent_session_id: 's1' }), 201)

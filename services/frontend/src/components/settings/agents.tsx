@@ -86,7 +86,7 @@ export function AgentSettingsSection() {
             settings={settings}
             label="Research agent"
             hint="The model that works on a brief handed to it from a session, in a session of its own, and reports back."
-            none="None: research cannot be delegated"
+            none="Use the session agent"
             value={settings.research_agent}
             set={setResearchAgent}
           />

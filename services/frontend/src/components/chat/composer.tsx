@@ -63,6 +63,8 @@ export function Composer({
   const [unanswered, setUnanswered] = useState(false)
   const models = useQuery(modelsQuery())
   const model = picked ?? models.data?.session_agent ?? null
+  // Research falls back to the session agent's model, as the backend does.
+  const researcher = models.data?.research_agent ?? models.data?.session_agent
   const agent = unanswered ? 'no' : agentOf(models.data)
 
   // A chip added from elsewhere on the page: the person says next what they want.
@@ -176,8 +178,8 @@ export function Composer({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={research.isPending || text.trim() === '' || !models.data.research_agent}
-                title={models.data.research_agent ? undefined : 'Pick a research agent in Settings first'}
+                disabled={research.isPending || text.trim() === '' || !researcher}
+                title={researcher ? undefined : 'Pick a session or research agent in Settings first'}
                 onClick={() => research.mutate(text.trim())}
               >
                 <Microscope aria-hidden="true" />
