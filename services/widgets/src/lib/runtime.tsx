@@ -66,7 +66,7 @@ export function WidgetRuntime({ children }: { children: (loaded: Loaded) => Reac
 
   if (!result) {
     return (
-      <div className="ada-widget ada-centered" role="status">
+      <div className="ada-widget ada-centered" role="status" aria-busy="true">
         <span className="ada-muted">Loading…</span>
       </div>
     )

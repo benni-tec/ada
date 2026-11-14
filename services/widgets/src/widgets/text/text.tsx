@@ -304,7 +304,7 @@ export function Text({ widget, data, fetchedAt }: Loaded) {
 
   if (others.length > 0 && read?.key !== key) {
     return (
-      <div className="ada-centered" role="status">
+      <div className="ada-centered" role="status" aria-busy="true">
         <span className="ada-muted">Loading…</span>
       </div>
     )

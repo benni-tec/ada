@@ -188,6 +188,13 @@ test('where the page fits the frame to its content, the widget tells it its heig
   expect(document.documentElement.dataset.fit).toBe('content')
   expect(parent.postMessage).toHaveBeenLastCalledWith({ type: 'ada:resize', height: 121 }, '*')
 
+  // Still loading: the page keeps the frame's usual height.
+  height = 33
+  element.innerHTML = '<div role="status" aria-busy="true">Loading…</div>'
+  observed[0]()
+  expect(parent.postMessage).toHaveBeenCalledTimes(1)
+  element.innerHTML = ''
+
   height = 300
   observed[0]()
   observed[0]()

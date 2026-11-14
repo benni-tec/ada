@@ -175,20 +175,25 @@ export function openPipeline(input: string) {
 /**
  * In content mode, tells the page the height of the element (the widget's root) now and
  * whenever it changes, so the page can size the frame to it. Nothing in fill mode, where
- * the page sizes the frame. Returns the function that stops it.
+ * the page sizes the frame, and nothing while something in it is still loading
+ * (`aria-busy="true"`), so the frame keeps its usual height instead of shrinking to a
+ * loading line first. Returns the function that stops it.
  */
 export function reportHeight(element: HTMLElement): () => void {
   if (!framedByPage() || typeof ResizeObserver === 'undefined') return () => {}
   let last = -1
   const post = () => {
-    if (!fitsContent()) return
+    if (!fitsContent() || element.querySelector('[aria-busy="true"]')) return
     const height = Math.ceil(element.getBoundingClientRect().height)
-    if (height === last) return
+    if (height === 0 || height === last) return
     last = height
     tellPage({ type: 'ada:resize', height })
   }
   const observer = new ResizeObserver(post)
   observer.observe(element)
+  // Loading may end without a change of size.
+  const busy = typeof MutationObserver === 'undefined' ? null : new MutationObserver(post)
+  busy?.observe(element, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] })
   post()
   // Switching to content mode by the fragment posts at once.
   const onHash = () => {
@@ -198,6 +203,7 @@ export function reportHeight(element: HTMLElement): () => void {
   window.addEventListener('hashchange', onHash)
   return () => {
     observer.disconnect()
+    busy?.disconnect()
     window.removeEventListener('hashchange', onHash)
   }
 }
