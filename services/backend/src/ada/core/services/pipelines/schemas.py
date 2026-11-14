@@ -6,16 +6,15 @@ from collections.abc import Iterable
 from ada.core.models.errors import Invalid
 from ada.core.models.operators import Operator, OperatorKind, SourceParams
 from ada.core.models.runs import Snapshot
-from ada.core.models.schema import Column, ColumnType, Roles, Schema
+from ada.core.models.schema import Column, ColumnType, Schema
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.repositories import OperatorRepository, SnapshotRepository
 from ada.core.services.pipelines.fusion import Node, SnapshotNode, StandInNode, compose
 from ada.core.services.ports.sources import SourceService
 
-# Source snapshots carry no parameters in wave 1: there is no time-range pushdown yet.
+# The key of a source's whole-source snapshot. A source that fetches by period also has
+# one snapshot per period (ada.core.services.schema.time.period_key).
 SOURCE_KEY = ""
-
-_NUMERIC = {ColumnType.INTEGER, ColumnType.NUMBER}
 
 
 class Columns:
@@ -69,39 +68,6 @@ def check_unique(columns: tuple[Column, ...]) -> None:
         raise Invalid(f"Column names must be unique; repeated: {', '.join(repeated)}")
 
 
-def check_roles(roles: Roles, columns: tuple[Column, ...]) -> None:
-    """Roles must name columns that exist and whose types fit what the role means: a
-    measure and its bounds are numbers, a suppression flag is a boolean."""
-    by_name = {column.name: column for column in columns}
-    problems: list[str] = []
-
-    def need(name: str, role: str, types: set[ColumnType] | None = None) -> None:
-        column = by_name.get(name)
-        if column is None:
-            problems.append(f"{role} names {name!r}, which is not a column")
-        elif types is not None and column.type not in types:
-            problems.append(f"{role} needs {name!r} to be {_one_of(types)}, not {column.type}")
-
-    if roles.time:
-        need(roles.time.start, "the time start")
-        need(roles.time.end, "the time end")
-    if roles.geo:
-        need(roles.geo.code, "the region code")
-    for measure in roles.measures:
-        need(measure.value, "a measure", _NUMERIC)
-        for name, role in (
-            (measure.lower, "a lower bound"),
-            (measure.upper, "an upper bound"),
-            (measure.coverage, "a coverage"),
-        ):
-            if name is not None:
-                need(name, role, _NUMERIC)
-        if measure.suppressed is not None:
-            need(measure.suppressed, "a suppression flag", {ColumnType.BOOLEAN})
-    if problems:
-        raise Invalid("The roles do not fit the columns: " + "; ".join(problems))
-
-
 def check_fits(slot: Schema, columns: tuple[Column, ...], what: str) -> None:
     """Whether data with `columns` can fill a slot declared as `slot`: every declared
     column must be there with a fitting type. Extra columns are allowed; an integer
@@ -129,7 +95,3 @@ def check_still_matches(declared: tuple[Column, ...], actual: Iterable[Column], 
 
 def _fits(wanted: ColumnType, actual: ColumnType) -> bool:
     return wanted == actual or (wanted is ColumnType.NUMBER and actual is ColumnType.INTEGER)
-
-
-def _one_of(types: set[ColumnType]) -> str:
-    return " or ".join(sorted(t.value for t in types))

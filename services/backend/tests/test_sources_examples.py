@@ -136,6 +136,9 @@ async def test_sotkanet_breast_screening(world: World) -> None:
         "gender": "total",
         "value": 86.6,
         "count": 560,
+        # From the year, by the `period` option: the time role's columns.
+        "period_start": "2023-01-01",
+        "period_end": "2023-12-31",
     }
     assert {row["year"] for row in rows} == {2023, 2024}
     assert written.origin == SOTKANET_BREAST_SCREENING.address

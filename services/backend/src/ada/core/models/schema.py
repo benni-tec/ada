@@ -1,6 +1,7 @@
 from enum import StrEnum
 
 from ada.core.models.base import DomainModel
+from ada.core.models.time import Grain
 
 
 class ColumnType(StrEnum):
@@ -20,15 +21,21 @@ class Column(DomainModel):
 
 
 class TimeRole(DomainModel):
-    """Which columns hold the period a row describes."""
+    """Which columns hold the period a row describes: its first and last day, both
+    inclusive, as dates."""
 
     start: str
     end: str
+    # What every period spans, e.g. a year; None for windows such as 2020-2024 or periods
+    # of mixed length. Pushing a time range down to a source needs one.
+    grain: Grain | None = None
 
 
 class GeoRole(DomainModel):
     """Which column holds a region code, in which code system and at which level, e.g.
-    system "sotkanet" and level "wellbeing_services_county"."""
+    system "sotkanet" and level "wellbeing_services_county". Level "mixed" says the column
+    holds regions of several levels, as Sotkanet's answers do (ada.core.services.schema.geo
+    lists the known systems and levels)."""
 
     code: str
     system: str

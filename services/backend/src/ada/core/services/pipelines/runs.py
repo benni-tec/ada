@@ -20,7 +20,13 @@ from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import OperatorRepository, RunRepository, SnapshotRepository
 from ada.core.ports.system import Clock
-from ada.core.services.pipelines.fusion import Node, QueryNode, SnapshotNode, compose
+from ada.core.services.pipelines.fusion import (
+    Node,
+    PeriodFilterNode,
+    QueryNode,
+    SnapshotNode,
+    compose,
+)
 from ada.core.services.pipelines.fusion import parameters_key as key_of
 from ada.core.services.pipelines.schemas import (
     SOURCE_KEY,
@@ -30,6 +36,8 @@ from ada.core.services.pipelines.schemas import (
 )
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sources import SourceService
+from ada.core.services.schema.roles import check_compatible
+from ada.core.services.schema.time import check_range, is_bounded
 
 
 class _NeedsExecution(Exception):
@@ -74,6 +82,10 @@ class Runs(RunService):
         bindings: dict[str, OperatorId] | None = None,
     ) -> Run:
         bindings = bindings or {}
+        try:
+            check_range(time_range or TimeRange())
+        except ValueError as error:
+            raise Invalid(str(error)) from None
         if bindings:
             await self._check_bindings(project_id, bindings)
         run = Run(
@@ -146,6 +158,7 @@ class Runs(RunService):
             columns = await self.columns.of(bound)
             for slot in slots[name]:
                 check_fits(slot.output, columns, f"The binding of {name!r}")
+                check_compatible(slot.output.roles, bound.output.roles, f"The binding of {name!r}")
 
     async def _operator(self, run: Run, operator_id: OperatorId) -> Operator:
         operator = await self.operators.get(operator_id)
@@ -183,6 +196,8 @@ class _Planner:
         self.visiting.add(operator_id)
         operator = await self.runs._operator(self.run, operator_id)
         node = await self._plan(operator)
+        if operator.kind is OperatorKind.SOURCE:
+            node = self._in_range(operator, node)
         self.visiting.discard(operator_id)
         self.nodes[operator_id] = node
         return node
@@ -210,6 +225,16 @@ class _Planner:
             case kind:
                 raise Invalid(f"{kind.value.capitalize()} operators cannot run yet")
 
+    def _in_range(self, operator: Operator, node: Node) -> Node:
+        """A source's rows in the run's time range. Sources that fetched only the
+        requested periods are already in it, and filtering them again changes nothing; a
+        source read whole is filtered here. A source without a time role ignores the
+        range, and so does everything downstream of it."""
+        time = operator.output.roles.time
+        if time is None or not is_bounded(self.run.time_range):
+            return node
+        return PeriodFilterNode(node, time, self.run.time_range)
+
     def _bound(self, operator: Operator) -> OperatorId:
         name = InputParams.model_validate(operator.params).name
         if name in self.run.bindings:
@@ -222,6 +247,12 @@ class _Planner:
         self._require_fixing()
         runs = self.runs
         data_source_id = SourceParams.model_validate(operator.params).data_source_id
+        if is_bounded(self.run.time_range):
+            # Pushdown: only the requested periods, fetched where missing or stale. A
+            # source that cannot fetch by period answers None and is read whole below.
+            ranged = await runs.sources.refresh_range(data_source_id, self.run.time_range)
+            if ranged is not None:
+                return ranged
         try:
             # The source service decides by its freshness policy whether to fetch; most
             # calls change nothing.

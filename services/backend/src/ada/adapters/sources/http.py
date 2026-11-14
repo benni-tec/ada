@@ -6,8 +6,9 @@ has its own keys (ada.core.services.sources.shaping).
 `headers`
     {name: value}, sent with every request of the source, the probe's included.
 `params`
-    {name: value or [values]}, query parameters added to the address. Repeated parameters,
-    such as Sotkanet's `years`, can also stay in the address itself.
+    {name: value or [values]}, query parameters added to the address; one named here
+    replaces all of that name in the address. Repeated parameters, such as Sotkanet's
+    `years`, can also stay in the address itself.
 `method` (request sources)
     The HTTP method; POST when there is a body, otherwise GET.
 `body` (request sources)
@@ -21,6 +22,11 @@ has its own keys (ada.core.services.sources.shaping).
     sends one and the source is read with GET.
 
 A URL source is always read with GET; `method` and `body` belong to request sources.
+
+Time ranges. The readers send what the options say and nothing more. A source that can be
+asked for some periods only declares `pushdown` in its options, and the source service
+writes the requested periods into `params` or `body` before it calls the reader
+(ada.core.services.sources.pushdown), so the reader needs no notion of periods.
 """
 
 import hashlib
@@ -90,8 +96,8 @@ class HttpReader(SourceReader):
         self.kind = kind
 
     async def fetch(self, source: DataSource, time_range: TimeRange) -> FetchedData:
-        # Wave 1 has no time-range pushdown: the options do not yet say how to pass a range
-        # on, so every source answers with everything.
+        # The time range is already in the options where the source can take it (see the
+        # module's docstring); it is not sent a second time.
         options = _options(source)
         method = self._method(options)
         body = options.body if self.kind is AccessKind.REQUEST else None

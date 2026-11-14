@@ -18,6 +18,7 @@ from ada.core.ports.system import Clock
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.widgets import WidgetService
+from ada.core.services.schema.roles import check_widget
 
 # Who starts the run when a widget asks for its data without naming one: nobody asked for
 # it, the widget did, so it is the platform's doing.
@@ -61,6 +62,9 @@ class Widgets(WidgetService):
         operator = await self.operators.get(operator_id)
         if operator.project_id != project_id:
             raise Invalid("The operator belongs to another project")
+        # What the widget needs (a measure, an x and a y, a geography role) must be
+        # declared on its operator now, not discovered when someone first looks at it.
+        check_widget(type.strip(), operator.output, spec or {})
         if session_id is not None:
             session = await self.sessions.get(session_id)
             if session.project_id != project_id:

@@ -1,4 +1,5 @@
 from datetime import date
+from enum import StrEnum
 
 from ada.core.models.base import DomainModel
 
@@ -16,3 +17,12 @@ class TimeRange(DomainModel):
 
     start: date | None = None
     end: date | None = None
+
+
+class Grain(StrEnum):
+    """The calendar unit every period of a table spans exactly. A table of windows of
+    several years, or of periods of mixed length, has no grain."""
+
+    YEAR = "year"
+    QUARTER = "quarter"
+    MONTH = "month"

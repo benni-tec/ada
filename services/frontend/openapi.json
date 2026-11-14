@@ -711,7 +711,7 @@
         "type": "object"
       },
       "GeoRole": {
-        "description": "Which column holds a region code, in which code system and at which level, e.g.\nsystem \"sotkanet\" and level \"wellbeing_services_county\".",
+        "description": "Which column holds a region code, in which code system and at which level, e.g.\nsystem \"sotkanet\" and level \"wellbeing_services_county\". Level \"mixed\" says the column\nholds regions of several levels, as Sotkanet's answers do (ada.core.services.schema.geo\nlists the known systems and levels).",
         "properties": {
           "code": {
             "title": "Code",
@@ -733,6 +733,16 @@
         ],
         "title": "GeoRole",
         "type": "object"
+      },
+      "Grain": {
+        "description": "The calendar unit every period of a table spans exactly. A table of windows of\nseveral years, or of periods of mixed length, has no grain.",
+        "enum": [
+          "year",
+          "quarter",
+          "month"
+        ],
+        "title": "Grain",
+        "type": "string"
       },
       "HTTPValidationError": {
         "properties": {
@@ -2351,11 +2361,21 @@
         "type": "object"
       },
       "TimeRole": {
-        "description": "Which columns hold the period a row describes.",
+        "description": "Which columns hold the period a row describes: its first and last day, both\ninclusive, as dates.",
         "properties": {
           "end": {
             "title": "End",
             "type": "string"
+          },
+          "grain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Grain"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "start": {
             "title": "Start",
