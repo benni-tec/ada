@@ -1,0 +1,47 @@
+# Deploy
+
+ada runs on one Verda VM that it shares with another project, "Tell me when". Pushes to
+`main` deploy through `.github/workflows/ci.yml`; nothing is built on the VM.
+
+## What runs where
+
+- **GitHub Actions** builds the three images (`ghcr.io/benni-tec/ada/{backend,frontend,gateway}`),
+  tagged `sha-<first 7 of the commit>`, then its `deploy` job opens one SSH connection to the VM.
+- **The VM** keeps ada in `/opt/ada`: `docker-compose.yml`, `docker-compose.infra.yml` and
+  `docker-compose.deploy.yml` (CI replaces these three), plus `REVISION`, the deployed sha.
+  The deploy runs `docker compose -f docker-compose.yml -f docker-compose.deploy.yml` at
+  `VERSION=sha-<sha>`.
+- **Caddy**, owned by the other project, holds ports 80 and 443 and proxies
+  `https://ada.65-109-75-63.sslip.io` to `ada-gateway:80` over the external Docker network
+  `edge`. ada publishes no host ports: the override removes the PostgreSQL, Valkey and gateway
+  ones, because Docker bypasses the host firewall.
+
+`edge` belongs to the front door: its Caddy must be up (so the network exists) before ada
+starts, or `up` fails with "network edge not found".
+
+## Repository secrets
+
+| Secret | Value |
+| --- | --- |
+| `DEPLOY_HOST` | The VM's address (`65.109.75.63`). A recreated VM changes this and the URL in the workflow's health check. |
+| `DEPLOY_SSH_KEY` | Private key of a user on the VM that may run Docker (the controller's `~/.ssh/ada_deploy`). |
+| `DEPLOY_KNOWN_HOSTS` | The VM's host key line (the controller's `~/.ssh/ada_known_hosts`); the connection fails on a mismatch. |
+| `DEPLOY_USER` | Optional, default `root`. |
+
+While `DEPLOY_HOST`, `DEPLOY_SSH_KEY` or `DEPLOY_KNOWN_HOSTS` is unset, the deploy job skips itself
+with a notice.
+
+## Files placed by hand on the VM
+
+CI never writes these two in `/opt/ada`:
+
+- `.env`: `POSTGRES_PASSWORD=...`. The deploy sets `VERSION` itself.
+- `.env.local`: `ADA_SECRET_KEY=...`, the master key of the stored agent API keys (see the README).
+  Keep it: keys stored under a lost key cannot be read.
+
+## Rolling back
+
+Run the CI workflow by hand (Actions, CI, Run workflow) with `ref` set to an earlier commit
+whose images exist. It deploys that commit's `sha-<short>` images; the compose files come from
+that commit too. Re-running the workflow run of an earlier push does the same. The deploy
+then checks `https://ada.65-109-75-63.sslip.io/api/health/live` for about 90 seconds.
