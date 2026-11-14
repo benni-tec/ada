@@ -79,6 +79,8 @@ class DataSourceRow(Base):
     monitor_id: Mapped[str | None] = mapped_column(Text)
     # Sealed by the SecretBox; never on the model.
     monitor_secret_encrypted: Mapped[str | None] = mapped_column(Text)
+    # What unwatching restores; set while a monitor is.
+    freshness_before_watch: Mapped[Json | None] = mapped_column(JSONB)
     revision: Mapped[int] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}

@@ -49,7 +49,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == [f"{n:04}" for n in range(1, 11)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(1, 12)]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -78,7 +78,7 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "web_usage" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == [f"{n:04}" for n in range(2, 11)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(2, 12)]
     assert migrate(database_url) == []
 
 
@@ -374,13 +374,16 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         assert await repos.sessions.get(session.id) == session
         assert await repos.sessions.get(child.id) == child
         # A monitor is written outside the revision; its secret never leaves the repository.
-        await repos.data_sources.set_monitor(source.id, "mon_1", "sealed")
+        probe = FreshnessPolicy(kind=FreshnessKind.PROBE, ttl_seconds=3600)
+        await repos.data_sources.set_monitor(source.id, "mon_1", "sealed", probe)
         watched = await repos.data_sources.get(source.id)
         assert (watched.monitor_id, watched.revision) == ("mon_1", 1)
         assert await repos.data_sources.monitor_secret_encrypted(source.id) == "sealed"
+        assert await repos.data_sources.freshness_before_watch(source.id) == probe
         assert "sealed" not in watched.model_dump_json()
-        await repos.data_sources.set_monitor(source.id, None, None)
+        await repos.data_sources.set_monitor(source.id, None, None, None)
         assert await repos.data_sources.monitor_secret_encrypted(source.id) is None
+        assert await repos.data_sources.freshness_before_watch(source.id) is None
         assert await repos.sessions.entries(session.id) == [first, later]
         assert await repos.widgets.list(world.project.id) == [original, copy]
         assert await repos.widgets.list_by_session(session.id) == [original]

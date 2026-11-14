@@ -26,7 +26,7 @@ from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionAgent, SessionEntry
-from ada.core.models.sources import DataSource
+from ada.core.models.sources import DataSource, FreshnessPolicy
 from ada.core.models.widgets import Widget
 from ada.core.ports.agents import ResearchCalls, TurnProgress
 from ada.core.ports.repositories import (
@@ -86,6 +86,7 @@ class MemoryStore:
         self.research_agent: tuple[Id, str] | None = None
         # Source id -> the sealed secret of its monitor.
         self.monitor_secrets: dict[Id, str] = {}
+        self.freshness_before_watch: dict[Id, FreshnessPolicy] = {}
         # Session id -> its paid web calls.
         self.web_calls: dict[Id, int] = {}
 
@@ -169,7 +170,11 @@ class MemoryDataSourceRepository(DataSourceRepository):
         )
 
     async def set_monitor(
-        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+        self,
+        id: Id,
+        monitor_id: str | None,
+        secret_encrypted: str | None,
+        freshness_before: FreshnessPolicy | None,
     ) -> None:
         source = await self.get(id)
         self.store.data_sources[id] = source.model_copy(update={"monitor_id": monitor_id})
@@ -177,10 +182,18 @@ class MemoryDataSourceRepository(DataSourceRepository):
             self.store.monitor_secrets.pop(id, None)
         else:
             self.store.monitor_secrets[id] = secret_encrypted
+        if freshness_before is None:
+            self.store.freshness_before_watch.pop(id, None)
+        else:
+            self.store.freshness_before_watch[id] = freshness_before
 
     async def monitor_secret_encrypted(self, id: Id) -> str | None:
         await self.get(id)
         return self.store.monitor_secrets.get(id)
+
+    async def freshness_before_watch(self, id: Id) -> FreshnessPolicy | None:
+        await self.get(id)
+        return self.store.freshness_before_watch.get(id)
 
 
 class MemorySessionRepository(SessionRepository):

@@ -357,7 +357,7 @@ async def test_an_edit_from_before_watching_keeps_the_monitor(world: World) -> N
     source = await world.register()
     repository = MemoryDataSourceRepository(world.memory)
 
-    await repository.set_monitor(source.id, "mon_1", "sealed")
+    await repository.set_monitor(source.id, "mon_1", "sealed", None)
     await repository.update(source.model_copy(update={"name": "Renamed"}), source.revision)
 
     stored = await repository.get(source.id)
@@ -1164,10 +1164,11 @@ async def test_watch_stores_encrypted_secret_and_sets_push(
         await pages.service.watch(elsewhere.id)
 
 
-async def test_watching_again_replaces_the_monitor_and_unwatch_clears_it(
+async def test_watching_again_replaces_the_monitor_and_unwatch_restores_the_policy(
     pages: World, explorer: FakeExplorer
 ) -> None:
-    source = await pages.register(**web_page())
+    weekly = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=WEEK)
+    source = await pages.register(**web_page(freshness=weekly))
     await pages.service.watch(source.id)
 
     await pages.service.watch(source.id)
@@ -1175,8 +1176,23 @@ async def test_watching_again_replaces_the_monitor_and_unwatch_clears_it(
 
     assert [call[0] for call in explorer.calls] == ["watch", "watch", "unwatch", "unwatch"]
     assert explorer.calls[2] == ("unwatch", {"monitor_id": "mon_1"})
-    assert (unwatched.monitor_id, unwatched.freshness.kind) == (None, FreshnessKind.MANUAL)
+    assert (unwatched.monitor_id, unwatched.freshness) == (None, weekly)
     assert source.id not in pages.memory.monitor_secrets
+
+
+async def test_a_watched_address_cannot_change(pages: World) -> None:
+    source = await pages.register(**web_page())
+    watched = await pages.service.watch(source.id)
+
+    renamed = await pages.service.update(
+        source.id, watched.revision, name="Renamed", address=f" {source.address} "
+    )
+    with pytest.raises(Invalid, match="Stop watching it before changing the address"):
+        await pages.service.update(source.id, renamed.revision, address="https://x.test/b")
+    unwatched = await pages.service.unwatch(source.id)
+    moved = await pages.service.update(source.id, unwatched.revision, address="https://x.test/b")
+
+    assert moved.address == "https://x.test/b"
 
 
 async def test_a_failed_replacement_keeps_the_old_monitor(

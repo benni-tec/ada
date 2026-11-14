@@ -183,14 +183,22 @@ class SqlDataSourceRepository(DataSourceRepository):
             raise NotFound("data source", id)
 
     async def set_monitor(
-        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+        self,
+        id: Id,
+        monitor_id: str | None,
+        secret_encrypted: str | None,
+        freshness_before: FreshnessPolicy | None,
     ) -> None:
         # Outside the revision, like a check: watching never conflicts with an edit.
         table = DataSourceRow.__table__
         result = await self.session.execute(
             update(table)
             .where(table.c.id == id)
-            .values(monitor_id=monitor_id, monitor_secret_encrypted=secret_encrypted)
+            .values(
+                monitor_id=monitor_id,
+                monitor_secret_encrypted=secret_encrypted,
+                freshness_before_watch=dump(freshness_before) if freshness_before else None,
+            )
         )
         if result.rowcount == 0:
             raise NotFound("data source", id)
@@ -198,6 +206,11 @@ class SqlDataSourceRepository(DataSourceRepository):
     async def monitor_secret_encrypted(self, id: Id) -> str | None:
         row = await fetch(self.session, DataSourceRow, id, "data source")
         return row.monitor_secret_encrypted
+
+    async def freshness_before_watch(self, id: Id) -> FreshnessPolicy | None:
+        row = await fetch(self.session, DataSourceRow, id, "data source")
+        before = row.freshness_before_watch
+        return FreshnessPolicy.model_validate(before) if before is not None else None
 
 
 def _session(row: SessionRow) -> Session:
