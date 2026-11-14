@@ -6,6 +6,7 @@ import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import duckdb
 import httpx
 import pytest
 from dishka import AsyncContainer, Provider, Scope
@@ -110,3 +111,19 @@ async def test_the_areas_pages_become_one_table_and_kajaanis_longer_queue_an_ale
 
     [alert] = firing
     assert alert.key == {"station": rows(queue, "station")[0][0]}
+
+
+def test_a_station_without_a_callback_time_keeps_its_queue() -> None:
+    line = next(
+        line for line in (PAGES / "kainuu.md").read_text().splitlines() if "Kajaani" in line
+    )
+    row = line.rstrip(" |").rsplit("|", 1)[0] + "|  |"
+    with duckdb.connect(":memory:") as connection:
+        connection.execute(
+            "CREATE TABLE input_0 AS SELECT 1 AS page, ? AS text",
+            [f"Hoitoon pääsy lokakuu 2026:\n\n{row}\n"],
+        )
+        result = connection.execute(waits.STATION_ROWS)
+        names = [column[0] for column in result.description]
+        rows = [dict(zip(names, values, strict=True)) for values in result.fetchall()]
+    assert [(r["queue_months"], r["callback_minutes"]) for r in rows] == [(5.0, None)]

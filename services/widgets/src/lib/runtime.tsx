@@ -66,7 +66,15 @@ async function withInputs(loaded: Loaded, ctx: WidgetContext | null): Promise<Lo
     ...Object.fromEntries(names.map((name, i) => [name, others[i]] as const)),
   }
   const stale = Object.values(inputs).some((input) => input.is_stale)
-  return { ...loaded, data: { ...main, is_stale: stale }, roles: main.output.roles ?? {}, inputs }
+  // Each answer names the sources of its own input; the footer lists them all, once each.
+  const sources = [
+    ...new Map(
+      Object.values(inputs)
+        .flatMap((input) => input.sources ?? [])
+        .map((source) => [source.operator_id, source] as const),
+    ).values(),
+  ]
+  return { ...loaded, data: { ...main, is_stale: stale, sources }, roles: main.output.roles ?? {}, inputs }
 }
 
 /** Loads the widget named in the URL fragment and its data, shows loading and error
