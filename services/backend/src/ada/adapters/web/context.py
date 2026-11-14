@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from ada.adapters.web import send_json
+from ada.adapters.web import ProviderAnswered, send_json
 from ada.core.models.base import JsonObject
 from ada.core.models.errors import Unavailable
 from ada.core.models.web import Monitor, PageText, reading_not_configured
@@ -81,7 +81,12 @@ class ContextPages(PageReader):
         return Monitor(id=answer["id"], secret=SecretStr(answer["webhook"]["secret"]))
 
     async def unwatch(self, monitor_id: str) -> None:
-        await self._send("DELETE", f"/monitors/{monitor_id}", None)
+        try:
+            await self._send("DELETE", f"/monitors/{monitor_id}", None)
+        except ProviderAnswered as error:
+            # Already deleted at the provider: the goal is reached.
+            if error.status != 404:
+                raise
 
     async def _send(self, method: str, path: str, body: dict[str, Any] | None) -> dict[str, Any]:
         if self.api_key is None:

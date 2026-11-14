@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Protocol
 
 from ada.core.models.base import Id, JsonObject
@@ -71,3 +72,20 @@ class SourceService(Protocol):
         # A default, so implementations from before pushdown keep working: they cannot
         # filter, and the caller falls back to the whole source.
         return None
+
+    async def watch(self, id: Id) -> DataSource:
+        """Have the page monitor service call this platform when the source's page changes,
+        and set the source's freshness to push. Needs ADA_PUBLIC_URL and the master key.
+        A source that is watched already gets a new monitor in place of its old one."""
+        ...
+
+    async def unwatch(self, id: Id) -> DataSource:
+        """Delete the source's monitor and set its freshness back to manual."""
+        ...
+
+    async def verify_push(
+        self, id: Id, raw_body: bytes, signature: str | None, now: datetime
+    ) -> bool:
+        """Whether a webhook delivery for the source is signed by its monitor and recent.
+        False when the source has no monitor."""
+        ...

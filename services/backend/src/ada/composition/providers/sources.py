@@ -3,7 +3,17 @@ from collections.abc import AsyncIterator
 from dishka import Provider, Scope, provide
 
 from ada.adapters.sources.http import HttpSourceReaders, create_client
-from ada.core.ports.sources import SourceReaders
+from ada.config import Settings
+from ada.core.ports.analysis import AnalysisStore
+from ada.core.ports.events import EventPublisher
+from ada.core.ports.repositories import (
+    DataSourceRepository,
+    OperatorRepository,
+    ProjectRepository,
+    SnapshotRepository,
+)
+from ada.core.ports.secrets import SecretBox
+from ada.core.ports.sources import SourceCheckLog, SourceLocks, SourceReaders
 from ada.core.ports.system import Clock
 from ada.core.ports.web import PageReader
 from ada.core.services.ports.sources import SourceService
@@ -20,7 +30,38 @@ class SourceProvider(Provider):
         async with create_client() as client:
             yield HttpSourceReaders(client, clock, pages)
 
-    sources = provide(DataSources, provides=SourceService, scope=Scope.REQUEST)
+    @provide(scope=Scope.REQUEST)
+    def sources(
+        self,
+        projects: ProjectRepository,
+        sources: DataSourceRepository,
+        operators: OperatorRepository,
+        snapshots: SnapshotRepository,
+        readers: SourceReaders,
+        checks: SourceCheckLog,
+        store: AnalysisStore,
+        events: EventPublisher,
+        clock: Clock,
+        locks: SourceLocks,
+        pages: PageReader,
+        secrets: SecretBox,
+        settings: Settings,
+    ) -> SourceService:
+        return DataSources(
+            projects,
+            sources,
+            operators,
+            snapshots,
+            readers,
+            checks,
+            store,
+            events,
+            clock,
+            locks,
+            pages,
+            secrets,
+            settings.ada_public_url,
+        )
 
 
 provider = SourceProvider()

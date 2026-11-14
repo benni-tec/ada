@@ -2,6 +2,8 @@
 bus and the task dispatcher have in-memory implementations in ada.adapters.memory; use
 those directly."""
 
+import hashlib
+import hmac
 import json
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -236,3 +238,9 @@ class FakePageReader(PageReader):
 
     async def unwatch(self, monitor_id: str) -> None:
         self.calls.append(("unwatch", (monitor_id,)))
+
+
+def context_signature(secret: str, body: bytes, at: int) -> str:
+    """The x-context-signature header Context.dev sends for a delivery made at unix time `at`."""
+    digest = hmac.new(secret.encode(), f"{at}.".encode() + body, hashlib.sha256).hexdigest()
+    return f"t={at},v1={digest}"

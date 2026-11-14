@@ -4,15 +4,20 @@ into a table, and the example registrations against their recorded answers."""
 import csv
 import io
 import json
-from collections.abc import Callable
+import time
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import uuid7
 
 import httpx
 import pytest
-from dishka import Provider, Scope
+from cryptography.fernet import Fernet
+from dishka import Provider, Scope, provide
 from dishka.integrations.fastapi import FastapiProvider
+from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 import factories
 from ada.adapters.memory.events import MemoryEventBus
@@ -25,6 +30,7 @@ from ada.adapters.memory.repositories import (
     MemorySourceLocks,
     MemoryStore,
 )
+from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.adapters.sources.document import DocumentReader
 from ada.adapters.sources.examples import (
     EXAMPLES,
@@ -58,10 +64,12 @@ from ada.core.models.sources import (
 )
 from ada.core.models.time import TimeRange
 from ada.core.ports.sources import SourceReaders
+from ada.core.ports.web import PageReader
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.sources.service import DataSources, source_operator_id
 from ada.core.services.sources.shaping import shape
+from api_support import dispatcher, new_project, send, serve
 from conftest import settings_in
 from fakes import (
     RECORDINGS,
@@ -71,12 +79,15 @@ from fakes import (
     FakeSourceReaders,
     FixedClock,
     Replay,
+    context_signature,
 )
 from memory import MemoryBackground, MemoryRepositories
 
 pytestmark = pytest.mark.anyio
 
 CSV = b"region,value\nHelsinki,74.3\n"
+PUBLIC_URL = "https://ada.example"
+KEY = Fernet.generate_key().decode()
 
 
 @dataclass
@@ -107,7 +118,11 @@ class World:
 
 
 def data_sources(
-    memory: MemoryStore, readers: SourceReaders, store: FakeAnalysisStore, clock: FixedClock
+    memory: MemoryStore,
+    readers: SourceReaders,
+    store: FakeAnalysisStore,
+    clock: FixedClock,
+    pages: PageReader | None = None,
 ) -> tuple[DataSources, MemoryEventBus]:
     events = MemoryEventBus()
     service = DataSources(
@@ -121,6 +136,9 @@ def data_sources(
         events=events,
         clock=clock,
         locks=MemorySourceLocks(),
+        pages=pages or FakePageReader(),
+        secrets=FernetSecretBox(KEY),
+        public_url=PUBLIC_URL,
     )
     return service, events
 
@@ -222,7 +240,9 @@ def pages() -> FakePageReader:
 @pytest.fixture
 async def documents(world: World, pages: FakePageReader) -> World:
     readers = FakeSourceReaders({AccessKind.DOCUMENT: DocumentReader(pages, world.clock)})
-    world.service, world.events = data_sources(world.memory, readers, world.store, world.clock)
+    world.service, world.events = data_sources(
+        world.memory, readers, world.store, world.clock, pages
+    )
     return world
 
 
@@ -796,3 +816,127 @@ async def test_each_example_declares_exactly_the_columns_it_produces(
             if row["country"] == "Finland" and row["period"] == "2020-2024"
         }
         assert finland == {1: 17.9, 2: 30.8}
+
+
+# Watched sources
+
+
+async def test_watch_stores_encrypted_secret_and_sets_push(
+    documents: World, pages: FakePageReader
+) -> None:
+    source = await documents.register(access_kind=AccessKind.DOCUMENT, format=DataFormat.JSON)
+
+    watched = await documents.service.watch(source.id)
+
+    sealed = documents.memory.monitor_secrets[source.id]
+    assert sealed != "test-secret"
+    assert FernetSecretBox(KEY).decrypt(sealed) == "test-secret"
+    assert (watched.monitor_id, watched.freshness.kind) == ("mon_1", FreshnessKind.PUSH)
+    assert "test-secret" not in watched.model_dump_json()
+    assert pages.calls == [
+        ("watch", (source.address, f"{PUBLIC_URL}/api/hooks/context/{source.id}"))
+    ]
+
+
+async def test_watching_again_replaces_the_monitor_and_unwatch_clears_it(
+    documents: World, pages: FakePageReader
+) -> None:
+    source = await documents.register(access_kind=AccessKind.DOCUMENT, format=DataFormat.JSON)
+    await documents.service.watch(source.id)
+
+    await documents.service.watch(source.id)
+    unwatched = await documents.service.unwatch(source.id)
+
+    assert [call[0] for call in pages.calls] == ["watch", "unwatch", "watch", "unwatch"]
+    assert pages.calls[1] == ("unwatch", ("mon_1",))
+    assert (unwatched.monitor_id, unwatched.freshness.kind) == (None, FreshnessKind.MANUAL)
+    assert source.id not in documents.memory.monitor_secrets
+
+
+async def test_watch_without_public_url_fails_clearly(
+    documents: World, pages: FakePageReader
+) -> None:
+    source = await documents.register(access_kind=AccessKind.DOCUMENT, format=DataFormat.JSON)
+    documents.service.public_url = None
+
+    with pytest.raises(Invalid, match="watching is not configured: ADA_PUBLIC_URL is not set"):
+        await documents.service.watch(source.id)
+    assert pages.calls == []
+
+
+class WatchedApp(Provider):
+    scope = Scope.APP
+
+    def __init__(self, pages: FakePageReader) -> None:
+        super().__init__()
+        self.pages = pages
+
+    @provide
+    def page_reader(self) -> PageReader:
+        return self.pages
+
+
+@pytest.fixture
+def watched(tmp_path: Path) -> Iterator[tuple[TestClient, str]]:
+    settings = settings_in(tmp_path).model_copy(
+        update={"ada_public_url": PUBLIC_URL, "secret_key": SecretStr(KEY)}
+    )
+    with serve(settings, WatchedApp(FakePageReader())) as client:
+        project = new_project(client)
+        body = {"name": "Page", "access_kind": "document", "format": "json", "address": PAGE}
+        source = send(client, "POST", f"/projects/{project['id']}/sources", body, 201)
+        send(client, "POST", f"/sources/{source['id']}/watch")
+        yield client, source["id"]
+
+
+def deliver(
+    client: TestClient, source_id: Any, secret: str = "test-secret", at: float | None = None
+) -> Any:
+    body = b'{"event": "change.detected"}'
+    signature = context_signature(secret, body, int(time.time() if at is None else at))
+    return client.post(
+        f"/api/hooks/context/{source_id}", content=body, headers={"x-context-signature": signature}
+    )
+
+
+def test_hook_good_signature_queues_forced_refresh(watched: tuple[TestClient, str]) -> None:
+    client, source_id = watched
+
+    response = deliver(client, source_id)
+
+    assert (response.status_code, response.json()) == (202, {"status": "queued"})
+    assert [(str(i), force) for i, force in dispatcher(client).refreshes] == [(source_id, True)]
+    assert "test-secret" not in response.text
+
+
+@pytest.mark.parametrize("header", [None, "", "t=1", "t=x,v1=00", "garbage"])
+def test_hook_rejects_bad_signature(watched: tuple[TestClient, str], header: str | None) -> None:
+    client, source_id = watched
+    headers = {} if header is None else {"x-context-signature": header}
+
+    malformed = client.post(f"/api/hooks/context/{source_id}", content=b"{}", headers=headers)
+    wrong = deliver(client, source_id, secret="another-secret")
+
+    assert (malformed.status_code, wrong.status_code) == (401, 401)
+    assert dispatcher(client).refreshes == []
+
+
+def test_hook_rejects_stale_timestamp(watched: tuple[TestClient, str]) -> None:
+    client, source_id = watched
+
+    old = deliver(client, source_id, at=time.time() - 301)
+    future = deliver(client, source_id, at=time.time() + 301)
+
+    assert (old.status_code, future.status_code) == (401, 401)
+    assert dispatcher(client).refreshes == []
+
+
+def test_hook_unknown_source_is_404(watched: tuple[TestClient, str]) -> None:
+    client, source_id = watched
+    send(client, "DELETE", f"/sources/{source_id}/watch")
+
+    unwatched = deliver(client, source_id)
+    unknown = deliver(client, uuid7())
+
+    assert (unwatched.status_code, unknown.status_code) == (404, 404)
+    assert dispatcher(client).refreshes == []

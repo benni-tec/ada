@@ -77,6 +77,17 @@ async def test_monitor_secret_comes_from_the_response() -> None:
     assert replay.requests[1].method == "DELETE"
 
 
+async def test_unwatch_ignores_a_monitor_that_is_gone_but_not_other_failures() -> None:
+    def answer(status: int) -> httpx.AsyncClient:
+        return create_client(httpx.MockTransport(lambda _: httpx.Response(status, json={})))
+
+    async with answer(404) as http:
+        await ContextPages(http, KEY).unwatch("mon_gone")
+    async with answer(500) as http:
+        with pytest.raises(Unavailable):
+            await ContextPages(http, KEY).unwatch("mon_1")
+
+
 async def test_missing_key_fails_clearly() -> None:
     async with client(WebReplay()) as http:
         with pytest.raises(Invalid, match="web search is not configured: EXA_API_KEY is not set"):

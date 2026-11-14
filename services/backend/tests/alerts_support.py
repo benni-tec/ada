@@ -24,12 +24,13 @@ from ada.core.models.time import TimeRange
 from ada.core.ports.repositories import DashboardRepository
 from ada.core.ports.sources import SourceReaders
 from ada.core.ports.system import Clock
+from ada.core.ports.web import PageReader
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sources import SourceService
-from fakes import FakeSourceReader, FakeSourceReaders, FixedClock
+from fakes import FakePageReader, FakeSourceReader, FakeSourceReaders, FixedClock
 
 TESTER = Actor(kind=ActorKind.USER, name="test")
 
@@ -130,6 +131,10 @@ class AlertOverrides(Provider):
     @provide(scope=Scope.APP)
     def clock_(self) -> Clock:
         return self.clock
+
+    @provide(scope=Scope.APP)
+    def pages(self) -> PageReader:
+        return FakePageReader()
 
     @provide(scope=Scope.APP)
     def readers(self) -> SourceReaders:

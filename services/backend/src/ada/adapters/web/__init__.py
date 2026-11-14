@@ -8,6 +8,14 @@ import httpx
 from ada.core.models.errors import Unavailable
 
 
+class ProviderAnswered(Unavailable):
+    """The provider answered with an error status."""
+
+    def __init__(self, message: str, status: int) -> None:
+        super().__init__(message)
+        self.status = status
+
+
 async def send_json(
     client: httpx.AsyncClient, method: str, url: str, token: str, body: dict[str, Any] | None
 ) -> dict[str, Any]:
@@ -20,8 +28,9 @@ async def send_json(
     except httpx.HTTPError as error:
         raise Unavailable(f"{method} {url} failed: {str(error) or type(error).__name__}") from error
     if response.is_error:
-        raise Unavailable(
-            f"{method} {url} answered {response.status_code}{_error_code(response, token)}"
+        raise ProviderAnswered(
+            f"{method} {url} answered {response.status_code}{_error_code(response, token)}",
+            response.status_code,
         )
     try:
         answer: dict[str, Any] = response.json()

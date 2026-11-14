@@ -25,6 +25,7 @@ from ada.adapters.memory.repositories import (
     MemoryStore,
     MemoryWidgetRepository,
 )
+from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.adapters.sources.examples import ExampleSource
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.core.models.base import Id
@@ -38,7 +39,7 @@ from ada.core.services.sessions.service import Sessions
 from ada.core.services.sources.service import DataSources, source_operator_id
 from ada.core.services.widgets.service import Widgets
 from factories import AGENT
-from fakes import FixedClock, Replay
+from fakes import FakePageReader, FixedClock, Replay
 
 # The day the recordings were made.
 TODAY = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
@@ -85,6 +86,9 @@ class World:
             events=self.events,
             clock=self.clock,
             locks=MemorySourceLocks(),
+            pages=FakePageReader(),
+            secrets=FernetSecretBox(None),
+            public_url=None,
         )
         self.pipelines = Pipelines(
             self.operators, self.data_sources, self.snapshots, self.sources, self.store, self.clock

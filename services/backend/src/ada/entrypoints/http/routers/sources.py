@@ -134,3 +134,15 @@ async def refresh_source(
     force = body.force if body else False
     await dispatcher.refresh_source(source_id, force)
     return RefreshQueued(data_source_id=source_id, force=force)
+
+
+@router.post("/sources/{source_id}/watch")
+async def watch_source(source_id: Id, service: FromDishka[SourceService]) -> DataSource:
+    """Have Context.dev watch the source's page and refresh the source when it changes."""
+    return await service.watch(source_id)
+
+
+@router.delete("/sources/{source_id}/watch")
+async def unwatch_source(source_id: Id, service: FromDishka[SourceService]) -> DataSource:
+    """Stop watching the source's page; it is refreshed by hand again."""
+    return await service.unwatch(source_id)

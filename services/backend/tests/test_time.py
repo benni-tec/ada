@@ -20,6 +20,7 @@ from ada.adapters.db.workspace_repositories import SqlSourceCheckLog, SqlSourceL
 from ada.adapters.duckdb.store import DuckDbAnalysisStore
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import MemorySourceLocks
+from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.adapters.sources.examples import NORDCAN_LUNG_SURVIVAL, SOTKANET_BREAST_SCREENING
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.core.models.analysis import FetchedData
@@ -35,7 +36,7 @@ from ada.core.services.sources.service import DataSources, source_operator_id
 from ada.core.services.sources.shaping import shape, split_periods
 from db_helpers import Repos, engine_for, sql_repos, unit_of_work
 from factories import AGENT
-from fakes import FixedClock, Replay
+from fakes import FakePageReader, FixedClock, Replay
 from time_world import TODAY, World
 
 pytestmark = pytest.mark.anyio
@@ -413,6 +414,9 @@ async def test_a_refetched_period_replaces_the_stored_one(
                 events,
                 clock,
                 MemorySourceLocks(),
+                FakePageReader(),
+                FernetSecretBox(None),
+                None,
             )
             runs = Runs(repos.runs, repos.operators, repos.snapshots, sources, store, events, clock)
             return sources, runs
@@ -479,6 +483,9 @@ async def test_two_runs_that_want_the_same_missing_periods_fetch_them_once(
                 MemoryEventBus(),
                 clock,
                 SqlSourceLocks(session),
+                FakePageReader(),
+                FernetSecretBox(None),
+                None,
             )
 
         async with AsyncSession(engine, expire_on_commit=False) as session, session.begin():
