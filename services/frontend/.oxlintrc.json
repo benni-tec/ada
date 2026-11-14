@@ -8,6 +8,11 @@
   },
   "overrides": [
     {
+      // shadcn/ui components as its CLI writes them: they export variants next to components.
+      "files": ["src/components/ui/**"],
+      "rules": { "react/only-export-components": "off" }
+    },
+    {
       // Route files export a `Route` object next to their component.
       "files": ["src/routes/**"],
       "rules": { "react/only-export-components": "off" }

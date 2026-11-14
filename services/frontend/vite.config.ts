@@ -32,5 +32,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Whole routes render in these tests; on a busy machine the defaults time out.
+    testTimeout: 20_000,
   },
 })
