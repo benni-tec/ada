@@ -1126,7 +1126,7 @@ async def test_a_batch_builds_everything_with_references_and_again_nothing_new(
             "url": f"/projects/{project['id']}/sessions/{session['id']}?widget={refs['w']}",
         }
     ]
-    lineage = await call(client, "get_lineage", operator_id=refs["t"])
+    lineage = await call(client, "get_lineage", session_id=session["id"], operator_id=refs["t"])
     assert [operator["id"] for operator in lineage] == [refs["src"], refs["t"]]
     assert lineage[0]["params"] == {"data_source_id": refs["s"]}
     # The registered source was not fetched in the batch, but queued after its commit.
@@ -1135,11 +1135,15 @@ async def test_a_batch_builds_everything_with_references_and_again_nothing_new(
         entries = await (await request.get(SessionService)).entries(UUID(session["id"]))
         sources = await (await request.get(SourceService)).list(UUID(project["id"]))
         widgets = await (await request.get(WidgetService)).list(UUID(project["id"]))
-    assert [(e.kind, e.ref, e.text) for e in entries] == [
+    # Each call is recorded after what it made; the second made nothing.
+    calls = [(e.tool_call.tool, e.tool_call.status) for e in entries if e.tool_call is not None]
+    assert [(e.kind, e.ref, e.text) for e in entries if e.kind != "tool_call"] == [
         ("operator", refs["src"], "The raw regions"),
         ("operator", refs["t"], "Totals"),
         ("widget", refs["w"], ""),
     ]
+    assert [e.kind for e in entries][3:] == ["tool_call"] * 3
+    assert calls == [("build_pipeline", "ok")] * 2 + [("get_lineage", "ok")]
     assert (len(sources), len(widgets)) == (1, 1)
 
 
@@ -1148,17 +1152,19 @@ async def test_a_batch_that_fails_midway_stores_nothing(
 ) -> None:
     client, container = builder
     project = await call(client, "create_project", name="Batch")
+    session = await call(client, "create_session", project_id=project["id"], title="Build")
+    where = {"project_id": project["id"], "session_id": session["id"]}
     broken = batch("SELECT nope FROM input_0")
 
     with pytest.raises(ToolError, match=r"steps\[2\] \(ref 't'\) failed.*nope"):
-        await call(client, "build_pipeline", project_id=project["id"], steps=broken)
+        await call(client, "build_pipeline", **where, steps=broken)
     later = batch()
     later[1]["source_operator"]["data_source_id"] = "$w"
     with pytest.raises(ToolError, match=r"steps\[1\].*\$w names no earlier step"):
-        await call(client, "build_pipeline", project_id=project["id"], steps=later)
+        await call(client, "build_pipeline", **where, steps=later)
 
-    assert await call(client, "list_sources", project_id=project["id"]) == []
-    assert await call(client, "list_pipelines", project_id=project["id"]) == []
+    assert await call(client, "list_sources", **where) == []
+    assert await call(client, "list_pipelines", **where) == []
     dispatcher = await container.get(TaskDispatcher)
     assert isinstance(dispatcher, RecordingTaskDispatcher)
     assert dispatcher.refreshes == []

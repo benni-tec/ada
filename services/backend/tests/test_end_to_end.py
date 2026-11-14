@@ -45,6 +45,7 @@ from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.alerts import AlertState
 from ada.core.models.events import Event, EventType
+from ada.core.models.sessions import EntryKind
 from ada.core.models.time import TimeRange
 from ada.core.ports.events import EventBroadcaster
 from ada.core.ports.sources import SourceReaders
@@ -59,6 +60,7 @@ from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.cli.seed import DEMO_DASHBOARD, DEMO_PROJECT, DEMO_RANGE, seed_demo
 from ada.entrypoints.mcp.server import create_mcp
+from ada.entrypoints.mcp.sessions import SESSIONLESS
 from ada.entrypoints.worker import create_broker
 from fakes import RECORDINGS, Replay
 from memory import MemoryBackground
@@ -130,11 +132,18 @@ class Stack:
     events: CommittedBroadcaster
     replay: Replay
     outside: Outside
+    # The session the agent works in, from its latest create_session.
+    session_id: str | None = None
 
     async def call(self, tool: str, **arguments: Any) -> Any:
+        """Call a tool as an agent would: in its session, unless the tool needs none."""
+        if tool not in SESSIONLESS:
+            arguments.setdefault("session_id", self.session_id)
         result = await self.mcp.call_tool(tool, arguments)
         content = result.structured_content
         assert content is not None
+        if tool == "create_session":
+            self.session_id = content["id"]
         return content["result"] if set(content) == {"result"} else content
 
 
@@ -175,13 +184,13 @@ async def stack(migrated_database_url: str, tmp_path: Path) -> AsyncIterator[Sta
 
 async def test_an_agent_builds_a_widget_from_a_public_source(stack: Stack) -> None:
     project = await stack.call("create_project", name="Nordic cancer care")
+    session = await stack.call(
+        "create_session", project_id=project["id"], title="Lung cancer survival"
+    )
     source = await stack.call(
         "register_source",
         project_id=project["id"],
         **NORDCAN_LUNG_SURVIVAL.model_dump(mode="json"),
-    )
-    session = await stack.call(
-        "create_session", project_id=project["id"], title="Lung cancer survival"
     )
 
     # Refreshing is queued; the worker fetches the source and stores its snapshot.
@@ -246,10 +255,22 @@ async def test_an_agent_builds_a_widget_from_a_public_source(stack: Stack) -> No
     # The session records what the agent did, as the agent, with its notes.
     async with stack.api() as request:
         entries = await (await request.get(SessionService)).entries(UUID(session["id"]))
-    assert [(entry.kind.value, entry.text) for entry in entries] == [
+    assert [(e.kind.value, e.text) for e in entries if e.kind != EntryKind.TOOL_CALL] == [
         ("operator", "Survival by country, sex and period"),
         ("operator", "Finland, latest period"),
         ("widget", "Men and women side by side"),
+    ]
+    # And each of its calls, but the widget's own data call.
+    assert [(e.tool_call.tool, e.tool_call.status) for e in entries if e.tool_call] == [
+        (tool, "ok")
+        for tool in (
+            "register_source",
+            "refresh_source",
+            "list_sources",
+            "add_source_operator",
+            "add_transform",
+            "create_widget",
+        )
     ]
     assert {(entry.actor.kind.value, entry.actor.name) for entry in entries} == {
         ("external_agent", AGENT)
@@ -257,17 +278,18 @@ async def test_an_agent_builds_a_widget_from_a_public_source(stack: Stack) -> No
 
     # Every event went out after the work it names had been committed.
     assert stack.events.unseen == []
-    assert stack.events.types == [
+    added = EventType.SESSION_ENTRY_ADDED
+    assert stack.events.types.count(added) == len(entries)
+    assert [t for t in stack.events.types if t != added] == [
         EventType.SESSION_CREATED,
         EventType.SOURCE_REFRESHED,
-        EventType.SESSION_ENTRY_ADDED,
-        EventType.SESSION_ENTRY_ADDED,
         EventType.WIDGET_CREATED,
-        EventType.SESSION_ENTRY_ADDED,
         EventType.RUN_STARTED,
         EventType.RUN_FINISHED,
     ]
-    refreshed_event = stack.events.bus.published[1]
+    [refreshed_event] = [
+        e for e in stack.events.bus.published if e.type is EventType.SOURCE_REFRESHED
+    ]
     assert refreshed_event.payload == {"data_source_id": source["id"], "changed": True}
 
 
@@ -333,6 +355,7 @@ async def test_an_agent_maps_a_measure_and_follows_it_with_a_report_and_alerts(
     stack: Stack,
 ) -> None:
     project = await stack.call("create_project", name="Screening")
+    await stack.call("create_session", project_id=project["id"], title="Screening")
     sources = [
         await stack.call(
             "register_source", project_id=project["id"], **example.model_dump(mode="json")

@@ -4,7 +4,7 @@ from typing import Protocol
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.operators import OperatorId
-from ada.core.models.sessions import Context, Session, SessionEntry
+from ada.core.models.sessions import Context, Session, SessionEntry, ToolCall
 
 
 class SessionService(Protocol):
@@ -49,4 +49,13 @@ class SessionService(Protocol):
 
     async def record_agent_turn(self, session_id: Id, turn_id: Id, actor: Actor) -> SessionEntry:
         """Where the agent's answer to the latest message goes in the record."""
+        ...
+
+    async def record_tool_call(self, session_id: Id, call: ToolCall, actor: Actor) -> SessionEntry:
+        """An external agent's tool call, its arguments shortened for the record."""
+        ...
+
+    async def check(self, session_id: Id, project_id: Id | None = None) -> Session:
+        """The session a tool call works in: it must exist, and be in `project_id` when the
+        call names a project (Invalid otherwise)."""
         ...

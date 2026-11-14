@@ -182,6 +182,7 @@ def _entry(row: SessionEntryRow) -> SessionEntry:
         actor=Actor.model_validate(row.actor),
         created_at=row.created_at,
         context=row.context,
+        tool_call=row.tool_call,
     )
 
 
@@ -233,6 +234,7 @@ class SqlSessionRepository(SessionRepository):
             actor=dump(entry.actor),
             created_at=entry.created_at,
             context=dump_all(entry.context),
+            tool_call=dump(entry.tool_call) if entry.tool_call is not None else None,
         )
         await add_row(self.session, row)
 

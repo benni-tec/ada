@@ -19,8 +19,9 @@ from dishka import FromDishka, Provider, Scope, provide
 from dishka.integrations.taskiq import inject as inject_task
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from fastmcp import Client
+from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
+from mcp.types import Implementation
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from sqlalchemy import text
@@ -42,6 +43,7 @@ from ada.adapters.valkey.tasks import (
 )
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.alerts import Alert, AlertRule
 from ada.core.models.base import Id
 from ada.core.models.errors import Invalid, Unavailable
@@ -52,14 +54,16 @@ from ada.core.ports.repositories import ProjectRepository
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.runs import RunService
+from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.http.app import create_app
+from ada.entrypoints.mcp.actor import calling_agent
 from ada.entrypoints.mcp.injection import make_inject
 from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.worker import create_broker
 from ada.entrypoints.worker.factory import ContainerMiddleware, create_scheduler
 from alerts_support import below
-from api_support import send
+from api_support import call, send
 from conftest import settings_in
 from memory import MemoryBackground, memory_adapters
 
@@ -430,7 +434,9 @@ async def test_a_failed_mcp_tool_or_worker_task_announces_nothing(
 ) -> None:
     container = create_container(unreachable_settings, *memory_adapters())
     bus = await container.get(MemoryEventBus)
-    mcp = create_mcp(container)
+    # A bare server: the platform's checks the session of every call, which is not the
+    # point here (see the test after this one).
+    mcp = FastMCP("test")
     broker = InMemoryBroker()
     broker.add_middlewares(ContainerMiddleware(container))
 
@@ -455,6 +461,54 @@ async def test_a_failed_mcp_tool_or_worker_task_announces_nothing(
     finally:
         await broker.shutdown()
         await container.close()
+
+
+async def test_a_tool_call_is_recorded_in_a_transaction_of_its_own_even_when_it_fails(
+    migrated_database_url: str, tmp_path: Path
+) -> None:
+    container = create_container(settings_in(tmp_path, migrated_database_url), MemoryBackground())
+    bus = await container.get(MemoryEventBus)
+    mcp = create_mcp(container)
+
+    async def add_note(
+        session_id: Id, text: str, fail: bool, sessions: FromDishka[SessionService]
+    ) -> str:
+        await sessions.add_message(session_id, text, calling_agent())
+        if fail:
+            raise Invalid("the work failed")
+        return "done"
+
+    mcp.tool(make_inject(container)(add_note), name="add_note")
+    try:
+        info = Implementation(name="claude-code", version="1")
+        async with Client(mcp, client_info=info) as client:
+            project = await call(client, "create_project", name="P")
+            session = await call(client, "create_session", project_id=project["id"], title="S")
+            note = {"session_id": session["id"], "text": "kept", "fail": False}
+            await client.call_tool("add_note", note)
+            with pytest.raises(ToolError, match="the work failed"):
+                await client.call_tool("add_note", {**note, "text": "lost", "fail": True})
+        async with container() as request:
+            entries = await (await request.get(SessionService)).entries(UUID(session["id"]))
+    finally:
+        await container.close()
+
+    # The failed call's own message was rolled back; its record was committed.
+    assert [(e.kind, e.text) for e in entries] == [
+        ("message", "kept"),
+        ("tool_call", ""),
+        ("tool_call", ""),
+    ]
+    ok, failed = (e.tool_call for e in entries[1:])
+    assert ok is not None and (ok.tool, ok.status, ok.error) == ("add_note", "ok", None)
+    assert failed is not None and (failed.status, failed.error) == ("error", "the work failed")
+    assert failed.arguments == {**note, "text": "lost", "fail": True}
+    assert entries[2].actor == Actor(kind=ActorKind.EXTERNAL_AGENT, name="claude-code")
+    # Each entry announced after its commit, and nothing else.
+    added = [
+        e.payload["entry_id"] for e in bus.published if e.type is EventType.SESSION_ENTRY_ADDED
+    ]
+    assert added == [str(e.id) for e in entries]
 
 
 # The server-sent event stream. The test client waits for the whole body, which an event

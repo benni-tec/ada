@@ -23,6 +23,7 @@ from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.mcp.actor import calling_agent
 from ada.entrypoints.mcp.injection import Inject
 from ada.entrypoints.mcp.links import widget_url
+from ada.entrypoints.mcp.sessions import SessionId
 
 # A preview is for looking at, not for analysing: the agent computes in SQL instead.
 MAX_PREVIEW_ROWS = 100
@@ -66,30 +67,30 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @inject
     async def add_source_operator(
         project_id: Id,
+        session_id: SessionId,
         data_source_id: Id,
         projects: FromDishka[ProjectService],
         pipelines: FromDishka[PipelineService],
         sessions: FromDishka[SessionService],
-        session_id: Id | None = None,
         note: str = "",
     ) -> Operator:
         """Start a pipeline from a registered data source: adds an operator that reads
         it. Use the returned operator id as an input of add_transform, or to preview it.
         Adding the same source twice returns the operator that already exists.
 
-        Pass `session_id` and a one-line `note` on why you need this source to show it in
-        that session. Returns the operator with its id and output columns."""
+        Give a one-line `note` on why you need this source: the session shows it.
+        Returns the operator with its id and output columns."""
         await projects.get(project_id)
         actor = calling_agent()
         operator = await pipelines.add_source(project_id, data_source_id, actor)
-        if session_id is not None:
-            await sessions.record_operator(session_id, operator.id, note, actor)
+        await sessions.record_operator(session_id, operator.id, note, actor)
         return operator
 
     @mcp.tool
     @inject
     async def add_transform(
         project_id: Id,
+        session_id: SessionId,
         sql: str,
         inputs: Sequence[OperatorId],
         projects: FromDishka[ProjectService],
@@ -97,7 +98,6 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         sessions: FromDishka[SessionService],
         roles: Roles | None = None,
         materialize: bool = False,
-        session_id: Id | None = None,
         note: str = "",
     ) -> Operator:
         """Add a SQL step over earlier operators. In the SQL the inputs are the tables
@@ -118,21 +118,21 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         `materialize` stores the result instead of recomputing it; leave it off unless the
         step is expensive. The same SQL over the same inputs returns the existing operator.
 
-        Pass `session_id` and a one-line `note` on why you add this step to show it in that
-        session. Returns the operator with its id and output columns."""
+        Give a one-line `note` on why you add this step: the session shows it.
+        Returns the operator with its id and output columns."""
         await projects.get(project_id)
         actor = calling_agent()
         operator = await pipelines.add_transform(
             project_id, sql, tuple(inputs), actor, roles=roles, materialize=materialize
         )
-        if session_id is not None:
-            await sessions.record_operator(session_id, operator.id, note, actor)
+        await sessions.record_operator(session_id, operator.id, note, actor)
         return operator
 
     @mcp.tool
     @inject
     async def list_pipelines(
         project_id: Id,
+        session_id: SessionId,
         projects: FromDishka[ProjectService],
         pipelines: FromDishka[PipelineService],
     ) -> Sequence[Pipeline]:
@@ -146,7 +146,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def get_lineage(
-        operator_id: OperatorId, pipelines: FromDishka[PipelineService]
+        session_id: SessionId, operator_id: OperatorId, pipelines: FromDishka[PipelineService]
     ) -> Sequence[Operator]:
         """Show how an operator's output is made: the operator and everything upstream of
         it, inputs first, each with its parameters (the SQL, the data source) and output
@@ -157,6 +157,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def preview_operator(
+        session_id: SessionId,
         operator_id: OperatorId,
         pipelines: FromDishka[PipelineService],
         runs: FromDishka[RunService],
@@ -176,6 +177,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def query_operator(
+        session_id: SessionId,
         operator_id: OperatorId,
         select: str,
         exploration: FromDishka[ExplorationService],
@@ -228,9 +230,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @inject
     async def build_pipeline(
         project_id: Id,
+        session_id: SessionId,
         steps: Sequence[Step],
         batches: FromDishka[BatchService],
-        session_id: Id | None = None,
     ) -> Built:
         """Build a whole pipeline in one call: register sources, read them, add input
         slots and SQL steps, and show results as widgets. Prefer it to calling the single
@@ -248,8 +250,8 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
         "$name" stands for what the earlier step with that `ref` made (a registered
         source also stands for its source operator); any other value is an existing id.
-        Every step may carry a one-line `note`, shown in the session given by
-        `session_id`, as the single tools show it.
+        Every step may carry a one-line `note`, shown in the session, as the single
+        tools show it.
 
         It is all or nothing: the first step that fails is named by its index and ref,
         and nothing of the batch is stored. Running the same batch again creates nothing

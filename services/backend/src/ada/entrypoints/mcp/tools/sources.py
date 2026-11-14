@@ -14,6 +14,7 @@ from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.refreshes import MAX_WAIT_SECONDS, RefreshService, SnapshotSummary
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.mcp.injection import Inject
+from ada.entrypoints.mcp.sessions import SessionId
 
 
 class Refreshed(DomainModel):
@@ -31,6 +32,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @inject
     async def register_source(
         project_id: Id,
+        session_id: SessionId,
         name: str,
         address: str,
         projects: FromDishka[ProjectService],
@@ -70,6 +72,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @inject
     async def list_sources(
         project_id: Id,
+        session_id: SessionId,
         projects: FromDishka[ProjectService],
         service: FromDishka[SourceService],
     ) -> Sequence[DataSource]:
@@ -83,6 +86,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def update_source(
+        session_id: SessionId,
         source_id: Id,
         expected_revision: int,
         service: FromDishka[SourceService],
@@ -119,6 +123,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def refresh_source(
+        session_id: SessionId,
         source_id: Id,
         service: FromDishka[SourceService],
         dispatcher: FromDishka[TaskDispatcher],

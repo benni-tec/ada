@@ -533,12 +533,19 @@ async def test_an_agent_writes_reads_and_versions_a_report(
     added = await call(
         client,
         "add_report_version",
+        session_id=str(scene.session.id),
         report_id=report["id"],
         content=blocks(heading("Gap"), shows(scene.value), shows(scene.chart)),
         run_id=version["run_id"],
         expected_revision=1,
     )
-    first = await call(client, "get_report", report_id=report["id"], version="1.0.0")
+    first = await call(
+        client,
+        "get_report",
+        session_id=str(scene.session.id),
+        report_id=report["id"],
+        version="1.0.0",
+    )
 
     assert version["created_by"] == {"kind": "external_agent", "name": "claude-code"}
     assert created["url"] == f"/projects/{scene.project.id}/reports/{report['id']}?version=1.0.0"
@@ -549,6 +556,7 @@ async def test_an_agent_writes_reads_and_versions_a_report(
         await call(
             client,
             "add_report_version",
+            session_id=str(scene.session.id),
             report_id=report["id"],
             content=blocks(shows(scene.table)),
             expected_revision=1,

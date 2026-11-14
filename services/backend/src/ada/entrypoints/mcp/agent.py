@@ -40,12 +40,21 @@ class InProcessToolbox(AgentToolbox):
                     ToolSpec(
                         name=tool.name,
                         description=tool.description or "",
-                        input_schema=tool.input_schema,
+                        input_schema=_session_optional(tool.input_schema),
                     )
                     for tool in listed
                     if tool.name not in LEFT_OUT
                 ]
                 yield _McpTools(client, specs, session_id)
+
+
+def _session_optional(schema: JsonObject) -> JsonObject:
+    """A tool's schema as the model sees it: `session_id` may be left out, since every call
+    is filled in with the turn's session (see _McpTools.call)."""
+    required = schema.get("required")
+    if not required or "session_id" not in required:
+        return schema
+    return {**schema, "required": [name for name in required if name != "session_id"]}
 
 
 def application(container: AsyncContainer) -> AsyncContainer:

@@ -14,6 +14,7 @@ from ada.core.services.ports.reports import ReportService, TemplateService
 from ada.core.services.ports.runs import RunService
 from ada.entrypoints.mcp.actor import calling_agent
 from ada.entrypoints.mcp.injection import Inject
+from ada.entrypoints.mcp.sessions import SessionId
 
 CONTENT_FORMAT = """
 The content is a JSON component tree, `{"blocks": [...]}`. Blocks, by `type`:
@@ -56,9 +57,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool(
         description=f"""Write a report: a document frozen at one run, so it always shows
 the same numbers, with every number traceable to its pipeline. Creates the report with
-version 1.0.0. It belongs to exactly one owner: pass `session_id` for a report written in
-a session, or `dashboard_id` for one about a dashboard (generate_report_from_dashboard
-does that for you).
+version 1.0.0. It belongs to exactly one owner: the session, or the dashboard given as
+`dashboard_id` for a report about a dashboard (generate_report_from_dashboard does that for
+you).
 
 `run_id` pins the run whose data the widgets show, e.g. the run of preview_operator;
 without one a new run is started for `time_range` (default: open). The version records the
@@ -74,13 +75,13 @@ person."""
     @inject
     async def create_report(
         project_id: Id,
+        session_id: SessionId,
         name: str,
         content: JsonObject,
         reports: FromDishka[ReportService],
         runs: FromDishka[RunService],
         run_id: Id | None = None,
         time_range: TimeRange | None = None,
-        session_id: Id | None = None,
         dashboard_id: Id | None = None,
         template_id: Id | None = None,
     ) -> ReportView:
@@ -93,7 +94,8 @@ person."""
             run.id,
             time_range if time_range is not None else run.time_range,
             actor,
-            session_id=session_id,
+            # A report about a dashboard belongs to the dashboard, not the session.
+            session_id=session_id if dashboard_id is None else None,
             dashboard_id=dashboard_id,
             template_id=template_id,
         )
@@ -119,6 +121,7 @@ version and its `url`."""
     )
     @inject
     async def add_report_version(
+        session_id: SessionId,
         report_id: Id,
         content: JsonObject,
         reports: FromDishka[ReportService],
@@ -146,6 +149,7 @@ version and its `url`."""
     @mcp.tool
     @inject
     async def generate_report_from_dashboard(
+        session_id: SessionId,
         dashboard_id: Id,
         name: str,
         reports: FromDishka[ReportService],
@@ -168,24 +172,29 @@ version and its `url`."""
     @inject
     async def list_reports(
         project_id: Id,
+        session_id: SessionId,
         reports: FromDishka[ReportService],
-        session_id: Id | None = None,
         dashboard_id: Id | None = None,
+        only_this_session: bool = False,
     ) -> Sequence[ReportListing]:
-        """List a project's reports, oldest first, each with its url; pass `session_id`
-        or `dashboard_id` for only the reports that session or dashboard produced. Use it
-        before writing a report, to add a version to an existing one instead."""
+        """List a project's reports, oldest first, each with its url; pass
+        `only_this_session` or a `dashboard_id` for only the reports this session or that
+        dashboard produced. Use it before writing a report, to add a version to an existing
+        one instead."""
         return [
             ReportListing(report=report, url=report_url(report))
             for report in await reports.list(project_id)
-            if (session_id is None or report.session_id == session_id)
+            if (not only_this_session or report.session_id == session_id)
             and (dashboard_id is None or report.dashboard_id == dashboard_id)
         ]
 
     @mcp.tool
     @inject
     async def get_report(
-        report_id: Id, reports: FromDishka[ReportService], version: str | None = None
+        session_id: SessionId,
+        report_id: Id,
+        reports: FromDishka[ReportService],
+        version: str | None = None,
     ) -> ReportView:
         """Read a report version: its content tree, its run and time range, and the
         generated `sources` list (each data source behind its widgets, with the address
@@ -207,6 +216,7 @@ version and its `url`."""
     @inject
     async def create_template(
         project_id: Id,
+        session_id: SessionId,
         name: str,
         kind: TemplateKind,
         slots: Sequence[Slot],
@@ -228,7 +238,7 @@ version and its `url`."""
     @mcp.tool
     @inject
     async def list_templates(
-        project_id: Id, templates: FromDishka[TemplateService]
+        project_id: Id, session_id: SessionId, templates: FromDishka[TemplateService]
     ) -> Sequence[Template]:
         """List a project's report and dashboard templates with their slots, oldest first.
         Look here before writing a report from scratch: filling a template keeps reports

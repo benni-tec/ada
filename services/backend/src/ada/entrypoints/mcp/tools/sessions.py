@@ -15,6 +15,6 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     ) -> Session:
         """Start a session in a project: the record people see in the frontend while you
         work. Create one at the start of an analysis, then pass its id as `session_id`
-        to the tools that add operators and widgets, so that everything you do shows up
-        there with your note. Returns the session with its id."""
+        to every other tool: the session shows each call, and what it makes with your
+        note. Returns the session with its id."""
         return await service.create(project_id, title)

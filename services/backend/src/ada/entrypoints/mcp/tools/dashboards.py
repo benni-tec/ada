@@ -12,6 +12,7 @@ from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.mcp.actor import calling_agent
 from ada.entrypoints.mcp.injection import Inject
+from ada.entrypoints.mcp.sessions import SessionId
 
 
 class DashboardState(DomainModel):
@@ -45,7 +46,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def create_dashboard(
-        project_id: Id, name: str, service: FromDishka[DashboardService]
+        project_id: Id, session_id: SessionId, name: str, service: FromDishka[DashboardService]
     ) -> DashboardState:
         """Create an empty dashboard in a project: a live view of widgets that follows the
         latest data, unlike a session, which is a one-off exploration. Fill it with
@@ -57,7 +58,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def list_dashboards(
-        project_id: Id, service: FromDishka[DashboardService]
+        project_id: Id, session_id: SessionId, service: FromDishka[DashboardService]
     ) -> Sequence[Dashboard]:
         """List a project's dashboards with their ids, names, revisions and default time
         ranges. Use it to find the dashboard to pin to before creating a new one."""
@@ -66,7 +67,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def get_dashboard(
-        dashboard_id: Id, service: FromDishka[DashboardService]
+        session_id: SessionId, dashboard_id: Id, service: FromDishka[DashboardService]
     ) -> DashboardState:
         """Read a dashboard: its current version with the slots (name, widget id, layout)
         and the dashboard's `revision`. Read it before every write and send the revision
@@ -77,7 +78,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def list_dashboard_versions(
-        dashboard_id: Id, service: FromDishka[DashboardService]
+        session_id: SessionId, dashboard_id: Id, service: FromDishka[DashboardService]
     ) -> Sequence[DashboardVersion]:
         """Every version of a dashboard, oldest first, with who made it and when. Each edit
         adds one; reports record the version they were made from."""
@@ -86,6 +87,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def pin_widget(
+        session_id: SessionId,
         dashboard_id: Id,
         widget_id: Id,
         slot: str,
@@ -114,6 +116,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def edit_dashboard(
+        session_id: SessionId,
         dashboard_id: Id,
         slots: Sequence[Slot],
         expected_revision: int,
@@ -137,6 +140,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def set_dashboard_time_range(
+        session_id: SessionId,
         dashboard_id: Id,
         expected_revision: int,
         service: FromDishka[DashboardService],
@@ -154,7 +158,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def show_dashboard_in_session(
-        session_id: Id,
+        session_id: SessionId,
         expected_revision: int,
         sessions: FromDishka[SessionService],
         dashboard_id: Id | None = None,

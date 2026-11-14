@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from ada.core.models.actors import Actor
-from ada.core.models.base import DomainModel, Id
+from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.operators import OperatorId
 
 
@@ -33,6 +33,26 @@ class EntryKind(StrEnum):
     # The in-platform agent's answer to a message; `ref` is the AgentTurn's id. Added when
     # the turn is queued, so the record orders it right after the message it answers.
     AGENT_TURN = "agent_turn"
+    # An MCP tool call of an external agent, whatever it did; `tool_call` says which. The
+    # in-platform agent's calls are in its turn instead.
+    TOOL_CALL = "tool_call"
+
+
+class ToolCallStatus(StrEnum):
+    OK = "ok"
+    ERROR = "error"
+
+
+class ToolCall(DomainModel):
+    """One tool call as the session shows it: the arguments shortened (see
+    ada.core.services.sessions.shortened), the outcome and how long it took."""
+
+    tool: str
+    arguments: JsonObject
+    status: ToolCallStatus
+    # The tool error's message when it failed.
+    error: str | None = None
+    duration_ms: int
 
 
 class PipelineContext(DomainModel):
@@ -79,3 +99,5 @@ class SessionEntry(DomainModel):
     created_at: datetime
     # For a message: what it is about (a pipeline, a dashboard and slot, a widget).
     context: tuple[Context, ...] = ()
+    # For a tool call: which tool, with what, and how it went.
+    tool_call: ToolCall | None = None
