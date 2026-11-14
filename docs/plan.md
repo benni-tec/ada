@@ -63,7 +63,7 @@ written down in `docs/contracts.md`, which every workstream reads first.
 Done when: all checks pass, the migration applies to an empty database, and every port
 has a fake.
 
-## Wave 1: the slice (six agents at once)
+## Wave 1: the slice (six agents at once) (done)
 
 Each agent works in its own git worktree on its own branch and owns the paths listed.
 Nobody edits the frozen contracts; a needed change is reported back, not made.
@@ -87,12 +87,18 @@ Reasons for these cuts:
 - **B is the largest.** If it runs long, its schema derivation can be handed to a
   seventh agent, since it only needs DuckDB.
 
-### Integration (one agent, after wave 1)
+### Integration (one agent, after wave 1) (done)
 
 Merges the six branches, binds the real adapters in the provider modules, serves the
 widget bundles from the backend as MCP App resources, and adds an end-to-end test that
 drives the slice over MCP against the compose stack. This is the only step that edits
 across workstreams.
+
+Besides the merge it made events and after-commit work transactional, added `Unavailable`
+(503), kept failed refresh records apart from the caller's transaction, refetched sources
+on edits, filled the contract gaps the frontend found, moved the frontend onto the
+generated types, served the widgets over REST and as MCP Apps, and added `ada seed-demo`.
+`docs/contracts.md` describes the result and lists the known issues wave 2 starts from.
 
 ## Wave 2: dashboards, reports, alerts (four agents at once)
 

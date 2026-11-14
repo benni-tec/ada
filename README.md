@@ -51,6 +51,15 @@ To debug a service in an IDE instead, start only the infrastructure with
 | `moon run backend:migrate` | Apply pending migrations |
 | `moon run backend:revision -- "<message>"` | Write a migration from the model changes |
 | `moon run frontend:generate` | Regenerate the frontend's API types from the backend's schema |
+| `moon run widgets:build` | Build the widgets the backend serves (`WIDGETS_DIR`) |
+
+### Demo data
+
+`ada seed-demo` creates the project "Nordic cancer care" with three public sources
+(Sotkanet, Statistics Finland, NORDCAN), unless it exists; `--refresh` also queues a fetch
+of each for the worker. From source: `cd services/backend && uv run ada seed-demo` with the
+environment of `services/backend/moon.yml`; in the full stack:
+`docker compose exec backend ada seed-demo --refresh`.
 
 ## Running the full stack
 
