@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections.abc import Sequence
+from contextlib import nullcontext
 from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid7
@@ -13,11 +14,12 @@ from ada.core.models.agents import (
     SourcePart,
     TextPart,
     ToolPart,
+    ToolSpec,
     ToolState,
     TurnPart,
     TurnStatus,
 )
-from ada.core.models.base import Id
+from ada.core.models.base import Id, JsonObject
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import Event, EventType
 from ada.core.models.operators import OperatorKind
@@ -26,6 +28,7 @@ from ada.core.ports.agents import (
     AgentFailed,
     AgentRuntime,
     AgentToolbox,
+    AgentTools,
     LanguageModels,
     TurnProgress,
     TurnSink,
@@ -44,6 +47,7 @@ from ada.core.ports.system import Clock
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.transactions import AfterCommit, UnitsOfWork
 from ada.core.services.agents.briefing import Briefing
+from ada.core.services.agents.research import researching
 from ada.core.services.ports.agents import AgentTurnService
 from ada.core.services.ports.sessions import SessionService
 
@@ -61,7 +65,8 @@ TURN_TIME_LIMIT = timedelta(minutes=30)
 # The turns of a session run one after the other: a turn waits for the earlier ones,
 # looking every WAIT_POLL seconds. A turn that holds the session up for longer than a turn
 # may run, plus TURN_MARGIN, ended without saying so (its worker stopped, or its task was
-# lost), and is failed so that the session goes on.
+# lost), and is failed so that the session goes on. `recover` fails one that nothing waits
+# for, measured from when it started.
 WAIT_POLL = 1.0
 TURN_MARGIN = timedelta(minutes=1)
 ABANDONED = "The turn did not end in time; the worker running it has probably stopped"
@@ -168,10 +173,23 @@ class AgentTurns(AgentTurnService):
             await asyncio.sleep(WAIT_POLL)
 
     async def ended(self, id: Id) -> None:
+        if not await self.turn_records.settle(id):
+            return
         turn = await self.turn_records.get(id)
         session = await self.sessions.get(turn.session_id)
         await self.events.publish(self._finished(session.project_id, turn))
         await self._report_end(session, turn)
+
+    async def recover(self) -> None:
+        now = self.clock.now()
+        stuck = await self.turn_records.unsettled(
+            now - TURN_TIME_LIMIT - TURN_MARGIN, now - TURN_MARGIN
+        )
+        for turn in stuck:
+            if turn.status is TurnStatus.RUNNING:
+                await self._abandon(turn)
+            else:
+                await self._ended_apart(turn.id)
 
     async def _ahead(self, id: Id) -> AgentTurn | None:
         """The earliest turn of the session before this one that has not ended. None when
@@ -226,8 +244,7 @@ class AgentTurns(AgentTurnService):
         await self.turn_records.add(turn)
         await self.session_records.record_agent_turn(session_id, turn.id, _agent(chosen))
         if turn.status is TurnStatus.FAILED:
-            await self.events.publish(self._finished(session.project_id, turn))
-            await self._report_end(session, turn)
+            await self.ended(turn.id)
             return turn
         await self.events.publish(
             self._event(EventType.AGENT_TURN_STARTED, session.project_id, turn)
@@ -239,13 +256,8 @@ class AgentTurns(AgentTurnService):
                 await self.dispatcher.run_turn(turn.id)
             except Exception as error:
                 logger.exception("Queueing agent turn %s failed", turn.id)
-                await self.progress.finish(
-                    turn.id,
-                    TurnStatus.FAILED,
-                    (),
-                    f"The turn could not be queued: {error}",
-                    self.clock.now(),
-                )
+                message = f"The turn could not be queued: {error}"
+                await self.progress.abandon(turn.id, message, self.clock.now())
                 await self._ended_apart(turn.id)
 
         self.after_commit.add(queue)
@@ -263,14 +275,16 @@ class AgentTurns(AgentTurnService):
         turn = await self.turn_records.request_cancel(id, self.clock.now())
         if before.status is TurnStatus.QUEUED and turn.status is TurnStatus.CANCELLED:
             # A running turn announces its own end when it stops.
-            session = await self.sessions.get(turn.session_id)
-            await self.events.publish(self._finished(session.project_id, turn))
+            await self.ended(turn.id)
         return turn
 
     async def run(self, id: Id, toolbox: AgentToolbox) -> AgentTurn:
         turn = await self.turn_records.get(id)
         session = await self.sessions.get(turn.session_id)
-        if turn.status is not TurnStatus.QUEUED or not await self.progress.start(id):
+        started = turn.status is TurnStatus.QUEUED and await self.progress.start(
+            id, self.clock.now()
+        )
+        if not started:
             # Cancelled before it started, or run already.
             return await self.turn_records.get(id)
         await self.broadcaster.publish(
@@ -294,8 +308,11 @@ class AgentTurns(AgentTurnService):
                     MAX_RESEARCH_STEPS if research else MAX_STEPS,
                 )
                 agent = _agent(turn.model)
-                async with toolbox.connect(agent, session.id, session.agent) as tools:
-                    status = await self.runtime.run(request, tools, recorder)
+                # Paid web calls in a research turn count against its session.
+                with researching(session.id) if research else nullcontext():
+                    async with toolbox.connect(agent, session.id, session.agent) as tools:
+                        fenced = _Fenced(tools, self.progress, id)
+                        status = await self.runtime.run(request, fenced, recorder)
         except (AgentFailed, Invalid) as failure:
             # Invalid: the model was removed, or became unusable, since the message.
             error = str(failure)
@@ -309,15 +326,20 @@ class AgentTurns(AgentTurnService):
                 logger.exception("Agent turn %s failed", id)
                 error = f"The turn failed unexpectedly: {type(failure).__name__}: {failure}"
         finished = await self.progress.finish(id, status, recorder.parts, error, self.clock.now())
+        if finished is None:
+            # Failed meanwhile, as if its worker had stopped; that ending was announced.
+            logger.warning("Agent turn %s was failed while it still ran", id)
+            return await self.turn_records.get(id)
         await self.broadcaster.publish(self._finished(session.project_id, finished))
-        await self._report_end(session, finished)
+        if await self.turn_records.settle(id):
+            await self._report_end(session, finished)
         return finished
 
     async def _report_end(self, session: Session, turn: AgentTurn) -> None:
         """The research turn on the brief, when it did not report back, reports how it
-        ended: its final text, marked incomplete, or its failure. Each turn ends once, so
-        this happens once. A person's follow-ups in the research session are a
-        conversation of their own: they report only by calling report_back."""
+        ended: its final text, marked incomplete, or its failure. Only whoever settles the
+        turn calls this, so it happens once. A person's follow-ups in the research session
+        are a conversation of their own: they report only by calling report_back."""
         if session.agent is not SessionAgent.RESEARCH or _reported(turn):
             return
         entries = await self.sessions.entries(session.id)
@@ -374,6 +396,24 @@ class AgentTurns(AgentTurnService):
             url = source.address if source.address.startswith(("http://", "https://")) else None
             found.append(SourcePart(source_id=source.id, title=source.name, url=url))
         return found
+
+
+class _Fenced(AgentTools):
+    """A turn's tools, refused once the turn no longer runs: it was failed while its worker
+    was only slow, and another turn of the session may be running by now."""
+
+    def __init__(self, tools: AgentTools, progress: TurnProgress, id: Id) -> None:
+        self.tools = tools
+        self.progress = progress
+        self.id = id
+
+    def specs(self) -> Sequence[ToolSpec]:
+        return self.tools.specs()
+
+    async def call(self, name: str, arguments: JsonObject) -> Any:
+        if not await self.progress.running(self.id):
+            raise AgentFailed("The turn was ended while it ran")
+        return await self.tools.call(name, arguments)
 
 
 class _Recorder(TurnSink):

@@ -49,7 +49,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == ["0001", "0002", "0003", "0004", "0005", "0006"]
+    assert migrate(database_url) == ["0001", "0002", "0003", "0004", "0005", "0006", "0007"]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -70,14 +70,14 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "agent_settings" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == ["0002", "0003", "0004", "0005", "0006"]
+    assert migrate(database_url) == ["0002", "0003", "0004", "0005", "0006", "0007"]
     assert migrate(database_url) == []
 
 
-def test_migration_0006_keeps_existing_rows(database_url: str) -> None:
+def test_migrations_0006_and_0007_keep_existing_rows(database_url: str) -> None:
     config = _config(database_url)
     command.upgrade(config, "0005")
-    project, source, session = uuid7(), uuid7(), uuid7()
+    project, source, session, entry = uuid7(), uuid7(), uuid7(), uuid7()
     engine = create_engine(database_url)
     try:
         with engine.begin() as connection:
@@ -103,6 +103,22 @@ def test_migration_0006_keeps_existing_rows(database_url: str) -> None:
                 ),
                 {"s": session, "p": project},
             )
+            connection.execute(
+                text(
+                    "INSERT INTO session_entries (id, session_id, kind, text, actor, created_at)"
+                    " VALUES (:e, :s, 'message', 'Hi', '{}', now())"
+                ),
+                {"e": entry, "s": session},
+            )
+            for status in ("done", "running"):
+                connection.execute(
+                    text(
+                        "INSERT INTO agent_turns (id, session_id, prompt_entry_id, model, status,"
+                        " parts, created_at) VALUES (:t, :s, :e, 'm', :status, '[]',"
+                        " '2026-01-01T12:00:00Z')"
+                    ),
+                    {"t": uuid7(), "s": session, "e": entry, "status": status},
+                )
 
         command.upgrade(config, "head")
 
@@ -116,9 +132,18 @@ def test_migration_0006_keeps_existing_rows(database_url: str) -> None:
             settings = connection.execute(
                 text("SELECT research_agent_model_id FROM agent_settings")
             ).one()
+            turns = connection.execute(
+                text("SELECT status, settled, started_at FROM agent_turns ORDER BY id")
+            ).all()
         assert tuple(source_row) == (None, None, None)
         assert tuple(session_row) == ("session", None, 0)
         assert tuple(settings) == (None,)
+        # An ended turn was announced then, so recovery leaves it alone; a running one is
+        # recovered once it is overdue, counted from its creation.
+        assert [tuple(row) for row in turns] == [
+            ("done", True, None),
+            ("running", False, datetime(2026, 1, 1, 12, 0, tzinfo=UTC)),
+        ]
     finally:
         engine.dispose()
 
@@ -719,8 +744,8 @@ async def test_a_turn_starts_once_stores_its_parts_and_goes_with_its_session(
     )
     async with unit_of_work(engine) as repos:
         turn = await stored_turn(repos)
-        assert await repos.agent_turns.start(turn.id) is True
-        assert await repos.agent_turns.start(turn.id) is False
+        assert await repos.agent_turns.start(turn.id, factories.NOW) is True
+        assert await repos.agent_turns.start(turn.id, factories.NOW) is False
         await repos.agent_turns.save_parts(turn.id, parts[:2])
         assert (await repos.agent_turns.get(turn.id)).parts == parts[:2]
         finished = await repos.agent_turns.finish(
@@ -741,13 +766,13 @@ async def test_cancelling_ends_a_queued_turn_and_flags_a_running_one(engine: Asy
     async with unit_of_work(engine) as repos:
         queued = await stored_turn(repos)
         running = await stored_turn(repos)
-        await repos.agent_turns.start(running.id)
+        await repos.agent_turns.start(running.id, factories.NOW)
 
         cancelled = await repos.agent_turns.request_cancel(queued.id, factories.NOW)
         flagged = await repos.agent_turns.request_cancel(running.id, factories.NOW)
 
         assert (cancelled.status, cancelled.finished_at) == (TurnStatus.CANCELLED, factories.NOW)
-        assert await repos.agent_turns.start(queued.id) is False
+        assert await repos.agent_turns.start(queued.id, factories.NOW) is False
         assert flagged.status is TurnStatus.RUNNING
         assert await repos.agent_turns.cancel_requested(running.id) is True
 
@@ -756,7 +781,7 @@ async def test_a_turn_left_running_is_failed_once_on_its_own(engine: AsyncEngine
     async with unit_of_work(engine) as repos:
         turn = await stored_turn(repos)
     progress = SqlTurnProgress(engine)
-    assert await progress.start(turn.id) is True
+    assert await progress.start(turn.id, factories.NOW) is True
 
     # Read and written while the waiting turn's own unit of work stays open.
     async with unit_of_work(engine) as waiting:
@@ -786,7 +811,7 @@ async def test_a_running_turn_commits_its_progress_on_its_own(engine: AsyncEngin
     # The worker's own unit of work is open the whole time, as in the run_turn task.
     async with unit_of_work(engine) as worker:
         await worker.agent_turns.get(turn.id)
-        assert await progress.start(turn.id) is True
+        assert await progress.start(turn.id, factories.NOW) is True
         # Someone presses stop, in a request of their own; it does not wait for the turn.
         async with unit_of_work(engine) as request:
             await asyncio.wait_for(request.agent_turns.request_cancel(turn.id, factories.NOW), 5)
