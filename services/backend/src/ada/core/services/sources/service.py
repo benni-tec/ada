@@ -494,9 +494,10 @@ def _check(source: DataSource) -> None:
         raise Invalid("A data source needs a name")
     if not source.address:
         raise Invalid("A data source needs an address")
-    check_policy(source.freshness)
+    # Before the generic policy check, so a document source gets its own message.
     if source.access_kind is AccessKind.DOCUMENT:
         _check_document(source)
+    check_policy(source.freshness)
     shape_options(source.options)
     declared = source.declared_schema
     if declared is not None and declared.columns:

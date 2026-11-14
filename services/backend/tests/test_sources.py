@@ -254,13 +254,18 @@ async def test_document_source_without_extract_is_one_page_row(documents: World)
     assert json.loads(written.content) == [{"url": PAGE, "title": None, "text": "Indicator 3625"}]
 
 
-@pytest.mark.parametrize("kind", [FreshnessKind.TTL, FreshnessKind.PROBE])
-async def test_document_source_rejects_ttl(documents: World, kind: FreshnessKind) -> None:
+@pytest.mark.parametrize(
+    ("kind", "ttl"),
+    [(FreshnessKind.TTL, 60), (FreshnessKind.PROBE, 60), (FreshnessKind.TTL, None)],
+)
+async def test_document_source_rejects_ttl(
+    documents: World, kind: FreshnessKind, ttl: int | None
+) -> None:
     message = (
         "A document source refreshes only by hand or when its monitor fires"
         " (freshness manual or push)"
     )
-    policy = FreshnessPolicy(kind=kind, ttl_seconds=60)
+    policy = FreshnessPolicy(kind=kind, ttl_seconds=ttl)
     arguments: dict[str, Any] = {
         "access_kind": AccessKind.DOCUMENT,
         "address": PAGE,
