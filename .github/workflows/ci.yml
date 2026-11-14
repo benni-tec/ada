@@ -161,12 +161,15 @@ jobs:
             flock -w 600 9
             cd /opt/ada
             tar -x docker-compose.yml docker-compose.infra.yml docker-compose.deploy.yml
-            trap "docker logout ghcr.io >/dev/null 2>&1 || true" EXIT
-            printf %s "$token" | docker login ghcr.io -u "$actor" --password-stdin
+            # A login of its own, so the other apps on this VM keep theirs.
+            export DOCKER_CONFIG="$(mktemp -d)"
+            trap "rm -rf $DOCKER_CONFIG" EXIT
+            printf %s "$token" | docker login ghcr.io -u "$actor" --password-stdin >/dev/null
             export VERSION="sha-$sha"
             compose="docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yml"
             $compose pull
-            $compose up -d --remove-orphans
+            # Every service healthy (or the migration finished) before the revision is recorded.
+            $compose up -d --remove-orphans --wait --wait-timeout 300
             echo "$sha" > REVISION
           '
 
@@ -183,5 +186,5 @@ jobs:
             curl -fsS --max-time 5 "$url" && exit 0
             sleep 5
           done
-          echo "::error::$url did not answer within 90 s"
+          echo "::error::$url did not answer within 3 minutes"
           exit 1

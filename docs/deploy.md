@@ -42,6 +42,7 @@ CI never writes these two in `/opt/ada`:
 ## Rolling back
 
 Run the CI workflow by hand from main (Actions, CI, Run workflow; other branches never deploy) with `ref` set to an earlier commit
-whose images exist. It deploys that commit's `sha-<short>` images; the compose files come from
+whose images exist and which has `docker-compose.deploy.yml` (this deploy's first commit or later;
+older commits were never deployed this way). It deploys that commit's `sha-<short>` images; the compose files come from
 that commit too. Re-running the workflow run of an earlier push does the same. The deploy
-then checks `https://ada.95-133-254-42.sslip.io/api/health/live` for about 90 seconds.
+then checks `https://ada.95-133-254-42.sslip.io/api/health/live` for up to three minutes.
