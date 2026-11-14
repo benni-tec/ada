@@ -238,7 +238,8 @@ export interface paths {
         get?: never;
         /**
          * Edit Dashboard
-         * @description Replace the slots. Adds a version and points the dashboard at it.
+         * @description Replace the slots. Adds a version and points the dashboard at it. A widget of the
+         *     project that was never on this dashboard is copied onto it, as a pin copies it.
          */
         put: operations["edit_dashboard_api_dashboards__dashboard_id__slots_put"];
         post?: never;
@@ -1005,8 +1006,10 @@ export interface paths {
         put?: never;
         /**
          * Refresh Source
-         * @description Queue a refresh and answer at once; the worker reports the outcome as a
-         *     `source.refreshed` or `source.refresh_failed` event.
+         * @description Queue a refresh and answer at once (202); the worker reports the outcome as a
+         *     `source.refreshed` or `source.refresh_failed` event. With `wait`, fetch in the
+         *     request, for at most `timeout_seconds`, and answer how it went (200): `fetched`,
+         *     `unchanged` or `failed`, with the current snapshot and the error.
          */
         post: operations["refresh_source_api_sources__source_id__refresh_post"];
         delete?: never;
@@ -1891,6 +1894,7 @@ export interface components {
         Pin: {
             /** Expected Revision */
             expected_revision: number;
+            layout?: components["schemas"]["JsonObject"] | null;
             /** Slot */
             slot: string;
             widget_id: components["schemas"]["Id"];
@@ -1997,6 +2001,14 @@ export interface components {
              */
             type: "reasoning";
         };
+        /** RefreshOutcome */
+        RefreshOutcome: {
+            data_source_id: components["schemas"]["Id"];
+            /** Error */
+            error?: string | null;
+            snapshot?: components["schemas"]["SnapshotSummary"] | null;
+            status: components["schemas"]["RefreshStatus"];
+        };
         /** RefreshQueued */
         RefreshQueued: {
             data_source_id: components["schemas"]["Id"];
@@ -2010,7 +2022,16 @@ export interface components {
              * @default false
              */
             force: boolean;
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
+            /** Wait */
+            wait?: boolean | null;
         };
+        /**
+         * RefreshStatus
+         * @enum {string}
+         */
+        RefreshStatus: "fetched" | "unchanged" | "failed";
         /**
          * Report
          * @description A name with versions. Owned by the session or the dashboard that produced it.
@@ -2284,6 +2305,17 @@ export interface components {
             row_count?: number | null;
             /** Superseded At */
             superseded_at?: string | null;
+        };
+        /** SnapshotSummary */
+        SnapshotSummary: {
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            id: components["schemas"]["Id"];
+            /** Row Count */
+            row_count: number;
         };
         /**
          * SourceChange
@@ -4619,13 +4651,22 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Waited for */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefreshOutcome"];
+                };
+            };
             /** @description Successful Response */
             202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RefreshQueued"];
+                    "application/json": components["schemas"]["RefreshQueued"] | components["schemas"]["RefreshOutcome"];
                 };
             };
             /** @description Validation Error */

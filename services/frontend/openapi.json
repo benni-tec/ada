@@ -2004,6 +2004,16 @@
             "title": "Expected Revision",
             "type": "integer"
           },
+          "layout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "slot": {
             "title": "Slot",
             "type": "string"
@@ -2251,6 +2261,43 @@
         "title": "ReasoningPart",
         "type": "object"
       },
+      "RefreshOutcome": {
+        "properties": {
+          "data_source_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnapshotSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/RefreshStatus"
+          }
+        },
+        "required": [
+          "data_source_id",
+          "status"
+        ],
+        "title": "RefreshOutcome",
+        "type": "object"
+      },
       "RefreshQueued": {
         "properties": {
           "data_source_id": {
@@ -2275,10 +2322,43 @@
             "default": false,
             "title": "Force",
             "type": "boolean"
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "maximum": 60.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds"
+          },
+          "wait": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait"
           }
         },
         "title": "RefreshRequest",
         "type": "object"
+      },
+      "RefreshStatus": {
+        "enum": [
+          "fetched",
+          "unchanged",
+          "failed"
+        ],
+        "title": "RefreshStatus",
+        "type": "string"
       },
       "Report": {
         "description": "A name with versions. Owned by the session or the dashboard that produced it.",
@@ -2935,6 +3015,29 @@
           "fetched_at"
         ],
         "title": "Snapshot",
+        "type": "object"
+      },
+      "SnapshotSummary": {
+        "properties": {
+          "fetched_at": {
+            "format": "date-time",
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "row_count",
+          "fetched_at"
+        ],
+        "title": "SnapshotSummary",
         "type": "object"
       },
       "SourceChange": {
@@ -4182,7 +4285,7 @@
     },
     "/api/dashboards/{dashboard_id}/slots": {
       "put": {
-        "description": "Replace the slots. Adds a version and points the dashboard at it.",
+        "description": "Replace the slots. Adds a version and points the dashboard at it. A widget of the\nproject that was never on this dashboard is copied onto it, as a pin copies it.",
         "operationId": "edit_dashboard_api_dashboards__dashboard_id__slots_put",
         "parameters": [
           {
@@ -6607,7 +6710,7 @@
     },
     "/api/sources/{source_id}/refresh": {
       "post": {
-        "description": "Queue a refresh and answer at once; the worker reports the outcome as a\n`source.refreshed` or `source.refresh_failed` event.",
+        "description": "Queue a refresh and answer at once (202); the worker reports the outcome as a\n`source.refreshed` or `source.refresh_failed` event. With `wait`, fetch in the\nrequest, for at most `timeout_seconds`, and answer how it went (200): `fetched`,\n`unchanged` or `failed`, with the current snapshot and the error.",
         "operationId": "refresh_source_api_sources__source_id__refresh_post",
         "parameters": [
           {
@@ -6639,11 +6742,29 @@
           }
         },
         "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshOutcome"
+                }
+              }
+            },
+            "description": "Waited for"
+          },
           "202": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RefreshQueued"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RefreshQueued"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RefreshOutcome"
+                    }
+                  ],
+                  "title": "Response Refresh Source Api Sources  Source Id  Refresh Post"
                 }
               }
             },

@@ -42,9 +42,11 @@ class SourceChange(Request):
 class RefreshRequest(Request):
     # Skip the freshness check and the probe.
     force: bool = False
-    # Fetch in the request and answer how it went (200), instead of queueing (202).
-    wait: bool = False
-    timeout_seconds: int = Field(default=30, ge=1, le=MAX_WAIT_SECONDS)
+    # Fetch in the request and answer how it went (200), instead of queueing (202). Both
+    # default to null rather than a value, so generated clients may leave them out.
+    wait: bool | None = None
+    # Seconds; null means 30.
+    timeout_seconds: int | None = Field(default=None, ge=1, le=MAX_WAIT_SECONDS)
 
 
 class RefreshQueued(DomainModel):
@@ -137,7 +139,7 @@ async def refresh_source(
     body = body or RefreshRequest()
     if body.wait:
         response.status_code = status.HTTP_200_OK
-        return await refreshes.refresh_now(source_id, body.force, body.timeout_seconds)
+        return await refreshes.refresh_now(source_id, body.force, body.timeout_seconds or 30)
     # Read the source first, so an unknown id is a 404 and not a task that fails later.
     await service.get(source_id)
     await dispatcher.refresh_source(source_id, body.force)
