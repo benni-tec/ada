@@ -1,0 +1,155 @@
+<title>Equal Care Across Finland</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: eleven slides stacked as cards, each a 16:10 frame that scales to the width; arrow keys and the dots jump between them. */
+:root { --bg: #f6f4f0; --card: #ffffff; --fg: #1b1917; --muted: #6a645e; --line: #e3ded7; --accent: #1d4ed8; --warn: #c2410c; --ok: #166534;
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #121110; --card: #1d1b19; --fg: #f2eee8; --muted: #a39d95; --line: #312d29; --accent: #7ca3ff; --warn: #fb923c; --ok: #86efac; color-scheme: dark } }
+:root[data-theme="dark"] { --bg: #121110; --card: #1d1b19; --fg: #f2eee8; --muted: #a39d95; --line: #312d29; --accent: #7ca3ff; --warn: #fb923c; --ok: #86efac; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 16px/1.5 var(--sans); margin: 0 }
+.wrap { max-width: 960px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 24px }
+.slide { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: clamp(20px, 4vw, 44px); display: flex; flex-direction: column; gap: 14px; min-height: 0; scroll-margin-top: 16px }
+.slide .n { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500 }
+h1 { font-size: clamp(26px, 4.5vw, 44px); line-height: 1.1; margin: 0; letter-spacing: -0.015em; text-wrap: balance }
+h2 { font-size: clamp(22px, 3.2vw, 32px); line-height: 1.15; margin: 0; letter-spacing: -0.01em; text-wrap: balance }
+p { margin: 0; max-width: 62ch } ul { margin: 0; padding-left: 20px; max-width: 70ch } li + li { margin-top: 6px }
+.big { font-size: clamp(40px, 8vw, 84px); font-weight: 700; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums }
+.row { display: flex; flex-wrap: wrap; gap: 24px } .row > div { flex: 1 1 200px; min-width: 0 }
+.stat { display: flex; flex-direction: column; gap: 4px } .stat .v { font-size: clamp(30px, 5vw, 52px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums } .stat .l { color: var(--muted); font-size: 14px }
+.warn { color: var(--warn) } .accent { color: var(--accent) } .ok { color: var(--ok) }
+.bars { display: flex; flex-direction: column; gap: 10px; max-width: 560px } .bar { display: grid; grid-template-columns: 180px minmax(0, 1fr) 48px; gap: 12px; align-items: center; font-size: 14px }
+.bar .t { height: 22px; background: var(--line); border-radius: 4px } .bar .t i { display: block; height: 100%; border-radius: 4px } .bar .v { text-align: right; font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums }
+.src { color: var(--muted); font-size: 13px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line) }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px } .steps div { border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 14px } .steps strong { display: block; font-size: 22px }
+.pill { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; background: var(--line) }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth } }
+</style>
+<div class="wrap">
+  <section class="slide" id="s1">
+    <div class="n">Junction 2026 · Equal Care Across Finland</div>
+    <h1>Finland loses cancer patients to time. The Nordic standards show where.</h1>
+    <p>A patient pathway model: whether a presentation would start a fast-track pathway in Norway or Sweden, when each step is due, how many days Finland's pathways run behind, and what that costs. Built on ADA with every figure traced to its source.</p>
+    <p class="src">Educational use, synthetic profiles only. The platform is not for patient data.</p>
+  </section>
+
+  <section class="slide" id="s2">
+    <div class="n">1 · The gap</div>
+    <h2>Lung cancer, five-year survival</h2>
+    <div class="row">
+      <div class="stat"><span class="v warn">18</span><span class="l">of 100 men alive at 5 years, Finland</span></div>
+      <div class="stat"><span class="v accent">31</span><span class="l">the Nordic level (mean of Norway and Sweden)</span></div>
+      <div class="stat"><span class="v">31 / 39</span><span class="l">Finland / Nordic, women</span></div>
+    </div>
+    <p>The National Cancer Strategy 2026–2035 sets the Nordic level as the target for the poor-prognosis cancers. For pancreas the figures are 12 and 18.</p>
+    <p class="src">NORDCAN 9.6.1, 5-year relative survival, 2020–2024, read from ADA's NORDCAN operator. Lundberg et al., Acta Oncol 2020.</p>
+  </section>
+
+  <section class="slide" id="s3">
+    <div class="n">2 · Where the days go</div>
+    <h2>155 days from symptoms to treatment in Finland</h2>
+    <div class="bars">
+      <div class="bar"><span>Finland</span><div class="t"><i style="width:100%;background:var(--warn)"></i></div><span class="v">155</span></div>
+      <div class="bar"><span>Sweden</span><div class="t"><i style="width:69%;background:var(--muted)"></i></div><span class="v">107</span></div>
+      <div class="bar"><span>Denmark</span><div class="t"><i style="width:43%;background:var(--accent)"></i></div><span class="v">67</span></div>
+    </div>
+    <ul>
+      <li>Of Finland's 155: more than 50 days the patient, 41 primary care, 58 specialised care.</li>
+      <li>Only 40–60 % of Finnish lung-symptom patients see a doctor at first contact; 14 days to an appointment, against 2–7 elsewhere.</li>
+    </ul>
+    <p class="src">Yle MOT 2025, reporting an unpublished study (Kuittinen, University of Eastern Finland). Khalife et al., Acta Oncol 2025, a survey of 42 clinicians.</p>
+  </section>
+
+  <section class="slide" id="s4">
+    <div class="n">3 · What Norway and Sweden have</div>
+    <h2>A trigger and a clock. Finland has neither.</h2>
+    <div class="steps">
+      <div><strong>Trigger</strong>"Well-founded suspicion": an imaging finding, a metastasis, repeated haemoptysis.</div>
+      <div><strong>7</strong>days to the first specialist visit</div>
+      <div><strong>28</strong>days to the end of work-up</div>
+      <div><strong>42–44</strong>days to the start of treatment</div>
+    </div>
+    <p>Sweden also names the symptoms that send a patient to imaging within six days. Finland has no national trigger, no standard times and no cancer-specific waiting-time statistics.</p>
+    <p class="src">Helsedirektoratet, Pakkeforløp for lungekreft (3 July 2026). Regionala cancercentrum, SVF lungcancer v1.4 (2024). Colorectal and pancreas standards read the same way.</p>
+  </section>
+
+  <section class="slide" id="s5">
+    <div class="n">4 · Does it matter?</div>
+    <h2>After Denmark's pathways: lung survival 11 → 20 %</h2>
+    <p>Three-year relative survival among symptomatic primary-care patients, before and after the pathways, adjusted for stage, comorbidity, education and income: excess hazard ratio 1.30 (1.09–1.55) before vs after.</p>
+    <p>The authors name the caveat themselves: earlier diagnosis makes survival look longer even when death comes no later. Lead time is on every slide that follows.</p>
+    <p class="src">Jensen, Tørring &amp; Vedsted, BMC Cancer 2017.</p>
+  </section>
+
+  <section class="slide" id="s6">
+    <div class="n">5 · The tool at the point of care</div>
+    <h2>A woman of 64, lung cancer, day 71</h2>
+    <ul>
+      <li>Cough for eight weeks, smoker, at a health centre: <span class="pill">suspicion met, Sweden</span></li>
+      <li>X-ray on day 27 shows a lesion: <span class="pill">pathway would start, Norway and Sweden</span></li>
+      <li>First specialist visit met, work-up 3 days late, <span class="warn">treatment start overdue by 1 day</span>. No plan booked.</li>
+      <li>20 days behind target so far, most of them before the X-ray.</li>
+    </ul>
+    <p>This part needs no hazard ratio. The urgency comes from a standard that exists next door.</p>
+    <p class="src">Live demo: the Evaluation tab. Demo profile 1.</p>
+  </section>
+
+  <section class="slide" id="s7">
+    <div class="n">6 · Survival, second and graded</div>
+    <h2>34 of 100 alive at five years, either way</h2>
+    <p>For this profile the remaining wait stays under the twelve weeks beyond which the published effect begins, so the survival figure does not move. The deadline does. Each lever names its evidence: a national standard, a meta-analysis, one cohort, or an assumption.</p>
+    <div class="row">
+      <div class="stat"><span class="v">31–39</span><span class="l">range across the two settings</span></div>
+      <div class="stat"><span class="v">+3</span><span class="l">of 100 if the 14 days before the X-ray count (an assumption)</span></div>
+    </div>
+    <p class="src">Heiden et al., JAMA Netw Open 2021. Hanna et al., BMJ 2020. Sud et al., Ann Oncol 2020.</p>
+  </section>
+
+  <section class="slide" id="s8">
+    <div class="n">7 · How it is built</div>
+    <h2>One parameter per arrow, so nothing counts twice</h2>
+    <ul>
+      <li>Baseline: the Nordic level by site, sex and age group, from NORDCAN through ADA, cited by operator and run.</li>
+      <li>Days from the trigger to treatment beyond target: Hanna (meta-analysis), Heiden (one cohort).</li>
+      <li>Days before the trigger: Sud's per-day rate, a toggle, off by default.</li>
+      <li>Education: Zai's direct effect, carried but never shown as a lower figure.</li>
+      <li>The Finland residual: what the days do not explain, as one factor, shown not hidden.</li>
+    </ul>
+    <p class="src">Westreich &amp; Greenland, Am J Epidemiol 2013, on why a product of adjusted hazard ratios double-counts.</p>
+  </section>
+
+  <section class="slide" id="s9">
+    <div class="n">8 · What timing explains</div>
+    <h2>Three of the thirteen points. The rest is not timing.</h2>
+    <div class="bars">
+      <div class="bar"><span>Nordic level</span><div class="t"><i style="width:78%;background:var(--accent)"></i></div><span class="v">31</span></div>
+      <div class="bar"><span>With Finland's waits</span><div class="t"><i style="width:70%;background:var(--muted)"></i></div><span class="v">28</span></div>
+      <div class="bar"><span>Finland, observed</span><div class="t"><i style="width:45%;background:var(--warn)"></i></div><span class="v">18</span></div>
+    </div>
+    <p>Lung cancer, men. The published rate over every extra day, an upper bound. The other ten points are treatment access, stage at diagnosis, smoking and registry practice. Faster pathways are necessary, not sufficient.</p>
+    <p class="src">The Population tab, computed at build.</p>
+  </section>
+
+  <section class="slide" id="s10">
+    <div class="n">9 · Education</div>
+    <h2>The gap survives adjustment for stage and treatment</h2>
+    <div class="row">
+      <div class="stat"><span class="v">1.13–1.14</span><span class="l">cancer mortality, basic vs high education, after stage and treatment</span></div>
+      <div class="stat"><span class="v">18.8 vs 12.3</span><span class="l">lung, women, 5-year survival by education, Finland</span></div>
+    </div>
+    <p>The model carries it and never shows it as a lower figure for the person in front of you. It becomes a navigator, and a check that every treatment option was offered.</p>
+    <p class="src">Zai et al., BMJ Public Health 2025 (469,522 cases). Pokhrel et al., Br J Cancer 2010.</p>
+  </section>
+
+  <section class="slide" id="s11">
+    <div class="n">10 · What it is not</div>
+    <h2>Not a prognosis. Not a device. Not validated on Finnish patients.</h2>
+    <ul>
+      <li>Lead time and the waiting-time paradox are stated on every result.</li>
+      <li>Nordic baseline, Finnish education gradient, American and English delay effects.</li>
+      <li>Educational use with synthetic profiles; a banner on every page. A clinical version would be a medical device (MDR Rule 11) and need Findata.</li>
+    </ul>
+    <div class="n" style="margin-top:8px">11 · Next</div>
+    <p>Denmark's standard as the third country. Finland's days per step for colorectal and pancreas. A stage-specific baseline. Every parameter as a registered source with its lineage, as the baseline already is.</p>
+  </section>
+</div>

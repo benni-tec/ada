@@ -216,6 +216,8 @@ POKHREL = Citation(
 )
 
 LUNG, COLORECTAL, PANCREAS = "lung", "colorectal", "pancreas"
+# NORDCAN's own age groups for survival; no interpolation between them.
+AGE_BANDS = ("00-49", "50-59", "60-69", "70-79", "80-89")
 FEMALE, MALE = "female", "male"
 
 
@@ -436,6 +438,53 @@ def _targets() -> tuple[TargetTime, ...]:
     )
 
 
+NORDCAN_BY_AGE = NORDCAN.model_copy(
+    update={
+        "source": "NORDCAN 5-year relative survival by site, sex and age group, Norway and Sweden, "
+        "2020-2024 (canapi.iarc.who.int, age_surv=1, read directly on 2026-11-14)",
+        "passage": "Age groups 00-49, 50-59, 60-69, 70-79 and 80-89 for cancers 160, 520 and 130; "
+        "the Nordic level is the mean of Norway and Sweden per cell.",
+        "url": "https://canapi.iarc.who.int/api/nordcan/v2/961/survival/population/5/1_2/246_578_752/160_130_520/?&surv_period=5&age_surv=1&year_start=2020&year_end=2024",  # noqa: E501
+        "operator_id": None,
+        "run_id": None,
+    }
+)
+
+# (site, sex, NORDCAN age group, the mean of Norway and Sweden), from NORDCAN_BY_AGE.
+NORDIC_BY_AGE = (
+    (LUNG, MALE, "00-49", 0.4545),  # Norway 45.3, Sweden 45.6
+    (LUNG, MALE, "50-59", 0.354),  # Norway 34.1, Sweden 36.7
+    (LUNG, MALE, "60-69", 0.3185),  # Norway 31.9, Sweden 31.8
+    (LUNG, MALE, "70-79", 0.278),  # Norway 28.1, Sweden 27.5
+    (LUNG, MALE, "80-89", 0.194),  # Norway 18.6, Sweden 20.2
+    (LUNG, FEMALE, "00-49", 0.582),  # Norway 54.7, Sweden 61.7
+    (LUNG, FEMALE, "50-59", 0.4405),  # Norway 41.8, Sweden 46.3
+    (LUNG, FEMALE, "60-69", 0.3925),  # Norway 41.5, Sweden 37.0
+    (LUNG, FEMALE, "70-79", 0.343),  # Norway 35.2, Sweden 33.4
+    (LUNG, FEMALE, "80-89", 0.244),  # Norway 22.5, Sweden 26.3
+    (COLORECTAL, MALE, "00-49", 0.763),  # Norway 75.5, Sweden 77.1
+    (COLORECTAL, MALE, "50-59", 0.736),  # Norway 75.6, Sweden 71.6
+    (COLORECTAL, MALE, "60-69", 0.7365),  # Norway 74.7, Sweden 72.6
+    (COLORECTAL, MALE, "70-79", 0.7015),  # Norway 70.0, Sweden 70.3
+    (COLORECTAL, MALE, "80-89", 0.671),  # Norway 65.3, Sweden 68.9
+    (COLORECTAL, FEMALE, "00-49", 0.7825),  # Norway 79.3, Sweden 77.2
+    (COLORECTAL, FEMALE, "50-59", 0.7475),  # Norway 76.7, Sweden 72.8
+    (COLORECTAL, FEMALE, "60-69", 0.743),  # Norway 74.7, Sweden 73.9
+    (COLORECTAL, FEMALE, "70-79", 0.7065),  # Norway 70.8, Sweden 70.5
+    (COLORECTAL, FEMALE, "80-89", 0.6945),  # Norway 71.1, Sweden 67.8
+    (PANCREAS, MALE, "00-49", 0.4435),  # Norway 43.4, Sweden 45.3
+    (PANCREAS, MALE, "50-59", 0.215),  # Norway 24.1, Sweden 18.9
+    (PANCREAS, MALE, "60-69", 0.1525),  # Norway 16.5, Sweden 14.0
+    (PANCREAS, MALE, "70-79", 0.1235),  # Norway 13.1, Sweden 11.6
+    (PANCREAS, MALE, "80-89", 0.0885),  # Norway 7.6, Sweden 10.1
+    (PANCREAS, FEMALE, "00-49", 0.4935),  # Norway 52.8, Sweden 45.9
+    (PANCREAS, FEMALE, "50-59", 0.2765),  # Norway 32.7, Sweden 22.6
+    (PANCREAS, FEMALE, "60-69", 0.1635),  # Norway 15.5, Sweden 17.2
+    (PANCREAS, FEMALE, "70-79", 0.1115),  # Norway 11.6, Sweden 10.7
+    (PANCREAS, FEMALE, "80-89", 0.044),  # Norway 3.8, Sweden 5.0
+)
+
+
 def _baseline() -> tuple[BaselineCell, ...]:
     # The mean of Sweden and Norway, 2020-2024, from the NORDCAN operator (NORDCAN citation).
     nordic = {
@@ -446,10 +495,15 @@ def _baseline() -> tuple[BaselineCell, ...]:
         (PANCREAS, MALE): (18.7 + 17.3) / 2,
         (PANCREAS, FEMALE): (20.0 + 17.9) / 2,
     }
-    return tuple(
+    all_ages = tuple(
         BaselineCell(site=site, sex=sex, survival=round(pct / 100, 4), provenance=NORDCAN)
         for (site, sex), pct in nordic.items()
     )
+    by_age = tuple(
+        BaselineCell(site=site, sex=sex, age_band=age, survival=survival, provenance=NORDCAN_BY_AGE)
+        for site, sex, age, survival in NORDIC_BY_AGE
+    )
+    return all_ages + by_age
 
 
 def _parameter(name, estimate, lo, hi, scale, form, provenance):
@@ -472,9 +526,7 @@ def pathway_spec() -> ModelSpec:
         sites=(LUNG, COLORECTAL, PANCREAS),
         terms=(
             Term(name="sex", levels=(FEMALE, MALE), reference=FEMALE),
-            Term(
-                name="age_band", levels=("under_60", "60_69", "70_79", "80_plus"), reference="60_69"
-            ),
+            Term(name="age_band", levels=AGE_BANDS, reference="60-69"),
             Term(
                 name="education",
                 levels=("basic", "secondary", "tertiary"),

@@ -17,7 +17,7 @@ physician two weeks later, chest X-ray two weeks after that showing a suspicious
 (the trigger). Work-up complete; nine days waiting for the treatment plan.
 
 ```json
-{"site": "lung", "sex": "female", "age_band": "60_69", "education": "basic",
+{"site": "lung", "sex": "female", "age_band": "60-69", "education": "basic",
  "route": "public_health_centre", "intent": "curative", "modality": "surgery",
  "presentation": ["lung_symptoms_smoker", "lung_imaging"],
  "days": {"symptoms_to_contact": 51, "contact_to_physician": 14, "physician_to_imaging": 13,
@@ -40,7 +40,7 @@ standard reaches, and that the model gives no survival penalty for the post-trig
 pathway.
 
 ```json
-{"site": "lung", "sex": "male", "age_band": "70_79", "education": "tertiary",
+{"site": "lung", "sex": "male", "age_band": "70-79", "education": "tertiary",
  "route": "occupational", "intent": "curative", "modality": "surgery",
  "presentation": ["lung_chest_pain", "lung_imaging"],
  "days": {"symptoms_to_contact": 30, "contact_to_physician": 2, "physician_to_imaging": 22,
@@ -57,14 +57,17 @@ for curative treatment), the deadlines still shown (the drug-treatment target st
 stage-specific baseline is loaded.
 
 ```json
-{"site": "pancreas", "sex": "female", "age_band": "80_plus", "education": "secondary",
+{"site": "pancreas", "sex": "female", "age_band": "80-89", "education": "secondary",
  "route": "emergency", "stage": "distant", "intent": "palliative", "modality": "drugs",
  "presentation": ["panc_jaundice", "panc_imaging"],
  "days": {"symptoms_to_contact": 10, "contact_to_physician": 0, "physician_to_imaging": 1,
           "imaging_to_referral": 1, "referral_to_specialist": 4}}
 ```
 
-## Slide outline
+## Slides
+
+Published as a page at https://claude.ai/artifact/4LSDyw28ehwNQKTyhSsKNy (private until shared); the
+source is `2026-11-14-pathway-model-slides.html` beside this file. The outline:
 
 1. **The gap.** Lung cancer, 5-year survival: Finland 18 % (men), the Nordic level 31 %
    (NORDCAN 2020-2024, from ADA's operator). Lundberg 2020; NORDCAN.

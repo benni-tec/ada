@@ -38,7 +38,7 @@ ACTOR = Actor(kind=ActorKind.USER, name="test")
 EXAMPLE = EvaluationInputs(
     site="lung",
     sex="female",
-    age_band="60_69",
+    age_band="60-69",
     education="basic",
     route="public_health_centre",
     presentation=("lung_symptoms_smoker", "lung_imaging"),
@@ -129,6 +129,16 @@ def test_colorectal_and_pancreas_have_their_own_triggers_and_targets(version: Mo
     )
     assert pancreas.trigger.well_founded.countries == ("Norway", "Sweden")
     assert all(lever.grade is EvidenceGrade.ASSUMPTION for lever in pancreas.levers)
+
+
+def test_the_baseline_has_age_bands_and_the_evaluation_uses_them(version: ModelVersion) -> None:
+    young = evaluate(version, EXAMPLE.model_copy(update={"age_band": "50-59"}))
+    old = evaluate(version, EXAMPLE.model_copy(update={"age_band": "80-89"}))
+    assert young.survival.now > old.survival.now
+    baseline = next(c for c in old.contributions if c.term == "baseline")
+    assert "age group" in baseline.note
+    with pytest.raises(Invalid, match="age_band must be"):
+        evaluate(version, EXAMPLE.model_copy(update={"age_band": "60_69"}))
 
 
 def test_the_spec_must_hold_together() -> None:
