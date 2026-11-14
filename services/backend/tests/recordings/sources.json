@@ -1,0 +1,35 @@
+{
+  "recorded": "2026-11-14",
+  "note": "Answers of the public APIs behind the example sources, replayed by tests/test_sources_examples.py. Bodies are stored as they came; headers are reduced to the content type.",
+  "exchanges": [
+    {
+      "method": "GET",
+      "url": "https://sotkanet.fi/rest/1.1/json?indicator=3621&years=2023&years=2024&genders=total",
+      "status": 200,
+      "content_type": "application/json;charset=UTF-8",
+      "body": "sotkanet-3621.json"
+    },
+    {
+      "method": "GET",
+      "url": "https://sotkanet.fi/rest/1.1/indicators/3621",
+      "status": 200,
+      "content_type": "application/json;charset=UTF-8",
+      "body": "sotkanet-3621-indicator.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://pxdata.stat.fi/PxWeb/api/v1/en/StatFin/ksyyt/13u5.px",
+      "request": "statfin-13u5-query.json",
+      "status": 200,
+      "content_type": "text/csv; charset=Windows-1252",
+      "body": "statfin-13u5.csv"
+    },
+    {
+      "method": "GET",
+      "url": "https://canapi.iarc.who.int/api/nordcan/v2/961/survival/population/5/1_2/208_246_578_752/160/?&surv_period=5&age_surv=0&year_start=1967&year_end=2024",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "nordcan-lung-survival.json"
+    }
+  ]
+}

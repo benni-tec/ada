@@ -1,0 +1,105 @@
+﻿"Wellbeing services county","Underlying cause of death (time series classification)","2022 Deaths","2022 Crude death rate, whole population (1/100 000)","2023 Deaths","2023 Crude death rate, whole population (1/100 000)","2024 Deaths","2024 Crude death rate, whole population (1/100 000)"
+"WHOLE COUNTRY","04-21 Malignant neoplasms (C00-C97)",13072,235.3,13472,241.3,13316,236.9
+"WHOLE COUNTRY","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",596,10.7,623,11.2,644,11.5
+"WHOLE COUNTRY","10 Malignant neoplasm of pancreas (C25)",1272,22.9,1371,24.6,1337,23.8
+"WHOLE COUNTRY","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",2447,44.0,2256,40.4,2317,41.2
+"MA1 MAINLAND FINLAND","04-21 Malignant neoplasms (C00-C97)",12990,235.1,13402,241.3,13219,236.5
+"MA1 MAINLAND FINLAND","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",592,10.7,622,11.2,640,11.5
+"MA1 MAINLAND FINLAND","10 Malignant neoplasm of pancreas (C25)",1261,22.8,1366,24.6,1328,23.8
+"MA1 MAINLAND FINLAND","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",2430,44.0,2238,40.3,2301,41.2
+"HVA01 East Uusimaa wellbeing services county","04-21 Malignant neoplasms (C00-C97)",231,233.3,239,241.5,241,242.9
+"HVA01 East Uusimaa wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",11,11.1,7,7.1,10,10.1
+"HVA01 East Uusimaa wellbeing services county","10 Malignant neoplasm of pancreas (C25)",23,23.2,17,17.2,29,29.2
+"HVA01 East Uusimaa wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",42,42.4,41,41.4,64,64.5
+"HVA02 Central Uusimaa wellbeing services county","04-21 Malignant neoplasms (C00-C97)",439,216.8,414,202.6,458,222.1
+"HVA02 Central Uusimaa wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",27,13.3,22,10.8,23,11.2
+"HVA02 Central Uusimaa wellbeing services county","10 Malignant neoplasm of pancreas (C25)",36,17.8,42,20.6,55,26.7
+"HVA02 Central Uusimaa wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",75,37.0,62,30.3,85,41.2
+"HVA03 West Uusimaa wellbeing services county","04-21 Malignant neoplasms (C00-C97)",894,185.2,950,193.6,951,190.8
+"HVA03 West Uusimaa wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",32,6.6,38,7.7,41,8.2
+"HVA03 West Uusimaa wellbeing services county","10 Malignant neoplasm of pancreas (C25)",85,17.6,104,21.2,95,19.1
+"HVA03 West Uusimaa wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",183,37.9,170,34.6,168,33.7
+"HVA04 Vantaa and Kerava wellbeing services county","04-21 Malignant neoplasms (C00-C97)",471,169.1,499,176.3,481,167.2
+"HVA04 Vantaa and Kerava wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",18,6.5,28,9.9,29,10.1
+"HVA04 Vantaa and Kerava wellbeing services county","10 Malignant neoplasm of pancreas (C25)",35,12.6,61,21.5,50,17.4
+"HVA04 Vantaa and Kerava wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",82,29.4,90,31.8,73,25.4
+"HVA05 Southwest Finland wellbeing services county","04-21 Malignant neoplasms (C00-C97)",1191,245.8,1166,238.8,1267,257.1
+"HVA05 Southwest Finland wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",52,10.7,59,12.1,55,11.2
+"HVA05 Southwest Finland wellbeing services county","10 Malignant neoplasm of pancreas (C25)",115,23.7,107,21.9,135,27.4
+"HVA05 Southwest Finland wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",214,44.2,197,40.4,213,43.2
+"HVA06 Satakunta wellbeing services county","04-21 Malignant neoplasms (C00-C97)",670,313.9,720,339.4,636,300.7
+"HVA06 Satakunta wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",25,11.7,26,12.3,27,12.8
+"HVA06 Satakunta wellbeing services county","10 Malignant neoplasm of pancreas (C25)",64,30.0,58,27.3,66,31.2
+"HVA06 Satakunta wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",126,59.0,119,56.1,118,55.8
+"HVA07 Kanta-Häme wellbeing services county","04-21 Malignant neoplasms (C00-C97)",412,242.5,499,294.3,490,289.1
+"HVA07 Kanta-Häme wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",11,6.5,18,10.6,21,12.4
+"HVA07 Kanta-Häme wellbeing services county","10 Malignant neoplasm of pancreas (C25)",38,22.4,50,29.5,59,34.8
+"HVA07 Kanta-Häme wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",92,54.2,77,45.4,88,51.9
+"HVA08 Pirkanmaa wellbeing services county","04-21 Malignant neoplasms (C00-C97)",1215,229.2,1319,246.1,1278,235.6
+"HVA08 Pirkanmaa wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",42,7.9,49,9.1,61,11.2
+"HVA08 Pirkanmaa wellbeing services county","10 Malignant neoplasm of pancreas (C25)",110,20.8,134,25.0,108,19.9
+"HVA08 Pirkanmaa wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",201,37.9,204,38.1,182,33.6
+"HVA09 Päijät-Häme wellbeing services county","04-21 Malignant neoplasms (C00-C97)",612,298.8,582,284.6,585,286.0
+"HVA09 Päijät-Häme wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",34,16.6,37,18.1,29,14.2
+"HVA09 Päijät-Häme wellbeing services county","10 Malignant neoplasm of pancreas (C25)",58,28.3,65,31.8,61,29.8
+"HVA09 Päijät-Häme wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",123,60.1,110,53.8,106,51.8
+"HVA10 Kymenlaakso wellbeing services county","04-21 Malignant neoplasms (C00-C97)",505,314.8,565,355.2,546,345.5
+"HVA10 Kymenlaakso wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",22,13.7,25,15.7,27,17.1
+"HVA10 Kymenlaakso wellbeing services county","10 Malignant neoplasm of pancreas (C25)",50,31.2,56,35.2,58,36.7
+"HVA10 Kymenlaakso wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",106,66.1,102,64.1,96,60.7
+"HVA11 South Karelia wellbeing services county","04-21 Malignant neoplasms (C00-C97)",323,256.9,355,283.4,364,290.9
+"HVA11 South Karelia wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",16,12.7,22,17.6,19,15.2
+"HVA11 South Karelia wellbeing services county","10 Malignant neoplasm of pancreas (C25)",33,26.2,41,32.7,35,28.0
+"HVA11 South Karelia wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",58,46.1,51,40.7,68,54.3
+"HVA12 South Savo wellbeing services county","04-21 Malignant neoplasms (C00-C97)",432,329.6,376,288.8,412,317.8
+"HVA12 South Savo wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",16,12.2,22,16.9,14,10.8
+"HVA12 South Savo wellbeing services county","10 Malignant neoplasm of pancreas (C25)",50,38.1,39,30.0,45,34.7
+"HVA12 South Savo wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",95,72.5,57,43.8,75,57.9
+"HVA13 North Savo wellbeing services county","04-21 Malignant neoplasms (C00-C97)",599,241.5,605,244.0,586,235.8
+"HVA13 North Savo wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",30,12.1,37,14.9,34,13.7
+"HVA13 North Savo wellbeing services county","10 Malignant neoplasm of pancreas (C25)",67,27.0,57,23.0,60,24.1
+"HVA13 North Savo wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",99,39.9,83,33.5,94,37.8
+"HVA14 North Karelia wellbeing services county","04-21 Malignant neoplasms (C00-C97)",448,275.0,454,279.5,439,270.6
+"HVA14 North Karelia wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",21,12.9,29,17.9,24,14.8
+"HVA14 North Karelia wellbeing services county","10 Malignant neoplasm of pancreas (C25)",46,28.2,42,25.9,43,26.5
+"HVA14 North Karelia wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",89,54.6,76,46.8,65,40.1
+"HVA15 Central Finland wellbeing services county","04-21 Malignant neoplasms (C00-C97)",669,245.5,655,240.1,624,228.0
+"HVA15 Central Finland wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",33,12.1,20,7.3,22,8.0
+"HVA15 Central Finland wellbeing services county","10 Malignant neoplasm of pancreas (C25)",71,26.0,69,25.3,55,20.1
+"HVA15 Central Finland wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",112,41.1,112,41.0,95,34.7
+"HVA16 South Ostrobothnia wellbeing services county","04-21 Malignant neoplasms (C00-C97)",528,276.1,570,299.0,507,266.5
+"HVA16 South Ostrobothnia wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",24,12.5,22,11.5,34,17.9
+"HVA16 South Ostrobothnia wellbeing services county","10 Malignant neoplasm of pancreas (C25)",55,28.8,66,34.6,57,30.0
+"HVA16 South Ostrobothnia wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",94,49.1,82,43.0,71,37.3
+"HVA17 Ostrobothnia wellbeing services county","04-21 Malignant neoplasms (C00-C97)",398,225.9,400,226.0,412,231.2
+"HVA17 Ostrobothnia wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",20,11.4,16,9.0,25,14.0
+"HVA17 Ostrobothnia wellbeing services county","10 Malignant neoplasm of pancreas (C25)",33,18.7,39,22.0,30,16.8
+"HVA17 Ostrobothnia wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",71,40.3,62,35.0,73,41.0
+"HVA18 Central Ostrobothnia wellbeing services county","04-21 Malignant neoplasms (C00-C97)",148,218.1,159,234.6,159,234.8
+"HVA18 Central Ostrobothnia wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",8,11.8,8,11.8,3,4.4
+"HVA18 Central Ostrobothnia wellbeing services county","10 Malignant neoplasm of pancreas (C25)",17,25.1,21,31.0,15,22.1
+"HVA18 Central Ostrobothnia wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",25,36.8,23,33.9,23,34.0
+"HVA19 North Ostrobothnia wellbeing services county","04-21 Malignant neoplasms (C00-C97)",804,193.2,864,207.0,876,209.4
+"HVA19 North Ostrobothnia wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",38,9.1,38,9.1,49,11.7
+"HVA19 North Ostrobothnia wellbeing services county","10 Malignant neoplasm of pancreas (C25)",78,18.7,93,22.3,95,22.7
+"HVA19 North Ostrobothnia wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",152,36.5,164,39.3,169,40.4
+"HVA20 Kainuu wellbeing services county","04-21 Malignant neoplasms (C00-C97)",220,310.3,224,318.4,195,279.0
+"HVA20 Kainuu wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",19,26.8,9,12.8,13,18.6
+"HVA20 Kainuu wellbeing services county","10 Malignant neoplasm of pancreas (C25)",23,32.4,32,45.5,20,28.6
+"HVA20 Kainuu wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",38,53.6,46,65.4,41,58.7
+"HVA21 Lapland wellbeing services county","04-21 Malignant neoplasms (C00-C97)",536,304.3,479,272.2,499,283.3
+"HVA21 Lapland wellbeing services county","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",26,14.8,34,19.3,29,16.5
+"HVA21 Lapland wellbeing services county","10 Malignant neoplasm of pancreas (C25)",50,28.4,45,25.6,49,27.8
+"HVA21 Lapland wellbeing services county","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",124,70.4,102,58.0,98,55.6
+"HVA90 City of Helsinki","04-21 Malignant neoplasms (C00-C97)",1245,188.3,1308,195.4,1213,178.6
+"HVA90 City of Helsinki","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",67,10.1,56,8.4,51,7.5
+"HVA90 City of Helsinki","10 Malignant neoplasm of pancreas (C25)",124,18.8,128,19.1,108,15.9
+"HVA90 City of Helsinki","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",229,34.6,208,31.1,236,34.7
+"MA2 ÅLAND","04-21 Malignant neoplasms (C00-C97)",82,270.2,70,229.9,97,317.0
+"MA2 ÅLAND","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",4,13.2,1,3.3,4,13.1
+"MA2 ÅLAND","10 Malignant neoplasm of pancreas (C25)",11,36.2,5,16.4,9,29.4
+"MA2 ÅLAND","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",17,56.0,18,59.1,16,52.3
+"HVA91 Åland","04-21 Malignant neoplasms (C00-C97)",82,270.2,70,229.9,97,317.0
+"HVA91 Åland","09 Primary malignant neoplasm of liver and intrahepatic bile ducts (C22)",4,13.2,1,3.3,4,13.1
+"HVA91 Åland","10 Malignant neoplasm of pancreas (C25)",11,36.2,5,16.4,9,29.4
+"HVA91 Åland","11 Malignant neoplasm of larynx, trachea, bronchus and lung (C32-C34)",17,56.0,18,59.1,16,52.3

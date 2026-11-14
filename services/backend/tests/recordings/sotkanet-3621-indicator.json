@@ -1,0 +1,142 @@
+{
+"id" : 3621,
+"data-updated": "2026-06-12",
+"range" : {
+"start": 1992,
+"end": 2024
+},
+"title" : {
+"fi": "Rintasyövän seulontaan (mammografia) osallistuneiden osuus kutsutuista, %",
+"en": "Proportion of women invited to breast cancer screening (mammography) who attended, %",
+"sv": "Andelen kvinnor som deltagit i bröstcancerscreening (mammografi) av dem som fått kallelse, %"
+}
+,
+"description" : {
+"fi": "Indikaattori ilmaisee rintasyövän seulontaan (mammografia) osallistuneiden osuuden kutsutuista. ",
+"en": "The indicator represents the percentage of invitees to breast cancer screening (mammography) who attended. ",
+"sv": "Indikatorn visar andelen kvinnor som deltagit i bröstcancerscreening (mammografi) av dem som fått kallelse. "
+}
+,
+"interpretation" : {
+"fi": "",
+"en": "",
+"sv": ""
+}
+,
+"limits" : {
+"fi": "",
+"en": "",
+"sv": ""
+}
+,
+"legislation" : {
+"fi": "",
+"en": "",
+"sv": ""
+}
+,
+"notices" : {
+"fi": "",
+"en": "",
+"sv": ""
+}
+,
+"primaryValueType" : {
+"code": "PROS",
+"title": {
+"fi": "Prosenttia",
+"en": "Percent",
+"sv": "Procent"
+}
+},
+"decimals" : 1,
+"classifications" : {
+"sex" : {
+"title": {
+"fi": "Naiset",
+"en": "Female",
+"sv": "Kvinnor"
+}
+,
+"values": ["female"]
+},
+"region" : {
+"title": {
+"fi": "Kunta, seutukunta, maakunta, hyvinvointialue, sairaanhoitopiiri, aluehallintoviraston alue, erityisvastuualue, suuralue, Manner-Suomi/Ahvenanmaa, koko maa",
+"en": "Municipality, sub-region, region, the wellbeing services county, hospital district, area for the regional state administrative agency, university hospital special responsibility area,, major region Mainland Finland/Åland, whole country",
+"sv": "Kommun, ekonomisk region, landskap, välfärdsområde, sjukvårdsdistrikt, området för regionförvaltningsverket, specialupptagningsområde, storområde, Fastlandsfinland/Åland, hela landet"
+}
+,
+"values": ["Suuralue","Maa","Sairaanhoitopiiri","Aluehallintovirasto","Nuts1","Kunta","Erva","Seutukunta","Maakunta"]
+}
+},
+"organization" : {
+"id" : 41,
+"title": {
+"fi": "Suomen Syöpärekisteri",
+"en": "Finnish Cancer Registry",
+"sv": "Finlands cancerregister"
+}
+},
+"subjects" : [
+{
+"fi" : "syöpä",
+"sv" : "cancer",
+"en" : "cancer",
+"uri" : ""
+},
+{
+"fi" : "mammografia",
+"sv" : "mammografi",
+"en" : "mammography",
+"uri" : ""
+},
+{
+"fi" : "seulonta",
+"sv" : "screening",
+"en" : "screening",
+"uri" : ""
+},
+{
+"fi" : "rintasyöpä",
+"sv" : "bröstcancer",
+"en" : "breast cancer",
+"uri" : ""
+},
+{
+"fi" : "palvelujen laatu",
+"sv" : "servicekvalitet",
+"en" : "quality of services",
+"uri" : ""
+},
+{
+"fi" : "hyvinvointikertomus",
+"sv" : "välfärdsberättelse",
+"en" : "health report"
+}
+],
+"sources": [
+{
+"organization" : {
+"id" : 41,
+"title": {
+"fi": "Suomen Syöpärekisteri",
+"en": "Finnish Cancer Registry",
+"sv": "Finlands cancerregister"
+}
+},
+"title" : {
+"fi": "Seulontatilastot (Suomen Syöpärekisteri)",
+"en": "Screening statistics (Finnish Cancer Registry)",
+"sv": "Screeningstatistik (Finlands cancerregister)"
+}
+,
+"description" : {
+"fi": "",
+"en": "",
+"sv": ""
+}
+}
+],
+"groups": [ 926, 644 ]
+}
