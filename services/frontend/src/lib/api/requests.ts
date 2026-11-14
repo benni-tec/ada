@@ -2,7 +2,7 @@
 // answers are checked against the backend's OpenAPI schema.
 
 import { api, ApiFailure, type ApiError } from './client'
-import type { Id, Project, Session } from './models'
+import type { Id, Project, Session, SessionEntry } from './models'
 
 type Answer<T> = { data?: T; error?: unknown; response: Response }
 
@@ -62,16 +62,20 @@ export const renameSession = (session: Session, title: string) =>
     }),
   )
 
-export const listEntries = (sessionId: Id) =>
-  unwrap(api.GET('/api/sessions/{session_id}/entries', { params: { path: { session_id: sessionId } } }))
-
-export const addMessage = (sessionId: Id, text: string) =>
+/** Puts a dashboard beside the session, or with null takes it away. */
+export const setPanelDashboard = (session: Session, dashboardId: Id | null) =>
   unwrap(
-    api.POST('/api/sessions/{session_id}/messages', {
-      params: { path: { session_id: sessionId } },
-      body: { text },
+    api.PATCH('/api/sessions/{session_id}', {
+      params: { path: { session_id: session.id } },
+      body: { panel_dashboard_id: dashboardId, expected_revision: session.revision },
     }),
   )
+
+// Typed as the wave 3 entry (models.ts), which the generated schema does not have yet.
+export const listEntries = (sessionId: Id): Promise<SessionEntry[]> =>
+  unwrap(api.GET('/api/sessions/{session_id}/entries', { params: { path: { session_id: sessionId } } }))
+
+// Messages are posted with their context and model by `postMessage` (agent.ts, wave 3).
 
 export const listSessionWidgets = (sessionId: Id) =>
   unwrap(api.GET('/api/sessions/{session_id}/widgets', { params: { path: { session_id: sessionId } } }))

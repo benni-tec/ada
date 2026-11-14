@@ -9,6 +9,7 @@ export * from './requests'
 export * from './reports'
 export * from './runs'
 export * from './alerts'
+export * from './agent'
 
 export type Health = Schemas['Health']
 

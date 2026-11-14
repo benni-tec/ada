@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useContext, useEffect, useState } from 'react'
 
 import type { Id, LiveEvent } from '@/lib/api'
+import { forgetLiveParts, receivePart } from '@/lib/agent-turns'
 import { effectsOf, EVENT_TYPES } from '@/lib/events'
 
 export type Connection = 'connecting' | 'open' | 'reconnecting'
@@ -44,7 +45,9 @@ export function useProjectEvents(projectId: Id): Live {
       } catch {
         return
       }
-      const { invalidate, reloadWidgets } = effectsOf(event)
+      const { invalidate, reloadWidgets, turnPart, turnFinished } = effectsOf(event)
+      if (turnPart) receivePart(queryClient, turnPart.turnId, turnPart.index, turnPart.part)
+      if (turnFinished) forgetLiveParts(turnFinished)
       for (const queryKey of invalidate) void queryClient.invalidateQueries({ queryKey })
       if (reloadWidgets) setWidgetEpoch((epoch) => epoch + 1)
     }
@@ -56,6 +59,8 @@ export function useProjectEvents(projectId: Id): Live {
         attempt = 0
         setConnection('open')
         if (reconnecting) {
+          // Parts were missed too: every turn is fetched again and continues from there.
+          forgetLiveParts()
           void queryClient.invalidateQueries()
           setWidgetEpoch((epoch) => epoch + 1)
         }

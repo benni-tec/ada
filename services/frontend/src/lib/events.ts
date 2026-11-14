@@ -1,6 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query'
 
-import { alertKeys, dashboardKeys, keys, reportKeys, type EventType, type LiveEvent } from '@/lib/api'
+import { agentKeys, alertKeys, dashboardKeys, keys, reportKeys, type EventType, type LiveEvent, type Part } from '@/lib/api'
 
 /** What the page does about one live event. */
 export type Effects = {
@@ -9,6 +9,10 @@ export type Effects = {
   /** Widget frames reload: the data behind them may have changed. Widgets fetch their own
    * data, so the query cache cannot see it. */
   reloadWidgets: boolean
+  /** A part of an agent turn, to put into the turn as it is: the one event with content. */
+  turnPart?: { turnId: string; index: number; part: Part }
+  /** An agent turn that finished: what was streamed of it can be forgotten. */
+  turnFinished?: string
 }
 
 /** Every type the stream may carry; one listener each, since named server-sent events
@@ -26,6 +30,9 @@ export const EVENT_TYPES: readonly EventType[] = [
   'report.version_created',
   'alert.firing',
   'alert.resolved',
+  'agent.turn_started',
+  'agent.turn_part',
+  'agent.turn_finished',
 ]
 
 function id(payload: Record<string, unknown>, key: string): string | null {
@@ -39,6 +46,7 @@ export function effectsOf(event: LiveEvent): Effects {
   const { payload, project_id: projectId } = event
   const invalidate: QueryKey[] = []
   let reloadWidgets = false
+  const effects: Effects = { invalidate, reloadWidgets }
 
   switch (event.type) {
     case 'session.created':
@@ -94,6 +102,25 @@ export function effectsOf(event: LiveEvent): Effects {
     case 'alert.resolved':
       invalidate.push(alertKeys.all(), alertKeys.rules())
       break
+    case 'agent.turn_started':
+    case 'agent.turn_finished': {
+      // The record gains the turn's entry (or the agent's operators and widgets), and the
+      // turn its status; when it finished, its stored form is complete.
+      const session = id(payload, 'session_id')
+      if (session) invalidate.push(keys.entries(session))
+      const turn = id(payload, 'turn_id')
+      if (turn) invalidate.push(agentKeys.turn(turn))
+      if (turn && event.type === 'agent.turn_finished') effects.turnFinished = turn
+      break
+    }
+    case 'agent.turn_part': {
+      const turn = id(payload, 'turn_id')
+      const { index, part } = payload
+      if (turn && typeof index === 'number' && part && typeof part === 'object')
+        effects.turnPart = { turnId: turn, index, part: part as Part }
+      break
+    }
   }
-  return { invalidate, reloadWidgets }
+  effects.reloadWidgets = reloadWidgets
+  return effects
 }
