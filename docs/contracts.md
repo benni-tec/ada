@@ -196,6 +196,34 @@ Shared by the sources, the pipelines, the worker and the alerts:
 - **Registration checks.** `register` and `update` check the declared schema's roles
   (below), that its column names are unique, and the `pushdown` and `period` options.
 
+### Document sources (PDF)
+
+A document source (`access_kind: "document"`, `format: "pdf"`; the format `pdf` belongs
+to document sources only, and they have no other) has a PDF's URL as its address.
+`DocumentReader` (`adapters/sources/document.py`) fetches and probes it through the URL
+reader, so `headers`, `params`, `probe`, freshness and snapshots work as for a URL source,
+and extracts it locally with pdfplumber, in a worker thread. It hands on Parquet with the
+columns' exact types, so shaping leaves it alone and a document without tables still
+gives the declared (empty) table.
+
+| `options.extract` | Rows |
+| --- | --- |
+| `"pages"` (default) | `page integer, text text`: one per page; a page without a text layer has empty text |
+| `"tables"` | `page integer, table integer, row integer, cells json`: one per row of each table pdfplumber finds; `cells` is the row's cells as a list of strings (`""` for an empty cell), a DuckDB `VARCHAR[]`, so `cells[1]` is the first. Tables count per page, rows per table, all from 1 |
+
+- The columns are fixed per mode (`DOCUMENT_COLUMNS` in `core/models/sources.py`), so
+  `register` fills them in when the declared schema has none (keeping declared roles),
+  and the source operator knows its columns before any fetch. Declared columns that
+  differ from the mode's, an unknown mode, or an edit that changes the mode are `Invalid`:
+  another extract is another source.
+- `table` is a reserved word in SQL: a transform writes `"table"`.
+- An answer that is not a PDF (`<url> is not a PDF: it starts with ...`), a malformed PDF
+  (`<url> is not a readable PDF: ...`) and one that needs a password (`<url> is an
+  encrypted PDF ...`) are `Invalid`; the refresh fails and records the message as the
+  source's `last_error`.
+- Scanned pages are not read (no OCR); the national cancer strategy (64 pages, 1.7 MB)
+  takes about two seconds to extract either way.
+
 ### Periods and pushdown
 
 A period is an `Interval`, both ends inclusive. A time role names the columns of a
@@ -1021,7 +1049,7 @@ not describe it.
 ## Tests
 
 - **Backend tests by feature**, one file each (`services/backend/tests`): `test_sources`
-  (registering, freshness, the HTTP readers, shaping, the recorded examples),
+  (registering, freshness, the HTTP readers, shaping, document sources, the recorded examples),
   `test_pipelines` (building and running pipelines on DuckDB, the store, the pipelines
   list, roles and geography), `test_time` (periods and pushdown), `test_dashboards`,
   `test_reports`, `test_alerts` (the formula compiler first), `test_agent` (turns, the
@@ -1056,7 +1084,8 @@ not describe it.
   the report, alert and time tests; `tests/db_helpers.py` the SQL repositories on one
   session.
 - No test calls an external service. Source readers are tested against recorded
-  responses (`tests/recordings`, replayed by `Replay` in `tests/fakes.py`).
+  responses (`tests/recordings`, replayed by `Replay` in `tests/fakes.py`); the document
+  tests write a tiny PDF in the test (`pdf()` in `tests/test_sources.py`).
 - `tests/test_end_to_end.py` drives both slices over MCP against PostgreSQL, the DuckDB
   store and recorded answers, with the worker's tasks in an in-memory broker: NORDCAN to a
   table widget; and Sotkanet pushed down to a dashboard's years, mapped to the counties on

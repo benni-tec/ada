@@ -2,7 +2,8 @@ from datetime import datetime
 from enum import StrEnum
 
 from ada.core.models.base import DomainModel, Id, JsonObject
-from ada.core.models.schema import Schema
+from ada.core.models.errors import Invalid
+from ada.core.models.schema import Column, ColumnType, Schema
 
 
 class AccessKind(StrEnum):
@@ -20,6 +21,43 @@ class DataFormat(StrEnum):
     CSV = "csv"
     JSON = "json"
     PARQUET = "parquet"
+    # Read by document sources only, which extract it into rows (DocumentExtract).
+    PDF = "pdf"
+
+
+class DocumentExtract(StrEnum):
+    """What a document source makes of its PDF: `options.extract`."""
+
+    # One row per page: its number and its text.
+    PAGES = "pages"
+    # One row per row of a table found on a page, its cells as a list of strings.
+    TABLES = "tables"
+
+
+# The columns of each extract mode. They are fixed, so a document source's operator knows
+# its columns at registration. Pages, tables and rows are numbered from 1.
+DOCUMENT_COLUMNS: dict[DocumentExtract, tuple[Column, ...]] = {
+    DocumentExtract.PAGES: (
+        Column(name="page", type=ColumnType.INTEGER, nullable=False),
+        Column(name="text", type=ColumnType.TEXT, nullable=False),
+    ),
+    DocumentExtract.TABLES: (
+        Column(name="page", type=ColumnType.INTEGER, nullable=False),
+        Column(name="table", type=ColumnType.INTEGER, nullable=False),
+        Column(name="row", type=ColumnType.INTEGER, nullable=False),
+        Column(name="cells", type=ColumnType.JSON, nullable=False),
+    ),
+}
+
+
+def document_extract(options: JsonObject) -> DocumentExtract:
+    """The extract mode a document source's options ask for; pages by default."""
+    value = options.get("extract", DocumentExtract.PAGES.value)
+    try:
+        return DocumentExtract(value)
+    except ValueError:
+        modes = ", ".join(repr(mode.value) for mode in DocumentExtract)
+        raise Invalid(f"options.extract must be one of {modes}, not {value!r}") from None
 
 
 class FreshnessKind(StrEnum):

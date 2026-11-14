@@ -15,6 +15,7 @@ from dishka import Provider, Scope
 from dishka.integrations.fastapi import FastapiProvider
 
 import factories
+from ada.adapters.duckdb.store import DuckDbAnalysisStore
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import (
     MemoryDataSourceRepository,
@@ -41,7 +42,7 @@ from ada.adapters.sources.http import (
 from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.actors import ActorKind
-from ada.core.models.analysis import FetchedData
+from ada.core.models.analysis import FetchedData, Query
 from ada.core.models.base import Id
 from ada.core.models.errors import Conflict, Invalid, NotFound, Unavailable
 from ada.core.models.events import EventType
@@ -54,6 +55,7 @@ from ada.core.models.sources import (
     FreshnessPolicy,
 )
 from ada.core.models.time import TimeRange
+from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.sources import SourceReaders
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sources import SourceService
@@ -103,7 +105,7 @@ class World:
 
 
 def data_sources(
-    memory: MemoryStore, readers: SourceReaders, store: FakeAnalysisStore, clock: FixedClock
+    memory: MemoryStore, readers: SourceReaders, store: AnalysisStore, clock: FixedClock
 ) -> tuple[DataSources, MemoryEventBus]:
     events = MemoryEventBus()
     service = DataSources(
@@ -572,6 +574,160 @@ def test_an_answer_of_another_shape_is_invalid(
 ) -> None:
     with pytest.raises(Invalid):
         shape(fetched(content, format), options)
+
+
+# Documents
+
+
+def pdf(*pages: str) -> bytes:
+    """A minimal valid PDF whose pages draw the given content streams in Helvetica."""
+    objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    kids = []
+    for stream in pages:
+        objects.append(f"<< /Length {len(stream.encode())} >>\nstream\n{stream}\nendstream")
+        objects.append(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] "
+            f"/Resources << /Font << /F1 3 0 R >> >> /Contents {len(objects)} 0 R >>"
+        )
+        kids.append(f"{len(objects)} 0 R")
+    objects[1] = f"<< /Type /Pages /Kids [{' '.join(kids)}] /Count {len(kids)} >>"
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n{body}\nendobj\n".encode()
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
+    out += b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets)
+    out += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    )
+    return bytes(out)
+
+
+def text(x: int, y: int, words: str) -> str:
+    return f"BT /F1 10 Tf {x} {y} Td ({words}) Tj ET"
+
+
+# Two pages: text only, then a heading over a ruled two-by-two table.
+STRATEGY_PDF = pdf(
+    "\n".join([text(20, 170, "Cancer strategy"), text(20, 150, "Equal care for all")]),
+    "\n".join(
+        [
+            text(20, 170, "Incidence"),
+            "0.5 w 20 40 m 220 40 l S 20 70 m 220 70 l S 20 100 m 220 100 l S",
+            "20 40 m 20 100 l S 120 40 m 120 100 l S 220 40 m 220 100 l S",
+            text(25, 80, "region"),
+            text(125, 80, "cases"),
+            text(25, 50, "Uusimaa"),
+            text(125, 50, "13,300"),
+        ]
+    ),
+)
+
+
+class Documents:
+    """Document sources read through the real readers and store, from a server that
+    answers with `answer`."""
+
+    def __init__(self, data_dir: Path) -> None:
+        memory = MemoryStore()
+        project = factories.project()
+        memory.projects[project.id] = project
+        self.project_id = project.id
+        self.answer = STRATEGY_PDF
+        self.server = Server(lambda request: httpx.Response(200, content=self.answer))
+        self.store = DuckDbAnalysisStore(data_dir)
+        readers = HttpSourceReaders(create_client(httpx.MockTransport(self.server)), FixedClock())
+        self.service, _ = data_sources(memory, readers, self.store, FixedClock())
+
+    async def register(self, **changes: Any) -> DataSource:
+        arguments: dict[str, Any] = {
+            "name": "Strategy",
+            "access_kind": AccessKind.DOCUMENT,
+            "address": "https://example.test/strategy.pdf",
+            "format": DataFormat.PDF,
+        }
+        return await self.service.register(self.project_id, **(arguments | changes))
+
+    async def rows(self, source: DataSource) -> list[tuple[object, ...]]:
+        assert (await self.service.refresh(source.id)).changed
+        snapshot = await self.service.snapshots.current(source_operator_id(source), "")
+        assert snapshot is not None
+        query = Query(sql="SELECT * FROM s", relations={"s": snapshot.location})
+        return list((await self.store.run(query, limit=100)).rows)
+
+
+@pytest.fixture
+def documents(tmp_path: Path) -> Documents:
+    return Documents(tmp_path / "data")
+
+
+async def test_a_document_source_has_the_columns_of_its_extract_mode(
+    documents: Documents,
+) -> None:
+    pages = await documents.register()
+    tables = await documents.register(options={"extract": "tables"})
+
+    assert pages.declared_schema is not None and tables.declared_schema is not None
+    assert [c.name for c in pages.declared_schema.columns] == ["page", "text"]
+    assert [(c.name, c.type.value) for c in tables.declared_schema.columns] == [
+        ("page", "integer"),
+        ("table", "integer"),
+        ("row", "integer"),
+        ("cells", "json"),
+    ]
+    operator = await documents.service.operators.get(source_operator_id(tables))
+    assert operator.output == tables.declared_schema
+    # The columns are the mode's, so the mode cannot change on an edit.
+    with pytest.raises(Invalid, match="register another source"):
+        await documents.service.update(pages.id, 1, options={"extract": "tables"})
+    for refused in [
+        {"options": {"extract": "words"}},
+        {"format": DataFormat.CSV},
+        {"access_kind": AccessKind.URL},
+        {"declared_schema": factories.SCHEMA},
+    ]:
+        with pytest.raises(Invalid):
+            await documents.register(**refused)
+
+
+async def test_a_pdf_is_fetched_and_extracted_as_pages_or_as_table_rows(
+    documents: Documents,
+) -> None:
+    pages = await documents.rows(await documents.register())
+    tables = await documents.rows(await documents.register(options={"extract": "tables"}))
+
+    assert pages == [
+        (1, "Cancer strategy\nEqual care for all"),
+        (2, "Incidence\nregion cases\nUusimaa 13,300"),
+    ]
+    assert tables == [
+        (2, 1, 1, ["region", "cases"]),
+        (2, 1, 2, ["Uusimaa", "13,300"]),
+    ]
+    assert [r.method for r in documents.server.requests] == ["GET", "GET"]
+
+
+async def test_a_pdf_that_cannot_be_read_fails_the_refresh_readably(
+    documents: Documents,
+) -> None:
+    source = await documents.register()
+
+    for answer, reason in [
+        (b"%PDF-1.4\nnot really", "is not a readable PDF"),
+        (b"<html>Moved</html>", "is not a PDF: it starts with '<html>Moved</html>'"),
+    ]:
+        documents.answer = answer
+        with pytest.raises(Invalid, match=reason):
+            await documents.service.refresh(source.id)
+        error = (await documents.service.get(source.id)).last_error
+        assert error is not None
+        assert error.startswith(f"https://example.test/strategy.pdf {reason}")
 
 
 # The examples, against their recorded answers

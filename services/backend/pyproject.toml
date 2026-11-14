@@ -11,6 +11,7 @@ dependencies = [
     "fastapi>=0.162.7",
     "fastmcp>=4.2.0",
     "httpx>=0.28.1",
+    "pdfplumber>=0.11.10",
     "psycopg[binary,pool]>=3.3.9",
     "pydantic-ai-slim[google,openai]>=2.68.0",
     "pydantic-settings>=2.16.3",
