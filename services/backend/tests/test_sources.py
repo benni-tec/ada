@@ -1015,13 +1015,15 @@ async def test_an_uploaded_pdf_is_parsed_by_context_dev_into_pages_or_table_rows
     assert [r.url.path for r in parse] == ["/v1/parse", "/v1/parse"]
     assert parse[0].headers["authorization"] == "Bearer ctxt_test"
     assert parse[0].content == STRATEGY_PDF
-    # Context.dev's refusals are the source's readable last error.
-    documents.parsed = (402, {"message": "Insufficient credits"})
+    # Context.dev's refusals are the source's readable last error: only the status and the
+    # error code, since an authentication error may echo the key.
+    documents.parsed = (402, {"error_code": "NO_CREDITS", "message": "key ctxt_test is out"})
     broke = await documents.register(
         address=stored.address, options=engine | {"extract": "tables"}, name="B"
     )
-    with pytest.raises(Invalid, match="no credits left: Insufficient credits"):
+    with pytest.raises(Invalid, match=r"no credits left: NO_CREDITS \(HTTP 402\)$") as refused:
         await documents.service.refresh(broke.id)
+    assert "ctxt_test" not in str(refused.value)
     with pytest.raises(Invalid, match="options.engine must be one of"):
         await documents.register(options={"engine": "magic"})
 

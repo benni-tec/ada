@@ -12,6 +12,7 @@ import re
 
 import httpx
 
+from ada.adapters.web import error_code
 from ada.core.models.errors import Invalid, Unavailable
 
 BASE_URL = "https://api.context.dev/v1"
@@ -41,7 +42,7 @@ class ContextDevParser:
             answer = await self._parse(content, ocr=True)
         if answer.status_code == 200:
             return str(answer.json().get("markdown") or "")
-        reason = _message(answer)
+        reason = _reason(answer, self.api_key)
         match answer.status_code:
             case 401 | 403:
                 raise Invalid(f"Context.dev refused the key: {reason}")
@@ -123,13 +124,12 @@ def _code(answer: httpx.Response) -> str | None:
     return body.get("error_code") or body.get("code") if isinstance(body, dict) else None
 
 
-def _message(answer: httpx.Response) -> str:
+def _reason(answer: httpx.Response, key: str) -> str:
+    """The status and the checked error code. Nothing else of the body is quoted: an
+    authentication error may echo the key."""
     try:
         body = answer.json()
     except ValueError:
-        return f"HTTP {answer.status_code}"
-    if isinstance(body, dict):
-        detail = body.get("message") or body.get("error") or body.get("error_code")
-        if detail:
-            return f"{detail} (HTTP {answer.status_code})"
-    return f"HTTP {answer.status_code}"
+        body = None
+    code = error_code(body, key) if isinstance(body, dict) else None
+    return f"{code} (HTTP {answer.status_code})" if code else f"HTTP {answer.status_code}"
