@@ -540,7 +540,9 @@ export interface components {
         /**
          * GeoRole
          * @description Which column holds a region code, in which code system and at which level, e.g.
-         *     system "sotkanet" and level "wellbeing_services_county".
+         *     system "sotkanet" and level "wellbeing_services_county". Level "mixed" says the column
+         *     holds regions of several levels, as Sotkanet's answers do (ada.core.services.schema.geo
+         *     lists the known systems and levels).
          */
         GeoRole: {
             /** Code */
@@ -550,6 +552,13 @@ export interface components {
             /** System */
             system: string;
         };
+        /**
+         * Grain
+         * @description The calendar unit every period of a table spans exactly. A table of windows of
+         *     several years, or of periods of mixed length, has no grain.
+         * @enum {string}
+         */
+        Grain: "year" | "quarter" | "month";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -974,11 +983,13 @@ export interface components {
         };
         /**
          * TimeRole
-         * @description Which columns hold the period a row describes.
+         * @description Which columns hold the period a row describes: its first and last day, both
+         *     inclusive, as dates.
          */
         TimeRole: {
             /** End */
             end: string;
+            grain?: components["schemas"]["Grain"] | null;
             /** Start */
             start: string;
         };
