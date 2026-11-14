@@ -5,9 +5,11 @@ from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, status
 from pydantic import model_validator
 
+from ada.core.models.agents import PostedMessage
 from ada.core.models.base import Id
-from ada.core.models.sessions import Session, SessionEntry
+from ada.core.models.sessions import Context, Session, SessionEntry
 from ada.core.models.widgets import Widget
+from ada.core.services.ports.agents import AgentTurnService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.widgets import WidgetService
@@ -39,6 +41,10 @@ class SessionChange(Request):
 
 class NewMessage(Request):
     text: str
+    # What the message is about: a pipeline, a dashboard and slot, a widget.
+    context: tuple[Context, ...] = ()
+    # Another configured model than the session agent, by its id.
+    model: str | None = None
 
 
 @router.get("/projects/{project_id}/sessions")
@@ -83,9 +89,11 @@ async def list_entries(
 
 @router.post("/sessions/{session_id}/messages", status_code=status.HTTP_201_CREATED)
 async def add_message(
-    session_id: Id, body: NewMessage, service: FromDishka[SessionService]
-) -> SessionEntry:
-    return await service.add_message(session_id, body.text, WEB)
+    session_id: Id, body: NewMessage, service: FromDishka[AgentTurnService]
+) -> PostedMessage:
+    """Add a message. With a session agent configured, its answer is queued as a turn,
+    which the response carries; `turn` is null without one."""
+    return await service.post_message(session_id, body.text, WEB, body.context, body.model)
 
 
 @router.get("/sessions/{session_id}/widgets")

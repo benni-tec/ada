@@ -14,6 +14,8 @@ env:
   DATA_DIR: "$workspaceRoot/data"
   # Built by `moon run widgets:build`; served at /api/widget-bundles and over MCP.
   WIDGETS_DIR: "$workspaceRoot/services/widgets/dist"
+  # The in-platform agent's models (llms.example.yml); a missing file means no agent.
+  ADA_LLMS_CONFIG: "$workspaceRoot/config/llms.yml"
 
 fileGroups:
   sources:

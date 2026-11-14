@@ -1,0 +1,37 @@
+import logging
+from uuid import UUID
+
+from dishka import AsyncContainer
+from dishka.integrations.taskiq import FromDishka
+
+from ada.core.services.ports.agents import AgentTurnService
+from ada.entrypoints.mcp.agent import InProcessToolbox
+from ada.entrypoints.worker.registry import task
+
+logger = logging.getLogger(__name__)
+
+
+@task()
+async def run_turn(
+    turn_id: str,
+    *,
+    service: FromDishka[AgentTurnService],
+    container: FromDishka[AsyncContainer],
+) -> None:
+    """Queued when a message is posted and a session agent is configured. Runs the agent
+    with the platform's own MCP tools, each call a unit of work of its own, so what it
+    builds is stored and announced as it goes, like an external agent's work."""
+    try:
+        await service.run(UUID(turn_id), InProcessToolbox(_application(container)))
+    except Exception:
+        # The service ends every turn it started, failed or not; this is for what happens
+        # before (the turn cannot be read). Ending normally keeps the worker running.
+        logger.exception("Running agent turn %s failed", turn_id)
+
+
+def _application(container: AsyncContainer) -> AsyncContainer:
+    """The application's container, which outlives this task: the tool calls open their
+    own request scopes from it, as HTTP requests do."""
+    while container.parent_container is not None:
+        container = container.parent_container
+    return container

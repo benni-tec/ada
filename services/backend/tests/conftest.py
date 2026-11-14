@@ -13,6 +13,9 @@ from ada.config import Settings
 
 # The development database of docker-compose.infra.yml; moon sets the same value.
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://ada:ada-dev@localhost:5434/ada")
+# Never the developer's models file (moon points at config/llms.yml): tests run without an
+# agent unless they configure one, and never reach a provider.
+os.environ["ADA_LLMS_CONFIG"] = str(Path(__file__).parent / "no-llms.yml")
 
 
 @pytest.fixture

@@ -17,6 +17,7 @@ from taskiq_redis import RedisStreamBroker
 
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.ports.agents import LanguageModels
 from ada.core.services.ports.system import SystemStatusService
 from ada.discovery import modules
 from ada.entrypoints.worker import tasks
@@ -59,6 +60,8 @@ def create_broker(settings: Settings, *providers: Provider, in_memory: bool = Fa
 
         @broker.on_event(TaskiqEvents.WORKER_STARTUP)
         async def _startup(state: TaskiqState) -> None:
+            # A models file that cannot be used stops the worker with every problem named.
+            await container.get(LanguageModels)
             # Report alive right away instead of waiting for the first scheduled heartbeat.
             await (await container.get(SystemStatusService)).record_heartbeat()
 
