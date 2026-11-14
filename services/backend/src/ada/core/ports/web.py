@@ -1,69 +1,58 @@
-"""The web on ADA's own account (Context.dev): explored by agents, read by web sources."""
+"""The web on ADA's own accounts: Exa searches it, Context.dev reads, extracts, maps,
+crawls and watches it, for agents (the web tools) and for web sources."""
 
 from collections.abc import Sequence
 from datetime import date
 from typing import Any, Protocol
 
-from ada.core.models.base import DomainModel, Id, JsonObject
+from ada.core.models.base import Id
+from ada.core.models.web import (
+    Answer,
+    Crawl,
+    Extraction,
+    Monitor,
+    SearchHit,
+    SearchScope,
+    WebLink,
+    WebPage,
+)
 
 
-class SearchResult(DomainModel):
-    title: str
-    url: str
-    snippet: str
-
-
-class WebPage(DomainModel):
-    # The final address, after redirects.
-    url: str
-    title: str | None = None
-    markdown: str
-
-
-class WebLink(DomainModel):
-    url: str
-    title: str | None = None
-
-
-class Crawl(DomainModel):
-    pages: list[WebPage]
-    # What Context.dev charged; one per page when it does not say.
-    credits: int
-
-
-class Answer(DomainModel):
-    # In the shape of the json_format asked for.
-    content: JsonObject
-    # The URLs the answer read or cites.
-    sources: list[str]
-    credits: int
-
-
-class WebExplorer(Protocol):
-    """Search, read, map and crawl the web, and research answers. Every call carries
-    `tags`, which say on whose behalf it was made (Context.dev's usage labels). Raises
-    Invalid with a readable reason when the service refuses (no key, no credits, a page
-    it cannot read), Unavailable when it is busy or unreachable."""
+class WebSearch(Protocol):
+    """Exa's search. Raises Invalid (search_not_configured) without a key, Unavailable
+    when the call fails."""
 
     @property
     def configured(self) -> bool:
         """Whether a key is set; without one every call raises Invalid."""
         ...
 
-    async def search(
-        self,
-        query: str,
-        *,
-        num_results: int,
-        include_domains: Sequence[str] | None,
-        exclude_domains: Sequence[str] | None,
-        country: str | None,
-        languages: Sequence[str] | None,
-        tags: Sequence[str],
-    ) -> list[SearchResult]: ...
+    async def search(self, query: str, scope: SearchScope, limit: int) -> list[SearchHit]: ...
 
-    async def read(self, url: str, *, tags: Sequence[str]) -> WebPage:
-        """The page as Markdown."""
+
+class WebExplorer(Protocol):
+    """Context.dev: read, extract, map and crawl the web, research answers, and watch
+    pages. Every call that reads carries `tags`, which say on whose behalf it was made
+    (Context.dev's usage labels). Raises Invalid with a readable reason when the service
+    refuses (no key, no credits, a page it cannot read), Unavailable when it is busy or
+    unreachable."""
+
+    @property
+    def configured(self) -> bool:
+        """Whether a key is set; without one every call raises Invalid."""
+        ...
+
+    async def read(
+        self, url: str, *, tags: Sequence[str], main_content_only: bool = False
+    ) -> WebPage:
+        """The page as Markdown; with `main_content_only` without navigation and footers."""
+        ...
+
+    async def extract(
+        self, url: str, instruction: str, columns: Sequence[str], *, tags: Sequence[str]
+    ) -> Extraction:
+        """Rows with the given columns, as a model reads them off the page following
+        `instruction` (null where the page does not state a value)."""
         ...
 
     async def map(
@@ -92,9 +81,18 @@ class WebExplorer(Protocol):
         """A researched answer to `task` in the shape of the example `json_format`."""
         ...
 
+    async def watch(self, url: str, webhook_url: str) -> Monitor:
+        """Watch the page: Context.dev checks it daily and calls the webhook, signed with
+        the monitor's secret, when it changed."""
+        ...
+
+    async def unwatch(self, monitor_id: str) -> None:
+        """Delete the monitor; one that is gone already is no error."""
+        ...
+
 
 class WebBudget(Protocol):
-    """The Context.dev credits each project spent per day."""
+    """The web credits each project spent per day."""
 
     async def spend(self, project_id: Id, day: date, credits: int, limit: int) -> bool:
         """Count `credits` for the project on `day` unless that would exceed `limit`; then

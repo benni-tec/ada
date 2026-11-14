@@ -16,10 +16,11 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, SecretStr
 
 from ada.core.models.base import DomainModel, Id, JsonObject
-from ada.core.models.sessions import SessionEntry
+from ada.core.models.sessions import SessionAgent, SessionEntry
 
 # What a configured model is for. One for now; the operators of later waves add theirs.
 SESSION_AGENT = "session_agent"
+RESEARCH_AGENT = "research_agent"
 
 # A provider's name: the first half of its models' ids.
 PROVIDER_NAME = r"^[a-z0-9-]+$"
@@ -68,6 +69,8 @@ class AgentSettings(DomainModel):
     # Free text for the session agent in every project (e.g. a pasted skill), added to its
     # system prompt after ADA's own rules; "" for none.
     instructions: str = ""
+    # The model id that runs research sessions; None without one, cleared likewise.
+    research_agent: str | None = None
     revision: int = 1
 
 
@@ -78,7 +81,7 @@ class ModelInfo(DomainModel):
     id: str
     provider: str
     model: str
-    # What it is used for, e.g. "session_agent".
+    # What it is used for, e.g. "session_agent" or "research_agent".
     purposes: tuple[str, ...] = ()
     # False when it cannot be used, e.g. its provider needs a key and has none; `reason`
     # says why.
@@ -90,6 +93,14 @@ class ModelList(DomainModel):
     models: tuple[ModelInfo, ...] = ()
     # The model that answers messages in sessions and dashboard panels; None without one.
     session_agent: str | None = None
+    research_agent: str | None = None
+
+    def agent_for(self, agent: SessionAgent) -> str | None:
+        """The model that answers in a session `agent` works in. Research sessions fall
+        back to the session agent's model."""
+        if agent is SessionAgent.RESEARCH:
+            return self.research_agent or self.session_agent
+        return self.session_agent
 
 
 class AgentSettingsView(DomainModel):
@@ -98,12 +109,18 @@ class AgentSettingsView(DomainModel):
     providers: tuple[LlmProvider, ...] = ()
     models: ModelList = ModelList()
     session_agent: str | None = None
+    research_agent: str | None = None
     # False when no master key is set (ADA_SECRET_KEY): API keys cannot be stored.
     secrets_available: bool
     # The instructions for the session agent in every project; "" for none.
     instructions: str = ""
     # The revision of AgentSettings, for setting the session agent or the instructions.
     revision: int
+
+
+class ResearchLimits(DomainModel):
+    # Paid web tool calls a research session may make, over all its turns.
+    web_calls: int = 40
 
 
 class ModelTarget(DomainModel):

@@ -12,7 +12,7 @@ from ada.core.models.agents import (
     ProviderKind,
 )
 from ada.core.models.base import UNCHANGED, Change, Id
-from ada.core.models.sessions import Context
+from ada.core.models.sessions import Context, Session, SessionEntry
 from ada.core.ports.agents import AgentToolbox
 
 
@@ -33,7 +33,27 @@ class AgentTurnService(Protocol):
     ) -> PostedMessage:
         """Add a message to a session and, when a session agent is configured, queue its
         turn: the turn, an agent_turn entry after the message, and the task once this
-        commits. `model` picks another configured model than the session agent."""
+        commits. `model` picks another configured model than the session agent; a
+        research session's turns default to the research agent."""
+        ...
+
+    async def post_report(self, child_session_id: Id, text: str, actor: Actor) -> PostedMessage:
+        """Add a research session's report to its parent. When an agent delegated the
+        research, the report also queues the parent's turn, as a message would; when a
+        person did, it is only added to the record."""
+        ...
+
+    async def wait(self, id: Id) -> None:
+        """Return once the earlier turns of the turn's session have ended, or at once when
+        the turn is no longer queued: the session's turns run one after the other. A turn
+        ahead that holds the session up for longer than a turn may run is failed first, so
+        two turns of a session never run at once."""
+        ...
+
+    async def ended(self, id: Id) -> None:
+        """Announce a turn that ended without `run` ending it (it could not be queued, or
+        it was failed after its worker stopped): that it finished, and for a research turn
+        what `run` would report into the parent session."""
         ...
 
     async def turns(self, session_id: Id) -> Sequence[AgentTurn]:
@@ -101,4 +121,41 @@ class AgentSettingsService(Protocol):
     ) -> AgentSettingsView:
         """The session agent's instructions for every project, added to its system prompt
         after ADA's own rules; "" for none. Shares the revision with the session agent."""
+        ...
+
+    async def set_research_agent(
+        self, model_id: str | None, expected_revision: int
+    ) -> AgentSettingsView:
+        """None lets research sessions use the session agent. The model must be
+        configured."""
+        ...
+
+
+class ResearchService(Protocol):
+    """Research delegated to the research agent, which works in a child session and
+    reports back into the session that delegated."""
+
+    async def delegate(
+        self, parent_session_id: Id, brief: str, title: str, actor: Actor
+    ) -> Session:
+        """Create the research session, note the delegation in the parent and queue the
+        research agent's turn on the brief. Returns at once."""
+        ...
+
+    async def report(
+        self,
+        child_session_id: Id,
+        summary: str,
+        source_ids: Sequence[Id],
+        missing: Sequence[str],
+        actor: Actor,
+    ) -> SessionEntry:
+        """Post the research session's report into its parent: the summary, the sources
+        it added by name and what it could not find."""
+        ...
+
+    async def use_web_call(self, session_id: Id) -> None:
+        """Count a paid web call about to be made for the session, committed at once, so a
+        call that then fails counts too. A research session past its cap raises Invalid,
+        telling the agent to report back; other sessions are not capped."""
         ...

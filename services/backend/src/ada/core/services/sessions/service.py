@@ -13,6 +13,7 @@ from ada.core.models.sessions import (
     EntryKind,
     PipelineContext,
     Session,
+    SessionAgent,
     SessionEntry,
     ToolCall,
     WidgetContext,
@@ -167,6 +168,31 @@ class Sessions(SessionService):
         if project_id is not None and session.project_id != project_id:
             raise Invalid("The session belongs to another project than the one given")
         return session
+
+    async def create_research(self, parent_session_id: Id, title: str, actor: Actor) -> Session:
+        parent = await self.sessions.get(parent_session_id)
+        if parent.agent is SessionAgent.RESEARCH:
+            raise Invalid("A research session cannot delegate research")
+        child = Session(
+            id=uuid7(),
+            project_id=parent.project_id,
+            title=_title(title),
+            agent=SessionAgent.RESEARCH,
+            parent_session_id=parent.id,
+            created_at=self.clock.now(),
+        )
+        await self._add(child)
+        await self._append(parent, EntryKind.DELEGATION, child.title, str(child.id), actor)
+        return child
+
+    async def record_report(self, child_session_id: Id, text: str, actor: Actor) -> SessionEntry:
+        child = await self.sessions.get(child_session_id)
+        if child.agent is not SessionAgent.RESEARCH or child.parent_session_id is None:
+            raise Invalid("Only a research session reports back, into the session it serves")
+        if not text.strip():
+            raise Invalid("A report needs text")
+        parent = await self.sessions.get(child.parent_session_id)
+        return await self._append(parent, EntryKind.REPORT, text, str(child.id), actor)
 
     async def _checked(self, session: Session, item: Context) -> Context:
         """A context item that names something of the session's project. A message about

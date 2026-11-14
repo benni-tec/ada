@@ -12,8 +12,10 @@ export type RecordItem =
 const RECORDING_TOOLS = new Set(['add_source_operator', 'add_transform', 'create_widget', 'build_pipeline'])
 
 /** Calls whose answers are for the agent alone: it may not show them to the person. */
+const EXPLORATION_TOOLS = new Set(['query_operator', 'search_web', 'read_page', 'extract_table', 'map_site'])
+
 export function isExploration(tool: string): boolean {
-  return tool === 'query_operator' || tool.startsWith('web_')
+  return EXPLORATION_TOOLS.has(tool)
 }
 
 export function isToolCall(entry: SessionEntry): entry is ToolCallEntry {

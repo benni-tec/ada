@@ -7,7 +7,7 @@ from ada.core.models.runs import Snapshot
 from ada.core.models.sources import DataSource, FreshnessKind, FreshnessPolicy
 
 # Policies the scheduler acts on. The others wait to be asked: manual by a person or an
-# agent, push by a webhook that does not exist yet.
+# agent, push by a page monitor's webhook (watch_source, routers/hooks.py).
 SCHEDULED = frozenset({FreshnessKind.TTL, FreshnessKind.PROBE})
 
 

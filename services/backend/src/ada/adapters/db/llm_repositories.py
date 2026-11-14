@@ -151,26 +151,34 @@ class SqlAgentSettingsRepository(AgentSettingsRepository):
         return await self._settings(row)
 
     async def update(self, settings: AgentSettings, expected_revision: int) -> AgentSettings:
-        model_id: UUID | None = None
-        if settings.session_agent is not None:
-            model_id = (await _model_row(self.session, settings.session_agent))[0].id
+        model_ids: dict[str, UUID | None] = {}
+        for column, model in (
+            ("session_agent_model_id", settings.session_agent),
+            ("research_agent_model_id", settings.research_agent),
+        ):
+            model_ids[column] = (
+                (await _model_row(self.session, model))[0].id if model is not None else None
+            )
         row = await update_row(
             self.session,
             AgentSettingsRow,
             "agent settings",
             SETTINGS_ID,
             expected_revision,
-            {"session_agent_model_id": model_id, "instructions": settings.instructions},
+            {**model_ids, "instructions": settings.instructions},
         )
         return await self._settings(row)
 
     async def _settings(self, row: AgentSettingsRow) -> AgentSettings:
-        session_agent = None
-        if row.session_agent_model_id is not None:
-            statement = _models().where(LlmModelRow.id == row.session_agent_model_id)
-            found = (await self.session.execute(statement)).first()
-            if found is not None:
-                session_agent = _model(found[0], found[1]).id
         return AgentSettings(
-            session_agent=session_agent, instructions=row.instructions, revision=row.revision
+            session_agent=await self._model_id(row.session_agent_model_id),
+            research_agent=await self._model_id(row.research_agent_model_id),
+            instructions=row.instructions,
+            revision=row.revision,
         )
+
+    async def _model_id(self, id: UUID | None) -> str | None:
+        if id is None:
+            return None
+        found = (await self.session.execute(_models().where(LlmModelRow.id == id))).first()
+        return _model(found[0], found[1]).id if found is not None else None

@@ -35,13 +35,21 @@ class Settings(BaseSettings):
     secret_key: SecretStr | None = Field(None, validation_alias="ADA_SECRET_KEY")
     secret_key_file: Path | None = Field(None, validation_alias="ADA_SECRET_KEY_FILE")
     # Context.dev's API key, for document sources with `options.engine: "context.dev"`,
-    # web sources and the web tools (web_search, web_read, web_map), all on ADA's account.
+    # web sources, page monitors and the web tools (read_page, extract_table, map_site), all
+    # on ADA's account.
     context_dev_api_key: SecretStr | None = Field(
         None, validation_alias=AliasChoices("CONTEXT_DEV_API_KEY", "CONTEXT_API_KEY")
     )
-    # Context.dev credits each project may spend per day (UTC), web tools and web sources
-    # together.
+    # Exa's API key, for search_web. Unset: the tool refuses, naming it.
+    exa_api_key: SecretStr | None = None
+    # Web credits each project may spend per day (UTC): the web tools (Exa searches
+    # included, see WEB_SEARCH_CREDITS) and web sources together.
     web_daily_credit_limit: int = Field(300, ge=0)
+    # Where Context.dev can reach this platform, for page monitor webhooks. Unset:
+    # watching refuses, naming it.
+    ada_public_url: str | None = None
+    # Paid web tool calls (Exa and Context.dev) a research session may make.
+    research_web_calls: int = 40
 
     def master_key(self) -> str | None:
         """ADA_SECRET_KEY, else the contents of ADA_SECRET_KEY_FILE; None when neither is

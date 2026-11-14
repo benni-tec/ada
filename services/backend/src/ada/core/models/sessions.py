@@ -9,6 +9,13 @@ from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.operators import OperatorId
 
 
+class SessionAgent(StrEnum):
+    # An ordinary session, led by the person's agent.
+    SESSION = "session"
+    # A child session in which the research agent runs.
+    RESEARCH = "research"
+
+
 class Session(DomainModel):
     """Exploratory work led by an agent. Belongs to a project, not to a user."""
 
@@ -20,6 +27,10 @@ class Session(DomainModel):
     # The dashboard shown beside the conversation, if any.
     panel_dashboard_id: Id | None = None
     created_at: datetime
+    # Which agent works in it.
+    agent: SessionAgent = SessionAgent.SESSION
+    # The session that delegated to this one; None for a session of its own.
+    parent_session_id: Id | None = None
     revision: int = 1
 
 
@@ -36,6 +47,10 @@ class EntryKind(StrEnum):
     # An MCP tool call of an external agent, whatever it did; `tool_call` says which. The
     # in-platform agent's calls are in its turn instead.
     TOOL_CALL = "tool_call"
+    # The agent handed work to a child session; `ref` is its id.
+    DELEGATION = "delegation"
+    # What a child session came back with; `ref` is its id and `text` the report.
+    REPORT = "report"
 
 
 class ToolCallStatus(StrEnum):

@@ -57,6 +57,13 @@ export const updateSource = (source: DataSource, change: SourceChange) =>
 export const refreshSource = (id: Id) =>
   unwrap(api.POST('/api/sources/{source_id}/refresh', { params: { path: { source_id: id } }, body: { force: true } }))
 
+/** Has Context.dev watch the source's page; the source then refreshes when the page changes. */
+export const watchSource = (id: Id) =>
+  unwrap(api.POST('/api/sources/{source_id}/watch', { params: { path: { source_id: id } } }))
+
+export const unwatchSource = (id: Id) =>
+  unwrap(api.DELETE('/api/sources/{source_id}/watch', { params: { path: { source_id: id } } }))
+
 // Sessions
 
 export const listSessions = (projectId: Id) =>
@@ -92,6 +99,15 @@ export const setPanelDashboard = (session: Session, dashboardId: Id | null) =>
 
 export const listEntries = (sessionId: Id) =>
   unwrap(api.GET('/api/sessions/{session_id}/entries', { params: { path: { session_id: sessionId } } }))
+
+/** Hands a brief to a research agent in a new child session, which reports back here. */
+export const delegateResearch = (sessionId: Id, title: string, brief: string) =>
+  unwrap(
+    api.POST('/api/sessions/{session_id}/research', {
+      params: { path: { session_id: sessionId } },
+      body: { title, brief },
+    }),
+  )
 
 // Messages are posted with their context and model by `postMessage` (agent.ts).
 

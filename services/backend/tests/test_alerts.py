@@ -11,11 +11,13 @@ from uuid import UUID, uuid7
 
 import duckdb
 import pytest
+from cryptography.fernet import Fernet
 from dishka import AsyncContainer, Provider, Scope
 from dishka.integrations.fastapi import FastapiProvider
 from fastapi.testclient import TestClient
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
+from pydantic import SecretStr
 from taskiq import AsyncBroker
 
 from ada.adapters.valkey.tasks import ValkeyTaskDispatcher
@@ -38,6 +40,7 @@ from ada.entrypoints.worker.factory import ContainerMiddleware
 from alerts_support import MEASURE, TESTER, AlertOverrides, Setup, World, below, csv
 from api_support import call
 from conftest import settings_in
+from fakes import context_signature
 from memory import MemoryBackground, memory_adapters
 
 pytestmark = pytest.mark.anyio
@@ -323,7 +326,13 @@ START = csv(("north", 2023, 85), ("north", 2024, 70), ("south", 2023, 90), ("sou
 @pytest.fixture
 async def world(unreachable_settings: Settings) -> AsyncIterator[World]:
     overrides = AlertOverrides()
-    container = create_container(unreachable_settings, *memory_adapters(), overrides)
+    settings = unreachable_settings.model_copy(
+        update={
+            "ada_public_url": "https://ada.example",
+            "secret_key": SecretStr(Fernet.generate_key().decode()),
+        }
+    )
+    container = create_container(settings, *memory_adapters(), overrides)
     try:
         yield World(container, overrides)
     finally:
@@ -556,6 +565,31 @@ async def test_a_rule_is_due_when_its_interval_passed_or_its_data_changed(
     world.clock.advance(minutes=1)
     await world.refetch(setup.source, csv(("north", 2024, 90)))
     assert await due() == [timed.id, on_change.id]
+
+
+async def test_pushed_snapshot_makes_alert_rule_due(world: World, setup: Setup) -> None:
+    rule = await world.rule(setup)
+    async with world.alerts() as service:
+        await service.check(rule.id)
+        assert await service.due() == []
+    async with world.container() as request:
+        sources = await request.get(SourceService)
+        await sources.watch(setup.source.id)
+        monitor_secret = "test-secret"
+
+    body = b"{}"
+    now = world.clock.now()
+    signature = context_signature(monitor_secret, body, int(now.timestamp()))
+    async with world.container() as request:
+        assert await (await request.get(SourceService)).verify_push(
+            setup.source.id, body, signature, now
+        )
+    # What the webhook queues: a forced refresh that finds new content.
+    world.clock.advance(minutes=1)
+    await world.refetch(setup.source, csv(("north", 2024, 90)))
+
+    async with world.alerts() as service:
+        assert [r.id for r in await service.due()] == [rule.id]
 
 
 async def test_the_alert_pipeline_runs_on_the_alerting_rows_when_an_alert_fires(

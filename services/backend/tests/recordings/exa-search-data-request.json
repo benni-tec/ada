@@ -1,0 +1,29 @@
+{
+  "query": "cancer survival by hospital district Finland",
+  "type": "auto",
+  "numResults": 5,
+  "includeDomains": [
+    "sotkanet.fi",
+    "thl.fi",
+    "stat.fi",
+    "pxdata.stat.fi",
+    "syoparekisteri.fi",
+    "cancerregistry.fi",
+    "iarc.who.int",
+    "gco.iarc.fr",
+    "ec.europa.eu",
+    "oecd.org",
+    "who.int",
+    "kela.fi",
+    "duodecim.fi",
+    "avoindata.fi",
+    "zenodo.org",
+    "kaggle.com",
+    "figshare.com"
+  ],
+  "contents": {
+    "highlights": {
+      "maxCharacters": 600
+    }
+  }
+}

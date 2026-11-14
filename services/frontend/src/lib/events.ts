@@ -111,7 +111,7 @@ export function effectsOf(event: LiveEvent): Effects {
       // The record gains the turn's entry (or the agent's operators and widgets), and the
       // turn its status; when it finished, its stored form is complete.
       const session = id(payload, 'session_id')
-      if (session) invalidate.push(keys.entries(session))
+      if (session) invalidate.push(keys.entries(session), agentKeys.sessionTurns(session))
       const turn = id(payload, 'turn_id')
       if (turn) invalidate.push(agentKeys.turn(turn))
       if (turn && event.type === 'agent.turn_finished') effects.turnFinished = turn

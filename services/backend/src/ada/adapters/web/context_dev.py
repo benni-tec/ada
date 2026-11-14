@@ -1,23 +1,39 @@
-"""Context.dev's web API on ADA's key: search, scrape, map, crawl and answers.
+"""Context.dev's web API on ADA's key: scrape (Markdown, or a schema's JSON), map, crawl,
+answers and page monitors.
 
 Called over REST (https://api.context.dev/v1, `Authorization: Bearer <key>`). Exactly
-the parameters of the WebExplorer port are sent, with Markdown as the only scrape format,
-and every request carries the caller's `tags`; nothing else of the API (screenshots,
-browser actions, profiles, policies, ZDR) is reachable from here.
+the parameters of the WebExplorer port are sent, and every request that reads carries the
+caller's `tags`; nothing else of the API (screenshots, browser actions, profiles,
+policies, ZDR) is reachable from here. A read that fails keeps HTTP 200 with
+`success: false` in its format; only a malformed request is an HTTP error.
 """
 
 from collections.abc import Sequence
 from typing import Any
 
 import httpx
+from pydantic import SecretStr
 
 from ada.core.models.base import JsonObject
 from ada.core.models.errors import Invalid, Unavailable
-from ada.core.ports.web import Answer, Crawl, SearchResult, WebExplorer, WebLink, WebPage
+from ada.core.models.web import (
+    Answer,
+    Crawl,
+    Extraction,
+    Monitor,
+    WebLink,
+    WebPage,
+    reading_not_configured,
+)
+from ada.core.ports.web import WebExplorer
 
 BASE_URL = "https://api.context.dev/v1"
 # A crawl stops itself after about 80 seconds; an answer takes up to a few minutes.
 TIMEOUT = httpx.Timeout(180.0, connect=10.0)
+# What an extraction costs when Context.dev does not say (the recorded one cost 5).
+EXTRACT_CREDITS = 5
+# Watched pages are checked once a day.
+SCHEDULE = {"type": "interval", "frequency": 1, "unit": "days"}
 
 
 class ContextDevWeb(WebExplorer):
@@ -30,49 +46,53 @@ class ContextDevWeb(WebExplorer):
     def configured(self) -> bool:
         return bool(self.api_key)
 
-    async def search(
-        self,
-        query: str,
-        *,
-        num_results: int,
-        include_domains: Sequence[str] | None,
-        exclude_domains: Sequence[str] | None,
-        country: str | None,
-        languages: Sequence[str] | None,
-        tags: Sequence[str],
-    ) -> list[SearchResult]:
-        body: JsonObject = {"query": query, "numResults": num_results}
-        if include_domains:
-            body["includeDomains"] = list(include_domains)
-        if exclude_domains:
-            body["excludeDomains"] = list(exclude_domains)
-        if country:
-            body["country"] = country.lower()
-        if languages:
-            body["languages"] = list(languages)
-        answer = await self._send("POST", "/web/search", "search the web", tags, json=body)
-        return [
-            SearchResult(
-                title=str(result.get("title") or ""),
-                url=str(result.get("url") or ""),
-                snippet=str(result.get("description") or ""),
-            )
-            for result in answer.get("results") or []
-            if result.get("url")
-        ]
-
-    async def read(self, url: str, *, tags: Sequence[str]) -> WebPage:
-        body = {"url": url, "formats": {"markdown": True}}
+    async def read(
+        self, url: str, *, tags: Sequence[str], main_content_only: bool = False
+    ) -> WebPage:
+        body: JsonObject = {"url": url, "formats": {"markdown": True}}
+        if main_content_only:
+            body["sharedParams"] = {"mainContentOnly": True}
+            body["markdownParams"] = {"includeLinks": False}
         answer = await self._send("POST", "/web/scrape", f"read {url}", tags, json=body)
-        markdown = answer.get("markdown") or {}
-        if not markdown.get("success"):
-            reason = markdown.get("message") or markdown.get("error_code") or "no Markdown"
-            raise Invalid(f"Context.dev could not read {url}: {reason}")
+        markdown = _format(answer, "markdown", url)
         metadata = answer.get("metadata") or {}
         return WebPage(
             url=str(answer.get("url") or url),
             title=metadata.get("title") or None,
-            markdown=str(markdown.get("data") or ""),
+            markdown=str(markdown or ""),
+        )
+
+    async def extract(
+        self, url: str, instruction: str, columns: Sequence[str], *, tags: Sequence[str]
+    ) -> Extraction:
+        # The schema must be a top-level object, so the rows sit in a property. Nullable
+        # columns keep the model from guessing a value the page does not state.
+        schema = {
+            "type": "object",
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {c: {"type": ["string", "null"]} for c in columns},
+                        "required": list(columns),
+                    },
+                }
+            },
+            "required": ["rows"],
+        }
+        body = {
+            "url": url,
+            "formats": {"json": True},
+            "jsonParams": {"schema": schema, "instructions": instruction},
+        }
+        answer = await self._send("POST", "/web/scrape", f"extract from {url}", tags, json=body)
+        data = _format(answer, "json", url)
+        rows = data.get("rows") if isinstance(data, dict) else None
+        return Extraction(
+            rows=[row for row in rows or [] if isinstance(row, dict)],
+            truncated=bool((answer.get("json") or {}).get("isTruncated")),
+            credits=_credits(answer, EXTRACT_CREDITS),
         )
 
     async def map(
@@ -129,17 +149,34 @@ class ContextDevWeb(WebExplorer):
         sources = [str(source) for source in answer.get("sources") or []]
         return Answer(content=content, sources=sources, credits=_credits(answer, 10))
 
+    async def watch(self, url: str, webhook_url: str) -> Monitor:
+        body = {
+            "name": f"ada {url}"[:120],
+            "target": {"type": "page", "url": url},
+            "webhook": {"url": webhook_url, "events": ["change.detected"]},
+            "schedule": SCHEDULE,
+        }
+        answer = await self._send("POST", "/monitors", f"watch {url}", None, json=body)
+        webhook = answer.get("webhook") or {}
+        if not answer.get("id") or not webhook.get("secret"):
+            raise Invalid("Context.dev answered the new monitor without its id or secret")
+        return Monitor(id=str(answer["id"]), secret=SecretStr(str(webhook["secret"])))
+
+    async def unwatch(self, monitor_id: str) -> None:
+        try:
+            await self._send("DELETE", f"/monitors/{monitor_id}", "delete the monitor", None)
+        except _Gone:
+            # Deleted at Context.dev already: the goal is reached.
+            pass
+
     async def _send(
-        self, method: str, path: str, what: str, tags: Sequence[str], **kwargs: Any
+        self, method: str, path: str, what: str, tags: Sequence[str] | None, **kwargs: Any
     ) -> JsonObject:
         if not self.api_key:
-            raise Invalid(
-                "The web needs a Context.dev key: CONTEXT_DEV_API_KEY in the backend's "
-                "environment (.env.local in development)"
-            )
-        if "json" in kwargs:
+            raise reading_not_configured()
+        if tags is not None and "json" in kwargs:
             kwargs["json"] = {**kwargs["json"], "tags": list(tags)}
-        else:
+        elif tags is not None:
             # A comma-separated list in the query.
             kwargs["params"] = {**kwargs["params"], "tags": ",".join(tags)}
         try:
@@ -152,21 +189,40 @@ class ContextDevWeb(WebExplorer):
             )
         except httpx.HTTPError as error:
             raise Unavailable(f"Context.dev could not be reached: {error}") from error
-        if answer.status_code == 200:
-            body = answer.json()
+        if answer.status_code in (200, 201):
+            try:
+                body = answer.json()
+            except ValueError:
+                body = None
             if not isinstance(body, dict):
-                raise Invalid(f"Context.dev answered {what} with something unexpected")
+                raise Unavailable(f"Context.dev answered {what} with something other than JSON")
             return body
-        reason = _message(answer)
+        # The key never goes into a message: an authentication error may echo it.
+        reason = _message(answer).replace(self.api_key, "…")
         match answer.status_code:
             case 401 | 403:
                 raise Invalid(f"Context.dev refused the key: {reason}")
             case 402:
                 raise Invalid(f"Context.dev has no credits left: {reason}")
+            case 404 if method == "DELETE":
+                raise _Gone(reason)
             case 408 | 429 | 500 | 503 | 504:
                 raise Unavailable(f"Context.dev is busy and could not {what}: {reason}")
             case _:
                 raise Invalid(f"Context.dev could not {what}: {reason}")
+
+
+class _Gone(Invalid):
+    """What was to be deleted is not there."""
+
+
+def _format(answer: JsonObject, name: str, url: str) -> Any:
+    """The data of one requested format, or Invalid with Context.dev's reason."""
+    part = answer.get(name) or {}
+    if part.get("success") and part.get("data") is not None:
+        return part["data"]
+    reason = part.get("message") or part.get("error_code") or f"no {name}"
+    raise Invalid(f"Context.dev could not read {url}: {reason}")
 
 
 def _credits(answer: JsonObject, default: int) -> int:

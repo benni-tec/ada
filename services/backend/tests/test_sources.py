@@ -5,18 +5,25 @@ import asyncio
 import csv
 import io
 import json
-from collections.abc import Callable
+import time
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
+from uuid import uuid7
 
 import httpx
 import pytest
+from cryptography.fernet import Fernet
 from dishka import Provider, Scope
 from dishka.integrations.fastapi import FastapiProvider
+from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 import factories
+from ada.adapters.db.workspace_repositories import SqlSourceLocks
 from ada.adapters.duckdb.store import DuckDbAnalysisStore
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import (
@@ -28,6 +35,8 @@ from ada.adapters.memory.repositories import (
     MemorySourceLocks,
     MemoryStore,
 )
+from ada.adapters.memory.web import MemoryWebBudget
+from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.adapters.sources.examples import (
     EXAMPLES,
     NORDCAN_LUNG_SURVIVAL,
@@ -42,6 +51,7 @@ from ada.adapters.sources.http import (
     SourceUnavailable,
     create_client,
 )
+from ada.adapters.sources.web import WebPageReader
 from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.actors import ActorKind
@@ -50,36 +60,46 @@ from ada.core.models.base import Id
 from ada.core.models.errors import Conflict, Invalid, NotFound, Unavailable
 from ada.core.models.events import EventType
 from ada.core.models.operators import OperatorKind, operator_identity
+from ada.core.models.schema import Column, ColumnType, Schema
 from ada.core.models.sources import (
     AccessKind,
     DataFormat,
     DataSource,
+    FoundBy,
     FreshnessKind,
     FreshnessPolicy,
+    Provenance,
 )
 from ada.core.models.time import TimeRange
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.sources import SourceReaders
+from ada.core.ports.web import WebExplorer
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.refreshes import RefreshStatus, SnapshotSummary
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.sources.service import DataSources, source_operator_id
 from ada.core.services.sources.shaping import shape
 from ada.core.services.sources.waiting import WaitingRefreshes
+from api_support import FakeWeb, dispatcher, new_project, send, serve
 from conftest import settings_in
+from db_helpers import Repos, engine_for, unit_of_work
 from fakes import (
     RECORDINGS,
     FakeAnalysisStore,
+    FakeExplorer,
     FakeSourceReader,
     FakeSourceReaders,
     FixedClock,
     Replay,
+    context_signature,
 )
 from memory import MemoryBackground, MemoryRepositories
 
 pytestmark = pytest.mark.anyio
 
 CSV = b"region,value\nHelsinki,74.3\n"
+PUBLIC_URL = "https://ada.example"
+KEY = Fernet.generate_key().decode()
 
 
 @dataclass
@@ -110,7 +130,11 @@ class World:
 
 
 def data_sources(
-    memory: MemoryStore, readers: SourceReaders, store: AnalysisStore, clock: FixedClock
+    memory: MemoryStore,
+    readers: SourceReaders,
+    store: AnalysisStore,
+    clock: FixedClock,
+    explorer: WebExplorer | None = None,
 ) -> tuple[DataSources, MemoryEventBus]:
     events = MemoryEventBus()
     service = DataSources(
@@ -124,6 +148,9 @@ def data_sources(
         events=events,
         clock=clock,
         locks=MemorySourceLocks(),
+        explorer=explorer or FakeExplorer(),
+        secrets=FernetSecretBox(KEY),
+        public_url=PUBLIC_URL,
     )
     return service, events
 
@@ -197,6 +224,109 @@ async def test_an_update_changes_only_the_given_fields_from_the_current_revision
     assert (await world.service.get(source.id)).name == "Renamed"
 
 
+# Web extract sources and provenance
+
+
+PAGE = "https://example.test/page"
+WEEK = 7 * 24 * 60 * 60
+
+
+@pytest.fixture
+def explorer() -> FakeExplorer:
+    return FakeExplorer(rows=[{"county": "Uusimaa", "rate": "74.3"}, {"county": "Lappi"}])
+
+
+@pytest.fixture
+async def pages(world: World, explorer: FakeExplorer) -> World:
+    """The world with web sources, read by the web reader on the fake Context.dev."""
+    reader = WebPageReader(explorer, MemoryWebBudget(), world.clock, 300)
+    readers = FakeSourceReaders({AccessKind.WEB: reader, AccessKind.URL: world.reader})
+    world.service, world.events = data_sources(
+        world.memory, readers, world.store, world.clock, explorer
+    )
+    return world
+
+
+def extract_source(**changes: Any) -> dict[str, Any]:
+    columns = (
+        Column(name="county", type=ColumnType.TEXT),
+        Column(name="rate", type=ColumnType.NUMBER),
+    )
+    return {
+        "access_kind": AccessKind.WEB,
+        "address": PAGE,
+        "format": DataFormat.HTML,
+        "options": {"operation": "extract", "instruction": "the rate per county"},
+        "declared_schema": Schema(columns=columns),
+    } | changes
+
+
+async def test_an_extract_source_holds_the_rows_a_model_reads_off_the_page(
+    pages: World, explorer: FakeExplorer
+) -> None:
+    source = await pages.register(**extract_source(provenance=Provenance(publisher="THL")))
+
+    await pages.service.refresh(source.id)
+
+    assert explorer.calls == [
+        (
+            "extract",
+            {
+                "url": PAGE,
+                "instruction": "the rate per county",
+                "columns": ["county", "rate"],
+                "tags": ("ada", f"project:{pages.project_id}"),
+            },
+        )
+    ]
+    [written] = pages.store.written
+    assert written.format is DataFormat.PARQUET
+    assert [s.origin for s in pages.current(source)] == [PAGE]
+    # The registration says the rows are model-extracted, whatever the agent passed.
+    assert source.provenance == Provenance(publisher="THL", extracted_by_model=True)
+
+
+async def test_an_extract_source_is_fresh_for_a_week_at_least_or_watched(pages: World) -> None:
+    daily = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=WEEK // 7)
+    with pytest.raises(Invalid, match="ttl of at least 7 days"):
+        await pages.register(**extract_source(freshness=daily))
+    with pytest.raises(Invalid, match="needs a declared schema"):
+        await pages.register(**extract_source(declared_schema=None))
+    with pytest.raises(Invalid, match="options.instruction"):
+        await pages.register(**extract_source(options={"operation": "extract"}))
+
+    weekly = await pages.register(
+        **extract_source(freshness=FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=WEEK))
+    )
+    await pages.service.refresh(weekly.id, force=True)
+    with pytest.raises(Invalid, match="fetched at most every 7 days"):
+        await pages.service.refresh(weekly.id, force=True)
+    # Watched, its monitor's deliveries refresh it however often the page changes.
+    await pages.service.watch(weekly.id)
+    await pages.service.refresh(weekly.id, force=True)
+
+
+async def test_register_source_keeps_provenance(world: World) -> None:
+    provenance = Provenance(
+        publisher="THL",
+        licence="unknown",
+        found_by=FoundBy(query="stroke survival", scope="data"),
+        note="no licence on the page",
+    )
+
+    source = await world.register(provenance=provenance)
+    updated = await world.service.update(
+        source.id,
+        source.revision,
+        provenance=provenance.model_copy(update={"licence": "CC BY 4.0"}),
+    )
+
+    assert source.provenance == provenance
+    assert (await world.service.get(source.id)).provenance == updated.provenance
+    assert updated.provenance is not None and updated.provenance.licence == "CC BY 4.0"
+    assert (await world.register()).provenance is None
+
+
 # Refreshing
 
 
@@ -220,6 +350,27 @@ async def test_the_first_refresh_writes_a_snapshot_and_announces_it(world: World
     [event] = world.events.published
     assert event.type is EventType.SOURCE_REFRESHED
     assert event.payload == {"data_source_id": str(source.id), "changed": True}
+
+
+async def test_an_edit_from_before_watching_keeps_the_monitor(world: World) -> None:
+    source = await world.register()
+    repository = MemoryDataSourceRepository(world.memory)
+
+    await repository.set_monitor(source.id, "mon_1", "sealed")
+    await repository.update(source.model_copy(update={"name": "Renamed"}), source.revision)
+
+    stored = await repository.get(source.id)
+    assert (stored.name, stored.monitor_id) == ("Renamed", "mon_1")
+    assert await repository.monitor_secret_encrypted(source.id) == "sealed"
+
+
+async def test_snapshot_keeps_origin(world: World) -> None:
+    world.reader.origin = "https://final/url"
+    source = await world.register()
+
+    await world.service.refresh(source.id)
+
+    assert [s.origin for s in world.snapshots(source)] == ["https://final/url"]
 
 
 async def test_a_manual_source_is_fetched_only_when_asked_and_new_content_supersedes(
@@ -930,3 +1081,194 @@ async def test_each_example_declares_exactly_the_columns_it_produces(
             if row["country"] == "Finland" and row["period"] == "2020-2024"
         }
         assert finland == {1: 17.9, 2: 30.8}
+
+
+# Watched sources
+
+
+def web_page(**changes: Any) -> dict[str, Any]:
+    return {"access_kind": AccessKind.WEB, "address": PAGE, "format": DataFormat.HTML} | changes
+
+
+async def test_watch_stores_encrypted_secret_and_sets_push(
+    pages: World, explorer: FakeExplorer
+) -> None:
+    source = await pages.register(**web_page())
+
+    watched = await pages.service.watch(source.id)
+
+    sealed = pages.memory.monitor_secrets[source.id]
+    assert sealed != "test-secret"
+    assert FernetSecretBox(KEY).decrypt(sealed) == "test-secret"
+    assert (watched.monitor_id, watched.freshness.kind) == ("mon_1", FreshnessKind.PUSH)
+    assert "test-secret" not in watched.model_dump_json()
+    webhook = f"{PUBLIC_URL}/api/hooks/context/{source.id}"
+    assert explorer.calls == [("watch", {"url": PAGE, "webhook_url": webhook})]
+    elsewhere = await pages.register(address="ftp://example.test/data.csv")
+    with pytest.raises(Invalid, match="http"):
+        await pages.service.watch(elsewhere.id)
+
+
+async def test_watching_again_replaces_the_monitor_and_unwatch_clears_it(
+    pages: World, explorer: FakeExplorer
+) -> None:
+    source = await pages.register(**web_page())
+    await pages.service.watch(source.id)
+
+    await pages.service.watch(source.id)
+    unwatched = await pages.service.unwatch(source.id)
+
+    assert [call[0] for call in explorer.calls] == ["watch", "watch", "unwatch", "unwatch"]
+    assert explorer.calls[2] == ("unwatch", {"monitor_id": "mon_1"})
+    assert (unwatched.monitor_id, unwatched.freshness.kind) == (None, FreshnessKind.MANUAL)
+    assert source.id not in pages.memory.monitor_secrets
+
+
+async def test_a_failed_replacement_keeps_the_old_monitor(
+    pages: World, explorer: FakeExplorer
+) -> None:
+    source = await pages.register(**web_page())
+    before = await pages.service.watch(source.id)
+    sealed = pages.memory.monitor_secrets[source.id]
+    explorer.calls.clear()
+    explorer.failure = Unavailable("the monitor service is down")
+
+    with pytest.raises(Unavailable):
+        await pages.service.watch(source.id)
+
+    assert await pages.service.get(source.id) == before
+    assert pages.memory.monitor_secrets[source.id] == sealed
+    assert [call[0] for call in explorer.calls] == ["watch"]
+
+
+async def test_watch_without_public_url_fails_clearly(pages: World, explorer: FakeExplorer) -> None:
+    source = await pages.register(**web_page())
+    pages.service.public_url = None
+
+    with pytest.raises(Invalid, match="watching is not configured: ADA_PUBLIC_URL is not set"):
+        await pages.service.watch(source.id)
+    assert explorer.calls == []
+
+
+@pytest.fixture
+def watched(tmp_path: Path) -> Iterator[tuple[TestClient, str]]:
+    settings = settings_in(tmp_path).model_copy(
+        update={"ada_public_url": PUBLIC_URL, "secret_key": SecretStr(KEY)}
+    )
+    with serve(settings, FakeWeb()) as client:
+        project = new_project(client)
+        body = {"name": "Page", "access_kind": "web", "format": "html", "address": PAGE}
+        source = send(client, "POST", f"/projects/{project['id']}/sources", body, 201)
+        send(client, "POST", f"/sources/{source['id']}/watch")
+        yield client, source["id"]
+
+
+def deliver(
+    client: TestClient, source_id: Any, secret: str = "test-secret", at: float | None = None
+) -> Any:
+    body = b'{"event": "change.detected"}'
+    signature = context_signature(secret, body, int(time.time() if at is None else at))
+    return client.post(
+        f"/api/hooks/context/{source_id}", content=body, headers={"x-context-signature": signature}
+    )
+
+
+def test_hook_good_signature_queues_forced_refresh(watched: tuple[TestClient, str]) -> None:
+    client, source_id = watched
+
+    response = deliver(client, source_id)
+
+    assert (response.status_code, response.json()) == (202, {"status": "queued"})
+    assert [(str(i), force) for i, force in dispatcher(client).refreshes] == [(source_id, True)]
+    assert "test-secret" not in response.text
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        None,
+        "",
+        "t=1",
+        "t=x,v1=00",
+        "garbage",
+        f"t={9 * 10**399},v1=00",
+        "t=" + "9" * 5000 + ",v1=00",
+    ],
+)
+def test_hook_rejects_bad_signature(watched: tuple[TestClient, str], header: str | None) -> None:
+    client, source_id = watched
+    headers = {} if header is None else {"x-context-signature": header}
+
+    malformed = client.post(f"/api/hooks/context/{source_id}", content=b"{}", headers=headers)
+    wrong = deliver(client, source_id, secret="another-secret")
+
+    assert (malformed.status_code, wrong.status_code) == (401, 401)
+    assert dispatcher(client).refreshes == []
+
+
+def test_hook_rejects_stale_timestamp(watched: tuple[TestClient, str]) -> None:
+    client, source_id = watched
+
+    old = deliver(client, source_id, at=time.time() - 301)
+    future = deliver(client, source_id, at=time.time() + 301)
+
+    assert (old.status_code, future.status_code) == (401, 401)
+    assert dispatcher(client).refreshes == []
+
+
+def test_hook_unknown_source_is_404(watched: tuple[TestClient, str]) -> None:
+    client, source_id = watched
+    send(client, "DELETE", f"/sources/{source_id}/watch")
+
+    unwatched = deliver(client, source_id)
+    unknown = deliver(client, uuid7())
+
+    assert (unwatched.status_code, unknown.status_code) == (404, 404)
+    assert dispatcher(client).refreshes == []
+
+
+async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str) -> None:
+    explorer = FakeExplorer()
+    secrets = FernetSecretBox(KEY)
+
+    def service(repos: Repos) -> DataSources:
+        session = repos.data_sources.session  # type: ignore[attr-defined]
+        readers = FakeSourceReaders({AccessKind.WEB: FakeSourceReader()})
+        return DataSources(
+            repos.projects,
+            repos.data_sources,
+            repos.operators,
+            repos.snapshots,
+            readers,
+            MemorySourceCheckLog(MemoryStore()),
+            FakeAnalysisStore(),
+            MemoryEventBus(),
+            FixedClock(),
+            SqlSourceLocks(session),
+            explorer,
+            secrets,
+            PUBLIC_URL,
+        )
+
+    async with engine_for(migrated_database_url) as engine:
+        async with unit_of_work(engine) as repos:
+            project = factories.project()
+            await repos.projects.add(project)
+            source = await service(repos).register(
+                project.id, "Page", AccessKind.WEB, PAGE, DataFormat.HTML
+            )
+            watched = await service(repos).watch(source.id)
+        async with unit_of_work(engine) as repos:
+            column = await repos.data_sources.monitor_secret_encrypted(source.id)
+            verified = await service(repos).verify_push(
+                source.id,
+                b"{}",
+                context_signature("test-secret", b"{}", int(time.time())),
+                datetime.now(UTC),
+            )
+
+    assert column is not None and column != "test-secret"
+    assert secrets.decrypt(column) == "test-secret"
+    assert verified
+    assert (watched.monitor_id, watched.freshness.kind) == ("mon_1", FreshnessKind.PUSH)
+    assert "test-secret" not in watched.model_dump_json()

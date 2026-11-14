@@ -1,0 +1,18 @@
+{
+  "name": "ada feasibility probe (deleted)",
+  "target": {
+    "type": "page",
+    "url": "https://example.com/"
+  },
+  "webhook": {
+    "url": "https://example.com/api/hooks/context/probe",
+    "events": [
+      "change.detected"
+    ]
+  },
+  "schedule": {
+    "type": "interval",
+    "frequency": 1,
+    "unit": "days"
+  }
+}

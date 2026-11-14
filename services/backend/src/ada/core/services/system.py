@@ -1,4 +1,4 @@
-from ada.core.models.health import Health, Part
+from ada.core.models.health import Health, Part, WebConfigured
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.system import Database, TaskQueue
 from ada.core.services.ports.system import SystemStatusService
@@ -6,11 +6,16 @@ from ada.core.services.ports.system import SystemStatusService
 
 class SystemStatus(SystemStatusService):
     def __init__(
-        self, database: Database, task_queue: TaskQueue, analysis_store: AnalysisStore
+        self,
+        database: Database,
+        task_queue: TaskQueue,
+        analysis_store: AnalysisStore,
+        web: WebConfigured,
     ) -> None:
         self.database = database
         self.task_queue = task_queue
         self.analysis_store = analysis_store
+        self.web = web
 
     async def health(self) -> Health:
         database: Part = "ok" if await self.database.is_reachable() else "unavailable"
@@ -28,6 +33,9 @@ class SystemStatus(SystemStatusService):
             queue=queue,
             worker=worker,
             analysis_store=analysis_store,
+            web_search=self.web.search,
+            page_reading=self.web.reading,
+            watching=self.web.watching,
         )
 
     async def record_heartbeat(self) -> None:

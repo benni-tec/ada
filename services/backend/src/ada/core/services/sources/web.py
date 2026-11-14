@@ -1,6 +1,6 @@
 """The rules of web sources (`access_kind: "web"`, `format: "html"`): which options each
 operation takes, the shortest freshness it may have, and when a forced refresh is refused.
-Reading them is ada.adapters.sources.web."""
+Reading them is ada.adapters.sources.web; watching their pages is DataSources.watch."""
 
 from datetime import datetime, timedelta
 
@@ -9,6 +9,7 @@ from ada.core.models.runs import Snapshot
 from ada.core.models.schema import Schema
 from ada.core.models.sources import (
     DOCUMENT_COLUMNS,
+    MODEL_EXTRACTED,
     WEB_CRAWL_MAX_PAGES,
     WEB_MINIMUM_TTL,
     WEB_SOURCES_COLUMN,
@@ -21,21 +22,27 @@ from ada.core.models.sources import (
     web_operation,
 )
 
+# The columns an extraction may fill.
+MAX_EXTRACT_COLUMNS = 30
+
 
 def web_schema(options: dict[str, object], declared: Schema | None) -> Schema:
     """A web source's declared schema at registration: the document columns of its
-    extract mode for scrape and crawl; for answers the declared columns, which it must
-    have, with `sources` added at the end."""
-    if web_operation(options) is not WebOperation.ANSWERS:
+    extract mode for scrape and crawl; for answers and extract the declared columns, which
+    it must have, for answers with `sources` added at the end."""
+    operation = web_operation(options)
+    if operation not in MODEL_EXTRACTED:
         columns = DOCUMENT_COLUMNS[document_extract(options)]
         if declared is None:
             return Schema(columns=columns)
         return declared if declared.columns else declared.model_copy(update={"columns": columns})
     if declared is None or not declared.columns:
         raise Invalid(
-            'A web source with operation "answers" needs a declared schema with the columns '
-            "of its records"
+            f'A web source with operation "{operation.value}" needs a declared schema with '
+            "the columns of its rows"
         )
+    if operation is WebOperation.EXTRACT:
+        return declared
     if any(column.name == WEB_SOURCES_COLUMN.name for column in declared.columns):
         return declared
     return declared.model_copy(update={"columns": (*declared.columns, WEB_SOURCES_COLUMN)})
@@ -55,6 +62,9 @@ def check_web(source: DataSource) -> None:
     options = source.options
     if operation is WebOperation.ANSWERS:
         _check_answers(source)
+        return
+    if operation is WebOperation.EXTRACT:
+        _check_extract(source)
         return
     extract = document_extract(options)
     expected = [column.name for column in DOCUMENT_COLUMNS[extract]]
@@ -80,9 +90,13 @@ def check_web(source: DataSource) -> None:
 
 
 def check_forced_refresh(source: DataSource, current: Snapshot | None, now: datetime) -> None:
-    """A crawl or answers source is fetched at most once within its minimum ttl, forced or
-    not, so no one burns its credits by forcing refreshes."""
+    """A crawl, answers or extract source is fetched at most once within its minimum ttl,
+    forced or not, so no one burns its credits by forcing refreshes. A watched source is
+    refreshed whenever its monitor fires (Context.dev checks the page once a day)."""
     if source.access_kind is not AccessKind.WEB or current is None:
+        return
+    # A watched page is refetched when its monitor saw it change, at most daily.
+    if source.monitor_id is not None:
         return
     operation = web_operation(source.options)
     if operation is WebOperation.SCRAPE:
@@ -106,10 +120,11 @@ def check_forced_refresh(source: DataSource, current: Snapshot | None, now: date
 def _check_freshness(source: DataSource, operation: WebOperation) -> None:
     policy = source.freshness
     minimum = WEB_MINIMUM_TTL[operation]
-    if policy.kind not in (FreshnessKind.TTL, FreshnessKind.MANUAL):
+    if policy.kind not in (FreshnessKind.TTL, FreshnessKind.MANUAL, FreshnessKind.PUSH):
         raise Invalid(
             f'A web source is kept fresh by "ttl" (at least {_days(minimum)} days for '
-            f'operation "{operation.value}") or "manual", not "{policy.kind.value}"'
+            f'operation "{operation.value}"), "manual", or "push" when its page is watched '
+            f'(watch_source), not "{policy.kind.value}"'
         )
     if policy.kind is FreshnessKind.TTL and (policy.ttl_seconds or 0) < minimum:
         raise Invalid(
@@ -142,6 +157,21 @@ def _check_answers(source: DataSource) -> None:
         raise Invalid(
             'A web source with operation "answers" declares the columns of its records, '
             'and ends with the column "sources"'
+        )
+
+
+def _check_extract(source: DataSource) -> None:
+    instruction = source.options.get("instruction")
+    if not isinstance(instruction, str) or not instruction.strip() or len(instruction) > 2000:
+        raise Invalid(
+            'options.instruction of an "extract" source says which rows to read off the '
+            "page, 1 to 2000 characters"
+        )
+    declared = source.declared_schema
+    if declared is None or not 1 <= len(declared.columns) <= MAX_EXTRACT_COLUMNS:
+        raise Invalid(
+            f'A web source with operation "extract" declares 1 to {MAX_EXTRACT_COLUMNS} '
+            "columns, which the extraction fills"
         )
 
 

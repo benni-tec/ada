@@ -18,9 +18,9 @@ os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://ada:ada-dev@localhos
 # API keys bring their own.
 os.environ.pop("ADA_SECRET_KEY", None)
 os.environ.pop("ADA_SECRET_KEY_FILE", None)
-# Nor the developer's Context.dev key: no test calls it.
-os.environ.pop("CONTEXT_DEV_API_KEY", None)
-os.environ.pop("CONTEXT_API_KEY", None)
+# Nor the developer's web keys and public address: no test calls Context.dev or Exa.
+for name in ("CONTEXT_DEV_API_KEY", "CONTEXT_API_KEY", "EXA_API_KEY", "ADA_PUBLIC_URL"):
+    os.environ.pop(name, None)
 
 
 @pytest.fixture(scope="session")
@@ -52,6 +52,9 @@ UNREACHABLE_HEALTH = {
     "queue": "unavailable",
     "worker": "unavailable",
     "analysis_store": "ok",
+    "web_search": False,
+    "page_reading": False,
+    "watching": False,
 }
 
 

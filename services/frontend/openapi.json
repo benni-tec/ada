@@ -81,6 +81,17 @@
             "title": "Providers",
             "type": "array"
           },
+          "research_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Research Agent"
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -840,6 +851,17 @@
             ],
             "title": "Last Probe Token"
           },
+          "monitor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monitor Id"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -850,6 +872,16 @@
           },
           "project_id": {
             "$ref": "#/components/schemas/Id"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Provenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "revision": {
             "default": 1,
@@ -875,10 +907,31 @@
           "operator",
           "widget",
           "agent_turn",
-          "tool_call"
+          "tool_call",
+          "delegation",
+          "report"
         ],
         "title": "EntryKind",
         "type": "string"
+      },
+      "FoundBy": {
+        "description": "How an agent came upon a source: the web search and its scope.",
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "scope"
+        ],
+        "title": "FoundBy",
+        "type": "object"
       },
       "FreshnessKind": {
         "enum": [
@@ -1030,6 +1083,11 @@
             "title": "Database",
             "type": "string"
           },
+          "page_reading": {
+            "description": "Page reading is configured (CONTEXT_DEV_API_KEY is set)",
+            "title": "Page Reading",
+            "type": "boolean"
+          },
           "queue": {
             "description": "Valkey, the task queue broker",
             "enum": [
@@ -1048,6 +1106,16 @@
             "title": "Status",
             "type": "string"
           },
+          "watching": {
+            "description": "Page watching is configured (CONTEXT_DEV_API_KEY and ADA_PUBLIC_URL are set)",
+            "title": "Watching",
+            "type": "boolean"
+          },
+          "web_search": {
+            "description": "Web search is configured (EXA_API_KEY is set)",
+            "title": "Web Search",
+            "type": "boolean"
+          },
           "worker": {
             "description": "Task worker and scheduler, judged by their heartbeat",
             "enum": [
@@ -1064,9 +1132,23 @@
           "database",
           "queue",
           "worker",
-          "analysis_store"
+          "analysis_store",
+          "web_search",
+          "page_reading",
+          "watching"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "HookQueued": {
+        "properties": {
+          "status": {
+            "default": "queued",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "HookQueued",
         "type": "object"
       },
       "Id": {
@@ -1276,6 +1358,17 @@
             },
             "title": "Models",
             "type": "array"
+          },
+          "research_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Research Agent"
           },
           "session_agent": {
             "anyOf": [
@@ -1661,6 +1754,25 @@
         "title": "NewReportVersion",
         "type": "object"
       },
+      "NewResearch": {
+        "additionalProperties": false,
+        "properties": {
+          "brief": {
+            "title": "Brief",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "brief",
+          "title"
+        ],
+        "title": "NewResearch",
+        "type": "object"
+      },
       "NewRun": {
         "additionalProperties": false,
         "properties": {
@@ -1757,6 +1869,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Provenance"
               },
               {
                 "type": "null"
@@ -2225,6 +2347,72 @@
           "expected_revision"
         ],
         "title": "ProjectChange",
+        "type": "object"
+      },
+      "Provenance": {
+        "description": "Where a source's data comes from and on what terms. Filled by whoever registers a\nsource; \"unknown\" in `licence`, with the reason in `note`, when it cannot be told.",
+        "properties": {
+          "extracted_by_model": {
+            "default": false,
+            "title": "Extracted By Model",
+            "type": "boolean"
+          },
+          "found_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FoundBy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "landing_page": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Landing Page"
+          },
+          "licence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          }
+        },
+        "title": "Provenance",
         "type": "object"
       },
       "ProviderChange": {
@@ -2762,6 +2950,10 @@
       "Session": {
         "description": "Exploratory work led by an agent. Belongs to a project, not to a user.",
         "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/SessionAgent",
+            "default": "session"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2781,6 +2973,16 @@
             ]
           },
           "panel_dashboard_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parent_session_id": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Id"
@@ -2811,6 +3013,14 @@
         ],
         "title": "Session",
         "type": "object"
+      },
+      "SessionAgent": {
+        "enum": [
+          "session",
+          "research"
+        ],
+        "title": "SessionAgent",
+        "type": "string"
       },
       "SessionAgentChoice": {
         "additionalProperties": false,
@@ -3025,6 +3235,17 @@
           "operator_id": {
             "$ref": "#/components/schemas/OperatorId"
           },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
           "parameters_key": {
             "title": "Parameters Key",
             "type": "string"
@@ -3155,6 +3376,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Provenance"
               },
               {
                 "type": "null"
@@ -3558,6 +3789,16 @@
           "daily_credit_limit": {
             "title": "Daily Credit Limit",
             "type": "integer"
+          },
+          "exa_configured": {
+            "default": false,
+            "title": "Exa Configured",
+            "type": "boolean"
+          },
+          "watching_configured": {
+            "default": false,
+            "title": "Watching Configured",
+            "type": "boolean"
           }
         },
         "required": [
@@ -4626,6 +4867,66 @@
         "summary": "Live",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/hooks/context/{source_id}": {
+      "post": {
+        "description": "A Context.dev monitor saw its page change: refresh the source. Only the headers and\nthe signature are used; nothing in the body is trusted or read.",
+        "operationId": "context_monitor_fired_api_hooks_context__source_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-context-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Context-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookQueued"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Context Monitor Fired",
+        "tags": [
+          "hooks"
         ]
       }
     },
@@ -6461,6 +6762,60 @@
         ]
       }
     },
+    "/api/sessions/{session_id}/research": {
+      "post": {
+        "description": "Delegate research to the research agent, as the person: a research session under\nthis one, with the brief as its first message and its turn queued. Its report is added\nto this session's record; it does not start a turn here.",
+        "operationId": "delegate_research_api_sessions__session_id__research_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewResearch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delegate Research",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
     "/api/sessions/{session_id}/turns": {
       "get": {
         "description": "The agent's turns in a session, oldest first.",
@@ -6826,6 +7181,48 @@
         ]
       }
     },
+    "/api/settings/research-agent": {
+      "put": {
+        "description": "The model of research sessions; null falls back to the session agent's.",
+        "operationId": "set_research_agent_api_settings_research_agent_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionAgentChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Research Agent",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/settings/session-agent": {
       "put": {
         "operationId": "set_session_agent_api_settings_session_agent_put",
@@ -7101,6 +7498,92 @@
           }
         },
         "summary": "Refresh Source",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/api/sources/{source_id}/watch": {
+      "delete": {
+        "description": "Stop watching the source's page; it is refreshed by hand again.",
+        "operationId": "unwatch_source_api_sources__source_id__watch_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unwatch Source",
+        "tags": [
+          "sources"
+        ]
+      },
+      "post": {
+        "description": "Have Context.dev watch the source's page and refresh the source when it changes.",
+        "operationId": "watch_source_api_sources__source_id__watch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Watch Source",
         "tags": [
           "sources"
         ]

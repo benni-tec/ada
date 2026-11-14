@@ -1,0 +1,99 @@
+{
+  "url": "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625",
+  "html": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "markdown": {
+    "requested": true,
+    "success": true,
+    "data": "# Five-year relative survival rate of breast cancer patients, % (ind. 3625)\n\n| Data source | Years | Update frequency | Updated |\n| --- | --- | --- | --- |\n| Finnish Cancer Registry | 2015–2024 | Once a year | 12.6.2026 |\n\n## Data content\n\nThe indicator represents the five-year relative age-standardised survival rate of breast cancer patients, (0100 percent). The figure indicates the percentage of cancer patients alive five years after cancer diagnosis, compared to the percentage of the population of a similar age in the region surviving during this time. The relative survival rate can be interpreted as an estimate of the likelihood of survival in a situation where the cancer of the patient is the only possible cause of death. This is based on the monitoring of patients diagnosed during the statistical year visible on Sotkanet, and during the nine preceding years, carried out during the statistical year and the four years preceding the statistical year. The regional survival rates have been age-standardised to correspond to the age structure of the patients diagnosed in the entire country during the monitoring years.\n\n## Classifications\n\n- Gender total\n\n- Region, the wellbeing services county, hospital district, whole country\n\n## Subjects\n\n- cancer\n\n- breast cancer\n\n- quality of services\n\n## Data source\n\n- Cancer statistics (Finnish Cancer Registry)\n\n## Additional information\n\n- The Finnish Cancer Registry, Screening statistics\n\n## Member of\n\n- Quality of services\n\n- Effectiveness (primary health care) KUVA"
+  },
+  "screenshot": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "images": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "bytes": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "parsed": {
+    "requested": false,
+    "success": null,
+    "data": null,
+    "type": "custom"
+  },
+  "highlights": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "json": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "product": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "profile": null,
+  "metadata": {
+    "title": "Metadata - Sotkanet.fi, Statistics and Indicator Bank",
+    "language": "en",
+    "favicon": "https://sotkanet.fi/sotkanet/images/favicon.ico",
+    "headings": [
+      {
+        "level": 1,
+        "text": "Five-year relative survival rate of breast cancer patients, % (ind. 3625)"
+      },
+      {
+        "level": 2,
+        "text": "Data content"
+      },
+      {
+        "level": 2,
+        "text": "Classifications"
+      },
+      {
+        "level": 2,
+        "text": "Subjects"
+      },
+      {
+        "level": 2,
+        "text": "Data source"
+      },
+      {
+        "level": 2,
+        "text": "Additional information"
+      },
+      {
+        "level": 2,
+        "text": "Member of"
+      }
+    ],
+    "additionalMeta": {
+      "charset": "utf-8",
+      "x-ua-compatible": "IE=edge",
+      "viewport": "width=device-width, initial-scale=1"
+    }
+  },
+  "request_id": "94bfeaaa-8032-4a14-ad86-c7e3deef5419",
+  "cache_metadata": {
+    "status": "miss",
+    "age_ms": 0
+  },
+  "key_metadata": {
+    "credits_consumed": 1,
+    "credits_remaining": 50032
+  }
+}

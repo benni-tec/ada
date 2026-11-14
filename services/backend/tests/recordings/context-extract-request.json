@@ -1,0 +1,41 @@
+{
+  "url": "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625",
+  "formats": {
+    "json": true
+  },
+  "jsonParams": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "field",
+              "value"
+            ]
+          }
+        }
+      },
+      "required": [
+        "rows"
+      ]
+    },
+    "instructions": "Return the metadata table of the indicator (name/value pairs). Use only facts stated on the page."
+  }
+}

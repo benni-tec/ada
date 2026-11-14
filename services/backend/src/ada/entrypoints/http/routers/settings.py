@@ -1,11 +1,11 @@
-"""The settings' routes for the agent: providers, their models, the session agent and its
-instructions; and what the web tools may do. Instance-wide, shared by all projects. No
-response ever carries an API key."""
+"""The settings' routes for the agent: providers, their models, the session agent, its
+instructions and the research agent; and what the web may do. Instance-wide, shared by all
+projects. No response ever carries an API key."""
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, status
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
 from ada.config import Settings
 from ada.core.models.agents import AgentSettingsView, LlmProvider, ModelInfo, ProviderKind
@@ -47,7 +47,8 @@ class NewModel(Request):
 
 
 class SessionAgentChoice(Request):
-    # A model id ("<provider>/<model>"), or null for no session agent.
+    # A model id ("<provider>/<model>"), or null: no session agent, or, for the research
+    # agent, the session agent's model.
     model_id: str | None
     expected_revision: int
 
@@ -63,7 +64,13 @@ class WebSettings(BaseModel):
 
     # Whether a Context.dev key is set (CONTEXT_DEV_API_KEY or CONTEXT_API_KEY).
     context_dev_configured: bool
-    # Context.dev credits per project and day (WEB_DAILY_CREDIT_LIMIT).
+    # Whether an Exa key is set (EXA_API_KEY), for search_web.
+    exa_configured: bool = False
+    # Whether pages can be watched: a Context.dev key and ADA_PUBLIC_URL, where Context.dev
+    # calls back.
+    watching_configured: bool = False
+    # Web credits per project and day (WEB_DAILY_CREDIT_LIMIT): the web tools, Exa
+    # searches included, and web sources together.
     daily_credit_limit: int
 
 
@@ -130,8 +137,22 @@ async def set_agent_instructions(
 
 @router.get("/settings/web")
 async def get_web_settings(settings: FromDishka[Settings]) -> WebSettings:
-    key = settings.context_dev_api_key
+    context_dev = _set(settings.context_dev_api_key)
     return WebSettings(
-        context_dev_configured=key is not None and bool(key.get_secret_value().strip()),
+        context_dev_configured=context_dev,
+        exa_configured=_set(settings.exa_api_key),
+        watching_configured=context_dev and bool((settings.ada_public_url or "").strip()),
         daily_credit_limit=settings.web_daily_credit_limit,
     )
+
+
+def _set(key: SecretStr | None) -> bool:
+    return key is not None and bool(key.get_secret_value().strip())
+
+
+@router.put("/settings/research-agent")
+async def set_research_agent(
+    body: SessionAgentChoice, service: FromDishka[AgentSettingsService]
+) -> AgentSettingsView:
+    """The model of research sessions; null falls back to the session agent's."""
+    return await service.set_research_agent(body.model_id, body.expected_revision)

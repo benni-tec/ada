@@ -1,0 +1,59 @@
+{
+  "requestId": "7bb95d82ab156b44870656aff07fb3b8",
+  "resolvedSearchType": "",
+  "results": [
+    {
+      "id": "https://cancerregistry.fi/statistics/cancer-in-finland/most-important-statistics/",
+      "title": "Key statistics - Syöpärekisteri",
+      "url": "https://cancerregistry.fi/statistics/cancer-in-finland/most-important-statistics/",
+      "highlights": [
+        "### Survival of cancer patients\n\nMale Female\n\nRelative survival five years after cancer diagnosis among patients followed during the three most recent statistical years.\n\nThe relative survival rates by type of cancer can be viewed in one row by selecting “Wide table”.\n\nRelative survival describes the proportion of cancer patients alive after a certain period of time compared to the expected survival proportion based on mortality in the general population of the same age.\n\nIncidence of breast cancer by hospital district (Map, regional variation)"
+      ]
+    },
+    {
+      "id": "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625",
+      "title": "Metadata - Sotkanet.fi, Statistics and Indicator Bank",
+      "url": "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625",
+      "highlights": [
+        "# Five-year relative survival rate of breast cancer patients, % (ind. 3625)\n\n| Data source | Years | Update frequency | Updated |\n| --- | --- | --- | --- |\n| Finnish Cancer Registry | 2015–2024 | Once a year | 12.6.2026 |\n\n## Data content\n\nThe indicator represents the five-year relative age-standardised survival rate of breast cancer patients, (0100 percent). The figure indicates the percentage of cancer patients alive five years after cancer diagnosis, compared to the percentage of the population of a similar age in the region surviving during this time. The relative survival rate can be interpreted as an estimate of the likelihood of survival in a situation where the cancer of the patient is the only possible cause of death. This is based on the monitoring of patients diagnosed during the statistical year visible on Sotkanet, and during the nine preceding years, carried out during the statistical year and the four years preceding the statistical year. The regional survival rates have been age-standardised to correspond to the age structure of the patients diagnosed in the entire country during the monitoring years."
+      ],
+      "image": "https://sotkanet.fi/sotkanet/images/THL_Sotkanet_Vaaka_Vihrea_RGB.svg"
+    },
+    {
+      "id": "https://syoparekisteri.fi/2020/06/23/asuinpaikka-vaikuttaa-entista-vahemman-syovasta-selviytymiseen/",
+      "title": "Asuinpaikka vaikuttaa entistä vähemmän syövästä selviytymiseen - Syöpärekisteri",
+      "url": "https://syoparekisteri.fi/2020/06/23/asuinpaikka-vaikuttaa-entista-vahemman-syovasta-selviytymiseen/",
+      "publishedDate": "2020-06-23T07:20:59.000Z",
+      "author": "Nina Airisto",
+      "highlights": [
+        "–2016 välillä 18 prosentilla. Tutkimuksessa ei havaittu, että alueellinen ... olisi lisääntynyt minkään syöpätaudin kohdalla. Tulos heijastaa todennäköisesti tasavertaisuuden lisääntymistä syöpätutkimuksiin ja hoitoon"
+      ],
+      "image": "https://cancerregistry.fi/assets/files/2020/06/Syövästä-selviytymisen-alueellinen-vaihtelu-tietyissä-syöpätaudeissa.png"
+    },
+    {
+      "id": "https://cancerregistry.fi/statistics/statistical-descriptions-quality-reports/",
+      "title": "Description of statistics and their quality - Syöpärekisteri",
+      "url": "https://cancerregistry.fi/statistics/statistical-descriptions-quality-reports/",
+      "publishedDate": "2017-08-02T20:47:49.000Z",
+      "highlights": [
+        "The cancer statistics contain data on cancer incidence and mortality and on patients’ survival stratified by calendar year, age and sex since the year 1953. The cancer statistics are presented on a nation-wide basis and by cancer control regions and hospital districts.\n\n...\n\nThe date and cause of death are obtained from Statistics Finland’s cause of death statistics in accordance with the official cause-of-death classification used in the corresponding year. The municipality data and survival data are updated annually from the Population Register Centre. The municipality of residence is defined as the municipality the person resided in at the beginning of the year during which the cancer was diagnosed."
+      ]
+    },
+    {
+      "id": "https://cancerregistry.fi/statistics/cancer-in-finland/",
+      "title": "Cancer in Finland - Syöpärekisteri",
+      "url": "https://cancerregistry.fi/statistics/cancer-in-finland/",
+      "highlights": [
+        "### Cancer in men 2022\n\n94% Survival rate\n\n#### Prostate cancer\n\n5514 920 \n\n94% Survival rate\n\n68% Survival\n...\n#### Colorectal cancer\n\n2241 754 \n\n68% Survival rate\n\n14% Survival rate\n\n#### Lung cancer\n\n1740 1495 \n\n14% Survival rate"
+      ],
+      "image": "https://syoparekisteri.fi/assets/files/2017/06/kansi.jpg"
+    }
+  ],
+  "searchTime": 777.3,
+  "costDollars": {
+    "total": 0.007,
+    "search": {
+      "neural": 0.007
+    }
+  }
+}

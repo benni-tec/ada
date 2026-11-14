@@ -1,0 +1,146 @@
+{
+  "url": "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625",
+  "html": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "markdown": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "screenshot": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "images": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "bytes": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "parsed": {
+    "requested": false,
+    "success": null,
+    "data": null,
+    "type": "custom"
+  },
+  "highlights": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "json": {
+    "requested": true,
+    "success": true,
+    "data": {
+      "rows": [
+        {
+          "field": "Name",
+          "value": "Five-year relative survival rate of breast cancer patients, % (ind. 3625)"
+        },
+        {
+          "field": "Data source",
+          "value": "Finnish Cancer Registry"
+        },
+        {
+          "field": "Years",
+          "value": "2015–2024"
+        },
+        {
+          "field": "Update frequency",
+          "value": "Once a year"
+        },
+        {
+          "field": "Updated",
+          "value": "12.6.2026"
+        },
+        {
+          "field": "Data content",
+          "value": "The indicator represents the five-year relative age-standardised survival rate of breast cancer patients, (0100 percent). The figure indicates the percentage of cancer patients alive five years after cancer diagnosis, compared to the percentage of the population of a similar age in the region surviving during this time. The relative survival rate can be interpreted as an estimate of the likelihood of survival in a situation where the cancer of the patient is the only possible cause of death. This is based on the monitoring of patients diagnosed during the statistical year visible on Sotkanet, and during the nine preceding years, carried out during the statistical year and the four years preceding the statistical year. The regional survival rates have been age-standardised to correspond to the age structure of the patients diagnosed in the entire country during the monitoring years."
+        },
+        {
+          "field": "Classifications",
+          "value": "Gender total; Region, the wellbeing services county, hospital district, whole country"
+        },
+        {
+          "field": "Subjects",
+          "value": "cancer; breast cancer; quality of services"
+        },
+        {
+          "field": "Data source details",
+          "value": "Cancer statistics (Finnish Cancer Registry)"
+        },
+        {
+          "field": "Additional information",
+          "value": "The Finnish Cancer Registry, Screening statistics (https://cancerregistry.fi/statistics/screening-statistics/)"
+        },
+        {
+          "field": "Member of",
+          "value": "Quality of services; Effectiveness (primary health care) KUVA"
+        }
+      ]
+    }
+  },
+  "product": {
+    "requested": false,
+    "success": null,
+    "data": null
+  },
+  "profile": null,
+  "metadata": {
+    "title": "Metadata - Sotkanet.fi, Statistics and Indicator Bank",
+    "language": "en",
+    "favicon": "https://sotkanet.fi/sotkanet/images/favicon.ico",
+    "headings": [
+      {
+        "level": 1,
+        "text": "Five-year relative survival rate of breast cancer patients, % (ind. 3625)"
+      },
+      {
+        "level": 2,
+        "text": "Data content"
+      },
+      {
+        "level": 2,
+        "text": "Classifications"
+      },
+      {
+        "level": 2,
+        "text": "Subjects"
+      },
+      {
+        "level": 2,
+        "text": "Data source"
+      },
+      {
+        "level": 2,
+        "text": "Additional information"
+      },
+      {
+        "level": 2,
+        "text": "Member of"
+      }
+    ],
+    "additionalMeta": {
+      "charset": "utf-8",
+      "x-ua-compatible": "IE=edge",
+      "viewport": "width=device-width, initial-scale=1"
+    }
+  },
+  "request_id": "49604db7-00c9-4cc1-ad3d-884092b4d036",
+  "cache_metadata": {
+    "status": "hit",
+    "age_ms": 777
+  },
+  "key_metadata": {
+    "credits_consumed": 5,
+    "credits_remaining": 50027
+  }
+}

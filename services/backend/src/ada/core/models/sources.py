@@ -15,7 +15,8 @@ class AccessKind(StrEnum):
     BROWSER = "browser"
     # A PDF that is fetched and parsed.
     DOCUMENT = "document"
-    # A web page, read as Markdown through Context.dev's scrape (format html).
+    # A web page through Context.dev (format html): its Markdown, a table a model reads off
+    # it, the pages of a site, or a researched answer (WebOperation).
     WEB = "web"
 
 
@@ -96,6 +97,14 @@ class WebOperation(StrEnum):
     # A researched answer (10 credits): `task` and `json_format`, an example object whose
     # top level has one array of records. Its records are the rows, model-extracted.
     ANSWERS = "answers"
+    # A table a model reads off the page (about 5 credits): `instruction`, and the declared
+    # columns, whose values it fills (null where the page states none). Model-extracted.
+    EXTRACT = "extract"
+
+
+# The operations whose rows a model wrote down rather than read: their sources' provenance
+# says so (`extracted_by_model`).
+MODEL_EXTRACTED = frozenset({WebOperation.ANSWERS, WebOperation.EXTRACT})
 
 
 def web_operation(options: JsonObject) -> WebOperation:
@@ -115,11 +124,14 @@ WEB_MINIMUM_TTL: dict[WebOperation, int] = {
     WebOperation.SCRAPE: _DAY,
     WebOperation.CRAWL: 7 * _DAY,
     WebOperation.ANSWERS: 30 * _DAY,
+    WebOperation.EXTRACT: 7 * _DAY,
 }
 WEB_CRAWL_MAX_PAGES = 50
 # Credits per call, as Context.dev charges them; a crawl costs one per page fetched.
 WEB_SCRAPE_CREDITS = 1
 WEB_ANSWERS_CREDITS = 10
+# Reserved for an extraction, corrected afterwards to what Context.dev charged.
+WEB_EXTRACT_CREDITS = 5
 # The column of an answers source with the URLs the answer cites, added to its declared
 # columns.
 WEB_SOURCES_COLUMN = Column(name="sources", type=ColumnType.JSON, nullable=True)
@@ -156,6 +168,27 @@ class FreshnessPolicy(DomainModel):
     latest_period_ttl_seconds: int | None = None
 
 
+class FoundBy(DomainModel):
+    """How an agent came upon a source: the web search and its scope."""
+
+    query: str
+    scope: str
+
+
+class Provenance(DomainModel):
+    """Where a source's data comes from and on what terms. Filled by whoever registers a
+    source; "unknown" in `licence`, with the reason in `note`, when it cannot be told."""
+
+    publisher: str | None = None
+    licence: str | None = None
+    landing_page: str | None = None
+    found_by: FoundBy | None = None
+    # True when a model, not a person or a parser, read the values out of the page. Set by
+    # registration for web sources whose operation is model-extracted (MODEL_EXTRACTED).
+    extracted_by_model: bool = False
+    note: str | None = None
+
+
 class DataSource(DomainModel):
     """Registered once per project and referenced by source operators."""
 
@@ -171,8 +204,9 @@ class DataSource(DomainModel):
     freshness: FreshnessPolicy = FreshnessPolicy()
     # Declared by whoever registers the source; sources cannot derive their roles.
     declared_schema: Schema | None = None
+    provenance: Provenance | None = None
     created_at: datetime
-    # The next three are written by refreshes, outside the revision: a refresh never
+    # The next four are written by refreshes, outside the revision: a refresh never
     # conflicts with an edit.
     last_checked_at: datetime | None = None
     # What the last probe returned; a different token means the data changed.
@@ -180,6 +214,9 @@ class DataSource(DomainModel):
     # Why the last refresh failed; None after a successful one. While it is set, widgets
     # on this source show their data as stale.
     last_error: str | None = None
+    # The monitor that watches a document source, written by watch. Its secret is never
+    # part of the model: only the repository holds it, encrypted.
+    monitor_id: str | None = None
     revision: int = 1
 
 

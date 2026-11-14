@@ -11,3 +11,13 @@ class AfterCommit(Protocol):
         """Run `action` after the commit, and never when the work rolls back. A failing
         action is logged: the commit has happened and cannot be undone."""
         ...
+
+
+class UnitsOfWork(Protocol):
+    """Runs a use case in a unit of work of its own: for an action after a commit, whose
+    own unit of work has ended, or one that must not wait for a long-running one."""
+
+    async def run[S](self, service: type[S], work: Callable[[S], Awaitable[None]]) -> None:
+        """Resolve `service` in a new unit of work and call `work` with it. It commits when
+        `work` returns and rolls back when it raises, raising on."""
+        ...

@@ -1,6 +1,6 @@
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 
-from dishka import Provider, Scope, alias, from_context, provide
+from dishka import AsyncContainer, Provider, Scope, alias, from_context, provide
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
@@ -8,7 +8,19 @@ from ada.adapters.clock import SystemClock
 from ada.adapters.transactions import PendingWork
 from ada.config import Settings
 from ada.core.ports.system import Clock
-from ada.core.ports.transactions import AfterCommit
+from ada.core.ports.transactions import AfterCommit, UnitsOfWork
+
+
+class ContainerUnits(UnitsOfWork):
+    """A unit of work is a request scope of the application's container, as for an HTTP
+    request: its session commits when the scope ends without an error."""
+
+    def __init__(self, container: AsyncContainer) -> None:
+        self.container = container
+
+    async def run[S](self, service: type[S], work: Callable[[S], Awaitable[None]]) -> None:
+        async with self.container() as request:
+            await work(await request.get(service))
 
 
 class InfrastructureProvider(Provider):
@@ -35,6 +47,10 @@ class InfrastructureProvider(Provider):
             await work.run()
 
     after_commit = alias(source=PendingWork, provides=AfterCommit, cache=True)
+
+    @provide(scope=Scope.APP)
+    def units(self, container: AsyncContainer) -> UnitsOfWork:
+        return ContainerUnits(container)
 
     @provide(scope=Scope.REQUEST)
     async def session(
