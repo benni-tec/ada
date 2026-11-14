@@ -5,7 +5,7 @@ import { expressionInterpreter } from 'vega-interpreter'
 
 import type { Loaded } from '@/lib/runtime'
 
-import { chartSpec, readPalette, vegaConfig } from './spec'
+import { chartSpec, readPalette, sizesItself, vegaConfig } from './spec'
 
 // A chart's only data is its operator's rows. The backend refuses `url` and `data` in a
 // spec; this loader refuses any file or image a spec could still ask for.
@@ -83,7 +83,8 @@ export function Chart({ widget, data, roles }: Loaded) {
           This chart’s spec does not render: {problem}
         </p>
       )}
-      <div className="ada-chart" role="figure" aria-label={title}>
+      {/* Sized by its spec, it keeps its own height where the page fits frames to content. */}
+      <div className={sizesItself(widget.spec) ? 'ada-chart ada-chart-intrinsic' : 'ada-chart'} role="figure" aria-label={title}>
         <div className="ada-vega" ref={ref} />
       </div>
     </>

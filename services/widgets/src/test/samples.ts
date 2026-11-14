@@ -52,5 +52,5 @@ export const coverageRoles: Roles = {
 }
 
 export function loaded(overrides: Partial<Loaded> = {}): Loaded {
-  return { widget: widget(), data: coverage(), roles: coverageRoles, ...overrides }
+  return { widget: widget(), data: coverage(), roles: coverageRoles, fetchedAt: new Date('2026-11-14T12:00:00Z'), ...overrides }
 }

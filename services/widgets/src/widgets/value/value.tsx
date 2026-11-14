@@ -7,18 +7,12 @@ import {
   isNumberFormat,
   measureFor,
   NUMERIC_TYPES,
+  signed,
   specText,
   suppressedAt,
   toNumber,
 } from '@/lib/columns'
 import type { Loaded } from '@/lib/runtime'
-
-/** "+1,346", "−210" or "±0": a difference always says which way it goes. */
-function signed(difference: number, write: (value: number) => string): string {
-  const text = write(Math.abs(difference))
-  if (text === write(0)) return `±${text}`
-  return `${difference > 0 ? '+' : '−'}${text}`
-}
 
 /**
  * A single number with its label.
