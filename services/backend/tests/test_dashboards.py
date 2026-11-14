@@ -212,6 +212,46 @@ async def test_pinning_into_an_existing_slot_changes_its_widget_and_keeps_its_pl
     ] == [("main", new.id), ("side", other.id)]
     assert version.slots[0].layout == {"x": 0, "y": 0, "w": 6, "h": 4}
 
+    placed = await world.run(
+        lambda s: s.pin_widget(dashboard.id, old.id, "main", 4, AGENT, layout={"y": 4, "w": 12})
+    )
+    # A layout given with the pin places the slot; keys left out come from the defaults.
+    assert placed.slots[0].layout == {"x": 0, "y": 4, "w": 12, "h": 4}
+
+
+async def test_an_edit_copies_the_widgets_new_to_the_dashboard_in_one_version(
+    world: World,
+) -> None:
+    session = factories.session(world.project_id)
+    chart = world.widget(session_id=session.id, title="Chart")
+    table = world.widget(session_id=session.id, title="Table")
+    dashboard = await world.dashboard()
+    first = await world.run(
+        lambda s: s.edit(dashboard.id, [Slot(name="chart", widget_id=chart.id)], 1, AGENT)
+    )
+    [own] = [slot.widget_id for slot in first.slots]
+
+    # The dashboard's own widget stays; the session's table comes in as a copy, once,
+    # although two slots show it.
+    slots = [
+        Slot(name="chart", widget_id=own),
+        Slot(name="table", widget_id=table.id),
+        Slot(name="table again", widget_id=table.id),
+    ]
+    version = await world.run(lambda s: s.edit(dashboard.id, slots, 2, AGENT))
+
+    shown = [world.memory.widgets[slot.widget_id] for slot in version.slots]  # type: ignore[index]
+    assert world.memory.widgets[own].copied_from == chart.id  # type: ignore[index]
+    assert shown[0].id == own
+    assert shown[1].id == shown[2].id
+    assert (shown[1].copied_from, shown[1].session_id, shown[1].title) == (table.id, None, "Table")
+    assert len(world.memory.widgets) == 4
+    assert [v.number for v in await world.run(lambda s: s.versions(dashboard.id))] == [1, 2]
+    # A stale edit copies nothing.
+    with pytest.raises(Conflict):
+        await world.run(lambda s: s.edit(dashboard.id, slots, 2, AGENT))
+    assert len(world.memory.widgets) == 4
+
 
 async def test_a_refused_pin_copies_nothing(world: World) -> None:
     dashboard = await world.dashboard()

@@ -3,7 +3,7 @@ repositories, the DuckDB store itself, the pipelines list, and the roles checked
 anything runs (geography, periods, bounds, what a widget needs)."""
 
 import re
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -11,6 +11,10 @@ from uuid import UUID, uuid7
 
 import httpx
 import pytest
+from dishka import AsyncContainer
+from fastmcp import Client
+from fastmcp.exceptions import ToolError
+from mcp.types import Implementation
 
 import factories
 from ada.adapters.duckdb.store import DuckDbAnalysisStore
@@ -22,11 +26,13 @@ from ada.adapters.memory.repositories import (
     MemorySnapshotRepository,
     MemoryStore,
 )
+from ada.adapters.memory.tasks import RecordingTaskDispatcher
 from ada.adapters.sources.examples import (
     SOTKANET_BREAST_SCREENING,
     SOTKANET_REGIONS,
     WELLBEING_COUNTY_BOUNDARIES,
 )
+from ada.composition import create_container
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.analysis import FetchedData, Query, StoredSnapshot
 from ada.core.models.base import Id, JsonObject
@@ -46,14 +52,23 @@ from ada.core.models.schema import (
 from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy
 from ada.core.models.sources import RefreshResult as Refreshed
 from ada.core.models.time import Grain
+from ada.core.ports.tasks import TaskDispatcher
+from ada.core.services.pipelines.exploration import Exploration
 from ada.core.services.pipelines.listing import sql_name
 from ada.core.services.pipelines.runs import Runs
 from ada.core.services.pipelines.service import Pipelines
+from ada.core.services.ports.exploration import Clauses
+from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
+from ada.core.services.ports.widgets import WidgetService
 from ada.core.services.schema import geo
 from ada.core.services.schema.roles import check_compatible, check_widget
+from ada.entrypoints.mcp.server import create_mcp
+from api_support import call
+from conftest import settings_in
 from factories import AGENT, data_source
 from fakes import FixedClock
+from memory import MemoryBackground
 from time_world import World as TimeWorld
 
 pytestmark = pytest.mark.anyio
@@ -500,6 +515,46 @@ async def test_a_failing_execution_publishes_failed_with_the_error(world: World)
     assert failed.type is EventType.RUN_FAILED
     assert failed.payload["operator_id"] == broken.id
     assert "x" in failed.payload["error"]
+
+
+# Exploring an operator with one query
+
+
+async def test_a_query_puts_its_clauses_together_and_runs_only_one_select(world: World) -> None:
+    source = await world.source()
+    exploration = Exploration(world.operators, world.snapshots, world.runs, world.store)
+    clauses = Clauses(
+        select="value > 15 AS big, count(*) AS n, sum(value) AS total",
+        where="region <> 'Nowhere'",
+        group_by="GROUP BY big",
+        having="count(*) > 0",
+        order_by="big",
+    )
+
+    explored = await exploration.query(source.id, clauses, AGENT, limit=1)
+    run = await world.runs.get(explored.run_id)  # type: ignore[arg-type]
+    at_snapshot = await exploration.query(
+        source.id,
+        Clauses(select="sum(value) AS total"),
+        AGENT,
+        snapshot_id=run.snapshots[source.id],
+    )
+
+    assert [column.name for column in explored.rows.columns] == ["big", "n", "total"]
+    assert (explored.rows.rows, explored.rows.truncated) == (((False, 1, 10),), True)
+    assert (at_snapshot.rows.rows, at_snapshot.run_id) == (((60,),), None)
+    for fragments in (
+        {"select": "1; DROP TABLE input_0"},
+        {"select": "*", "where": "true; COPY input_0 TO 'out.csv'"},
+        {"select": " "},
+    ):
+        with pytest.raises(Invalid):
+            await exploration.query(source.id, Clauses(**fragments), AGENT)
+    with pytest.raises(Invalid):
+        await exploration.query(source.id, Clauses(select="*"), AGENT, limit=501)
+    # Nothing was stored for any of it.
+    assert world.store.materialized == []
+    assert await world.operators.list(world.project_id) == [source]
 
 
 # The DuckDB store, against real Parquet files
@@ -1014,3 +1069,96 @@ async def test_a_measure_mapped_to_the_counties_feeds_a_map(tmp_path: Path) -> N
     # Sotkanet's own regions are of mixed levels: no map without the mapping.
     with pytest.raises(Invalid, match="mixed levels"):
         await world.widgets.create(world.project_id, screening.id, "map", "Screening", AGENT)
+
+
+# Batches, over MCP on PostgreSQL: all or nothing is the transaction of the tool call.
+
+
+def batch(sql: str = "SELECT region, sum(value) AS total FROM input_0 GROUP BY region") -> list:
+    return [
+        {
+            "ref": "s",
+            "register_source": {
+                "name": "Regions",
+                "address": "https://example.test/regions.csv",
+                "declared_schema": DECLARED.model_dump(mode="json"),
+                "refresh": True,
+            },
+        },
+        {"ref": "src", "source_operator": {"data_source_id": "$s"}, "note": "The raw regions"},
+        {"ref": "t", "transform": {"sql": sql, "inputs": ["$src"]}, "note": "Totals"},
+        {"ref": "w", "widget": {"operator": "$t", "type": "table", "title": "Totals"}},
+    ]
+
+
+@pytest.fixture
+async def builder(
+    migrated_database_url: str, tmp_path: Path
+) -> AsyncIterator[tuple[Client, AsyncContainer]]:
+    container = create_container(settings_in(tmp_path, migrated_database_url), MemoryBackground())
+    info = Implementation(name="claude-code", version="1")
+    try:
+        async with Client(create_mcp(container), client_info=info) as client:
+            yield client, container
+    finally:
+        await container.close()
+
+
+async def test_a_batch_builds_everything_with_references_and_again_nothing_new(
+    builder: tuple[Client, AsyncContainer],
+) -> None:
+    client, container = builder
+    project = await call(client, "create_project", name="Batch")
+    session = await call(client, "create_session", project_id=project["id"], title="Build")
+    arguments = {"project_id": project["id"], "steps": batch(), "session_id": session["id"]}
+
+    built = await call(client, "build_pipeline", **arguments)
+    dispatcher = await container.get(TaskDispatcher)
+    assert isinstance(dispatcher, RecordingTaskDispatcher)
+    queued = list(dispatcher.refreshes)
+    again = await call(client, "build_pipeline", **arguments)
+
+    refs = built["refs"]
+    assert again == built
+    assert built["widgets"] == [
+        {
+            "id": refs["w"],
+            "url": f"/projects/{project['id']}/sessions/{session['id']}?widget={refs['w']}",
+        }
+    ]
+    lineage = await call(client, "get_lineage", operator_id=refs["t"])
+    assert [operator["id"] for operator in lineage] == [refs["src"], refs["t"]]
+    assert lineage[0]["params"] == {"data_source_id": refs["s"]}
+    # The registered source was not fetched in the batch, but queued after its commit.
+    assert queued == [(UUID(refs["s"]), False)]
+    async with container() as request:
+        entries = await (await request.get(SessionService)).entries(UUID(session["id"]))
+        sources = await (await request.get(SourceService)).list(UUID(project["id"]))
+        widgets = await (await request.get(WidgetService)).list(UUID(project["id"]))
+    assert [(e.kind, e.ref, e.text) for e in entries] == [
+        ("operator", refs["src"], "The raw regions"),
+        ("operator", refs["t"], "Totals"),
+        ("widget", refs["w"], ""),
+    ]
+    assert (len(sources), len(widgets)) == (1, 1)
+
+
+async def test_a_batch_that_fails_midway_stores_nothing(
+    builder: tuple[Client, AsyncContainer],
+) -> None:
+    client, container = builder
+    project = await call(client, "create_project", name="Batch")
+    broken = batch("SELECT nope FROM input_0")
+
+    with pytest.raises(ToolError, match=r"steps\[2\] \(ref 't'\) failed.*nope"):
+        await call(client, "build_pipeline", project_id=project["id"], steps=broken)
+    later = batch()
+    later[1]["source_operator"]["data_source_id"] = "$w"
+    with pytest.raises(ToolError, match=r"steps\[1\].*\$w names no earlier step"):
+        await call(client, "build_pipeline", project_id=project["id"], steps=later)
+
+    assert await call(client, "list_sources", project_id=project["id"]) == []
+    assert await call(client, "list_pipelines", project_id=project["id"]) == []
+    dispatcher = await container.get(TaskDispatcher)
+    assert isinstance(dispatcher, RecordingTaskDispatcher)
+    assert dispatcher.refreshes == []

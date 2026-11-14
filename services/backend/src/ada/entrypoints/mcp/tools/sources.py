@@ -1,7 +1,9 @@
 from collections.abc import Sequence
+from typing import Annotated
 
 from dishka import FromDishka
 from fastmcp import FastMCP
+from pydantic import Field
 
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.schema import Schema
@@ -9,14 +11,19 @@ from ada.core.models.sources import AccessKind, DataFormat, DataSource, Freshnes
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.transactions import AfterCommit
 from ada.core.services.ports.projects import ProjectService
+from ada.core.services.ports.refreshes import MAX_WAIT_SECONDS, RefreshService, SnapshotSummary
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.mcp.injection import Inject
 
 
-class RefreshQueued(DomainModel):
+class Refreshed(DomainModel):
     data_source_id: Id
     force: bool
+    # "queued" without waiting; else "fetched", "unchanged" or "failed".
     status: str = "queued"
+    # When waited for: the source's current snapshot afterwards, and why it failed.
+    snapshot: SnapshotSummary | None = None
+    error: str | None = None
 
 
 def register(mcp: FastMCP, inject: Inject) -> None:
@@ -44,8 +51,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         request. `declared_schema` states column types and what columns mean,
         which the platform cannot work out by itself.
 
-        Registering does not fetch anything: call refresh_source to load the data, then
-        add_source_operator to start a pipeline from it. Returns the source with its id."""
+        Registering does not fetch anything: call refresh_source to load the data (with
+        `wait` to have it at once), then add_source_operator to start a pipeline from it,
+        or do all of it in one `build_pipeline` call. Returns the source with its id."""
         await projects.get(project_id)
         return await service.register(
             project_id,
@@ -114,12 +122,30 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         source_id: Id,
         service: FromDishka[SourceService],
         dispatcher: FromDishka[TaskDispatcher],
+        refreshes: FromDishka[RefreshService],
         force: bool = False,
-    ) -> RefreshQueued:
-        """Fetch a data source's data in the background and store it as a snapshot. Use it
-        after register_source and whenever the data may have changed. It returns at once;
-        the fetch runs in the worker. A source whose data did not change gets no new
-        snapshot. `force` skips the freshness check and the cheap probe for change."""
-        await service.get(source_id)
-        await dispatcher.refresh_source(source_id, force)
-        return RefreshQueued(data_source_id=source_id, force=force)
+        wait: bool = False,
+        timeout_seconds: Annotated[int, Field(ge=1, le=MAX_WAIT_SECONDS)] = 30,
+    ) -> Refreshed:
+        """Fetch a data source's data and store it as a snapshot. Use it after
+        register_source and whenever the data may have changed. A source whose data did
+        not change gets no new snapshot. `force` skips the freshness check and the cheap
+        probe for change.
+
+        Without `wait` it returns at once (status "queued") and the fetch runs in the
+        worker. With `wait` the fetch runs in this call, for at most `timeout_seconds`
+        (up to 60), and the answer says how it went: status "fetched", "unchanged" or
+        "failed", the source's current `snapshot` (id, row count, when fetched) and the
+        `error` if it failed. Wait when your next step reads the data."""
+        if not wait:
+            await service.get(source_id)
+            await dispatcher.refresh_source(source_id, force)
+            return Refreshed(data_source_id=source_id, force=force)
+        outcome = await refreshes.refresh_now(source_id, force, timeout_seconds)
+        return Refreshed(
+            data_source_id=source_id,
+            force=force,
+            status=outcome.status.value,
+            snapshot=outcome.snapshot,
+            error=outcome.error,
+        )

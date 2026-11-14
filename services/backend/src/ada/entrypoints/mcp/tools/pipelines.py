@@ -9,22 +9,56 @@ from ada.core.models.analysis import Rows
 from ada.core.models.base import DomainModel, Id
 from ada.core.models.operators import Operator, OperatorId
 from ada.core.models.pipelines import Pipeline
-from ada.core.models.schema import Roles
+from ada.core.models.schema import Column, Roles
+from ada.core.services.ports.batches import BatchService, Step
+from ada.core.services.ports.exploration import (
+    MAX_EXPLORATION_ROWS,
+    Clauses,
+    ExplorationService,
+)
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.mcp.actor import calling_agent
 from ada.entrypoints.mcp.injection import Inject
+from ada.entrypoints.mcp.links import widget_url
 
 # A preview is for looking at, not for analysing: the agent computes in SQL instead.
 MAX_PREVIEW_ROWS = 100
+
+# Said with every exploration's rows, so it is in front of the agent when it reads them.
+EXPLORATION_NOTE = (
+    "For your own exploration only. Do not show or quote these rows to the person: "
+    "anything you present must come from a transform and a widget, so it can be traced."
+)
 
 
 class Preview(DomainModel):
     operator_id: OperatorId
     run_id: Id
     rows: Rows
+
+
+class QueryAnswer(DomainModel):
+    columns: tuple[Column, ...]
+    rows: tuple[tuple[object, ...], ...]
+    truncated: bool
+    # The run the rows were read in; null when they came from one snapshot.
+    run_id: Id | None
+    note: str = EXPLORATION_NOTE
+
+
+class BuiltWidget(DomainModel):
+    id: Id
+    # Where a person sees it in the frontend, relative to the host serving ADA.
+    url: str
+
+
+class Built(DomainModel):
+    # Each step's ref: the source id, operator id or widget id it stands for.
+    refs: dict[str, str]
+    widgets: Sequence[BuiltWidget]
 
 
 def register(mcp: FastMCP, inject: Inject) -> None:
@@ -68,7 +102,11 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     ) -> Operator:
         """Add a SQL step over earlier operators. In the SQL the inputs are the tables
         input_0, input_1, ... in the order of `inputs`. The output columns are worked out
-        from the query, so a wrong query is rejected here, before anything runs.
+        from the query, so a wrong query is rejected here, before anything runs. The SQL is
+        DuckDB's. A wide table with one column per year (or per category) becomes one row
+        per value with UNPIVOT, e.g.
+        `SELECT region, CAST(year AS INTEGER) AS year, value FROM (UNPIVOT input_0 ON
+        COLUMNS(* EXCLUDE (region)) INTO NAME year VALUE value)`.
 
         `roles` says which output columns are the period, the region code and the measures
         with their confidence bounds; declare them when later steps or widgets depend on it.
@@ -133,4 +171,92 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         run = await runs.start(operator.project_id, calling_agent())
         return Preview(
             operator_id=operator_id, run_id=run.id, rows=await runs.read(run.id, operator_id, limit)
+        )
+
+    @mcp.tool
+    @inject
+    async def query_operator(
+        operator_id: OperatorId,
+        select: str,
+        exploration: FromDishka[ExplorationService],
+        where: str | None = None,
+        group_by: str | None = None,
+        having: str | None = None,
+        order_by: str | None = None,
+        limit: Annotated[int, Field(ge=1, le=MAX_EXPLORATION_ROWS)] = 100,
+        run_id: Id | None = None,
+        snapshot_id: Id | None = None,
+    ) -> QueryAnswer:
+        """Explore any operator's output, sources included, with one SQL query, before
+        you decide what to build: which values a column has, how many rows per year,
+        whether a join would match. The rows are for you only: never show or quote them
+        to the person. Anything you present must come from a transform and a widget, so
+        it can be traced.
+
+        Give each clause as an SQL fragment without its keyword. They are put together as
+        `SELECT {select} FROM input_0 WHERE {where} GROUP BY {group_by} HAVING {having}
+        ORDER BY {order_by} LIMIT {limit}`, where input_0 is the operator's output; window
+        functions are allowed in `select`. Only that one SELECT runs, and nothing is
+        stored. E.g. select "year, count(*) AS n", group_by "year", order_by "year".
+
+        Reads the output in `run_id`, or in `snapshot_id` (a stored snapshot of this
+        operator, if it is a source or a materialized transform), or by default in a new
+        run with no bindings and an open time range. Returns the columns, at most `limit`
+        rows (`truncated` says whether there are more) and the run it read."""
+        explored = await exploration.query(
+            operator_id,
+            Clauses(
+                select=select,
+                where=where,
+                group_by=group_by,
+                having=having,
+                order_by=order_by,
+            ),
+            calling_agent(),
+            limit=limit,
+            run_id=run_id,
+            snapshot_id=snapshot_id,
+        )
+        return QueryAnswer(
+            columns=explored.rows.columns,
+            rows=explored.rows.rows,
+            truncated=explored.rows.truncated,
+            run_id=explored.run_id,
+        )
+
+    @mcp.tool
+    @inject
+    async def build_pipeline(
+        project_id: Id,
+        steps: Sequence[Step],
+        batches: FromDishka[BatchService],
+        session_id: Id | None = None,
+    ) -> Built:
+        """Build a whole pipeline in one call: register sources, read them, add input
+        slots and SQL steps, and show results as widgets. Prefer it to calling the single
+        tools one by one. Each step is one of:
+
+        - `{"ref": "s", "register_source": {...the fields of register_source...,
+          "refresh": true}}`: `refresh` fetches the data once the batch is stored; the
+          steps after it are checked against `declared_schema`, so declare it.
+        - `{"ref": "src", "source_operator": {"data_source_id": "$s"}}`
+        - `{"ref": "slot", "input": {"name": "...", "output": {schema}, "default": "$t"}}`
+        - `{"ref": "t", "transform": {"sql": "...", "inputs": ["$src"], "roles": {...},
+          "materialize": false}}`, as add_transform.
+        - `{"ref": "w", "widget": {"operator": "$t", "type": "...", "title": "...",
+          "spec": {...}}}`, as create_widget.
+
+        "$name" stands for what the earlier step with that `ref` made (a registered
+        source also stands for its source operator); any other value is an existing id.
+        Every step may carry a one-line `note`, shown in the session given by
+        `session_id`, as the single tools show it.
+
+        It is all or nothing: the first step that fails is named by its index and ref,
+        and nothing of the batch is stored. Running the same batch again creates nothing
+        twice. Returns `refs` (each ref's source, operator or widget id) and the widgets
+        with their `url`: give the urls to the person."""
+        built = await batches.build(project_id, steps, calling_agent(), session_id=session_id)
+        return Built(
+            refs=built.refs,
+            widgets=[BuiltWidget(id=w.id, url=widget_url(w)) for w in built.widgets],
         )

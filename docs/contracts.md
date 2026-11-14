@@ -62,6 +62,15 @@ What the settings page added to them (the agent configured in the platform, not 
 | `core/services/ports/agents.py` | `AgentSettingsService`; `AgentTurnService.models` is async |
 | Migration `0005` | The tables `llm_providers`, `llm_models` and `agent_settings` (one row, inserted by the migration) |
 
+What wave 4's MCP workstream added to them (`docs/contracts/wave4.md`, A, B, E):
+
+| Where | Change |
+| --- | --- |
+| `core/services/ports/exploration.py` | `ExplorationService.query` (`query_operator`), with `Clauses` and `Explored`; `MAX_EXPLORATION_ROWS` (500) |
+| `core/services/ports/batches.py` | `BatchService.build` (`build_pipeline`), with the step models (`Step` and its five kinds) and `Batch` |
+| `core/services/ports/refreshes.py` | `RefreshService.refresh_now` (refresh and wait), with `RefreshOutcome`, `RefreshStatus`, `SnapshotSummary`; `MAX_WAIT_SECONDS` (60) |
+| `core/services/ports/dashboards.py` | `DashboardService.pin_widget(..., layout=None)`; `edit` copies a widget new to the dashboard (see Dashboards) |
+
 ## Adding a feature without touching shared files
 
 Four packages are scanned at startup. A feature adds a module; no list is edited.
@@ -86,8 +95,8 @@ stand-in.
 | `infrastructure.py` | Settings, database engine and request session, `AfterCommit` (`PendingWork`), Valkey client, `Clock` |
 | `system.py` | `Database`, `TaskQueue`, `SystemStatusService` |
 | `repositories.py` | All sixteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog` and `TurnProgress` (own connection, a short transaction per write) |
-| `analysis.py` | `AnalysisStore` (Parquet and DuckDB), `PipelineService`, `RunService` |
-| `sources.py` | `SourceReaders` (HTTP: URL and request sources), `SourceService` |
+| `analysis.py` | `AnalysisStore` (Parquet and DuckDB), `PipelineService`, `RunService`, `ExplorationService` (`Exploration`), `BatchService` (`Batches`) |
+| `sources.py` | `SourceReaders` (HTTP: URL and request sources), `SourceService`, `RefreshService` (`WaitingRefreshes`) |
 | `workspace.py` | `ProjectService`, `SessionService`, `WidgetService` |
 | `background.py` | `EventBroadcaster` (Valkey pub/sub), `EventPublisher` (transactional, per request), `EventStream` (Valkey), `TaskDispatcher` (taskiq on Valkey) |
 | `dashboards.py` | `DashboardService` (`Dashboards`) |
@@ -117,7 +126,12 @@ ends normally and rolls back when it raises.
 - **After the commit.** `AfterCommit.add(action)` runs an action once the unit's
   transaction has committed, never after a rollback. A failing action is logged, not
   raised: the commit cannot be undone. The REST and MCP source update paths use it to
-  queue the forced refresh; posting a message uses it to queue the agent's turn.
+  queue the forced refresh; posting a message uses it to queue the agent's turn; a
+  `build_pipeline` step that registers a source with `refresh: true` queues its refresh.
+- **Batches.** `build_pipeline` is one MCP call, so one unit of work: `BatchService.build`
+  (`core/services/pipelines/batch.py`) calls the same services the single tools call, step
+  by step, and the first failing step raises (`Invalid`, naming `steps[i]` and its ref),
+  which rolls back everything the steps before it wrote.
 - **Agent turns.** A turn is not one unit of work. Each tool call the agent makes is one,
   as over MCP; the turn's own writes go through `TurnProgress`, each in a short
   transaction of its own (see The agent).
@@ -193,6 +207,13 @@ Shared by the sources, the pipelines, the worker and the alerts:
   it show `is_stale`.
 - **Edits refetch.** A REST or MCP update that changes a source's `address` or `options`
   queues `refresh_source(id, force=True)` after the commit.
+- **Refresh and wait.** `RefreshService.refresh_now(id, force, timeout_seconds)`
+  (`core/services/sources/waiting.py`) runs `SourceService.refresh` in the caller's unit of
+  work, at most `timeout_seconds` (1–60), and answers `{data_source_id, status: fetched |
+  unchanged | failed, snapshot: {id, row_count, fetched_at} | null, error}` instead of
+  raising; `snapshot` is the current whole-source snapshot afterwards. A failure is
+  recorded and announced by the refresh as for the worker, and the unit commits. A fetch
+  cut off by the timeout reports `failed` with no snapshot read.
 - **Registration checks.** `register` and `update` check the declared schema's roles
   (below), that its column names are unique, and the `pushdown` and `period` options.
 
@@ -354,8 +375,14 @@ carries the revision.
   version exists; the revision increases on every edit, pin and range change.
 - **Slots.** Names are trimmed, not blank and unique within a version. A slot's widget
   must exist and be in the dashboard's project. The same widget may sit in several slots.
-  `pin_widget(id, widget_id, slot)` fills the slot of that name, keeping its layout, or
-  appends one.
+  `pin_widget(id, widget_id, slot, layout=None)` fills the slot of that name, keeping its
+  layout unless one is given, or appends one.
+- **Editing copies too.** `edit` (MCP `edit_dashboard`, REST `PUT /dashboards/{id}/slots`)
+  takes any widget of the project: a widget that is in no version of this dashboard comes
+  in as the dashboard's copy, as a pin makes it, once per widget however many slots show
+  it, in the one version the edit adds. The dashboard's own widgets stay as they are, so
+  the grid's drag and resize copy nothing. Slots are checked and the revision compared
+  before any copy is made.
 - **Pinning copies.** The dashboard gets a widget of its own: the same operator, type,
   spec, title and note, `copied_from` set to the original, no `session_id`, created by
   whoever pins, announced with `widget.created`. Either can change later without the
@@ -674,7 +701,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /projects/{id}`, `PATCH /projects/{id} {name, expected_revision}` | Read; rename |
 | `GET /projects/{id}/sources`, `POST /projects/{id}/sources` | List; register (`name, access_kind, address, format`, optional `options, freshness, declared_schema`) |
 | `GET /sources/{id}`, `PATCH /sources/{id} {expected_revision, ...}` | Read; update the given fields. A changed address or options queues a forced refresh |
-| `POST /sources/{id}/refresh {force?}` | Queue a refresh; answers 202 |
+| `POST /sources/{id}/refresh {force?, wait?, timeout_seconds?}` | Queue a refresh; answers 202 `{data_source_id, force}`. With `wait` the fetch runs in the request (at most `timeout_seconds`, default 30, up to 60) and answers 200 `RefreshOutcome {data_source_id, status, snapshot, error}` (see Sources) |
 | `GET /projects/{id}/sessions`, `POST /projects/{id}/sessions {title, origin_dashboard_id?}` | List; create |
 | `GET /sessions/{id}`, `PATCH /sessions/{id} {expected_revision, title?, panel_dashboard_id?}` | Read; rename or set the panel dashboard |
 | `GET /sessions/{id}/entries` | The session's record, oldest first |
@@ -703,8 +730,8 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /projects/{id}/dashboards`, `POST /projects/{id}/dashboards {name}` | List, oldest first; create |
 | `GET /dashboards/{id}` | `DashboardView {dashboard, version}`: what it points at, with the revision for the next write |
 | `PATCH /dashboards/{id} {default_time_range, expected_revision}` | Set the default range; `DashboardView` |
-| `PUT /dashboards/{id}/slots {slots, expected_revision}` | Replace the slots (the grid's drag and resize save the full list); adds a version; `DashboardView` |
-| `POST /dashboards/{id}/pins {widget_id, slot, expected_revision}` | Pin a copy of the widget (see Dashboards); adds a version; 201 `DashboardView` |
+| `PUT /dashboards/{id}/slots {slots, expected_revision}` | Replace the slots (the grid's drag and resize save the full list); a widget new to the dashboard is copied (see Dashboards); adds a version; `DashboardView` |
+| `POST /dashboards/{id}/pins {widget_id, slot, expected_revision, layout?}` | Pin a copy of the widget (see Dashboards); adds a version; 201 `DashboardView` |
 | `POST /dashboards/{id}/agent-session` | The dashboard's agent session (see The agent): 200 when found, 201 when created; `Session` |
 | `GET /dashboards/{id}/versions`, `GET /dashboard-versions/{id}` | Versions, oldest first; one version |
 | `POST /dashboards/{id}/runs {time_range?}` | Start the run the dashboard is viewed at; 201 `Run` |
@@ -736,7 +763,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 ## MCP tools
 
 Tool names are snake case and start with a verb (`list create register update refresh
-add get preview system pin edit set show generate check`; `tests/test_api.py`). Tools
+add get preview system pin edit set show generate check build query`; `tests/test_api.py`). Tools
 that create something in a session take an optional `session_id` and a `note`: one line
 on why the agent is doing this, shown in the session. The acting `Actor` is
 `external_agent` with the client name the MCP host reported when it connected; the
@@ -744,10 +771,10 @@ in-platform agent's calls act as `agent` with its model id (see The agent).
 
 | Group | Tools |
 | --- | --- |
-| Projects, sources | `list_projects`, `create_project`, `register_source`, `list_sources`, `update_source`, `refresh_source` |
-| Sessions, pipelines | `create_session`, `add_source_operator`, `add_transform`, `list_pipelines` (the pipelines list: look there before building), `get_lineage`, `preview_operator` |
+| Projects, sources | `list_projects`, `create_project`, `register_source`, `list_sources`, `update_source`, `refresh_source` (`wait` and `timeout_seconds` up to 60: fetch in the call and answer `{status, snapshot, error}`; else `status: "queued"`) |
+| Sessions, pipelines | `create_session`, `add_source_operator`, `add_transform` (mentions DuckDB's `UNPIVOT` for wide tables), `list_pipelines` (the pipelines list: look there before building), `get_lineage`, `preview_operator`, `query_operator`, `build_pipeline` (below) |
 | Widgets | `create_widget`, `list_session_widgets`, and `get_widget_data` for the widget itself (MCP Apps visibility `app`) |
-| Dashboards | `create_dashboard`, `list_dashboards`, `get_dashboard`, `list_dashboard_versions`, `pin_widget` (its description says the dashboard gets a copy), `edit_dashboard`, `set_dashboard_time_range` (ISO dates), `show_dashboard_in_session` (the session's revision). They return `{dashboard, version, url}` |
+| Dashboards | `create_dashboard`, `list_dashboards`, `get_dashboard`, `list_dashboard_versions`, `pin_widget` (its description says the dashboard gets a copy; optional `layout`), `edit_dashboard` (any widget of the project; one new to the dashboard is copied), `set_dashboard_time_range` (ISO dates), `show_dashboard_in_session` (the session's revision). They return `{dashboard, version, url}` |
 | Reports | `create_report`, `add_report_version`, `generate_report_from_dashboard`, `list_reports`, `get_report` (optional `version`), `create_template`, `list_templates`. They return `{report, version, versions, url}` |
 | Alerts | `create_alert_rule` (its description carries the formula format), `list_alert_rules`, `get_alert_rule`, `update_alert_rule` (a `clear` list empties the interval, maximum age or alert pipeline), `check_alert_rule` (`{rule, changed, firing}`), `list_alerts` (`{alert, rule_name, severity, dashboard_id, url}`) |
 | System | `system_status` |
@@ -757,6 +784,36 @@ dashboard or report returns its address in the frontend. Writes to mutable recor
 the `expected_revision` the agent read; a mismatch is a tool error naming both revisions.
 The core's errors come back as tool errors with their message; `Unavailable` adds that it
 is temporary and to try again later.
+
+**Server instructions** (`INSTRUCTIONS` in `entrypoints/mcp/server.py`): batch first
+(`build_pipeline`, `edit_dashboard`), explore with `query_operator` and never show its
+rows, present only through widgets and reports.
+
+**`query_operator(operator_id, select, where?, group_by?, having?, order_by?, limit=100,
+run_id?, snapshot_id?)`** explores any operator, sources included. The fragments (a leading
+keyword is dropped) become `SELECT {select} FROM input_0 [WHERE] [GROUP BY] [HAVING]
+[ORDER BY]`, `input_0` being the operator's output; the analysis store applies the limit
+(at most 500) and its guard (exactly one SELECT, only the snapshots it names), as for
+transforms. It reads in `run_id`, in `snapshot_id` (one stored snapshot of this operator),
+or in a new run with no bindings and an open range. Nothing is stored. It returns
+`{columns, rows, truncated, run_id, note}`; `note` always says the rows are for the
+agent's exploration only and must not be shown or quoted to the person, and so does the
+tool's description.
+
+**`build_pipeline(project_id, steps, session_id?)`**: each step is
+`{ref?, note?, <kind>: {...}}` with exactly one kind: `register_source` (the fields of
+`register_source`, plus `refresh`), `source_operator {data_source_id}`, `input {name,
+output, default}`, `transform {sql, inputs, roles?, materialize?}`, `widget {operator,
+type, title, spec?}`. `"$ref"` names an earlier step's result (a registered source also
+stands for its source operator); other values are existing ids; an unknown or later
+reference is `Invalid` naming the step. A registered source is not fetched in the batch:
+the steps after it are checked against its `declared_schema`. With `session_id` each
+operator and widget step gets its session entry with its note (registration has none, as
+with the single tool), unless the session already shows it. A re-run makes nothing new:
+operators by identity, a source of the same project, name and address is reused, and a
+widget with the same operator, type, title and spec in the same session (or, without one,
+among the project's widgets without a session) is reused. Returns
+`{refs: {ref: id}, widgets: [{id, url}]}`.
 
 ### Widget specs
 
@@ -1070,7 +1127,8 @@ not describe it.
 
 - **Backend tests by feature**, one file each (`services/backend/tests`): `test_sources`
   (registering, freshness, the HTTP readers, shaping, document sources, the recorded examples),
-  `test_pipelines` (building and running pipelines on DuckDB, the store, the pipelines
+  `test_pipelines` (building and running pipelines on DuckDB, exploring with
+  `query_operator`'s service, batches over MCP on PostgreSQL, the store, the pipelines
   list, roles and geography), `test_time` (periods and pushdown), `test_dashboards`,
   `test_reports`, `test_alerts` (the formula compiler first), `test_agent` (turns, the
   in-process toolbox), `test_settings` and `test_settings_db` (the master key, the agent
@@ -1166,7 +1224,8 @@ with Valkey as the broker. There is exactly one scheduler.
 the five example sources and, idempotently, a ready demo: a session that maps Sotkanet's
 breast cancer screening participation to the wellbeing services counties for the latest
 year with their boundaries; a map and a table of it on the dashboard "Screening
-participation" (2022–2024) shown beside the session; the alert rule "Participation below
+participation" (2022–2024, the dashboard's own copies of the session's widgets) shown
+beside the session; the alert rule "Participation below
 80 %" on it; and a line chart of lung cancer survival in Finland from NORDCAN. Everything
 is found by name (operators by identity) and only what is missing is added; a source an
 older seed registered differently is registered anew, the old one kept under a dated name.
