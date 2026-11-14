@@ -1,15 +1,16 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { CircleAlert } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
 
-import { describeRange } from '@/components/dashboards/ranges'
+import { attachmentTitle } from '@/components/attachments/kinds'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { PageHeader } from '@/components/page-header'
 import { Time } from '@/components/provenance'
 import {
   alertFeedQuery,
+  attachmentsQuery,
   dashboardsQuery,
   getProject,
   keys,
@@ -132,9 +133,9 @@ const listClass = 'divide-y rounded-lg border'
 
 function RecentSessions({ projectId }: { projectId: Id }) {
   const { data, error, isPending } = useQuery(sessionsQuery(projectId))
-  const { data: dashboards } = useQuery(dashboardsQuery(projectId))
   const recent = [...(data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5)
-  const names = new Map((dashboards ?? []).map((dashboard) => [dashboard.id, dashboard]))
+  // What each shows beside its conversation; a list that cannot be read is left out.
+  const attached = useQueries({ queries: recent.map((session) => attachmentsQuery(session.id)) })
   return (
     <Section title="Recent sessions">
       {isPending ? (
@@ -145,8 +146,8 @@ function RecentSessions({ projectId }: { projectId: Id }) {
         <p className="text-sm text-muted-foreground">No sessions yet. Start one with the + beside “Sessions”.</p>
       ) : (
         <ul className={listClass}>
-          {recent.map((session) => {
-            const beside = session.origin_dashboard_id ? names.get(session.origin_dashboard_id) : undefined
+          {recent.map((session, index) => {
+            const beside = (attached[index]?.data ?? []).map(attachmentTitle).join(', ')
             return (
               <li key={session.id}>
                 <Link
@@ -156,11 +157,7 @@ function RecentSessions({ projectId }: { projectId: Id }) {
                 >
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate font-medium">{session.title}</span>
-                    {beside && (
-                      <span className="truncate text-xs text-muted-foreground">
-                        With {beside.name} ({describeRange(beside.default_time_range)})
-                      </span>
-                    )}
+                    {beside && <span className="truncate text-xs text-muted-foreground">With {beside}</span>}
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     <Time value={session.created_at} />

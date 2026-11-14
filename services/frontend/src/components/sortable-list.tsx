@@ -8,6 +8,7 @@ import {
   useSensors,
   type Announcements,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -33,10 +34,12 @@ export type SortHandle = {
  * with a full page load: its default is prevented here instead. */
 function swallowClick(event: MouseEvent) {
   event.preventDefault()
+  document.removeEventListener('click', swallowClick, true)
 }
 
-function swallowNextClick() {
-  document.addEventListener('click', swallowClick, true)
+function swallowNextClick({ activatorEvent }: DragStartEvent) {
+  // A keyboard drag ends with no click.
+  if (activatorEvent instanceof PointerEvent) document.addEventListener('click', swallowClick, true)
 }
 
 function stopSwallowing() {

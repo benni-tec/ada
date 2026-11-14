@@ -2302,6 +2302,16 @@
         "title": "Order",
         "type": "object"
       },
+      "Outcome": {
+        "enum": [
+          "pass",
+          "warn",
+          "fail",
+          "unchecked"
+        ],
+        "title": "Outcome",
+        "type": "string"
+      },
       "OutputKind": {
         "enum": [
           "table",

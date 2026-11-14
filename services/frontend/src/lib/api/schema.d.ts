@@ -1761,6 +1761,19 @@ export interface components {
          * @enum {string}
          */
         EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report" | "alert";
+        /** Finding */
+        Finding: {
+            /** Excerpt */
+            excerpt: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default error
+             * @enum {string}
+             */
+            severity: "error" | "warning";
+        };
         /**
          * FoundBy
          * @description How an agent came upon a source: the web search and its scope.
@@ -2252,6 +2265,11 @@ export interface components {
             /** Ids */
             ids: components["schemas"]["Id"][];
         };
+        /**
+         * Outcome
+         * @enum {string}
+         */
+        Outcome: "pass" | "warn" | "fail" | "unchecked";
         /**
          * OutputKind
          * @enum {string}

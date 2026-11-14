@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
-import { dashboard, json, project, renderAt, serveApi, session } from './app'
+import { attachment, dashboard, json, project, renderAt, serveApi, session } from './app'
 
 // The projects page, a project's overview and the frame of every project page: the sidebar,
 // the type above each title, the theme.
@@ -35,6 +35,8 @@ function serveProject(overrides: Record<string, unknown> = {}) {
     'GET /api/projects/p1/alerts': [{ alert: { id: 'a1', state: 'firing' }, rule: { severity: 'critical' } }],
     'GET /api/projects/p1/sources': [source],
     'POST /api/projects/p1/runs': json({ id: 'r1', project_id: 'p1', snapshots: {} }, 201),
+    'GET /api/sessions/s1/attachments': [attachment()],
+    'GET /api/sessions/s2/attachments': [],
     ...overrides,
   })
 }
@@ -79,6 +81,8 @@ test('the overview counts the project’s items, and the sidebar lists them unde
   expect(counts).toHaveTextContent('Data sources1')
   const recent = screen.getByRole('region', { name: 'Recent sessions' })
   expect(await within(recent).findByRole('link', { name: /Why did coverage drop\?/ })).toHaveAttribute('href', '/projects/p1/sessions/s1')
+  // With what it shows beside its conversation.
+  expect(await within(recent).findByText('With Screening overview')).toBeInTheDocument()
   const sources = screen.getByRole('region', { name: 'Data sources' })
   expect(await within(sources).findByText(/Last refresh failed: HTTP 503/)).toBeInTheDocument()
   expect(screen.getByRole('status', { name: 'Live updates: Connecting' })).toBeInTheDocument()
@@ -117,6 +121,7 @@ test('the sidebar collapses to icons and opens again, and creates sessions and d
     'GET /api/sessions/s9': waiting,
     'GET /api/sessions/s9/entries': [],
     'GET /api/sessions/s9/widgets': [],
+    'GET /api/sessions/s9/attachments': [],
     'POST /api/projects/p1/dashboards': (body: unknown) => (created.push(body), json(dashboard({ id: 'd8', name: 'Mortality' }), 201)),
     'GET /api/dashboards/d8': { dashboard: dashboard({ id: 'd8', name: 'Mortality', current_version_id: null }), version: null },
     'GET /api/dashboards/d8/versions': [],

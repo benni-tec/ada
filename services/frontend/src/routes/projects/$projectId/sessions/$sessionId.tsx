@@ -1,13 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 
+import { AttachmentPanel } from '@/components/attachments/attachment-panel'
 import { ChatDraftContext, useChatDraftState } from '@/components/chat/chat-draft'
 import { SessionChat } from '@/components/chat/session-chat'
-import { DashboardPanel } from '@/components/dashboards/dashboard-panel'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { PageType } from '@/components/page-header'
-import { detachFromSession, getSession, keys, listAttachments, renameSession, sessionQuery, type Id } from '@/lib/api'
+import { getSession, keys, renameSession, sessionQuery } from '@/lib/api'
 import { useRevisedUpdate } from '@/lib/revisions'
 
 type Search = {
@@ -22,14 +22,14 @@ export const Route = createFileRoute('/projects/$projectId/sessions/$sessionId')
 })
 
 /**
- * A session: its conversation with the agent and the record of what was made, and when
- * the session has one, its dashboard beside it, half and half.
+ * A session: its conversation with the agent and the record of what was made, and beside
+ * it, half and half, what is attached to it as tabs (a dashboard, a report, a web page…).
  */
 function SessionPage() {
   const { projectId, sessionId } = Route.useParams()
   const { widget: highlighted } = Route.useSearch()
   const session = useQuery(sessionQuery(sessionId))
-  // The page holds the draft, so the dashboard half's "Add widget" can put its chip on it.
+  // The page holds the draft, so a dashboard tab's "Add widget" can put its chip on it.
   const draft = useChatDraftState()
   const rename = useRevisedUpdate({
     queryKey: keys.session(sessionId),
@@ -39,14 +39,6 @@ function SessionPage() {
       `Someone else changed this session while you were editing: its title is now “${latest.title}”. ` +
       'Your title was not saved; save again to replace it.',
     alsoInvalidate: [keys.sessions(projectId)],
-  })
-  // Until the attachments have tabs of their own, the first attached dashboard is the panel.
-  const queryClient = useQueryClient()
-  const attachmentsKey = [...keys.session(sessionId), 'attachments']
-  const attachments = useQuery({ queryKey: attachmentsKey, queryFn: () => listAttachments(sessionId) })
-  const detach = useMutation({
-    mutationFn: (attachmentId: Id) => detachFromSession(sessionId, attachmentId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: attachmentsKey }),
   })
 
   if (session.isPending)
@@ -62,7 +54,6 @@ function SessionPage() {
       </div>
     )
 
-  const panel = attachments.data?.find((attachment) => attachment.kind === 'dashboard')
   return (
     <ChatDraftContext value={draft}>
       <div className="flex h-full min-h-0 flex-col lg:flex-row">
@@ -70,17 +61,11 @@ function SessionPage() {
           <header className="mx-auto flex w-full max-w-4xl shrink-0 flex-col gap-1 px-4 pt-4">
             <PageType type="session" />
             <EditableTitle value={session.data.title} label="session title" {...rename} />
-            {detach.error && <ErrorNotice error={detach.error} prefix="Not detached:" />}
           </header>
           <SessionChat projectId={projectId} sessionId={sessionId} highlightedWidget={highlighted} />
         </section>
-        {panel && (
-          <DashboardPanel
-            dashboardId={panel.ref}
-            onDetach={() => detach.mutate(panel.id)}
-            detaching={detach.isPending}
-          />
-        )}
+        {/* Keyed: the open tab and what was seen of the list belong to one session. */}
+        <AttachmentPanel key={sessionId} projectId={projectId} sessionId={sessionId} />
       </div>
     </ChatDraftContext>
   )

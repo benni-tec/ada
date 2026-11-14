@@ -88,21 +88,7 @@ export const renameSession = (session: Session, title: string) =>
     }),
   )
 
-/** What the session shows beside its conversation, oldest first. */
-export const listAttachments = (sessionId: Id) =>
-  unwrap(api.GET('/api/sessions/{session_id}/attachments', { params: { path: { session_id: sessionId } } }))
-
-/** Takes an attachment away from beside the session; the thing itself stays. */
-export async function detachFromSession(sessionId: Id, attachmentId: Id): Promise<void> {
-  const { error, response } = await api.DELETE('/api/sessions/{session_id}/attachments/{attachment_id}', {
-    params: { path: { session_id: sessionId, attachment_id: attachmentId } },
-  })
-  // A 204 has no body, so there is no data to unwrap.
-  if (!response.ok) {
-    const body = error as ApiError | undefined
-    throw new ApiFailure(response.status, typeof body?.detail === 'string' ? body : undefined)
-  }
-}
+// What is shown beside the session is in attachments.ts.
 
 export const listEntries = (sessionId: Id) =>
   unwrap(api.GET('/api/sessions/{session_id}/entries', { params: { path: { session_id: sessionId } } }))

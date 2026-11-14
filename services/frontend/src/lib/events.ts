@@ -1,6 +1,16 @@
 import type { QueryKey } from '@tanstack/react-query'
 
-import { agentKeys, alertKeys, dashboardKeys, keys, reportKeys, type EventType, type LiveEvent, type Part } from '@/lib/api'
+import {
+  agentKeys,
+  alertKeys,
+  attachmentKeys,
+  dashboardKeys,
+  keys,
+  reportKeys,
+  type EventType,
+  type LiveEvent,
+  type Part,
+} from '@/lib/api'
 
 /** What the page does about one live event. */
 export type Effects = {
@@ -20,6 +30,8 @@ export type Effects = {
 export const EVENT_TYPES: readonly EventType[] = [
   'session.created',
   'session.entry_added',
+  'session.attachment_added',
+  'session.attachment_removed',
   'widget.created',
   'widget.updated',
   'run.started',
@@ -58,6 +70,14 @@ export function effectsOf(event: LiveEvent): Effects {
     case 'session.entry_added': {
       const session = id(payload, 'session_id')
       if (session) invalidate.push(keys.entries(session))
+      break
+    }
+    case 'session.attachment_added':
+    case 'session.attachment_removed': {
+      // The session page's tabs; it opens one an agent added (components/attachments). The
+      // project overview names what each recent session shows.
+      const session = id(payload, 'session_id')
+      if (session) invalidate.push(attachmentKeys.list(session))
       break
     }
     case 'widget.updated':
