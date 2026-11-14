@@ -114,10 +114,12 @@ jobs:
     permissions:
       contents: read
       packages: read
-    # One deploy at a time, the others wait in line (up to 100) instead of replacing each other.
+    # One deploy at a time, never cancelled once running. GitHub keeps one deploy waiting
+    # per group and a newer one replaces it; the VM's RUN check (docs/deploy.md) skips any
+    # push older than the newest deploy anyway.
     concurrency:
       group: deploy-ada
-      queue: max
+      cancel-in-progress: false
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}

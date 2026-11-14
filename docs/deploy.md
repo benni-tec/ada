@@ -45,8 +45,8 @@ CI never writes these two in `/opt/ada`:
 
 ## Order of deploys
 
-Deploys run one at a time; later ones wait in line rather than replace one another, and on the VM
-they also take a lock. A push deploy skips itself when `RUN` is a later run, so an older push never
+Deploys run one at a time, and on the VM they also take a lock. GitHub keeps one deploy waiting
+(a newer push replaces it; a running one is never cancelled). A push deploy skips itself when `RUN` is a later run, so an older push never
 replaces a newer push or a rollback started after it. That includes re-running an earlier push's
 workflow run: roll back with a manual run instead. Renaming the workflow file starts its run numbers
 again at 1; delete `RUN` on the VM then.
