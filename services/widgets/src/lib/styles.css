@@ -1,0 +1,278 @@
+/* Shared by every widget and inlined into each bundle. The page background stays
+   transparent so a widget blends into whatever card or host frame embeds it; light and
+   dark follow prefers-color-scheme, since a sandboxed frame cannot ask its host. */
+
+:root {
+  color-scheme: light dark;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #6f6e69;
+  --grid: #e5e4e0;
+  --surface: #fcfcfb;
+  --error: #b42318;
+  --scenario-bg: #ede9fe;
+  --scenario-fg: #4c1d95;
+  --stale-bg: #fef3c7;
+  --stale-fg: #78350f;
+  /* Categorical slots in fixed order, validated for colour-vision deficiency. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #9a998f;
+    --grid: #33332f;
+    --surface: #1a1a19;
+    --error: #f97066;
+    --scenario-bg: #2e1065;
+    --scenario-fg: #ddd6fe;
+    --stale-bg: #451a03;
+    --stale-fg: #fde68a;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+.ada-widget {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 8px;
+  gap: 8px;
+}
+
+/* A scenario is outlined as a whole, not only labelled, so a glance at a crowded page
+   still tells it apart. */
+.ada-widget[data-scenario] {
+  outline: 2px dashed var(--scenario-fg);
+  outline-offset: -2px;
+}
+
+.ada-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ada-centered {
+  align-items: center;
+  justify-content: center;
+}
+
+.ada-muted {
+  color: var(--text-muted);
+}
+
+.ada-error {
+  color: var(--error);
+  margin: 0;
+  text-align: center;
+}
+
+.ada-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ada-flag {
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ada-flag-scenario {
+  background: var(--scenario-bg);
+  color: var(--scenario-fg);
+}
+
+.ada-flag-stale {
+  background: var(--stale-bg);
+  color: var(--stale-fg);
+}
+
+.ada-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* value */
+
+.ada-value {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.ada-value-number {
+  font-size: clamp(28px, 18vmin, 56px);
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ada-value-label {
+  color: var(--text-secondary);
+}
+
+/* table */
+
+.ada-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ada-table-scroll:focus-visible {
+  outline: 2px solid var(--series-1);
+}
+
+.ada-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.ada-table th,
+.ada-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--grid);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ada-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.ada-table .ada-numeric {
+  text-align: right;
+}
+
+.ada-table .ada-empty {
+  color: var(--text-muted);
+}
+
+/* line chart */
+
+.ada-chart {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.ada-chart svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.ada-axis text {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.ada-axis line {
+  stroke: var(--grid);
+}
+
+.ada-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ada-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ada-swatch {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.ada-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+}
+
+.ada-tooltip dl {
+  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 8px;
+}
+
+.ada-tooltip dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
