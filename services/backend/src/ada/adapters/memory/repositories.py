@@ -81,6 +81,9 @@ class MemoryStore:
         # The session agent as (provider id, model), so it follows a renamed provider and
         # is gone with its model, as the database's SET NULL has it.
         self.session_agent: tuple[Id, str] | None = None
+        self.research_agent: tuple[Id, str] | None = None
+        # Source id -> the sealed secret of its monitor.
+        self.monitor_secrets: dict[Id, str] = {}
 
 
 def _get[K, M](records: dict[K, M], kind: str, id: K) -> M:
@@ -149,6 +152,20 @@ class MemoryDataSourceRepository(DataSourceRepository):
         self.store.data_sources[id] = source.model_copy(
             update={"last_checked_at": at, "last_probe_token": probe_token, "last_error": error}
         )
+
+    async def set_monitor(
+        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+    ) -> None:
+        source = await self.get(id)
+        self.store.data_sources[id] = source.model_copy(update={"monitor_id": monitor_id})
+        if secret_encrypted is None:
+            self.store.monitor_secrets.pop(id, None)
+        else:
+            self.store.monitor_secrets[id] = secret_encrypted
+
+    async def monitor_secret_encrypted(self, id: Id) -> str | None:
+        await self.get(id)
+        return self.store.monitor_secrets.get(id)
 
 
 class MemorySessionRepository(SessionRepository):
@@ -592,23 +609,26 @@ class MemoryAgentSettingsRepository(AgentSettingsRepository):
         self.store = store
 
     async def get(self) -> AgentSettings:
-        ref = self.store.session_agent
-        session_agent = (
-            _model_id(self.store, *ref)
-            if ref is not None and ref in self.store.llm_models
-            else None
+        return self.store.agent_settings.model_copy(
+            update={
+                "session_agent": self._current(self.store.session_agent),
+                "research_agent": self._current(self.store.research_agent),
+            }
         )
-        return self.store.agent_settings.model_copy(update={"session_agent": session_agent})
+
+    def _current(self, ref: tuple[Id, str] | None) -> str | None:
+        if ref is None or ref not in self.store.llm_models:
+            return None
+        return _model_id(self.store, *ref)
 
     async def update(self, settings: AgentSettings, expected_revision: int) -> AgentSettings:
         actual = self.store.agent_settings.revision
         if actual != expected_revision:
             raise Conflict("agent settings", 1, expected_revision, actual)
-        ref = (
-            _model_key(self.store, settings.session_agent)
-            if settings.session_agent is not None
-            else None
-        )
-        self.store.session_agent = ref
+        self.store.session_agent = self._key(settings.session_agent)
+        self.store.research_agent = self._key(settings.research_agent)
         self.store.agent_settings = AgentSettings(revision=expected_revision + 1)
         return await self.get()
+
+    def _key(self, model_id: str | None) -> tuple[Id, str] | None:
+        return _model_key(self.store, model_id) if model_id is not None else None

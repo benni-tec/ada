@@ -40,6 +40,26 @@ class FreshnessPolicy(DomainModel):
     latest_period_ttl_seconds: int | None = None
 
 
+class FoundBy(DomainModel):
+    """How the research agent came upon a source."""
+
+    query: str
+    scope: str
+
+
+class Provenance(DomainModel):
+    """Where a source's data comes from and on what terms. Filled by whoever registers a
+    source; "unknown" in `licence`, with the reason in `note`, when it cannot be told."""
+
+    publisher: str | None = None
+    licence: str | None = None
+    landing_page: str | None = None
+    found_by: FoundBy | None = None
+    # True when a model, not a person or a parser, read the values out of the page.
+    extracted_by_model: bool = False
+    note: str | None = None
+
+
 class DataSource(DomainModel):
     """Registered once per project and referenced by source operators."""
 
@@ -55,8 +75,9 @@ class DataSource(DomainModel):
     freshness: FreshnessPolicy = FreshnessPolicy()
     # Declared by whoever registers the source; sources cannot derive their roles.
     declared_schema: Schema | None = None
+    provenance: Provenance | None = None
     created_at: datetime
-    # The next three are written by refreshes, outside the revision: a refresh never
+    # The next four are written by refreshes, outside the revision: a refresh never
     # conflicts with an edit.
     last_checked_at: datetime | None = None
     # What the last probe returned; a different token means the data changed.
@@ -64,6 +85,9 @@ class DataSource(DomainModel):
     # Why the last refresh failed; None after a successful one. While it is set, widgets
     # on this source show their data as stale.
     last_error: str | None = None
+    # The monitor that watches a document source, written by watch. Its secret is never
+    # part of the model: only the repository holds it, encrypted.
+    monitor_id: str | None = None
     revision: int = 1
 
 

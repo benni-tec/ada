@@ -9,6 +9,7 @@ from ada.core.models.sources import (
     DataFormat,
     DataSource,
     FreshnessPolicy,
+    Provenance,
     RefreshResult,
 )
 from ada.core.models.time import TimeRange
@@ -25,6 +26,7 @@ class SourceService(Protocol):
         options: JsonObject | None = None,
         freshness: FreshnessPolicy | None = None,
         declared_schema: Schema | None = None,
+        provenance: Provenance | None = None,
     ) -> DataSource: ...
 
     async def get(self, id: Id) -> DataSource: ...

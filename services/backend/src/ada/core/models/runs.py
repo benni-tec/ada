@@ -26,6 +26,8 @@ class Snapshot(DomainModel):
     location: str
     row_count: int | None = None
     fetched_at: datetime
+    # Where the data came from, as the reader reported it: the final URL with its query.
+    origin: str | None = None
     # Set when a newer snapshot for the same operator and key replaced this one.
     superseded_at: datetime | None = None
 

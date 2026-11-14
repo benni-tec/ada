@@ -47,6 +47,7 @@ from ada.core.models.sources import (
     DataFormat,
     DataSource,
     FreshnessPolicy,
+    Provenance,
     RefreshResult,
 )
 from ada.core.models.time import TimeRange
@@ -222,6 +223,7 @@ class FakeSources(SourceService):
         options: dict | None = None,
         freshness: FreshnessPolicy | None = None,
         declared_schema: Schema | None = None,
+        provenance: Provenance | None = None,
     ) -> DataSource:
         source = DataSource(
             id=uuid7(),
@@ -233,6 +235,7 @@ class FakeSources(SourceService):
             options=options or {},
             freshness=freshness or FreshnessPolicy(),
             declared_schema=declared_schema,
+            provenance=provenance,
             created_at=self.clock.now(),
         )
         await self.sources.add(source)

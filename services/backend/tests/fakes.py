@@ -48,6 +48,8 @@ class FakeSourceReader(SourceReader):
         self.fetches: list[tuple[Id, TimeRange]] = []
         self.probes: list[Id] = []
         self.clock: Clock = FixedClock()
+        # What fetches report as their origin; the source address when None.
+        self.origin: str | None = None
 
     async def fetch(self, source: DataSource, time_range: TimeRange) -> FetchedData:
         self.fetches.append((source.id, time_range))
@@ -57,7 +59,7 @@ class FakeSourceReader(SourceReader):
             content=self.content,
             format=self.format,
             fetched_at=self.clock.now(),
-            origin=source.address,
+            origin=self.origin or source.address,
         )
 
     async def probe(self, source: DataSource) -> str | None:

@@ -5,7 +5,13 @@ from fastmcp import FastMCP
 
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.schema import Schema
-from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy
+from ada.core.models.sources import (
+    AccessKind,
+    DataFormat,
+    DataSource,
+    FreshnessPolicy,
+    Provenance,
+)
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.transactions import AfterCommit
 from ada.core.services.ports.projects import ProjectService
@@ -33,13 +39,17 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         options: JsonObject | None = None,
         freshness: FreshnessPolicy | None = None,
         declared_schema: Schema | None = None,
+        provenance: Provenance | None = None,
     ) -> DataSource:
         """Register a data source in a project, once, so that pipelines can read it. Use it
         for a stable URL that returns CSV, JSON or Parquet (access_kind "url"), or one HTTP
         request with method, headers and body in `options` (access_kind "request").
         `freshness` says when the data counts as outdated; without it the source is only
         refreshed on request. `declared_schema` states column types and what columns mean,
-        which the platform cannot work out by itself.
+        which the platform cannot work out by itself. Fill `provenance` with the
+        publisher, the licence ("unknown", with the reason in `note`, when it cannot be
+        established) and `found_by` (the query and scope that led to it); say in
+        `extracted_by_model` whether a model read the values out of a page.
 
         Registering does not fetch anything: call refresh_source to load the data, then
         add_source_operator to start a pipeline from it. Returns the source with its id."""
@@ -53,6 +63,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             options=options,
             freshness=freshness,
             declared_schema=declared_schema,
+            provenance=provenance,
         )
 
     @mcp.tool

@@ -50,8 +50,10 @@ from ada.core.models.sources import (
     AccessKind,
     DataFormat,
     DataSource,
+    FoundBy,
     FreshnessKind,
     FreshnessPolicy,
+    Provenance,
 )
 from ada.core.models.time import TimeRange
 from ada.core.ports.sources import SourceReaders
@@ -160,6 +162,20 @@ async def test_register_stores_the_source_and_its_source_operator(world: World) 
     assert await world.service.list(world.project_id) == [source]
 
 
+async def test_register_source_keeps_provenance(world: World) -> None:
+    provenance = Provenance(
+        publisher="THL",
+        licence="unknown",
+        found_by=FoundBy(query="stroke survival", scope="web"),
+        note="no licence on the page",
+    )
+
+    source = await world.register(provenance=provenance)
+
+    assert (await world.service.get(source.id)).provenance == provenance
+    assert (await world.register()).provenance is None
+
+
 @pytest.mark.parametrize(
     "changes",
     [
@@ -213,6 +229,15 @@ async def test_the_first_refresh_writes_a_snapshot_and_announces_it(world: World
     [event] = world.events.published
     assert event.type is EventType.SOURCE_REFRESHED
     assert event.payload == {"data_source_id": str(source.id), "changed": True}
+
+
+async def test_snapshot_keeps_origin(world: World) -> None:
+    world.reader.origin = "https://final/url"
+    source = await world.register()
+
+    await world.service.refresh(source.id)
+
+    assert [s.origin for s in world.snapshots(source)] == ["https://final/url"]
 
 
 async def test_a_manual_source_is_fetched_only_when_asked_and_new_content_supersedes(

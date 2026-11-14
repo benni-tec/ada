@@ -30,8 +30,14 @@ from ada.core.models.base import Id
 from ada.core.models.errors import NotFound
 from ada.core.models.projects import Project
 from ada.core.models.schema import Schema
-from ada.core.models.sessions import EntryKind, Session, SessionEntry
-from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy
+from ada.core.models.sessions import EntryKind, Session, SessionAgent, SessionEntry
+from ada.core.models.sources import (
+    AccessKind,
+    DataFormat,
+    DataSource,
+    FreshnessPolicy,
+    Provenance,
+)
 from ada.core.models.widgets import Widget
 from ada.core.ports.repositories import (
     DataSourceRepository,
@@ -85,10 +91,14 @@ def _data_source(row: DataSourceRow) -> DataSource:
         declared_schema=(
             Schema.model_validate(row.declared_schema) if row.declared_schema is not None else None
         ),
+        provenance=(
+            Provenance.model_validate(row.provenance) if row.provenance is not None else None
+        ),
         created_at=row.created_at,
         last_checked_at=row.last_checked_at,
         last_probe_token=row.last_probe_token,
         last_error=row.last_error,
+        monitor_id=row.monitor_id,
         revision=row.revision,
     )
 
@@ -96,7 +106,7 @@ def _data_source(row: DataSourceRow) -> DataSource:
 def _data_source_edit(source: DataSource) -> dict[str, object]:
     """The columns an edit may change. The last_* columns are written by refreshes alone
     (`record_check`): an edit that read the source before a refresh must not put the old
-    outcome back."""
+    outcome back, and `monitor_id` by `set_monitor`."""
     return {
         "name": source.name,
         "access_kind": source.access_kind.value,
@@ -105,6 +115,7 @@ def _data_source_edit(source: DataSource) -> dict[str, object]:
         "options": json_object(source.options),
         "freshness": dump(source.freshness),
         "declared_schema": dump(source.declared_schema) if source.declared_schema else None,
+        "provenance": dump(source.provenance) if source.provenance else None,
     }
 
 
@@ -159,6 +170,23 @@ class SqlDataSourceRepository(DataSourceRepository):
         if result.rowcount == 0:
             raise NotFound("data source", id)
 
+    async def set_monitor(
+        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+    ) -> None:
+        # Outside the revision, like a check: watching never conflicts with an edit.
+        table = DataSourceRow.__table__
+        result = await self.session.execute(
+            update(table)
+            .where(table.c.id == id)
+            .values(monitor_id=monitor_id, monitor_secret_encrypted=secret_encrypted)
+        )
+        if result.rowcount == 0:
+            raise NotFound("data source", id)
+
+    async def monitor_secret_encrypted(self, id: Id) -> str | None:
+        row = await fetch(self.session, DataSourceRow, id, "data source")
+        return row.monitor_secret_encrypted
+
 
 def _session(row: SessionRow) -> Session:
     return Session(
@@ -168,6 +196,8 @@ def _session(row: SessionRow) -> Session:
         origin_dashboard_id=row.origin_dashboard_id,
         panel_dashboard_id=row.panel_dashboard_id,
         created_at=row.created_at,
+        agent=SessionAgent(row.agent),
+        parent_session_id=row.parent_session_id,
         revision=row.revision,
     )
 
@@ -204,6 +234,8 @@ class SqlSessionRepository(SessionRepository):
             origin_dashboard_id=session.origin_dashboard_id,
             panel_dashboard_id=session.panel_dashboard_id,
             created_at=session.created_at,
+            agent=session.agent.value,
+            parent_session_id=session.parent_session_id,
         )
         await add_row(self.session, row)
 

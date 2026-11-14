@@ -189,7 +189,7 @@ def test_a_turn_needs_a_session_agent_with_its_key(unreachable_settings: Setting
                 assert models["models"][0]["available"] is False
             else:
                 assert turn is None
-                assert models == {"models": [], "session_agent": None}
+                assert models == {"models": [], "session_agent": None, "research_agent": None}
 
 
 def test_context_is_checked_stored_with_the_message_and_reaches_the_prompt(

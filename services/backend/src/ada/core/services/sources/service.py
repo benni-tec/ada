@@ -18,6 +18,7 @@ from ada.core.models.sources import (
     DataSource,
     FreshnessKind,
     FreshnessPolicy,
+    Provenance,
     RefreshResult,
 )
 from ada.core.models.time import Interval, TimeRange
@@ -100,6 +101,7 @@ class DataSources(SourceService):
         options: JsonObject | None = None,
         freshness: FreshnessPolicy | None = None,
         declared_schema: Schema | None = None,
+        provenance: Provenance | None = None,
     ) -> DataSource:
         await self.projects.get(project_id)
         # Fails now for a kind nobody can read yet, instead of at the first refresh.
@@ -115,6 +117,7 @@ class DataSources(SourceService):
             options=options or {},
             freshness=freshness or FreshnessPolicy(),
             declared_schema=declared_schema,
+            provenance=provenance,
             created_at=now,
         )
         _check(source)
@@ -336,6 +339,7 @@ class DataSources(SourceService):
             location=stored.location,
             row_count=stored.row_count,
             fetched_at=fetched.fetched_at,
+            origin=fetched.origin,
         )
         # Superseded first: at most one snapshot per operator and key is current, and the
         # database checks that on every write.
@@ -389,6 +393,7 @@ class DataSources(SourceService):
                 location=data.location,
                 row_count=data.row_count,
                 fetched_at=fetched.fetched_at,
+                origin=fetched.origin,
             )
             await self.snapshots.add(snapshot)
             written[period] = snapshot

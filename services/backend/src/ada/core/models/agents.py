@@ -20,6 +20,7 @@ from ada.core.models.sessions import SessionEntry
 
 # What a configured model is for. One for now; the operators of later waves add theirs.
 SESSION_AGENT = "session_agent"
+RESEARCH_AGENT = "research_agent"
 
 # A provider's name: the first half of its models' ids.
 PROVIDER_NAME = r"^[a-z0-9-]+$"
@@ -65,6 +66,8 @@ class AgentSettings(DomainModel):
     # The model id that answers messages in sessions and dashboard panels; None without
     # one, and cleared when its model or provider is deleted.
     session_agent: str | None = None
+    # The model id that runs research sessions; None without one, cleared likewise.
+    research_agent: str | None = None
     revision: int = 1
 
 
@@ -75,7 +78,7 @@ class ModelInfo(DomainModel):
     id: str
     provider: str
     model: str
-    # What it is used for, e.g. "session_agent".
+    # What it is used for, e.g. "session_agent" or "research_agent".
     purposes: tuple[str, ...] = ()
     # False when it cannot be used, e.g. its provider needs a key and has none; `reason`
     # says why.
@@ -87,6 +90,7 @@ class ModelList(DomainModel):
     models: tuple[ModelInfo, ...] = ()
     # The model that answers messages in sessions and dashboard panels; None without one.
     session_agent: str | None = None
+    research_agent: str | None = None
 
 
 class AgentSettingsView(DomainModel):
@@ -95,6 +99,7 @@ class AgentSettingsView(DomainModel):
     providers: tuple[LlmProvider, ...] = ()
     models: ModelList = ModelList()
     session_agent: str | None = None
+    research_agent: str | None = None
     # False when no master key is set (ADA_SECRET_KEY): API keys cannot be stored.
     secrets_available: bool
     # The revision of AgentSettings, for setting the session agent.

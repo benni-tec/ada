@@ -6,7 +6,13 @@ from fastapi import APIRouter, status
 
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.schema import Schema
-from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy
+from ada.core.models.sources import (
+    AccessKind,
+    DataFormat,
+    DataSource,
+    FreshnessPolicy,
+    Provenance,
+)
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.transactions import AfterCommit
 from ada.core.services.ports.projects import ProjectService
@@ -24,6 +30,7 @@ class NewSource(Request):
     options: JsonObject | None = None
     freshness: FreshnessPolicy | None = None
     declared_schema: Schema | None = None
+    provenance: Provenance | None = None
 
 
 class SourceChange(Request):
@@ -73,6 +80,7 @@ async def register_source(
         options=body.options,
         freshness=body.freshness,
         declared_schema=body.declared_schema,
+        provenance=body.provenance,
     )
 
 
