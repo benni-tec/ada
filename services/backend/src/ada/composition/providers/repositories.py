@@ -20,12 +20,13 @@ from ada.adapters.db.reporting_repositories import (
 from ada.adapters.db.workspace_repositories import (
     SqlDataSourceRepository,
     SqlProjectRepository,
+    SqlResearchCalls,
     SqlSessionRepository,
     SqlSourceCheckLog,
     SqlSourceLocks,
     SqlWidgetRepository,
 )
-from ada.core.ports.agents import TurnProgress
+from ada.core.ports.agents import ResearchCalls, TurnProgress
 from ada.core.ports.repositories import (
     AgentSettingsRepository,
     AgentTurnRepository,
@@ -76,6 +77,8 @@ class RepositoryProvider(Provider):
     source_checks = provide(SqlSourceCheckLog, provides=SourceCheckLog, scope=Scope.APP)
     # A running turn's progress, likewise on connections of its own.
     turn_progress = provide(SqlTurnProgress, provides=TurnProgress, scope=Scope.APP)
+    # A research session's paid web calls, counted before each call and committed at once.
+    research_calls = provide(SqlResearchCalls, provides=ResearchCalls, scope=Scope.APP)
 
 
 provider = RepositoryProvider()

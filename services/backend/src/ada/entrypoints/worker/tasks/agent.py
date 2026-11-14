@@ -22,7 +22,12 @@ async def run_turn(
     with the platform's own MCP tools, each call a unit of work of its own, so what it
     builds is stored and announced as it goes, like an external agent's work."""
     try:
-        await service.run(UUID(turn_id), InProcessToolbox(container))
+        turn = UUID(turn_id)
+        # The worker runs several tasks at once, in several processes: without this, two
+        # turns of one session could run side by side, e.g. the turn a research report
+        # queues while the turn that delegated is still running.
+        await service.wait(turn)
+        await service.run(turn, InProcessToolbox(container))
     except Exception:
         # The service ends every turn it started, failed or not; this is for what happens
         # before (the turn cannot be read). Ending normally keeps the worker running.

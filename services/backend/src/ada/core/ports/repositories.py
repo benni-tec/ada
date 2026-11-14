@@ -61,6 +61,17 @@ class DataSourceRepository(Protocol):
         last_error. Leaves the revision alone."""
         ...
 
+    async def set_monitor(
+        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+    ) -> None:
+        """Store (or with None clear) the monitor that watches the source and its secret,
+        already sealed. Leaves the revision alone."""
+        ...
+
+    async def monitor_secret_encrypted(self, id: Id) -> str | None:
+        """The sealed secret of the source's monitor; it is never part of a DataSource."""
+        ...
+
 
 class SessionRepository(Protocol):
     async def get(self, id: Id) -> Session: ...
@@ -152,7 +163,7 @@ class AgentSettingsRepository(Protocol):
 
     async def get(self) -> AgentSettings: ...
     async def update(self, settings: AgentSettings, expected_revision: int) -> AgentSettings:
-        """`session_agent` must name a stored model (or be None)."""
+        """`session_agent` and `research_agent` must name a stored model (or be None)."""
         ...
 
 

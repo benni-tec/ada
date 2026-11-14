@@ -121,6 +121,7 @@ export function session(overrides: Partial<Session> = {}): Session {
     title: 'Why did coverage drop?',
     origin_dashboard_id: null,
     panel_dashboard_id: null,
+    agent: 'session',
     created_at: '2026-11-01T09:05:00Z',
     revision: 1,
     ...overrides,

@@ -451,11 +451,10 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
     client, _ = agent
     tools = {tool.name: tool for tool in await client.list_tools()}
     verbs = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
-    verbs |= {"pin", "edit", "set", "show", "generate", "check", "build", "query"}
-    # The web tools are named for the web, Context.dev's way (web_search, web_read, web_map).
-    verbs |= {"web"}
+    verbs |= {"pin", "edit", "set", "show", "generate", "check", "build", "query", "search"}
+    verbs |= {"read", "extract", "map", "watch", "unwatch", "delegate", "report"}
     injected = {"service", "projects", "pipelines", "sessions", "widgets", "runs", "dispatcher"}
-    injected |= {"exploration", "batches", "refreshes", "web"}
+    injected |= {"exploration", "batches", "refreshes", "web", "research"}
 
     for name, tool in tools.items():
         assert name.split("_")[0] in verbs, name

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from collections.abc import Sequence
 from datetime import date, datetime
 from uuid import uuid7
@@ -7,23 +8,27 @@ from uuid import uuid7
 from ada.core.models.actors import PLATFORM
 from ada.core.models.analysis import Query
 from ada.core.models.base import Id, JsonObject
-from ada.core.models.errors import Invalid
+from ada.core.models.errors import Invalid, NotConfigured
 from ada.core.models.events import Event, EventType
 from ada.core.models.operators import Operator, OperatorId, OperatorKind, operator_identity
 from ada.core.models.runs import Snapshot
 from ada.core.models.schema import Schema, TimeRole
 from ada.core.models.sources import (
     DOCUMENT_COLUMNS,
+    MODEL_EXTRACTED,
     AccessKind,
     DataFormat,
     DataSource,
     FreshnessKind,
     FreshnessPolicy,
+    Provenance,
     RefreshResult,
     document_engine,
     document_extract,
+    web_operation,
 )
 from ada.core.models.time import Interval, TimeRange
+from ada.core.models.web import watching_not_configured
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import (
@@ -32,8 +37,10 @@ from ada.core.ports.repositories import (
     ProjectRepository,
     SnapshotRepository,
 )
+from ada.core.ports.secrets import SecretBox, SecretUnreadable
 from ada.core.ports.sources import SourceCheckLog, SourceLocks, SourceReader, SourceReaders
 from ada.core.ports.system import Clock
+from ada.core.ports.web import WebExplorer
 from ada.core.services.pipelines.fusion import stand_in_sql, union
 from ada.core.services.pipelines.schemas import check_unique
 from ada.core.services.ports.sources import SourceService
@@ -49,7 +56,10 @@ from ada.core.services.sources.pushdown import (
     time_role,
 )
 from ada.core.services.sources.shaping import shape, shape_options, split_periods
+from ada.core.services.sources.watching import signature_matches
 from ada.core.services.sources.web import check_forced_refresh, check_web, web_schema
+
+logger = logging.getLogger(__name__)
 
 # The key of the snapshot of the whole source, as `refresh` fetches it. A source that
 # fetches by period (pushdown.py) also keeps one snapshot per period, keyed
@@ -82,6 +92,9 @@ class DataSources(SourceService):
         events: EventPublisher,
         clock: Clock,
         locks: SourceLocks,
+        explorer: WebExplorer,
+        secrets: SecretBox,
+        public_url: str | None,
     ) -> None:
         self.projects = projects
         self.sources = sources
@@ -93,6 +106,10 @@ class DataSources(SourceService):
         self.events = events
         self.clock = clock
         self.locks = locks
+        self.explorer = explorer
+        self.secrets = secrets
+        # Where the page monitor service can reach this platform; None disables watching.
+        self.public_url = public_url
 
     async def register(
         self,
@@ -104,11 +121,13 @@ class DataSources(SourceService):
         options: JsonObject | None = None,
         freshness: FreshnessPolicy | None = None,
         declared_schema: Schema | None = None,
+        provenance: Provenance | None = None,
     ) -> DataSource:
         await self.projects.get(project_id)
         # Fails now for a kind nobody can read yet, instead of at the first refresh.
         self.readers.for_kind(access_kind)
         now = self.clock.now()
+        provenance = _provenance(access_kind, options or {}, provenance)
         if access_kind is AccessKind.DOCUMENT:
             declared_schema = _document_schema(options or {}, declared_schema)
         elif access_kind is AccessKind.WEB:
@@ -123,6 +142,7 @@ class DataSources(SourceService):
             options=options or {},
             freshness=freshness or FreshnessPolicy(),
             declared_schema=declared_schema,
+            provenance=provenance,
             created_at=now,
         )
         _check(source)
@@ -160,6 +180,7 @@ class DataSources(SourceService):
         options: JsonObject | None = None,
         freshness: FreshnessPolicy | None = None,
         declared_schema: Schema | None = None,
+        provenance: Provenance | None = None,
     ) -> DataSource:
         # A changed address or options is read by the next refresh that fetches; the
         # caller forces one to read it at once. The source operator keeps its declared
@@ -171,8 +192,14 @@ class DataSources(SourceService):
             "options": options,
             "freshness": freshness,
             "declared_schema": declared_schema,
+            "provenance": provenance,
         }
         updated = source.model_copy(update={k: v for k, v in changes.items() if v is not None})
+        updated = updated.model_copy(
+            update={
+                "provenance": _provenance(updated.access_kind, updated.options, updated.provenance)
+            }
+        )
         _check(updated)
         return await self.sources.update(updated, expected_revision)
 
@@ -313,6 +340,64 @@ class DataSources(SourceService):
             await self._publish(source, EventType.SOURCE_REFRESHED, changed=changed)
         return await self._union(source, operator_id, role, list(stored.values()))
 
+    async def watch(self, id: Id) -> DataSource:
+        if not self.public_url:
+            raise watching_not_configured()
+        if not self.secrets.available:
+            raise NotConfigured(
+                "watching needs a master key to keep the monitor secret (ADA_SECRET_KEY)"
+            )
+        # Held to the end of the transaction: two watches of one source would otherwise each
+        # create a monitor, and the one that loses the write could never be deleted.
+        await self.locks.hold(id)
+        source = await self.sources.get(id)
+        if not source.address.startswith(("http://", "https://")):
+            raise Invalid("Only a source at an http(s) address can be watched")
+        old = source.monitor_id
+        webhook = f"{self.public_url.rstrip('/')}/api/hooks/context/{id}"
+        monitor = await self.explorer.watch(source.address, webhook)
+        try:
+            sealed = self.secrets.encrypt(monitor.secret.get_secret_value())
+            await self.sources.set_monitor(id, monitor.id, sealed)
+            watched = await self._set_freshness(source, FreshnessKind.PUSH)
+        except Exception:
+            # Without this the monitor would keep firing at a source that does not know it.
+            await self.explorer.unwatch(monitor.id)
+            raise
+        if old is not None:
+            try:
+                await self.explorer.unwatch(old)
+            except Exception:
+                logger.warning("The replaced monitor %s of source %s was not deleted", old, id)
+        return watched
+
+    async def unwatch(self, id: Id) -> DataSource:
+        await self.locks.hold(id)
+        source = await self.sources.get(id)
+        if source.monitor_id is None:
+            return source
+        await self.explorer.unwatch(source.monitor_id)
+        await self.sources.set_monitor(id, None, None)
+        return await self._set_freshness(source, FreshnessKind.MANUAL)
+
+    async def _set_freshness(self, source: DataSource, kind: FreshnessKind) -> DataSource:
+        fresh = await self.sources.get(source.id)
+        updated = fresh.model_copy(update={"freshness": FreshnessPolicy(kind=kind)})
+        return await self.sources.update(updated, fresh.revision)
+
+    async def verify_push(
+        self, id: Id, raw_body: bytes, signature: str | None, now: datetime
+    ) -> bool:
+        sealed = await self.sources.monitor_secret_encrypted(id)
+        if sealed is None:
+            return False
+        try:
+            secret = self.secrets.decrypt(sealed)
+        except SecretUnreadable:
+            logger.warning("The monitor secret of source %s cannot be decrypted", id)
+            return False
+        return signature_matches(secret, raw_body, signature, now)
+
     async def due(self) -> Sequence[DataSource]:
         now = self.clock.now()
         due: list[DataSource] = []
@@ -347,6 +432,7 @@ class DataSources(SourceService):
             location=stored.location,
             row_count=stored.row_count,
             fetched_at=fetched.fetched_at,
+            origin=fetched.origin,
         )
         # Superseded first: at most one snapshot per operator and key is current, and the
         # database checks that on every write.
@@ -400,6 +486,7 @@ class DataSources(SourceService):
                 location=data.location,
                 row_count=data.row_count,
                 fetched_at=fetched.fetched_at,
+                origin=fetched.origin,
             )
             await self.snapshots.add(snapshot)
             written[period] = snapshot
@@ -540,6 +627,23 @@ def _check_document(source: DataSource) -> None:
             f'A document source with extract "{extract.value}" has the columns '
             f"{', '.join(expected)}; to extract something else, register another source"
         )
+
+
+def _provenance(
+    access_kind: AccessKind, options: JsonObject, provenance: Provenance | None
+) -> Provenance | None:
+    """The provenance as given, saying so when a model writes the rows down: a web source
+    whose operation is model-extracted (answers, extract)."""
+    if access_kind is not AccessKind.WEB:
+        return provenance
+    try:
+        operation = web_operation(options)
+    except Invalid:
+        # The checks say what is wrong with the options.
+        return provenance
+    if operation not in MODEL_EXTRACTED or (provenance and provenance.extracted_by_model):
+        return provenance
+    return (provenance or Provenance()).model_copy(update={"extracted_by_model": True})
 
 
 def _digest(value: object) -> str:

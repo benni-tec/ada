@@ -92,9 +92,12 @@ test('the gear opens the settings over the page; the side navigation switches se
 
   fireEvent.click(within(global).getByRole('link', { name: 'Web' }))
   const web = await screen.findByRole('region', { name: 'Web' })
-  expect(await within(web).findByText('Context.dev credits per project per day')).toBeInTheDocument()
+  expect(await within(web).findByText('Web credits per project per day')).toBeInTheDocument()
   expect(within(web).getByText('300')).toBeInTheDocument()
-  expect(within(web).getByText('Configured')).toBeInTheDocument()
+  // Context.dev has its key; Exa and watching (no ADA_PUBLIC_URL) have not.
+  expect(within(web).getAllByText('Configured')).toHaveLength(1)
+  expect(within(web).getByText('EXA_API_KEY')).toBeInTheDocument()
+  expect(within(web).getByText('ADA_PUBLIC_URL')).toBeInTheDocument()
 
   fireEvent.click(within(await navGroup('This project')).getByRole('link', { name: 'Data sources' }))
   expect(await within(await dataSources()).findByRole('listitem', { name: 'Sotkanet screening' })).toHaveAttribute(
@@ -306,4 +309,54 @@ test('a data source changed by someone else meanwhile is read again, and saving 
     [1, 'Screening coverage'],
     [2, 'Screening coverage'],
   ])
+})
+
+test('a source shows where it came from, says when its licence is unknown, and can be watched and unwatched', async () => {
+  let current = source({
+    provenance: {
+      publisher: 'THL',
+      licence: 'unknown',
+      landing_page: 'https://thl.test/cancer',
+      found_by: { query: 'cancer survival Finland', scope: 'data' },
+      extracted_by_model: true,
+      note: 'The page names no licence',
+    },
+  })
+  serveSettings({
+    'GET /api/projects/p1/sources': () => [current],
+    'POST /api/sources/ds1/watch': () => (current = { ...current, monitor_id: 'm1' }),
+    'DELETE /api/sources/ds1/watch': () => (current = { ...current, monitor_id: null }),
+  })
+  renderAt('/projects/p1?settings=data-sources')
+
+  const item = await within(await dataSources()).findByRole('listitem', { name: 'Sotkanet screening' })
+  expect(item).toHaveTextContent('THL')
+  expect(item).toHaveTextContent('Licence unknown')
+  expect(item).toHaveTextContent('The page names no licence')
+  expect(item).toHaveTextContent('Model-extracted')
+  expect(within(item).getByRole('link', { name: 'Landing page' })).toHaveAttribute('href', 'https://thl.test/cancer')
+
+  fireEvent.click(within(item).getByRole('button', { name: 'Watch Sotkanet screening' }))
+  expect(await within(item).findByText('Watched')).toBeInTheDocument()
+  fireEvent.click(within(item).getByRole('button', { name: 'Stop watching Sotkanet screening' }))
+  await waitFor(() => expect(within(item).queryByText('Watched')).not.toBeInTheDocument())
+})
+
+test('picking the research agent saves it beside the session agent', async () => {
+  const put: unknown[] = []
+  let current = settings()
+  serveSettings({
+    'GET /api/settings/agent': () => current,
+    'PUT /api/settings/research-agent': (body: { model_id: string }) => {
+      put.push(body)
+      current = { ...current, research_agent: body.model_id, revision: 4 }
+      return current
+    },
+  })
+  renderAt('/projects/p1?settings=models')
+
+  const picker = await within(await agents()).findByLabelText('Research agent')
+  expect(picker).toHaveValue('')
+  fireEvent.change(picker, { target: { value: 'gemini/pro' } })
+  await waitFor(() => expect(put).toEqual([{ model_id: 'gemini/pro', expected_revision: 3 }]))
 })

@@ -16,11 +16,15 @@
     level holds one array of records: the records are the rows, in the declared columns,
     plus `sources` (the URLs the answer read or cites). Model-extracted, not read from a
     document.
+`"extract"`
+    The rows a model reads off the page at the address, following `instruction`, in the
+    declared columns (null where the page states no value). Model-extracted.
 
 Each fetch spends the project's daily web credits first (WebBudget): its price, or for a
 crawl `max_pages`, of which what Context.dev did not charge is given back afterwards. A
 refused budget is Invalid, as are Context.dev's refusals; a fetch that was sent stays
-counted when it fails. There is no probe: web sources are kept fresh by ttl.
+counted when it fails. There is no probe: web sources are kept fresh by ttl, or by a page
+monitor that refreshes them when the page changed (push).
 """
 
 import asyncio
@@ -40,6 +44,7 @@ from ada.core.models.schema import Column, ColumnType
 from ada.core.models.sources import (
     WEB_ANSWERS_CREDITS,
     WEB_CRAWL_MAX_PAGES,
+    WEB_EXTRACT_CREDITS,
     WEB_SCRAPE_CREDITS,
     WEB_SOURCES_COLUMN,
     DataFormat,
@@ -118,7 +123,22 @@ class WebPageReader(SourceReader):
                         source.project_id, self._day(), answer.credits - WEB_ANSWERS_CREDITS
                     )
                 records = answer_records(answer.content)
-                content = await asyncio.to_thread(_answer_parquet, source, records, answer.sources)
+                content = await asyncio.to_thread(_records_parquet, source, records, answer.sources)
+                origin = source.address
+            case WebOperation.EXTRACT:
+                assert source.declared_schema is not None
+                await self._spend(source, WEB_EXTRACT_CREDITS)
+                extraction = await self.explorer.extract(
+                    source.address,
+                    str(source.options["instruction"]),
+                    [column.name for column in source.declared_schema.columns],
+                    tags=tags,
+                )
+                if extraction.credits != WEB_EXTRACT_CREDITS:
+                    await self.budget.adjust(
+                        source.project_id, self._day(), extraction.credits - WEB_EXTRACT_CREDITS
+                    )
+                content = await asyncio.to_thread(_records_parquet, source, extraction.rows, None)
                 origin = source.address
         return FetchedData(
             content=content,
@@ -173,38 +193,45 @@ def _crawl_parquet(source: DataSource, pages: list[Any]) -> bytes:
     return document_parquet(extract, rows)
 
 
-def _answer_parquet(source: DataSource, records: list[dict[str, Any]], sources: list[str]) -> bytes:
+def _records_parquet(
+    source: DataSource, records: list[dict[str, Any]], sources: list[str] | None
+) -> bytes:
     """The records in the declared columns, converted to their types (a value that does
-    not convert is null), and the answer's sources on every row."""
+    not convert is null), and for an answer its sources on every row."""
     assert source.declared_schema is not None
     columns: list[Column] = [
         column
         for column in source.declared_schema.columns
-        if column.name != WEB_SOURCES_COLUMN.name
+        if sources is None or column.name != WEB_SOURCES_COLUMN.name
     ]
+    sources_column = _quote(WEB_SOURCES_COLUMN.name)
     with tempfile.TemporaryDirectory() as directory:
-        path = Path(directory) / "answer.parquet"
+        path = Path(directory) / "records.parquet"
         with duckdb.connect(":memory:") as connection:
-            raw = ", ".join(f"{_quote(column.name)} VARCHAR" for column in columns)
-            connection.execute(
-                f"CREATE TABLE answer ({raw}, {_quote(WEB_SOURCES_COLUMN.name)} VARCHAR[])"
-            )
+            raw = [f"{_quote(column.name)} VARCHAR" for column in columns]
+            if sources is not None:
+                raw.append(f"{sources_column} VARCHAR[]")
+            connection.execute(f"CREATE TABLE records ({', '.join(raw)})")
             rows = [
-                (*(_text(record.get(column.name)) for column in columns), sources)
+                (
+                    *(_text(record.get(column.name)) for column in columns),
+                    *(() if sources is None else (sources,)),
+                )
                 for record in records
             ]
             if rows:
                 marks = ", ".join("?" for _ in rows[0])
-                connection.executemany(f"INSERT INTO answer VALUES ({marks})", rows)
-            typed = ", ".join(
+                connection.executemany(f"INSERT INTO records VALUES ({marks})", rows)
+            typed = [
                 f"TRY_CAST({name} AS {_DUCKDB_TYPES[column.type]}) AS {name}"
                 for column in columns
                 for name in [_quote(column.name)]
-            )
+            ]
+            if sources is not None:
+                typed.append(sources_column)
             literal = "'" + str(path).replace("'", "''") + "'"
-            sources_column = _quote(WEB_SOURCES_COLUMN.name)
             connection.execute(
-                f"COPY (SELECT {typed}, {sources_column} FROM answer) TO {literal} (FORMAT parquet)"
+                f"COPY (SELECT {', '.join(typed)} FROM records) TO {literal} (FORMAT parquet)"
             )
         return path.read_bytes()
 

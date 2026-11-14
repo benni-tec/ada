@@ -47,6 +47,9 @@ export const deleteModel = (id: string) =>
 export const setSessionAgent = (modelId: string | null, expectedRevision: number) =>
   unwrap(api.PUT('/api/settings/session-agent', { body: { model_id: modelId, expected_revision: expectedRevision } }))
 
+export const setResearchAgent = (modelId: string | null, expectedRevision: number) =>
+  unwrap(api.PUT('/api/settings/research-agent', { body: { model_id: modelId, expected_revision: expectedRevision } }))
+
 /** The session agent's instructions for every project; shares the settings' revision. */
 export const setAgentInstructions = (instructions: string, expectedRevision: number) =>
   unwrap(api.PUT('/api/settings/agent-instructions', { body: { instructions, expected_revision: expectedRevision } }))

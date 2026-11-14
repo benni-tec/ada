@@ -71,10 +71,14 @@ class DataSourceRow(Base):
     options: Mapped[Json] = mapped_column(JSONB)
     freshness: Mapped[Json] = mapped_column(JSONB)
     declared_schema: Mapped[Json | None] = mapped_column(JSONB)
+    provenance: Mapped[Json | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(_timestamp)
     last_checked_at: Mapped[datetime | None] = mapped_column(_timestamp)
     last_probe_token: Mapped[str | None] = mapped_column(Text)
     last_error: Mapped[str | None] = mapped_column(Text)
+    monitor_id: Mapped[str | None] = mapped_column(Text)
+    # Sealed by the SecretBox; never on the model.
+    monitor_secret_encrypted: Mapped[str | None] = mapped_column(Text)
     revision: Mapped[int] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
@@ -140,6 +144,12 @@ class SessionRow(Base):
         Uuid, ForeignKey("dashboards.id", ondelete="SET NULL")
     )
     created_at: Mapped[datetime] = mapped_column(_timestamp)
+    agent: Mapped[str] = mapped_column(String(16), server_default="session")
+    parent_session_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("sessions.id", ondelete="SET NULL"), index=True
+    )
+    # Paid web calls of a research session; outside the revision, like a counter.
+    web_calls: Mapped[int] = mapped_column(Integer, server_default="0")
     revision: Mapped[int] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
@@ -227,6 +237,9 @@ class AgentSettingsRow(Base):
     )
     # Instructions for the session agent in every project; "" for none (migration 0008).
     instructions: Mapped[str] = mapped_column(Text, default="", server_default="")
+    research_agent_model_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("llm_models.id", ondelete="SET NULL")
+    )
     revision: Mapped[int] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
@@ -289,6 +302,7 @@ class SnapshotRow(Base):
     location: Mapped[str] = mapped_column(Text)
     row_count: Mapped[int | None] = mapped_column(Integer)
     fetched_at: Mapped[datetime] = mapped_column(_timestamp)
+    origin: Mapped[str | None] = mapped_column(Text)
     superseded_at: Mapped[datetime | None] = mapped_column(_timestamp)
 
 

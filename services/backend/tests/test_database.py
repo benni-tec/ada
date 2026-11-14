@@ -19,6 +19,7 @@ import factories
 from ada.adapters.db.agent_repositories import SqlTurnProgress
 from ada.adapters.db.base import Base
 from ada.adapters.db.migrate import _config, migrate
+from ada.adapters.db.workspace_repositories import SqlResearchCalls
 from ada.composition import create_container
 from ada.core.models.agents import (
     AgentTurn,
@@ -33,8 +34,8 @@ from ada.core.models.alerts import AlertState
 from ada.core.models.errors import Conflict, NotFound
 from ada.core.models.operators import OperatorKind
 from ada.core.models.schema import GeoRole, Roles, Schema
-from ada.core.models.sessions import DashboardContext, PipelineContext
-from ada.core.models.sources import FreshnessKind, FreshnessPolicy
+from ada.core.models.sessions import DashboardContext, PipelineContext, SessionAgent
+from ada.core.models.sources import FoundBy, FreshnessKind, FreshnessPolicy, Provenance
 from ada.core.models.time import Interval, TimeRange
 from ada.core.ports.repositories import ProjectRepository
 from conftest import settings_in
@@ -48,7 +49,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == [f"000{n}" for n in range(1, 9)]
+    assert migrate(database_url) == [f"000{n}" for n in range(1, 10)]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -77,8 +78,57 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "web_usage" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == [f"000{n}" for n in range(2, 9)]
+    assert migrate(database_url) == [f"000{n}" for n in range(2, 10)]
     assert migrate(database_url) == []
+
+
+def test_migration_0006_keeps_existing_rows(database_url: str) -> None:
+    config = _config(database_url)
+    command.upgrade(config, "0005")
+    project, source, session = uuid7(), uuid7(), uuid7()
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO projects (id, name, created_at, revision) VALUES (:p, 'P',"
+                    " now(), 1)"
+                ),
+                {"p": project},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO data_sources (id, project_id, name, access_kind, address, format,"
+                    " options, freshness, created_at, revision) VALUES (:s, :p, 'S', 'url', 'u',"
+                    " 'csv', '{}', '{}', now(), 1)"
+                ),
+                {"s": source, "p": project},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO sessions (id, project_id, title, created_at, revision)"
+                    " VALUES (:s, :p, 'T', now(), 1)"
+                ),
+                {"s": session, "p": project},
+            )
+
+        command.upgrade(config, "head")
+
+        with engine.connect() as connection:
+            source_row = connection.execute(
+                text("SELECT provenance, monitor_id, monitor_secret_encrypted FROM data_sources")
+            ).one()
+            session_row = connection.execute(
+                text("SELECT agent, parent_session_id, web_calls FROM sessions")
+            ).one()
+            settings = connection.execute(
+                text("SELECT research_agent_model_id FROM agent_settings")
+            ).one()
+        assert tuple(source_row) == (None, None, None)
+        assert tuple(session_row) == ("session", None, 0)
+        assert tuple(settings) == (None,)
+    finally:
+        engine.dispose()
 
 
 def test_the_tables_in_code_match_the_migrations(migrated_database_url: str) -> None:
@@ -256,12 +306,22 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
                 roles=Roles(geo=GeoRole(code="region", system="sotkanet", level="county")),
             ),
             last_error="boom",
+            provenance=Provenance(
+                publisher="THL",
+                licence="unknown",
+                found_by=FoundBy(query="stroke survival", scope="web"),
+                extracted_by_model=True,
+            ),
         )
         await repos.data_sources.add(source)
         dashboard = db_helpers.dashboard(world.project.id)
         await repos.dashboards.add(dashboard)
         session = factories.session(world.project.id, origin_dashboard_id=dashboard.id)
         await repos.sessions.add(session)
+        child = factories.session(
+            world.project.id, agent=SessionAgent.RESEARCH, parent_session_id=session.id
+        )
+        await repos.sessions.add(child)
         later = db_helpers.entry(session.id, created_at=factories.NOW + timedelta(seconds=1))
         first = db_helpers.entry(
             session.id,
@@ -287,6 +347,15 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
     async with unit_of_work(engine) as repos:
         assert await repos.data_sources.list(world.project.id) == [world.source, source]
         assert await repos.sessions.get(session.id) == session
+        assert await repos.sessions.get(child.id) == child
+        # A monitor is written outside the revision; its secret never leaves the repository.
+        await repos.data_sources.set_monitor(source.id, "mon_1", "sealed")
+        watched = await repos.data_sources.get(source.id)
+        assert (watched.monitor_id, watched.revision) == ("mon_1", 1)
+        assert await repos.data_sources.monitor_secret_encrypted(source.id) == "sealed"
+        assert "sealed" not in watched.model_dump_json()
+        await repos.data_sources.set_monitor(source.id, None, None)
+        assert await repos.data_sources.monitor_secret_encrypted(source.id) is None
         assert await repos.sessions.entries(session.id) == [first, later]
         assert await repos.widgets.list(world.project.id) == [original, copy]
         assert await repos.widgets.list_by_session(session.id) == [original]
@@ -294,6 +363,17 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
             session.model_copy(update={"panel_dashboard_id": dashboard.id}), 1
         )
     assert (updated.panel_dashboard_id, updated.revision) == (dashboard.id, 2)
+    # A research session's web calls, each committed at once; other sessions are not counted.
+    calls = SqlResearchCalls(engine)
+    assert [await calls.use(child.id, 2) for _ in range(3)] == [True, True, False]
+    assert await calls.use(session.id, 2) is True
+    with pytest.raises(NotFound):
+        await calls.use(uuid7(), 2)
+    counted = "SELECT web_calls FROM sessions WHERE id = :id"
+    assert (
+        await scalar(engine, counted, id=child.id),
+        await scalar(engine, counted, id=session.id),
+    ) == (2, 0)
 
 
 async def test_reporting_records_round_trip(engine: AsyncEngine) -> None:
@@ -678,6 +758,32 @@ async def test_cancelling_ends_a_queued_turn_and_flags_a_running_one(engine: Asy
         assert await repos.agent_turns.start(queued.id) is False
         assert flagged.status is TurnStatus.RUNNING
         assert await repos.agent_turns.cancel_requested(running.id) is True
+
+
+async def test_a_turn_left_running_is_failed_once_on_its_own(engine: AsyncEngine) -> None:
+    async with unit_of_work(engine) as repos:
+        turn = await stored_turn(repos)
+    progress = SqlTurnProgress(engine)
+    assert await progress.start(turn.id) is True
+
+    # Read and written while the waiting turn's own unit of work stays open.
+    async with unit_of_work(engine) as waiting:
+        await waiting.agent_turns.get(turn.id)
+        seen = await progress.session_turns(turn.id)
+        failed = await progress.abandon(turn.id, "gone", factories.NOW)
+        again = await progress.abandon(turn.id, "again", factories.NOW)
+        assert [t.status for t in await progress.session_turns(turn.id)] == [TurnStatus.FAILED]
+
+    async with unit_of_work(engine) as repos:
+        flagged = await repos.agent_turns.cancel_requested(turn.id)
+    assert [(t.id, t.status) for t in seen] == [(turn.id, TurnStatus.RUNNING)]
+    assert failed is not None
+    assert (failed.status, failed.error, failed.finished_at) == (
+        TurnStatus.FAILED,
+        "gone",
+        factories.NOW,
+    )
+    assert (again, flagged) == (None, True)
 
 
 async def test_a_running_turn_commits_its_progress_on_its_own(engine: AsyncEngine) -> None:

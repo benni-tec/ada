@@ -41,6 +41,7 @@ import {
   reportsQuery,
   sessionsQuery,
   type Id,
+  type Session,
 } from '@/lib/api'
 import { severityPillClasses, worstActive } from '@/components/alerts/labels'
 import { pageTypes, type PageTypeName } from '@/lib/page-types'
@@ -221,6 +222,14 @@ function Sessions({ projectId }: { projectId: Id }) {
   const navigate = useNavigate()
   const { data } = useQuery(sessionsQuery(projectId))
   const sessions = [...(data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))
+  // Research sessions hang under the session that delegated them.
+  const known = new Set(sessions.map((session) => session.id))
+  const byParent = new Map<string, Session[]>()
+  for (const session of sessions) {
+    const parent = session.parent_session_id ?? ''
+    byParent.set(parent, [...(byParent.get(parent) ?? []), session])
+  }
+  const roots = sessions.filter((session) => !session.parent_session_id || !known.has(session.parent_session_id))
   return (
     <Group
       type="session"
@@ -247,14 +256,44 @@ function Sessions({ projectId }: { projectId: Id }) {
       }
     >
       {data && sessions.length === 0 && <Empty>No sessions yet.</Empty>}
-      {sessions.map((session) => (
-        <Item key={session.id} active={session.id === sessionId}>
-            <Link to="/projects/$projectId/sessions/$sessionId" params={{ projectId, sessionId: session.id }}>
-              <span>{session.title}</span>
-            </Link>
-        </Item>
+      {roots.map((session) => (
+        <SessionNode key={session.id} session={session} byParent={byParent} projectId={projectId} activeId={sessionId} />
       ))}
     </Group>
+  )
+}
+
+/** A session and, nested under it, the research sessions it delegated. */
+function SessionNode({
+  session,
+  byParent,
+  projectId,
+  activeId,
+}: {
+  session: Session
+  byParent: Map<string, Session[]>
+  projectId: Id
+  activeId: string | undefined
+}) {
+  const nested = byParent.get(session.id) ?? []
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild isActive={session.id === activeId}>
+        <Link to="/projects/$projectId/sessions/$sessionId" params={{ projectId, sessionId: session.id }}>
+          <span>{session.title}</span>
+          {session.agent === 'research' && (
+            <span className="ml-auto rounded-full border px-1.5 text-[10px] font-medium text-sidebar-foreground/70">research</span>
+          )}
+        </Link>
+      </SidebarMenuSubButton>
+      {nested.length > 0 && (
+        <SidebarMenuSub className="mx-0 pr-0">
+          {nested.map((child) => (
+            <SessionNode key={child.id} session={child} byParent={byParent} projectId={projectId} activeId={activeId} />
+          ))}
+        </SidebarMenuSub>
+      )}
+    </SidebarMenuSubItem>
   )
 }
 

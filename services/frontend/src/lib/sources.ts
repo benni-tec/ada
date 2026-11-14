@@ -20,7 +20,7 @@ export const freshnessLabels: Record<FreshnessKind, string> = {
   manual: 'Only when asked',
   ttl: 'After a time',
   probe: 'When the source says it changed',
-  push: 'When the source pushes',
+  push: 'When its page changes (watched)',
 }
 
 /** How a source stays fresh, in words, e.g. "every 24 h". */
@@ -33,7 +33,7 @@ export function describeFreshness(freshness: FreshnessPolicy): string {
     case 'probe':
       return 'when it changed'
     case 'push':
-      return 'when pushed'
+      return 'when its page changes (watched)'
   }
 }
 

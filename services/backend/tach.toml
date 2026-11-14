@@ -85,6 +85,7 @@ path = "ada.composition"
 depends_on = [
     "ada.adapters",
     "ada.config",
+    "ada.core.models",
     "ada.core.ports",
     "ada.core.services",
     "ada.core.services.ports", "ada.discovery",

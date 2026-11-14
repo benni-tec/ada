@@ -15,6 +15,7 @@ import {
   createProvider,
   deleteModel,
   deleteProvider,
+  setResearchAgent,
   setSessionAgent,
   settingsKeys,
   updateProvider,
@@ -73,7 +74,22 @@ export function AgentSettingsSection() {
               </p>
             </div>
           )}
-          <SessionAgentPicker settings={settings} />
+          <AgentPicker
+            settings={settings}
+            label="Session agent"
+            hint="The model that answers in every project’s sessions. A message can still ask for another one in the composer."
+            none="None: nobody answers in sessions"
+            value={settings.session_agent}
+            set={setSessionAgent}
+          />
+          <AgentPicker
+            settings={settings}
+            label="Research agent"
+            hint="The model that works on a brief handed to it from a session, in a session of its own, and reports back."
+            none="Use the session agent"
+            value={settings.research_agent}
+            set={setResearchAgent}
+          />
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold">Providers</h3>
             {settings.providers.length === 0 && (
@@ -99,15 +115,29 @@ export function AgentSettingsSection() {
   )
 }
 
-/** Which model answers in sessions; a change is saved at once. */
-function SessionAgentPicker({ settings }: { settings: AgentSettings }) {
+/** Which model fills one role; a change is saved at once. */
+function AgentPicker({
+  settings,
+  label,
+  hint,
+  none,
+  value,
+  set,
+}: {
+  settings: AgentSettings
+  label: string
+  hint: string
+  none: string
+  value: string | null | undefined
+  set: (modelId: string | null, revision: number) => Promise<AgentSettings>
+}) {
   const reload = useReload()
   const queryClient = useQueryClient()
   const [conflict, setConflict] = useState<string | null>(null)
   const save = useMutation({
     mutationFn: (modelId: string | null) => {
       setConflict(null)
-      return setSessionAgent(modelId, settings.revision)
+      return set(modelId, settings.revision)
     },
     onSuccess: async (saved) => {
       queryClient.setQueryData(settingsKeys.agent(), saved)
@@ -123,19 +153,19 @@ function SessionAgentPicker({ settings }: { settings: AgentSettings }) {
   return (
     <div className="flex max-w-xl flex-col gap-2">
       <Field
-        label="Session agent"
-        hint="The model that answers in every project’s sessions. A message can still ask for another one in the composer."
+        label={label}
+        hint={hint}
       >
         {({ id, describedBy }) => (
           <select
             id={id}
             aria-describedby={describedBy}
             className={selectClass}
-            value={settings.session_agent ?? ''}
+            value={value ?? ''}
             disabled={save.isPending}
             onChange={(event) => save.mutate(event.target.value === '' ? null : event.target.value)}
           >
-            <option value="">None: nobody answers in sessions</option>
+            <option value="">{none}</option>
             {models.map((model) => (
               <option key={model.id} value={model.id} disabled={!model.available}>
                 {model.available ? model.id : `${model.id} (unavailable: ${model.reason ?? 'unknown reason'})`}
@@ -256,6 +286,7 @@ function Models({ provider, models }: { provider: LlmProvider; models: LlmModel[
                 <span className="flex items-center gap-2">
                   <span className="truncate font-mono text-xs">{model.model}</span>
                   {model.purposes.includes('session_agent') && <Badge variant="outline">Session agent</Badge>}
+                  {model.purposes.includes('research_agent') && <Badge variant="outline">Research agent</Badge>}
                 </span>
                 {!model.available && (
                   <span className="text-xs text-amber-800 dark:text-amber-300">Unavailable: {model.reason}</span>

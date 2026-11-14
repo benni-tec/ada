@@ -25,6 +25,7 @@ from ada.adapters.memory.repositories import (
     MemoryOperatorRepository,
     MemoryProjectRepository,
     MemoryReportRepository,
+    MemoryResearchCalls,
     MemoryRunRepository,
     MemorySessionRepository,
     MemorySnapshotRepository,
@@ -37,7 +38,7 @@ from ada.adapters.memory.repositories import (
 )
 from ada.adapters.memory.tasks import RecordingTaskDispatcher
 from ada.adapters.memory.web import MemoryWebBudget
-from ada.core.ports.agents import TurnProgress
+from ada.core.ports.agents import ResearchCalls, TurnProgress
 from ada.core.ports.events import EventBroadcaster, EventStream
 from ada.core.ports.repositories import (
     AgentSettingsRepository,
@@ -106,6 +107,7 @@ class MemoryRepositories(Provider):
     source_locks = provide(MemorySourceLocks, provides=SourceLocks, scope=Scope.APP)
     turn_progress = provide(MemoryTurnProgress, provides=TurnProgress, scope=Scope.APP)
     web_budget = provide(MemoryWebBudget, provides=WebBudget, scope=Scope.APP)
+    research_calls = provide(MemoryResearchCalls, provides=ResearchCalls, scope=Scope.APP)
 
 
 def memory_adapters() -> tuple[Provider, Provider]:

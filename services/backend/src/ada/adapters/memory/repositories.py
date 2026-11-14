@@ -25,10 +25,10 @@ from ada.core.models.operators import Operator, OperatorId, OperatorKind
 from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
-from ada.core.models.sessions import Session, SessionEntry
+from ada.core.models.sessions import Session, SessionAgent, SessionEntry
 from ada.core.models.sources import DataSource
 from ada.core.models.widgets import Widget
-from ada.core.ports.agents import TurnProgress
+from ada.core.ports.agents import ResearchCalls, TurnProgress
 from ada.core.ports.repositories import (
     AgentSettingsRepository,
     AgentTurnRepository,
@@ -81,6 +81,19 @@ class MemoryStore:
         # The session agent as (provider id, model), so it follows a renamed provider and
         # is gone with its model, as the database's SET NULL has it.
         self.session_agent: tuple[Id, str] | None = None
+        self.research_agent: tuple[Id, str] | None = None
+        # Source id -> the sealed secret of its monitor.
+        self.monitor_secrets: dict[Id, str] = {}
+        # Session id -> its paid web calls.
+        self.web_calls: dict[Id, int] = {}
+
+    def forget_model(self, key: tuple[Id, str]) -> None:
+        """Remove a model and clear the selections naming it, as ON DELETE SET NULL does."""
+        del self.llm_models[key]
+        if self.session_agent == key:
+            self.session_agent = None
+        if self.research_agent == key:
+            self.research_agent = None
 
 
 def _get[K, M](records: dict[K, M], kind: str, id: K) -> M:
@@ -140,6 +153,9 @@ class MemoryDataSourceRepository(DataSourceRepository):
         self.store.data_sources[source.id] = source
 
     async def update(self, source: DataSource, expected_revision: int) -> DataSource:
+        # The monitor is written by set_monitor, outside the revision: an edit keeps it.
+        current = _get(self.store.data_sources, "data source", source.id)
+        source = source.model_copy(update={"monitor_id": current.monitor_id})
         return _update(self.store.data_sources, "data source", source, expected_revision)
 
     async def record_check(
@@ -149,6 +165,20 @@ class MemoryDataSourceRepository(DataSourceRepository):
         self.store.data_sources[id] = source.model_copy(
             update={"last_checked_at": at, "last_probe_token": probe_token, "last_error": error}
         )
+
+    async def set_monitor(
+        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+    ) -> None:
+        source = await self.get(id)
+        self.store.data_sources[id] = source.model_copy(update={"monitor_id": monitor_id})
+        if secret_encrypted is None:
+            self.store.monitor_secrets.pop(id, None)
+        else:
+            self.store.monitor_secrets[id] = secret_encrypted
+
+    async def monitor_secret_encrypted(self, id: Id) -> str | None:
+        await self.get(id)
+        return self.store.monitor_secrets.get(id)
 
 
 class MemorySessionRepository(SessionRepository):
@@ -484,6 +514,21 @@ class MemoryAgentTurnRepository(AgentTurnRepository):
         return id in self.store.cancel_requests
 
 
+class MemoryResearchCalls(ResearchCalls):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def use(self, session_id: Id, cap: int) -> bool:
+        session = await MemorySessionRepository(self.store).get(session_id)
+        if session.agent is not SessionAgent.RESEARCH:
+            return True
+        used = self.store.web_calls.get(session_id, 0)
+        if used >= cap:
+            return False
+        self.store.web_calls[session_id] = used + 1
+        return True
+
+
 class MemoryTurnProgress(TurnProgress):
     """Memory has no transactions; progress goes straight to the store."""
 
@@ -507,6 +552,18 @@ class MemoryTurnProgress(TurnProgress):
         at: datetime,
     ) -> AgentTurn:
         return await MemoryAgentTurnRepository(self.store).finish(id, status, parts, error, at)
+
+    async def session_turns(self, id: Id) -> Sequence[AgentTurn]:
+        turns = MemoryAgentTurnRepository(self.store)
+        return await turns.list((await turns.get(id)).session_id)
+
+    async def abandon(self, id: Id, error: str, at: datetime) -> AgentTurn | None:
+        turns = MemoryAgentTurnRepository(self.store)
+        turn = await turns.get(id)
+        if turn.status not in (TurnStatus.QUEUED, TurnStatus.RUNNING):
+            return None
+        self.store.cancel_requests.add(id)
+        return await turns.finish(id, TurnStatus.FAILED, turn.parts, error, at)
 
 
 class MemoryLlmProviderRepository(LlmProviderRepository):
@@ -547,7 +604,7 @@ class MemoryLlmProviderRepository(LlmProviderRepository):
         del self.store.llm_providers[id]
         self.store.llm_api_keys.pop(id, None)
         for key in [key for key in self.store.llm_models if key[0] == id]:
-            del self.store.llm_models[key]
+            self.store.forget_model(key)
 
     async def api_key(self, id: Id) -> str | None:
         _get(self.store.llm_providers, "llm provider", id)
@@ -588,7 +645,7 @@ class MemoryLlmModelRepository(LlmModelRepository):
         return self._current(key)
 
     async def delete(self, id: str) -> None:
-        del self.store.llm_models[_model_key(self.store, id)]
+        self.store.forget_model(_model_key(self.store, id))
 
 
 class MemoryAgentSettingsRepository(AgentSettingsRepository):
@@ -596,25 +653,28 @@ class MemoryAgentSettingsRepository(AgentSettingsRepository):
         self.store = store
 
     async def get(self) -> AgentSettings:
-        ref = self.store.session_agent
-        session_agent = (
-            _model_id(self.store, *ref)
-            if ref is not None and ref in self.store.llm_models
-            else None
+        return self.store.agent_settings.model_copy(
+            update={
+                "session_agent": self._current(self.store.session_agent),
+                "research_agent": self._current(self.store.research_agent),
+            }
         )
-        return self.store.agent_settings.model_copy(update={"session_agent": session_agent})
+
+    def _current(self, ref: tuple[Id, str] | None) -> str | None:
+        if ref is None or ref not in self.store.llm_models:
+            return None
+        return _model_id(self.store, *ref)
 
     async def update(self, settings: AgentSettings, expected_revision: int) -> AgentSettings:
         actual = self.store.agent_settings.revision
         if actual != expected_revision:
             raise Conflict("agent settings", 1, expected_revision, actual)
-        ref = (
-            _model_key(self.store, settings.session_agent)
-            if settings.session_agent is not None
-            else None
-        )
-        self.store.session_agent = ref
+        self.store.session_agent = self._key(settings.session_agent)
+        self.store.research_agent = self._key(settings.research_agent)
         self.store.agent_settings = AgentSettings(
             instructions=settings.instructions, revision=expected_revision + 1
         )
         return await self.get()
+
+    def _key(self, model_id: str | None) -> tuple[Id, str] | None:
+        return _model_key(self.store, model_id) if model_id is not None else None

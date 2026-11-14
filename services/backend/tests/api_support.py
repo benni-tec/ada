@@ -47,6 +47,7 @@ from ada.core.models.sources import (
     DataFormat,
     DataSource,
     FreshnessPolicy,
+    Provenance,
     RefreshResult,
 )
 from ada.core.models.time import TimeRange
@@ -59,13 +60,14 @@ from ada.core.ports.repositories import (
 )
 from ada.core.ports.system import Clock
 from ada.core.ports.tasks import TaskDispatcher
+from ada.core.ports.web import WebExplorer, WebSearch
 from ada.core.services.pipelines import listing
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.http.app import create_app
 from ada.entrypoints.mcp.server import create_mcp
-from fakes import FixedClock
+from fakes import FakeExplorer, FakeWebSearch, FixedClock
 from memory import memory_adapters
 
 COLUMNS = (
@@ -222,6 +224,7 @@ class FakeSources(SourceService):
         options: dict | None = None,
         freshness: FreshnessPolicy | None = None,
         declared_schema: Schema | None = None,
+        provenance: Provenance | None = None,
     ) -> DataSource:
         source = DataSource(
             id=uuid7(),
@@ -233,6 +236,7 @@ class FakeSources(SourceService):
             options=options or {},
             freshness=freshness or FreshnessPolicy(),
             declared_schema=declared_schema,
+            provenance=provenance,
             created_at=self.clock.now(),
         )
         await self.sources.add(source)
@@ -253,6 +257,7 @@ class FakeSources(SourceService):
         options: dict | None = None,
         freshness: FreshnessPolicy | None = None,
         declared_schema: Schema | None = None,
+        provenance: Provenance | None = None,
     ) -> DataSource:
         source = await self.sources.get(id)
         changes = {
@@ -263,6 +268,7 @@ class FakeSources(SourceService):
                 "options": options,
                 "freshness": freshness,
                 "declared_schema": declared_schema,
+                "provenance": provenance,
             }.items()
             if value is not None
         }
@@ -297,6 +303,25 @@ class Overrides(Provider):
     pipelines = provide(FakePipelines, provides=PipelineService)
     runs = provide(FakeRuns, provides=RunService)
     sources = provide(FakeSources, provides=SourceService)
+
+
+class FakeWeb(Provider):
+    """The web's ports on fakes: Exa's search and Context.dev."""
+
+    def __init__(
+        self, search: FakeWebSearch | None = None, explorer: FakeExplorer | None = None
+    ) -> None:
+        super().__init__()
+        self.search = search or FakeWebSearch()
+        self.explorer = explorer or FakeExplorer()
+
+    @provide(scope=Scope.APP)
+    def search_(self) -> WebSearch:
+        return self.search
+
+    @provide(scope=Scope.APP)
+    def explorer_(self) -> WebExplorer:
+        return self.explorer
 
 
 @dataclass

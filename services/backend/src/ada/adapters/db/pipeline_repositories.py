@@ -175,6 +175,7 @@ def _snapshot(row: SnapshotRow) -> Snapshot:
         location=row.location,
         row_count=row.row_count,
         fetched_at=row.fetched_at,
+        origin=row.origin,
         superseded_at=row.superseded_at,
     )
 
@@ -199,6 +200,7 @@ class SqlSnapshotRepository(SnapshotRepository):
             location=snapshot.location,
             row_count=snapshot.row_count,
             fetched_at=snapshot.fetched_at,
+            origin=snapshot.origin,
             superseded_at=snapshot.superseded_at,
         )
         await add_row(self.session, row)

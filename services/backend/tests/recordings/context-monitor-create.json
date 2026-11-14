@@ -1,0 +1,40 @@
+{
+  "mode": "web",
+  "id": "mon_ad7ebd7e14d14cbab79f8b3f9f89d23f",
+  "name": "ada feasibility probe (deleted)",
+  "tags": [],
+  "policies": [],
+  "change_detection": {
+    "type": "exact"
+  },
+  "schedule": {
+    "type": "interval",
+    "frequency": 1,
+    "unit": "days"
+  },
+  "webhook": {
+    "url": "https://example.com/api/hooks/context/probe",
+    "secret": "test-secret",
+    "events": [
+      "change.detected"
+    ]
+  },
+  "status": "active",
+  "last_run_at": null,
+  "last_change_at": null,
+  "next_run_at": "2026-11-14T09:47:38.973Z",
+  "last_error": null,
+  "webhook_failure": null,
+  "created_at": "2026-11-14T09:05:45.876Z",
+  "updated_at": "2026-11-14T09:05:45.876Z",
+  "target": {
+    "type": "page",
+    "url": "https://example.com/"
+  },
+  "initial_run_id": "run_4c38095bc2884c549e798e0c40bbe1c6",
+  "key_metadata": {
+    "credits_consumed": 0,
+    "credits_remaining": 50027
+  },
+  "request_id": "2c909377-af55-4377-b5a1-68691c4ed113"
+}

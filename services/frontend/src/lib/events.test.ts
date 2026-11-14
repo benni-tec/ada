@@ -54,6 +54,7 @@ test('a refresh reloads widgets only when data changed or became stale', () => {
 test('an agent turn refreshes the record and the turn; a part goes into the cached turn as it is', () => {
   const both = [
     ['sessions', 's1', 'entries'],
+    ['session-turns', 's1'],
     ['turns', 't1'],
   ]
   expect(event('agent.turn_started', { session_id: 's1', turn_id: 't1' })).toEqual({ invalidate: both, reloadWidgets: false })

@@ -59,3 +59,12 @@ class SessionService(Protocol):
         """The session a tool call works in: it must exist, and be in `project_id` when the
         call names a project (Invalid otherwise)."""
         ...
+
+    async def create_research(self, parent_session_id: Id, title: str, actor: Actor) -> Session:
+        """A research session under the parent, in its project, and a delegation entry in
+        the parent that names it. A research session does not delegate further."""
+        ...
+
+    async def record_report(self, child_session_id: Id, text: str, actor: Actor) -> SessionEntry:
+        """What a research session came back with, as a report entry in its parent."""
+        ...

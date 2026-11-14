@@ -1,5 +1,5 @@
-"""The agent's configuration: model providers, their models, the session agent. Shared by
-all projects.
+"""The agent's configuration: model providers, their models, the session agent and the
+research agent. Shared by all projects.
 
 API keys are encrypted with the SecretBox before they are stored and decrypted only to
 build a ModelTarget for a turn that runs. Nothing returned here carries one.
@@ -11,7 +11,9 @@ from uuid import uuid7
 
 from ada.core.models.agents import (
     PROVIDER_NAME,
+    RESEARCH_AGENT,
     SESSION_AGENT,
+    AgentSettings,
     AgentSettingsView,
     LlmModel,
     LlmProvider,
@@ -22,6 +24,7 @@ from ada.core.models.agents import (
 )
 from ada.core.models.base import UNCHANGED, Change, Id
 from ada.core.models.errors import Invalid, NotConfigured, NotFound
+from ada.core.models.sessions import SessionAgent
 from ada.core.ports.agents import LanguageModels
 from ada.core.ports.repositories import (
     AgentSettingsRepository,
@@ -61,8 +64,9 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
         providers = await self.providers.list()
         return AgentSettingsView(
             providers=tuple(providers),
-            models=await self._catalog(providers, settings.session_agent),
+            models=await self._catalog(providers, settings),
             session_agent=settings.session_agent,
+            research_agent=settings.research_agent,
             secrets_available=self.secrets.available,
             instructions=settings.instructions,
             revision=settings.revision,
@@ -122,13 +126,23 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
             LlmModel(id="", provider_id=provider_id, model=name, created_at=self.clock.now())
         )
         settings = await self.settings.get()
-        return await self._info(provider, added, settings.session_agent)
+        return await self._info(provider, added, settings)
 
     async def delete_model(self, id: str) -> None:
         await self.models.delete(id)
 
     async def set_session_agent(
         self, model_id: str | None, expected_revision: int
+    ) -> AgentSettingsView:
+        return await self._choose(SESSION_AGENT, model_id, expected_revision)
+
+    async def set_research_agent(
+        self, model_id: str | None, expected_revision: int
+    ) -> AgentSettingsView:
+        return await self._choose(RESEARCH_AGENT, model_id, expected_revision)
+
+    async def _choose(
+        self, purpose: str, model_id: str | None, expected_revision: int
     ) -> AgentSettingsView:
         if model_id is not None:
             try:
@@ -137,7 +151,7 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
                 raise Invalid(f"No model {model_id!r} is configured") from None
         settings = await self.settings.get()
         await self.settings.update(
-            settings.model_copy(update={"session_agent": model_id}), expected_revision
+            settings.model_copy(update={purpose: model_id}), expected_revision
         )
         return await self.view()
 
@@ -155,7 +169,13 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
 
     async def catalog(self) -> ModelList:
         settings = await self.settings.get()
-        return await self._catalog(await self.providers.list(), settings.session_agent)
+        return await self._catalog(await self.providers.list(), settings)
+
+    async def research_agent(self) -> str | None:
+        settings = await self.settings.get()
+        return ModelList(
+            session_agent=settings.session_agent, research_agent=settings.research_agent
+        ).agent_for(SessionAgent.RESEARCH)
 
     async def target(self, model_id: str) -> ModelTarget:
         try:
@@ -177,24 +197,35 @@ class AgentConfiguration(AgentSettingsService, LanguageModels):
     # Helpers ----------------------------------------------------------------------------
 
     async def _catalog(
-        self, providers: Sequence[LlmProvider], session_agent: str | None
+        self, providers: Sequence[LlmProvider], settings: AgentSettings
     ) -> ModelList:
         by_id = {provider.id: provider for provider in providers}
         infos = [
-            await self._info(by_id[model.provider_id], model, session_agent)
+            await self._info(by_id[model.provider_id], model, settings)
             for model in await self.models.list()
         ]
-        return ModelList(models=tuple(infos), session_agent=session_agent)
+        return ModelList(
+            models=tuple(infos),
+            session_agent=settings.session_agent,
+            research_agent=settings.research_agent,
+        )
 
     async def _info(
-        self, provider: LlmProvider, model: LlmModel, session_agent: str | None
+        self, provider: LlmProvider, model: LlmModel, settings: AgentSettings
     ) -> ModelInfo:
         _, reason = await self._key(provider)
         return ModelInfo(
             id=model.id,
             provider=provider.name,
             model=model.model,
-            purposes=(SESSION_AGENT,) if model.id == session_agent else (),
+            purposes=tuple(
+                purpose
+                for purpose, chosen in (
+                    (SESSION_AGENT, settings.session_agent),
+                    (RESEARCH_AGENT, settings.research_agent),
+                )
+                if model.id == chosen
+            ),
             available=reason is None,
             reason=reason,
         )

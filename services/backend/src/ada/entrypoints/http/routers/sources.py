@@ -10,7 +10,14 @@ from pydantic import Field
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.errors import Invalid
 from ada.core.models.schema import Schema
-from ada.core.models.sources import AccessKind, DataFormat, DataSource, FreshnessPolicy, StoredFile
+from ada.core.models.sources import (
+    AccessKind,
+    DataFormat,
+    DataSource,
+    FreshnessPolicy,
+    Provenance,
+    StoredFile,
+)
 from ada.core.ports.sources import FileStore
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.transactions import AfterCommit
@@ -30,6 +37,7 @@ class NewSource(Request):
     options: JsonObject | None = None
     freshness: FreshnessPolicy | None = None
     declared_schema: Schema | None = None
+    provenance: Provenance | None = None
 
 
 class SourceChange(Request):
@@ -41,6 +49,7 @@ class SourceChange(Request):
     options: JsonObject | None = None
     freshness: FreshnessPolicy | None = None
     declared_schema: Schema | None = None
+    provenance: Provenance | None = None
 
 
 class RefreshRequest(Request):
@@ -84,6 +93,7 @@ async def register_source(
         options=body.options,
         freshness=body.freshness,
         declared_schema=body.declared_schema,
+        provenance=body.provenance,
     )
 
 
@@ -135,6 +145,7 @@ async def update_source(
         options=body.options,
         freshness=body.freshness,
         declared_schema=body.declared_schema,
+        provenance=body.provenance,
     )
     if refetch_needed(before, updated):
         # Queued after the commit: the worker must read the new address, not the old one.
@@ -172,3 +183,15 @@ async def refresh_source(
     await service.get(source_id)
     await dispatcher.refresh_source(source_id, body.force)
     return RefreshQueued(data_source_id=source_id, force=body.force)
+
+
+@router.post("/sources/{source_id}/watch")
+async def watch_source(source_id: Id, service: FromDishka[SourceService]) -> DataSource:
+    """Have Context.dev watch the source's page and refresh the source when it changes."""
+    return await service.watch(source_id)
+
+
+@router.delete("/sources/{source_id}/watch")
+async def unwatch_source(source_id: Id, service: FromDishka[SourceService]) -> DataSource:
+    """Stop watching the source's page; it is refreshed by hand again."""
+    return await service.unwatch(source_id)
