@@ -17,6 +17,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
@@ -63,6 +64,7 @@ import { Vahti } from './vahti/vahti'
  * (`aria-current`), so the sidebar also says where one is, in place of breadcrumbs.
  */
 export function ProjectSidebar({ projectId }: { projectId: Id }) {
+  const pathwaysId = useId()
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -74,7 +76,6 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
           <SidebarGroup className="pb-0">
             <SidebarMenu>
               <Alerts projectId={projectId} />
-              <Models projectId={projectId} />
             </SidebarMenu>
           </SidebarGroup>
           <SidebarGroup className="pt-4">
@@ -90,6 +91,14 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
               <Sessions projectId={projectId} />
               <Dashboards projectId={projectId} />
               <Reports projectId={projectId} />
+            </SidebarMenu>
+          </SidebarGroup>
+          {/* Cases and the models that run on them. */}
+          <SidebarGroup role="group" aria-labelledby={pathwaysId}>
+            <SidebarGroupLabel id={pathwaysId}>Pathways</SidebarGroupLabel>
+            <SidebarMenu>
+              <PageLink to="/projects/$projectId/cases" projectId={projectId} type="case" label="Cases" />
+              <PageLink to="/projects/$projectId/models" projectId={projectId} type="model" label="Models" />
             </SidebarMenu>
           </SidebarGroup>
         </nav>
@@ -443,15 +452,25 @@ function Alerts({ projectId }: { projectId: Id }) {
   )
 }
 
-/** One page: the project's statistical models. */
-function Models({ projectId }: { projectId: Id }) {
-  const Icon = pageTypes.model.icon
+/** One page of the project, as a link that is marked while one is on it or below it. */
+function PageLink({
+  to,
+  projectId,
+  type,
+  label,
+}: {
+  to: '/projects/$projectId/cases' | '/projects/$projectId/models'
+  projectId: Id
+  type: PageTypeName
+  label: string
+}) {
+  const Icon = pageTypes[type].icon
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild tooltip="Models">
-        <Link to="/projects/$projectId/models" params={{ projectId }} activeProps={{ 'data-active': true }}>
+      <SidebarMenuButton asChild tooltip={label}>
+        <Link to={to} params={{ projectId }} activeProps={{ 'data-active': true }}>
           <Icon aria-hidden="true" />
-          <span>Models</span>
+          <span>{label}</span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>

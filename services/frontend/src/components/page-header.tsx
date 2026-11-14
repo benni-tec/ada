@@ -27,7 +27,7 @@ export function PageHeader({
 }: {
   type: PageTypeName
   /** Instead of the type's own label, e.g. "New report". */
-  typeLabel?: string
+  typeLabel?: ReactNode
   /** The `<h1>`, or an EditableTitle. */
   title: ReactNode
   below?: ReactNode
