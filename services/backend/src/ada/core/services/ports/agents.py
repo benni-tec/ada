@@ -13,6 +13,7 @@ from ada.core.models.agents import (
 )
 from ada.core.models.base import UNCHANGED, Change, Id
 from ada.core.models.sessions import Context, Session, SessionEntry
+from ada.core.models.sources import DataSource
 from ada.core.ports.agents import AgentToolbox
 
 
@@ -51,9 +52,15 @@ class AgentTurnService(Protocol):
         ...
 
     async def ended(self, id: Id) -> None:
-        """Announce a turn that ended without `run` ending it (it could not be queued, or
-        it was failed after its worker stopped): that it finished, and for a research turn
-        what `run` would report into the parent session."""
+        """Announce a turn that ended without `run` announcing it (it could not be queued,
+        or it was failed after its worker stopped): that it finished, and for a research
+        turn what `run` would report into the parent session. Once: a turn announced
+        already, or one that has not ended, is left as it is."""
+        ...
+
+    async def recover(self) -> None:
+        """Fail each turn left running past its time limit, its worker gone, and announce
+        each turn that ended without being announced, its worker gone right after."""
         ...
 
     async def turns(self, session_id: Id) -> Sequence[AgentTurn]:
@@ -154,8 +161,16 @@ class ResearchService(Protocol):
         it added by name and what it could not find."""
         ...
 
-    async def use_web_call(self, session_id: Id) -> None:
-        """Count a paid web call about to be made for the session, committed at once, so a
-        call that then fails counts too. A research session past its cap raises Invalid,
-        telling the agent to report back; other sessions are not capped."""
+    async def use_web_call(self, session_id: Id | None = None) -> None:
+        """Count a paid web call about to be made, committed at once, so a call that then
+        fails counts too. It counts against the research session whose turn makes it,
+        whatever `session_id` says; outside a research turn, against `session_id`. A
+        research session past its cap raises Invalid, telling the agent to report back;
+        other sessions are not capped."""
+        ...
+
+    async def use_source_read(self, source: DataSource) -> None:
+        """Count, as use_web_call, a paid read of the source (a web source, or a document
+        Context.dev parses) that the running research turn queues for the worker, which
+        reads it outside the turn. Nothing is counted outside a research turn."""
         ...

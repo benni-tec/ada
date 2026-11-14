@@ -74,6 +74,7 @@ from ada.core.models.time import TimeRange
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.sources import SourceReaders
 from ada.core.ports.web import WebExplorer
+from ada.core.services.agents.research import ResearchReaders
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.refreshes import RefreshStatus, SnapshotSummary
 from ada.core.services.ports.sources import SourceService
@@ -585,7 +586,9 @@ async def test_the_container_shares_the_readers_and_closes_them(
     container = create_container(unreachable_settings, FastapiProvider(), MemoryRepositories())
     try:
         readers = await container.get(SourceReaders)
-        assert isinstance(readers, HttpSourceReaders)
+        # Wrapped, so a research turn counts its paid reads.
+        assert isinstance(readers, ResearchReaders)
+        assert isinstance(readers.readers, HttpSourceReaders)
         async with container() as request:
             service = await request.get(SourceService)
             assert isinstance(service, DataSources)
@@ -593,7 +596,7 @@ async def test_the_container_shares_the_readers_and_closes_them(
             assert service.readers is readers
     finally:
         await container.close()
-    assert readers.readers[AccessKind.URL].client.is_closed
+    assert readers.readers.readers[AccessKind.URL].client.is_closed
 
 
 # The HTTP readers

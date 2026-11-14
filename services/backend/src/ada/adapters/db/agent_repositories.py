@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from ada.adapters.db.support import add_row, dump_all, fetch, oldest_first, require, rows
@@ -29,9 +29,13 @@ def _turn(row: AgentTurnRow) -> AgentTurn:
     )
 
 
+UNFINISHED = (TurnStatus.QUEUED.value, TurnStatus.RUNNING.value)
+
+
 class SqlAgentTurnRepository(AgentTurnRepository):
     """Every write after `add` is a plain UPDATE of the columns it means, so the worker's
-    progress and a cancel request never overwrite each other."""
+    progress and a cancel request never overwrite each other. The worker's writes are
+    conditional on the turn still running, so a turn failed elsewhere stays failed."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -51,6 +55,7 @@ class SqlAgentTurnRepository(AgentTurnRepository):
             parts=dump_all(turn.parts),
             error=turn.error,
             cancel_requested=False,
+            settled=False,
             created_at=turn.created_at,
             finished_at=turn.finished_at,
         )
@@ -60,17 +65,19 @@ class SqlAgentTurnRepository(AgentTurnRepository):
         statement = oldest_first(AgentTurnRow, AgentTurnRow.session_id == session_id)
         return [_turn(row) for row in await rows(self.session, statement)]
 
-    async def start(self, id: Id) -> bool:
+    async def start(self, id: Id, at: datetime) -> bool:
         changed = await self._update(
-            id, AgentTurnRow.status == TurnStatus.QUEUED.value, status=TurnStatus.RUNNING.value
+            id,
+            AgentTurnRow.status == TurnStatus.QUEUED.value,
+            status=TurnStatus.RUNNING.value,
+            started_at=at,
         )
         if not changed:
             await self.get(id)
         return changed
 
-    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> None:
-        if not await self._update(id, parts=dump_all(parts)):
-            raise NotFound("agent turn", id)
+    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> bool:
+        return await self._running_update(id, parts=dump_all(parts))
 
     async def finish(
         self,
@@ -79,20 +86,37 @@ class SqlAgentTurnRepository(AgentTurnRepository):
         parts: Sequence[TurnPart],
         error: str | None,
         at: datetime,
-    ) -> AgentTurn:
-        changed = await self._update(
+    ) -> AgentTurn | None:
+        changed = await self._running_update(
             id, status=status.value, parts=dump_all(parts), error=error, finished_at=at
         )
-        if not changed:
-            raise NotFound("agent turn", id)
-        return await self.get(id)
+        return await self.get(id) if changed else None
+
+    async def settle(self, id: Id) -> bool:
+        ended = AgentTurnRow.status.not_in(UNFINISHED)
+        if await self._update(id, ended, AgentTurnRow.settled.is_(False), settled=True):
+            return True
+        await self.get(id)
+        return False
+
+    async def unsettled(
+        self, started_before: datetime, finished_before: datetime
+    ) -> Sequence[AgentTurn]:
+        overdue = and_(
+            AgentTurnRow.status == TurnStatus.RUNNING.value,
+            AgentTurnRow.started_at < started_before,
+        )
+        ended = and_(
+            AgentTurnRow.status.not_in(UNFINISHED), AgentTurnRow.finished_at < finished_before
+        )
+        statement = oldest_first(AgentTurnRow, ~AgentTurnRow.settled, or_(overdue, ended))
+        return [_turn(row) for row in await rows(self.session, statement)]
 
     async def abandon(self, id: Id, error: str, at: datetime) -> bool:
         """TurnProgress.abandon; False when the turn has ended already."""
-        unfinished = (TurnStatus.QUEUED.value, TurnStatus.RUNNING.value)
         return await self._update(
             id,
-            AgentTurnRow.status.in_(unfinished),
+            AgentTurnRow.status.in_(UNFINISHED),
             status=TurnStatus.FAILED.value,
             error=error,
             finished_at=at,
@@ -123,6 +147,12 @@ class SqlAgentTurnRepository(AgentTurnRepository):
             raise NotFound("agent turn", id)
         return flag
 
+    async def _running_update(self, id: Id, **values: object) -> bool:
+        if await self._update(id, AgentTurnRow.status == TurnStatus.RUNNING.value, **values):
+            return True
+        await self.get(id)
+        return False
+
     async def _update(self, id: Id, *conditions: object, **values: object) -> bool:
         table = AgentTurnRow.__table__
         result = await self.session.execute(
@@ -138,15 +168,21 @@ class SqlTurnProgress(TurnProgress):
     def __init__(self, engine: AsyncEngine) -> None:
         self.engine = engine
 
-    async def start(self, id: Id) -> bool:
+    async def start(self, id: Id, at: datetime) -> bool:
         async with AsyncSession(self.engine) as session, session.begin():
-            return await SqlAgentTurnRepository(session).start(id)
+            return await SqlAgentTurnRepository(session).start(id, at)
 
     async def checkpoint(self, id: Id, parts: Sequence[TurnPart]) -> bool:
         async with AsyncSession(self.engine) as session, session.begin():
             turns = SqlAgentTurnRepository(session)
-            await turns.save_parts(id, parts)
-            return await turns.cancel_requested(id)
+            return not await turns.save_parts(id, parts) or await turns.cancel_requested(id)
+
+    async def running(self, id: Id) -> bool:
+        async with AsyncSession(self.engine) as session:
+            status = await session.scalar(select(AgentTurnRow.status).where(AgentTurnRow.id == id))
+        if status is None:
+            raise NotFound("agent turn", id)
+        return status == TurnStatus.RUNNING.value
 
     async def finish(
         self,
@@ -155,7 +191,7 @@ class SqlTurnProgress(TurnProgress):
         parts: Sequence[TurnPart],
         error: str | None,
         at: datetime,
-    ) -> AgentTurn:
+    ) -> AgentTurn | None:
         async with AsyncSession(self.engine, expire_on_commit=False) as session, session.begin():
             return await SqlAgentTurnRepository(session).finish(id, status, parts, error, at)
 

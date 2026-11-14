@@ -189,6 +189,32 @@ async def test_a_web_tool_takes_a_session_of_its_own_project_only(
     assert explorer.calls == []
 
 
+async def test_oversized_extractions_are_refused_before_they_are_counted_or_sent(
+    web: tuple[Client, Seen, FakeWebSearch, FakeExplorer],
+) -> None:
+    client, _, _, explorer = web
+    project_id, session_id = await _project_and_session(client)
+    ids = {"project_id": project_id, "session_id": session_id, "url": "https://example.test/s"}
+    explorer.calls.clear()
+    calls = [
+        {"instruction": "x" * 2001, "columns": ["c"]},
+        {"instruction": "", "columns": ["c"]},
+        {"instruction": "i", "columns": ["c" * 101]},
+    ]
+
+    results = [
+        await client.call_tool("extract_table", ids | arguments, raise_on_error=False)
+        for arguments in calls
+    ]
+
+    # The tool's own arguments refuse them, so a research session's cap is not spent.
+    messages = [result.content[0].text for result in results]  # type: ignore[union-attr]
+    expected = ["at most 2000 characters", "at least 1 character", "at most 100 characters"]
+    for message, bound in zip(messages, expected, strict=True):
+        assert bound in message
+    assert explorer.calls == []
+
+
 async def test_web_tools_without_keys_fail_with_the_setting_named(
     unreachable_settings: Settings,
 ) -> None:

@@ -8,7 +8,9 @@ from ada.core.models.base import Id
 from ada.core.models.web import SearchScope
 from ada.core.services.ports.agents import ResearchService
 from ada.core.services.ports.web import (
+    MAX_COLUMN_CHARS,
     MAX_EXTRACT_COLUMNS,
+    MAX_INSTRUCTION_CHARS,
     MAX_MAP_LINKS,
     MAX_READ_CHARS,
     MAX_SEARCH_RESULTS,
@@ -20,6 +22,10 @@ from ada.core.services.ports.web import (
 )
 from ada.entrypoints.mcp.injection import Inject
 from ada.entrypoints.mcp.sessions import SessionId
+
+# Checked by the tool's arguments, before a call is counted against the research cap.
+Instruction = Annotated[str, Field(min_length=1, max_length=MAX_INSTRUCTION_CHARS)]
+Column = Annotated[str, Field(min_length=1, max_length=MAX_COLUMN_CHARS)]
 
 EXPLORATION_ONLY = """
 
@@ -89,8 +95,8 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         project_id: Id,
         session_id: SessionId,
         url: str,
-        instruction: str,
-        columns: Annotated[list[str], Field(min_length=1, max_length=MAX_EXTRACT_COLUMNS)],
+        instruction: Instruction,
+        columns: Annotated[list[Column], Field(min_length=1, max_length=MAX_EXTRACT_COLUMNS)],
         web: FromDishka[WebExplorationService],
         research: FromDishka[ResearchService],
     ) -> WebExtractAnswer:
