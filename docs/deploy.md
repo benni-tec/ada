@@ -41,7 +41,7 @@ CI never writes these two in `/opt/ada`:
 
 ## Rolling back
 
-Run the CI workflow by hand (Actions, CI, Run workflow) with `ref` set to an earlier commit
+Run the CI workflow by hand from main (Actions, CI, Run workflow; other branches never deploy) with `ref` set to an earlier commit
 whose images exist. It deploys that commit's `sha-<short>` images; the compose files come from
 that commit too. Re-running the workflow run of an earlier push does the same. The deploy
 then checks `https://ada.65-109-75-63.sslip.io/api/health/live` for about 90 seconds.
