@@ -1,8 +1,10 @@
 import {
+  columnFormat,
   columnIndex,
   firstColumn,
-  formatNumber,
+  formatAs,
   formatPeriod,
+  isNumberFormat,
   measureFor,
   NUMERIC_TYPES,
   specText,
@@ -11,12 +13,21 @@ import {
 } from '@/lib/columns'
 import type { Loaded } from '@/lib/runtime'
 
+/** "+1,346", "−210" or "±0": a difference always says which way it goes. */
+function signed(difference: number, write: (value: number) => string): string {
+  const text = write(Math.abs(difference))
+  if (text === write(0)) return `±${text}`
+  return `${difference > 0 ? '+' : '−'}${text}`
+}
+
 /**
  * A single number with its label.
  *
  * Spec: `column` (default: the first measure role, else the first numeric column),
- * `label` (default: the column name), `unit`, `decimals`. Shows the latest period when
- * the schema has a time role, otherwise the last row.
+ * `label` (default: the column name), `unit`, `decimals`, `format` ("integer", "number",
+ * "percent" or "plain"; years are plain by default), `compare_to` (a column of the same
+ * row, or a number), shown as "+1,346 against 11,970". Shows the latest period when the
+ * schema has a time role, otherwise the last row.
  */
 export function Value({ widget, data, roles }: Loaded) {
   const spec = widget.spec
@@ -26,6 +37,9 @@ export function Value({ widget, data, roles }: Loaded) {
   const label = specText(spec, 'label') ?? column ?? widget.title
   const unit = specText(spec, 'unit')
   const decimals = typeof spec.decimals === 'number' ? spec.decimals : undefined
+  const format = index < 0 ? undefined : columnFormat(data.columns[index], roles, isNumberFormat(spec.format) ? spec.format : undefined)
+  const write = (number: number) => formatAs(number, format, decimals)
+  const withUnit = (text: string) => (unit ? `${text} ${unit}` : text)
 
   if (index < 0 || data.rows.length === 0) {
     return (
@@ -53,6 +67,12 @@ export function Value({ widget, data, roles }: Loaded) {
   const lower = toNumber(row[columnIndex(data, measure?.lower)])
   const upper = toNumber(row[columnIndex(data, measure?.upper)])
   const period = start >= 0 && end >= 0 ? formatPeriod(row[start], row[end]) : null
+  const comparedTo =
+    typeof spec.compare_to === 'number'
+      ? spec.compare_to
+      : typeof spec.compare_to === 'string'
+        ? toNumber(row[columnIndex(data, spec.compare_to)])
+        : null
 
   return (
     <figure className="ada-value">
@@ -62,7 +82,7 @@ export function Value({ widget, data, roles }: Loaded) {
         </div>
       ) : (
         <div className="ada-value-number">
-          {value === null ? '–' : formatNumber(value, decimals)}
+          {value === null ? '–' : write(value)}
           {unit && value !== null && <span className="ada-value-label"> {unit}</span>}
         </div>
       )}
@@ -70,9 +90,14 @@ export function Value({ widget, data, roles }: Loaded) {
         {label}
         {period && <span className="ada-muted"> · {period}</span>}
       </figcaption>
+      {!suppressed && value !== null && comparedTo !== null && (
+        <p className="ada-note">
+          {withUnit(signed(value - comparedTo, write))} against {withUnit(write(comparedTo))}
+        </p>
+      )}
       {!suppressed && lower !== null && upper !== null && (
         <p className="ada-note">
-          Interval {formatNumber(lower, decimals)} – {formatNumber(upper, decimals)}
+          Interval {write(lower)} – {write(upper)}
         </p>
       )}
     </figure>

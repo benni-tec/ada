@@ -5,6 +5,7 @@ import {
   columnIndex,
   firstColumn,
   formatNumber,
+  isYearName,
   measureFor,
   NUMERIC_TYPES,
   specText,
@@ -146,9 +147,14 @@ export function niceTicks(min: number, max: number, count = 5): number[] {
 }
 
 /** The label of an x position, as the axis and the tooltip show it. */
-export function xLabel(model: Pick<ChartModel, 'xKind' | 'categories'>, x: number, yearsOnly: boolean): string {
+export function xLabel(
+  model: Pick<ChartModel, 'xKind' | 'categories'> & { x?: string },
+  x: number,
+  yearsOnly: boolean,
+): string {
   if (model.xKind === 'category') return model.categories[x] ?? ''
-  if (model.xKind === 'number') return formatNumber(x)
+  // Years are labels: 2024, not 2,024.
+  if (model.xKind === 'number') return model.x && isYearName(model.x) && Number.isInteger(x) ? String(x) : formatNumber(x)
   const iso = new Date(x).toISOString()
   return yearsOnly ? iso.slice(0, 4) : iso.slice(0, 10)
 }
