@@ -223,6 +223,23 @@ the new rules (explore with `query_operator` but never present its rows; batch w
 `build_pipeline` and one `edit_dashboard`). The acceptance check is the goal 3 analysis
 rebuilt with the new tools.
 
+## Wave 5: the web through ADA, sessions for every tool call, settings (done)
+
+Three agents. **Web**: `web_search`, `web_read`, `web_map` on ADA's own Context.dev key
+(no customer needs an account), tagged per project, within a daily credit budget per
+project (300), every answer marked exploration-only; `web` sources (scrape, crawl,
+answers) with minimum freshness of 1, 7 and 30 days. **Sessions**: every ADA tool requires
+a `session_id` (but listing and creating projects and sessions), each external call is a
+`tool_call` entry in the session (failed ones too), drawn as compact Trace groups.
+**Settings**: global and project agent instructions after ADA's own rules; settings as a
+modal with Global and This project sections, and PDF upload. Migrations 0006–0008.
+
+Next: the research branch (Exa search, Context.dev reading and extraction, watched pages
+through Context.dev monitors, provenance and licence on sources, a research agent in child
+sessions) merges onto this, with one set of web tools (`search_web` on Exa, `read_page` and
+`extract_table` on Context.dev, plus wave 5's session, budget and exploration note),
+`document` meaning files and `web` meaning pages, and freshness by long TTLs or by monitors.
+
 ## Wave 6: custom widgets and session attachments (planned)
 
 Decided with the user:

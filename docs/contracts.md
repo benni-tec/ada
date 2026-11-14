@@ -71,7 +71,7 @@ What wave 4's MCP workstream added to them (`docs/contracts/wave4.md`, A, B, E):
 | `core/services/ports/refreshes.py` | `RefreshService.refresh_now` (refresh and wait), with `RefreshOutcome`, `RefreshStatus`, `SnapshotSummary`; `MAX_WAIT_SECONDS` (60) |
 | `core/services/ports/dashboards.py` | `DashboardService.pin_widget(..., layout=None)`; `edit` copies a widget new to the dashboard (see Dashboards) |
 
-What wave 5's Sessions workstream added to them (`docs/contracts/wave5.md`, C, D):
+What wave 5's Sessions workstream added to them:
 
 | Where | Change |
 | --- | --- |
@@ -79,7 +79,7 @@ What wave 5's Sessions workstream added to them (`docs/contracts/wave5.md`, C, D
 | `core/services/ports/sessions.py` | `SessionService.record_tool_call(session_id, call, actor)` (shortens the arguments), `check(session_id, project_id=None)` |
 | Migration `0007` (down revision `0006`) | `session_entries.tool_call` (JSONB, nullable); its downgrade deletes the `tool_call` entries |
 
-What wave 5's settings workstream added to them (`docs/contracts/wave5.md`, E, F):
+What wave 5's settings workstream added to them:
 
 | Where | Change |
 | --- | --- |
