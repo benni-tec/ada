@@ -18,10 +18,10 @@ import {
   reportsQuery,
   sessionsQuery,
   sourcesQuery,
-  type DataSource,
   type Id,
 } from '@/lib/api'
 import { pageTypes, type PageTypeName } from '@/lib/page-types'
+import { accessLabels, describeFreshness } from '@/lib/sources'
 import { useRevisedUpdate } from '@/lib/revisions'
 
 export const Route = createFileRoute('/projects/$projectId/')({
@@ -70,13 +70,16 @@ function ProjectPage() {
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   const headingId = useId()
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
-      <h2 id={headingId} className="text-lg font-semibold">
-        {title}
-      </h2>
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 id={headingId} className="text-lg font-semibold">
+          {title}
+        </h2>
+        {action}
+      </div>
       {children}
     </section>
   )
@@ -171,28 +174,29 @@ function RecentSessions({ projectId }: { projectId: Id }) {
   )
 }
 
-const accessLabels: Record<DataSource['access_kind'], string> = {
-  url: 'URL',
-  request: 'Request',
-  browser: 'Browser',
-  document: 'Document',
-}
-
-/** Each source with where it reads from and how fresh it is; the sidebar links here. */
+/** Each source with where it reads from and how fresh it is, read only: they are added
+ * and edited in Settings. */
 function Sources({ projectId }: { projectId: Id }) {
   const { data: sources, error, isPending } = useQuery(sourcesQuery(projectId))
   return (
-    <Section title="Data sources">
+    <Section
+      title="Data sources"
+      action={
+        <Link to="/projects/$projectId/settings" params={{ projectId }} className="text-sm underline underline-offset-2">
+          Manage in Settings
+        </Link>
+      }
+    >
       {isPending ? (
         <Loading what="data sources" />
       ) : error ? (
         <ErrorNotice error={error} prefix="The data sources cannot be loaded:" />
       ) : sources.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No data sources yet. Agents register them over MCP.</p>
+        <p className="text-sm text-muted-foreground">No data sources yet. Add one in Settings, or have an agent register one over MCP.</p>
       ) : (
         <ul className={listClass}>
           {sources.map((source) => (
-            <li key={source.id} id={`source-${source.id}`} className="flex scroll-mt-4 flex-col gap-1 px-4 py-3 text-sm target:bg-muted/50">
+            <li key={source.id} className="flex flex-col gap-1 px-4 py-3 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium">{source.name}</span>
                 <span className="text-xs text-muted-foreground">
@@ -203,7 +207,7 @@ function Sources({ projectId }: { projectId: Id }) {
                 {source.address}
               </p>
               <p className="text-xs text-muted-foreground">
-                Refresh: {source.freshness.kind}
+                Refresh: {describeFreshness(source.freshness)}
                 {source.last_checked_at && (
                   <>
                     {' · '}checked <Time value={source.last_checked_at} />

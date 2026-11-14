@@ -15,6 +15,7 @@ import {
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
@@ -80,6 +81,9 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
           </SidebarGroup>
         </nav>
       </SidebarContent>
+      <SidebarFooter>
+        <SettingsLink projectId={projectId} />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )
@@ -348,16 +352,43 @@ function Alerts({ projectId }: { projectId: Id }) {
   )
 }
 
-/** The sources have no page of their own: each leads to its card on the overview. Folded
- * at first: there are many, and they are looked up less than the rest. */
+/** Shared settings and the project's data sources, at the bottom of the sidebar. */
+function SettingsLink({ projectId }: { projectId: Id }) {
+  const Icon = pageTypes.settings.icon
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild tooltip="Settings">
+          <Link
+            to="/projects/$projectId/settings"
+            params={{ projectId }}
+            activeOptions={{ includeHash: false }}
+            activeProps={{ 'data-active': true }}
+          >
+            <Icon aria-hidden="true" />
+            <span>Settings</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  )
+}
+
+/** The sources have no page of their own: each leads to its entry in Settings, where it
+ * is edited. Folded at first: there are many, and they are looked up less than the rest. */
 function Sources({ projectId }: { projectId: Id }) {
   const { data: sources } = useQuery(sourcesQuery(projectId))
   return (
     <Group type="source" label="Data sources" defaultOpen={false}>
-      {sources?.length === 0 && <Empty>None yet. Agents register them over MCP.</Empty>}
+      {sources?.length === 0 && <Empty>None yet. Add one in Settings, or have an agent register one over MCP.</Empty>}
       {sources?.map((source) => (
         <Item key={source.id}>
-          <Link to="/projects/$projectId" params={{ projectId }} hash={`source-${source.id}`} activeOptions={{ exact: true, includeHash: true }}>
+          <Link
+            to="/projects/$projectId/settings"
+            params={{ projectId }}
+            hash={`source-${source.id}`}
+            activeOptions={{ exact: true, includeHash: true }}
+          >
             {source.last_error && (
               <CircleAlert aria-label="Last refresh failed" className="text-amber-600! dark:text-amber-400!" />
             )}

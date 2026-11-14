@@ -67,13 +67,13 @@ test('the sidebar groups the project’s items, newest sessions first, with the 
   const alerts = within(nav()).getByRole('link', { name: 'Alerts' })
   expect(alerts).toHaveAttribute('href', '/projects/p1/alerts')
   expect(await within(alerts.closest('li')!).findByText('1')).toBeInTheDocument()
-  // Data sources are folded at first, and have no page: each leads to its card on the overview.
+  // Data sources are folded at first, and have no page: each leads to its entry in Settings.
   const sources = within(group('Data sources')).getByRole('button', { name: 'Data sources' })
   expect(sources).toHaveAttribute('aria-expanded', 'false')
   fireEvent.click(sources)
   expect(await within(group('Data sources')).findByRole('link', { name: 'Sotkanet screening' })).toHaveAttribute(
     'href',
-    '/projects/p1#source-ds1',
+    '/projects/p1/settings#source-ds1',
   )
 })
 
