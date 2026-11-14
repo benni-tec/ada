@@ -135,9 +135,31 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `VALKEY_URL` | Valkey URL, e.g. `redis://…` |
 | `DATA_DIR` | Directory for snapshots (default `data`; `/data` in the image) |
 | `WIDGETS_DIR` | The built widgets (default `services/widgets/dist` of the checkout; `/app/widgets` in the image) |
+| `ADA_LLMS_CONFIG` | The in-platform agent's models file (default `llms.yml`; moon sets `config/llms.yml` of the checkout, compose `/config/llms.yml`) |
 
 There are no users and no authentication yet: whoever can reach the gateway can use the
 API and the MCP endpoint. Do not expose it publicly as it is.
 
 Secrets never go into the repository. `.env` holds only `VERSION`; put local secrets in
 `.env.local`, which git ignores.
+
+### The in-platform agent
+
+ADA answers messages in sessions and dashboard panels with an agent of its own when a
+models file names a session agent. Without the file ADA runs as before: messages are
+recorded and nobody answers them.
+
+1. Copy `llms.example.yml` to `config/llms.yml` (ignored by git) and keep the providers
+   you have a key for. Most providers speak the OpenAI chat API (`kind:
+   openai-compatible` with their `base_url`); Gemini also works natively (`kind: gemini`).
+   Set `models.session_agent` to `<provider>/<model>`.
+2. Put each provider's key in `.env.local` under the variable its `api_key_env` names,
+   e.g. `GEMINI_API_KEY=...`. Keys never go into the models file.
+3. Full stack: compose mounts `config/` into the backend and the worker and passes
+   `.env.local` to them; recreate both (`docker compose up -d backend worker`) so they
+   read the file and the keys. From source: `moon run :dev` reads `config/llms.yml`;
+   export the keys in the shell that starts it.
+
+`GET /api/llm/models` lists the configured models and, for each, whether its key is set.
+A models file that cannot be read stops the backend and the worker at start, with every
+problem named.
