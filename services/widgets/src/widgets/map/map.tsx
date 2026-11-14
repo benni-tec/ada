@@ -114,27 +114,30 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
         )}
       </div>
       <Legend model={model} />
-      <table className="sr-only">
-        <caption>
-          {model.value} by region{model.period ? `, ${model.period}` : ''}
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Region</th>
-            <th scope="col">{model.value}</th>
-            <th scope="col">Period</th>
-          </tr>
-        </thead>
-        <tbody>
-          {model.regions.map((r) => (
-            <tr key={r.code}>
-              <th scope="row">{r.name}</th>
-              <td>{describe(r)}</td>
-              <td>{r.period ?? '–'}</td>
+      {/* Hidden by its wrapper: a table keeps its full height whatever it is told. */}
+      <div className="sr-only">
+        <table>
+          <caption>
+            {model.value} by region{model.period ? `, ${model.period}` : ''}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Region</th>
+              <th scope="col">{model.value}</th>
+              <th scope="col">Period</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {model.regions.map((r) => (
+              <tr key={r.code}>
+                <th scope="row">{r.name}</th>
+                <td>{describe(r)}</td>
+                <td>{r.period ?? '–'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   )
 }

@@ -108,11 +108,14 @@
   box-sizing: border-box;
 }
 
+/* The page is exactly its frame: nothing scrolls at this level, so a card never shows
+   empty overflow below a widget. What needs scrolling scrolls inside (.ada-table-scroll). */
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
+  overflow: clip;
   background: transparent;
 }
 
@@ -186,12 +189,19 @@ body,
   color: var(--text-muted);
 }
 
+/* Only for blocks: a table keeps its full height whatever it is told, so a hidden table
+   goes inside a hidden div. */
 .sr-only {
   position: absolute;
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
