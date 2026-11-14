@@ -1,10 +1,12 @@
 import { Link } from '@tanstack/react-router'
+import { useContext, type ReactNode } from 'react'
 
 import type { Widget } from '@/lib/api'
 import { useLive } from '@/lib/live'
 import { widgetSrc } from '@/lib/widgets'
 
 import { Provenance } from './provenance'
+import { WidgetCardActions } from './widget-card-actions'
 
 // Starting heights per type; the frame can be resized by dragging its lower edge.
 const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 320 }
@@ -44,13 +46,18 @@ export function WidgetCard({
   highlighted = false,
   tall = false,
   linkToWidget = true,
+  actions,
 }: {
   widget: Widget
   runId?: string | null
   highlighted?: boolean
   tall?: boolean
   linkToWidget?: boolean
+  /** Shown in a strip under the widget; defaults to what WidgetCardActions gives. */
+  actions?: ReactNode
 }) {
+  const fromContext = useContext(WidgetCardActions)
+  const strip = actions ?? fromContext?.(widget)
   const external = widget.created_by.kind === 'external_agent'
   const border = highlighted
     ? 'border-amber-400 ring-2 ring-amber-400 dark:border-amber-500 dark:ring-amber-500'
@@ -94,6 +101,7 @@ export function WidgetCard({
         </span>
       </header>
       <WidgetFrame widget={widget} runId={runId} tall={tall} />
+      {strip && <footer className="border-t border-neutral-200 px-4 py-2 dark:border-neutral-800">{strip}</footer>}
     </article>
   )
 }

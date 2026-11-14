@@ -3,6 +3,7 @@ import { api, ApiFailure, type Schemas } from './client'
 export { api, ApiFailure } from './client'
 export type { ApiError, Schemas } from './client'
 export type * from './models'
+export * from './dashboards'
 export * from './queries'
 export * from './requests'
 

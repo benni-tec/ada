@@ -2,10 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo } from 'react'
 
+import { DashboardPanel } from '@/components/dashboards/dashboard-panel'
+import { PinActions } from '@/components/dashboards/pin-to-dashboard'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { MessageForm, SessionRecord } from '@/components/session-record'
-import { entriesQuery, getSession, keys, renameSession, sessionQuery, sessionWidgetsQuery, type Id } from '@/lib/api'
+import { entriesQuery, getSession, keys, renameSession, sessionQuery, sessionWidgetsQuery } from '@/lib/api'
 import { useRevisedUpdate } from '@/lib/revisions'
 
 type Search = {
@@ -51,7 +53,9 @@ function SessionPage() {
         ) : entries.error ? (
           <ErrorNotice error={entries.error} prefix="The session record cannot be loaded:" />
         ) : (
-          <SessionRecord entries={entries.data} widgets={widgetsById} highlightedWidget={highlighted} />
+          <PinActions>
+            <SessionRecord entries={entries.data} widgets={widgetsById} highlightedWidget={highlighted} />
+          </PinActions>
         )}
         <MessageForm sessionId={sessionId} />
       </div>
@@ -67,19 +71,4 @@ function useScrollToWidget(widgetId: string | undefined, ready: boolean) {
     // jsdom has no scrollIntoView.
     document.getElementById(`widget-${widgetId}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
   }, [widgetId, ready])
-}
-
-/** The dashboard beside the conversation. Wave 2 renders the dashboard itself here. */
-function DashboardPanel({ dashboardId }: { dashboardId: Id }) {
-  return (
-    <aside
-      aria-label="Dashboard"
-      className="flex min-h-48 flex-col gap-2 rounded-lg border border-neutral-200 p-4 lg:sticky lg:top-4 lg:self-start dark:border-neutral-800"
-    >
-      <h2 className="text-sm font-semibold">Dashboard</h2>
-      <p className="text-sm text-neutral-500" data-dashboard-id={dashboardId}>
-        Dashboards are not shown yet.
-      </p>
-    </aside>
-  )
 }

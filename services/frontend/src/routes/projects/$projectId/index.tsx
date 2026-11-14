@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
 
+import { DashboardsSection } from '@/components/dashboards/dashboards-section'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { Provenance, Time } from '@/components/provenance'
@@ -46,6 +47,7 @@ function ProjectPage() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-8">
           <Sessions projectId={projectId} />
+          <DashboardsSection projectId={projectId} />
           <Widgets projectId={projectId} />
         </div>
         <Sources projectId={projectId} />
