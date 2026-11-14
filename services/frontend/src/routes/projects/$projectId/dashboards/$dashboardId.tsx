@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useId, useMemo, useState, type ReactNode } from 'react'
 
+import { AlertBadges } from '@/components/alerts/alert-badges'
 import { DashboardGrid } from '@/components/dashboards/dashboard-grid'
 import { describeRange } from '@/components/dashboards/ranges'
 import { TimeRangeControl } from '@/components/dashboards/time-range-control'
@@ -94,8 +95,18 @@ function DashboardPage() {
             Showing {describeRange(range)}
             {sameAsDefault ? ' (the dashboard’s default)' : ''} · version {shown?.number ?? 'none yet'}
           </p>
+          <AlertBadges dashboardId={dashboardId} />
         </div>
         <div className="flex flex-col items-start gap-1 sm:items-end">
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/projects/$projectId/reports/new"
+              params={{ projectId }}
+              search={{ dashboard: dashboardId }}
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium dark:border-neutral-700"
+            >
+              Generate report
+            </Link>
           <button
             type="button"
             onClick={() => startSession.mutate()}
@@ -104,6 +115,7 @@ function DashboardPage() {
           >
             {startSession.isPending ? 'Starting…' : 'Start a session from this dashboard'}
           </button>
+          </div>
           {startSession.error && <ErrorNotice error={startSession.error} prefix="No session started:" />}
         </div>
       </header>

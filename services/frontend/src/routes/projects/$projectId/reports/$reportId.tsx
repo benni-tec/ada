@@ -142,17 +142,16 @@ function Owner({ report }: { report: Report }) {
     )
   }
   if (report.dashboard_id) {
-    // The dashboard page belongs to workstream G; a plain link keeps this page independent
-    // of its route being in the tree.
     return (
       <p className="text-sm text-neutral-600 dark:text-neutral-400">
         Generated from{' '}
-        <a
-          href={`/projects/${encodeURIComponent(report.project_id)}/dashboards/${encodeURIComponent(report.dashboard_id)}`}
+        <Link
+          to="/projects/$projectId/dashboards/$dashboardId"
+          params={{ projectId: report.project_id, dashboardId: report.dashboard_id }}
           className="text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
         >
           its dashboard
-        </a>
+        </Link>
       </p>
     )
   }

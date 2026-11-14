@@ -9,7 +9,7 @@ import { Provenance } from './provenance'
 import { WidgetCardActions } from './widget-card-actions'
 
 // Starting heights per type; the frame can be resized by dragging its lower edge.
-const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 320 }
+const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 320, map: 420 }
 
 /**
  * The widget bundle in a sandboxed frame. It fetches its own data by widget id, so the
@@ -17,15 +17,28 @@ const heights: Record<string, number> = { value: 160, table: 320, 'line-chart': 
  *
  * `allow-same-origin` is needed for the widget's same-origin request to /api; without
  * it the frame's origin is opaque and the request becomes cross-origin.
+ *
+ * `runFollowsData`: the page starts a new run when data changes (a dashboard), so the
+ * frame reloads by its new address and must not also reload on the live epoch.
  */
-export function WidgetFrame({ widget, runId, tall }: { widget: Widget; runId?: string | null; tall?: boolean }) {
+export function WidgetFrame({
+  widget,
+  runId,
+  tall,
+  runFollowsData = false,
+}: {
+  widget: Widget
+  runId?: string | null
+  tall?: boolean
+  runFollowsData?: boolean
+}) {
   // Changing key remounts the frame, which reloads the widget and its data.
   const { widgetEpoch } = useLive()
   const height = (heights[widget.type] ?? 280) * (tall ? 1.75 : 1)
   return (
     <div className="resize-y overflow-hidden" style={{ height }}>
       <iframe
-        key={widgetEpoch}
+        key={runFollowsData ? 0 : widgetEpoch}
         src={widgetSrc(widget, runId)}
         title={`Widget: ${widget.title || widget.type}`}
         sandbox="allow-scripts allow-same-origin"
@@ -46,6 +59,7 @@ export function WidgetCard({
   highlighted = false,
   tall = false,
   linkToWidget = true,
+  runFollowsData = false,
   actions,
 }: {
   widget: Widget
@@ -53,6 +67,8 @@ export function WidgetCard({
   highlighted?: boolean
   tall?: boolean
   linkToWidget?: boolean
+  /** See WidgetFrame. */
+  runFollowsData?: boolean
   /** Shown in a strip under the widget; defaults to what WidgetCardActions gives. */
   actions?: ReactNode
 }) {
@@ -100,7 +116,7 @@ export function WidgetCard({
           {widget.type}
         </span>
       </header>
-      <WidgetFrame widget={widget} runId={runId} tall={tall} />
+      <WidgetFrame widget={widget} runId={runId} tall={tall} runFollowsData={runFollowsData} />
       {strip && <footer className="border-t border-neutral-200 px-4 py-2 dark:border-neutral-800">{strip}</footer>}
     </article>
   )

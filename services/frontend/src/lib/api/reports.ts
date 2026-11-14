@@ -13,10 +13,6 @@ export type Slot = Schemas['Slot']
 export type TimeRange = Schemas['TimeRange']
 export type VersionBump = Schemas['VersionBump']
 
-/** What the dashboard picker needs of a dashboard. Workstream G serves the dashboards; the
- * route is not in this branch's generated schema yet, so its answer is typed here. */
-export type DashboardSummary = { id: Id; project_id: Id; name: string }
-
 // The component tree of a version's content (core/services/reports/content.py).
 
 export type HeadingBlock = { type: 'heading'; text: string; level: 1 | 2 | 3 }
@@ -107,18 +103,6 @@ export const getTemplate = (id: Id) =>
 export const getLineage = (operatorId: OperatorId) =>
   unwrap(api.GET('/api/operators/{operator_id}/lineage', { params: { path: { operator_id: operatorId } } }))
 
-/** GET /api/projects/{id}/dashboards, served by workstream G. */
-export async function listDashboards(projectId: Id): Promise<DashboardSummary[]> {
-  const url = new URL(`/api/projects/${encodeURIComponent(projectId)}/dashboards`, window.location.origin)
-  const response = await globalThis.fetch(url)
-  const body: unknown = await response.json().catch(() => undefined)
-  if (!response.ok) {
-    const detail = (body as ApiError | undefined)?.detail
-    throw new ApiFailure(response.status, typeof detail === 'string' ? { detail } : undefined)
-  }
-  return Array.isArray(body) ? (body as DashboardSummary[]) : []
-}
-
 // Queries. The keys sit under the prefixes of ./queries.ts: a project's reports under
 // ['projects', id], a report's versions under ['reports', id].
 
@@ -129,7 +113,6 @@ export const reportKeys = {
   sources: (versionId: Id) => ['report-versions', versionId, 'sources'] as const,
   template: (id: Id) => ['templates', id] as const,
   lineage: (operatorId: OperatorId) => ['operators', operatorId, 'lineage'] as const,
-  dashboards: (projectId: Id) => ['projects', projectId, 'dashboards'] as const,
 }
 
 export const reportsQuery = (projectId: Id) =>
@@ -158,6 +141,3 @@ export const lineageQuery = (operatorId: OperatorId) =>
     // An operator's id is its identity: its pipeline is always the same.
     staleTime: Infinity,
   })
-
-export const dashboardsQuery = (projectId: Id) =>
-  queryOptions({ queryKey: reportKeys.dashboards(projectId), queryFn: () => listDashboards(projectId) })

@@ -8,7 +8,8 @@ type Widgets = Map<Id, Widget>
 /** What a slot holds: the widget on the shared run, or why there is none. */
 function SlotContent({ slot, widgets, runId }: { slot: DashboardSlot; widgets: Widgets; runId: Id | null }) {
   const widget = slot.widget_id ? widgets.get(slot.widget_id) : undefined
-  if (widget) return <WidgetCard widget={widget} runId={runId} />
+  // The dashboard starts a new run when data changes; the new run reloads the frame.
+  if (widget) return <WidgetCard widget={widget} runId={runId} runFollowsData />
   return (
     <div className="flex min-h-32 flex-col justify-center gap-1 rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700">
       {slot.widget_id ? (

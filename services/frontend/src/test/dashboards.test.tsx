@@ -99,6 +99,23 @@ test('shows the slots on the grid, every widget reading the same run', async () 
   expect(screen.getByText(/Showing 2020 to 2024 \(the dashboard’s default\)/)).toBeInTheDocument()
 })
 
+test('the header shows the dashboard’s firing alerts and links to a report from it', async () => {
+  serveDashboard({
+    'GET /api/dashboards/d1/alerts': [
+      { alert: { id: 'a1', project_id: 'p1', rule_id: 'r1', state: 'firing' }, rule: { id: 'r1', severity: 'critical' } },
+      { alert: { id: 'a2', project_id: 'p1', rule_id: 'r1', state: 'firing' }, rule: { id: 'r1', severity: 'critical' } },
+    ],
+  })
+  renderAt('/projects/p1/dashboards/d1')
+
+  const badges = await screen.findByRole('link', { name: /2 firing alerts: 2 critical/ })
+  expect(badges).toHaveAttribute('href', '/projects/p1/alerts')
+  expect(screen.getByRole('link', { name: 'Generate report' })).toHaveAttribute(
+    'href',
+    '/projects/p1/reports/new?dashboard=d1',
+  )
+})
+
 test('a new time range starts a new run that all widgets then read', async () => {
   serveDashboard()
   renderAt('/projects/p1/dashboards/d1')
