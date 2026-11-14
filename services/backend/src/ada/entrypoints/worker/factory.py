@@ -1,6 +1,17 @@
+from typing import Any
+
 from dishka import Provider
-from dishka.integrations.taskiq import TaskiqProvider, setup_dishka
-from taskiq import AsyncBroker, InMemoryBroker, TaskiqEvents, TaskiqScheduler, TaskiqState
+from dishka.integrations.taskiq import CONTAINER_ID, CONTAINER_REGISTRY, TaskiqProvider
+from dishka.integrations.taskiq import ContainerMiddleware as DishkaContainerMiddleware
+from taskiq import (
+    AsyncBroker,
+    InMemoryBroker,
+    TaskiqEvents,
+    TaskiqMessage,
+    TaskiqResult,
+    TaskiqScheduler,
+    TaskiqState,
+)
 from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_redis import RedisStreamBroker
 
@@ -12,6 +23,24 @@ from ada.entrypoints.worker import tasks
 from ada.entrypoints.worker.registry import TASKS
 
 
+class ContainerMiddleware(DishkaContainerMiddleware):
+    """dishka's request scope per task, ended with the task's exception when it raises.
+
+    dishka's own middleware ends a failed task's scope as if it had succeeded, which would
+    commit what the task wrote before failing and broadcast its events.
+    """
+
+    async def on_error(
+        self, message: TaskiqMessage, result: TaskiqResult[Any], exception: BaseException
+    ) -> None:
+        if CONTAINER_ID not in message.labels:
+            return
+        registry = self.broker.state[CONTAINER_REGISTRY]
+        container = registry.pop(message.labels.pop(CONTAINER_ID), None)
+        if container is not None:
+            await container.close(exception)
+
+
 def create_broker(settings: Settings, *providers: Provider, in_memory: bool = False) -> AsyncBroker:
     """A broker with every task registered.
 
@@ -20,7 +49,7 @@ def create_broker(settings: Settings, *providers: Provider, in_memory: bool = Fa
     """
     container = create_container(settings, TaskiqProvider(), *providers)
     broker = InMemoryBroker() if in_memory else RedisStreamBroker(settings.valkey_url)
-    setup_dishka(container, broker)
+    broker.add_middlewares(ContainerMiddleware(container))
     # Importing the task modules is what declares their tasks.
     modules(tasks)
     for task in TASKS:

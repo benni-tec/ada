@@ -16,6 +16,7 @@ from ada.composition import create_container
 from ada.config import Settings
 from ada.entrypoints.mcp import actor
 from ada.entrypoints.mcp.server import create_mcp
+from memory import memory_adapters
 from test_api_support import Overrides, Seen
 
 pytestmark = pytest.mark.anyio
@@ -41,7 +42,9 @@ WAVE_1_TOOLS = {
 @pytest.fixture
 async def seen(unreachable_settings: Settings) -> AsyncIterator[Seen]:
     overrides = Overrides()
-    container = create_container(unreachable_settings, FastapiProvider(), overrides)
+    container = create_container(
+        unreachable_settings, FastapiProvider(), *memory_adapters(), overrides
+    )
     try:
         yield Seen(container, overrides)
     finally:
@@ -257,7 +260,8 @@ async def test_a_source_operator_is_added_and_recorded_in_the_session(
     assert entry.ref == operator["id"]
     assert entry.text == "Starting from the raw data"
     assert entry.actor.model_dump() == {"kind": "external_agent", "name": "claude-code"}
-    [event] = await seen.events()
+    created, event = await seen.events()
+    assert created.type == "session.created"
     assert event.type == "session.entry_added"
     assert event.payload == {"session_id": session["id"], "entry_id": str(entry.id)}
 
@@ -266,7 +270,7 @@ async def test_an_operator_added_without_a_session_leaves_no_entry(
     client: Client, seen: Seen, session: dict[str, Any], source_operator: dict[str, Any]
 ) -> None:
     assert await seen.entries(UUID(session["id"])) == []
-    assert await seen.events() == []
+    assert [event.type for event in await seen.events()] == ["session.created"]
 
 
 async def test_a_transform_is_added_over_inputs_and_recorded(
@@ -418,6 +422,7 @@ async def test_a_widget_in_a_session_is_created_with_its_url(
     )
     assert entry.actor.name == "claude-code"
     assert [event.type for event in await seen.events()] == [
+        "session.created",
         "widget.created",
         "session.entry_added",
     ]

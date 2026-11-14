@@ -39,8 +39,9 @@ def create_app(settings: Settings | None = None, *providers: Provider) -> FastAP
     for module in modules(routers):
         api.include_router(module.router)
     app.include_router(api)
-    errors.install(app)
     app.mount("/mcp", mcp_app)
     app.add_middleware(McpPathMiddleware)
     setup_dishka(container, app)
+    # Outside the container's middleware, so a failed request rolls back (see errors.py).
+    errors.install(app)
     return app

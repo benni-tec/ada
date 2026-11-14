@@ -7,6 +7,7 @@ from ada.core.models.base import DomainModel, Id, JsonObject
 class EventType(StrEnum):
     """What the live stream carries. The payload names ids only; clients fetch the rest."""
 
+    SESSION_CREATED = "session.created"
     SESSION_ENTRY_ADDED = "session.entry_added"
     WIDGET_CREATED = "widget.created"
     RUN_STARTED = "run.started"

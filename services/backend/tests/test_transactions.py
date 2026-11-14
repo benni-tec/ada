@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
+from ada.adapters.transactions import PendingWork
 from ada.composition.providers.infrastructure import InfrastructureProvider
 
 
@@ -20,7 +21,7 @@ async def _count(engine: AsyncEngine) -> int:
 
 
 async def _request(provider: InfrastructureProvider, engine: AsyncEngine, fail: bool) -> None:
-    sessions = provider.session(engine)
+    sessions = provider.session(engine, PendingWork())
     session: AsyncSession = await anext(sessions)
     await session.execute(text("INSERT INTO projects VALUES (gen_random_uuid(), 'p', now(), 1)"))
     # What dishka does when the request ends: send None, or the exception it raised.

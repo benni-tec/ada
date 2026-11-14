@@ -8,13 +8,14 @@ from ada.composition import create_container
 from ada.config import Settings
 from ada.entrypoints.mcp.server import create_mcp
 from conftest import UNREACHABLE_HEALTH
+from memory import MemoryBackground
 
 pytestmark = pytest.mark.anyio
 
 
 @pytest.fixture
 async def client(unreachable_settings: Settings) -> AsyncIterator[Client]:
-    container = create_container(unreachable_settings, FastapiProvider())
+    container = create_container(unreachable_settings, FastapiProvider(), MemoryBackground())
     try:
         async with Client(create_mcp(container)) as client:
             yield client

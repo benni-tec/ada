@@ -18,7 +18,7 @@ from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.base import Id
 from ada.core.models.events import Event, EventType
-from ada.core.ports.events import EventPublisher, EventStream
+from ada.core.ports.events import EventBroadcaster, EventStream
 
 pytestmark = pytest.mark.anyio
 
@@ -138,7 +138,7 @@ async def test_events_published_in_one_container_reach_streams_of_another(
         try:
             await until_subscribed(valkey, project_id)
             sent = event(project_id, EventType.RUN_STARTED)
-            await (await worker.get(EventPublisher)).publish(sent)
+            await (await worker.get(EventBroadcaster)).publish(sent)
             assert await asyncio.wait_for(received, 5) == sent
         finally:
             await stop(received, events)
@@ -152,7 +152,7 @@ async def test_publishing_does_not_raise_when_valkey_is_unreachable(
 ) -> None:
     container = create_container(unreachable_settings)
     try:
-        publisher = await container.get(EventPublisher)
+        publisher = await container.get(EventBroadcaster)
         assert isinstance(publisher, ValkeyEventPublisher)
         with caplog.at_level(logging.WARNING):
             await publisher.publish(event(uuid7()))

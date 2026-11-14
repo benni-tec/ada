@@ -6,11 +6,12 @@ from fastapi.testclient import TestClient
 from ada.config import Settings
 from ada.entrypoints.http.app import create_app
 from conftest import UNREACHABLE_HEALTH
+from memory import MemoryBackground
 
 
 @pytest.fixture
 def client(unreachable_settings: Settings) -> Iterator[TestClient]:
-    with TestClient(create_app(unreachable_settings)) as client:
+    with TestClient(create_app(unreachable_settings, MemoryBackground())) as client:
         yield client
 
 

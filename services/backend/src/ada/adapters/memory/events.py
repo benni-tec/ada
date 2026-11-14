@@ -3,12 +3,13 @@ from collections.abc import AsyncIterator
 
 from ada.core.models.base import Id
 from ada.core.models.events import Event
-from ada.core.ports.events import EventPublisher, EventStream
+from ada.core.ports.events import EventBroadcaster, EventPublisher, EventStream
 
 
-class MemoryEventBus(EventPublisher, EventStream):
+class MemoryEventBus(EventPublisher, EventBroadcaster, EventStream):
     """Publisher and stream in one process. Events reach only subscribers of this
-    instance, so it suits a single process and tests; several processes need a broker."""
+    instance, so it suits a single process and tests; several processes need a broker.
+    Used as a publisher directly it delivers at once, with no transaction to wait for."""
 
     def __init__(self) -> None:
         self._subscribers: dict[Id, set[asyncio.Queue[Event]]] = {}

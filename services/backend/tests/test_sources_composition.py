@@ -11,6 +11,7 @@ from ada.core.models.sources import AccessKind
 from ada.core.ports.sources import SourceReaders
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.sources.service import DataSources
+from memory import MemoryRepositories
 
 pytestmark = pytest.mark.anyio
 
@@ -18,7 +19,7 @@ pytestmark = pytest.mark.anyio
 async def test_the_container_provides_the_readers_and_the_service(
     unreachable_settings: Settings,
 ) -> None:
-    container = create_container(unreachable_settings, FastapiProvider())
+    container = create_container(unreachable_settings, FastapiProvider(), MemoryRepositories())
     try:
         readers = await container.get(SourceReaders)
         assert isinstance(readers, HttpSourceReaders)

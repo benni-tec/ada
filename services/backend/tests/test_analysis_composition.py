@@ -10,6 +10,7 @@ from ada.core.services.pipelines.runs import Runs
 from ada.core.services.pipelines.service import Pipelines
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
+from memory import MemoryRepositories
 
 pytestmark = pytest.mark.anyio
 
@@ -17,7 +18,7 @@ pytestmark = pytest.mark.anyio
 async def test_the_analysis_ports_are_bound_to_the_real_implementations(
     unreachable_settings: Settings,
 ) -> None:
-    container = create_container(unreachable_settings, FastapiProvider())
+    container = create_container(unreachable_settings, FastapiProvider(), MemoryRepositories())
     try:
         assert isinstance(await container.get(AnalysisStore), DuckDbAnalysisStore)
         async with container() as request:

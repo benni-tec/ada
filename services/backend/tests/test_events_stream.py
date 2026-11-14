@@ -21,6 +21,7 @@ from ada.config import Settings
 from ada.core.models.events import Event, EventType
 from ada.core.ports.events import EventStream
 from ada.entrypoints.http.app import create_app
+from memory import memory_adapters
 
 pytestmark = pytest.mark.anyio
 
@@ -96,7 +97,7 @@ def bus() -> MemoryEventBus:
 
 @pytest.fixture
 def app(unreachable_settings: Settings, bus: MemoryEventBus) -> FastAPI:
-    return create_app(unreachable_settings, MemoryEvents(bus))
+    return create_app(unreachable_settings, *memory_adapters(), MemoryEvents(bus))
 
 
 async def until_subscribed(bus: MemoryEventBus, project_id: UUID, count: int = 1) -> None:

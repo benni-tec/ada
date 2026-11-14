@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import uuid7
 
 import pytest
 from dishka.integrations.fastapi import FastapiProvider
@@ -7,7 +8,7 @@ from ada.adapters.db.workspace_repositories import SqlProjectRepository
 from ada.composition import create_container, providers
 from ada.config import Settings
 from ada.core.ports.repositories import ProjectRepository
-from ada.core.services.ports.pipelines import PipelineService
+from ada.core.services.ports.dashboards import DashboardService
 from ada.discovery import modules
 
 pytestmark = pytest.mark.anyio
@@ -28,10 +29,10 @@ async def test_the_container_resolves_bound_and_unbuilt_ports(
             # Bound to a real implementation. Resolving it opens no connection yet, so
             # this works with the database down.
             assert isinstance(await request.get(ProjectRepository), SqlProjectRepository)
-            # Not implemented yet: resolving works, using it says what is missing.
-            pipelines = await request.get(PipelineService)
-            with pytest.raises(NotImplementedError, match="PipelineService"):
-                await pipelines.get("op_missing")
+            # Not implemented until wave 2: resolving works, using it says what is missing.
+            dashboards = await request.get(DashboardService)
+            with pytest.raises(NotImplementedError, match="DashboardService"):
+                await dashboards.list(uuid7())
     finally:
         await container.close()
 

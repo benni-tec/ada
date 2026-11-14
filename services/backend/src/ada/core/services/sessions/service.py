@@ -52,6 +52,15 @@ class Sessions(SessionService):
             created_at=self.clock.now(),
         )
         await self.sessions.add(session)
+        # Announced, so a project page lists a session an agent started over MCP.
+        await self.events.publish(
+            Event(
+                type=EventType.SESSION_CREATED,
+                project_id=project_id,
+                payload={"session_id": str(session.id)},
+                at=self.clock.now(),
+            )
+        )
         return session
 
     async def get(self, id: Id) -> Session:

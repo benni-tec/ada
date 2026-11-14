@@ -16,6 +16,7 @@ from ada.core.models.events import Event
 from ada.core.ports.tasks import TaskDispatcher
 from ada.entrypoints.http.app import create_app
 from factories import NOW
+from memory import memory_adapters
 from test_api_support import Overrides
 
 WEB = {"kind": "user", "name": "web"}
@@ -28,7 +29,7 @@ def overrides() -> Overrides:
 
 @pytest.fixture
 def client(unreachable_settings: Settings, overrides: Overrides) -> Iterator[TestClient]:
-    with TestClient(create_app(unreachable_settings, overrides)) as client:
+    with TestClient(create_app(unreachable_settings, *memory_adapters(), overrides)) as client:
         yield client
 
 
@@ -341,7 +342,8 @@ def test_a_message_is_recorded_as_the_web_user_and_announced(
     assert entry["actor"] == WEB
 
     assert get(client, f"/sessions/{session['id']}/entries") == [entry]
-    [event] = events(client)
+    created, event = events(client)
+    assert created.type == "session.created"
     assert event.type == "session.entry_added"
     assert str(event.project_id) == project["id"]
     assert event.payload == {"session_id": session["id"], "entry_id": entry["id"]}
@@ -581,8 +583,12 @@ def test_a_widget_in_a_session_is_recorded_and_listed(
     assert entry["ref"] == widget["id"]
     assert entry["text"] == "Shows the regions"
     assert entry["actor"] == WEB
-    assert [event.type for event in events(client)] == ["widget.created", "session.entry_added"]
-    assert events(client)[0].payload == {"widget_id": widget["id"], "session_id": session["id"]}
+    assert [event.type for event in events(client)] == [
+        "session.created",
+        "widget.created",
+        "session.entry_added",
+    ]
+    assert events(client)[1].payload == {"widget_id": widget["id"], "session_id": session["id"]}
 
 
 def test_widgets_of_unknown_things_are_not_found(

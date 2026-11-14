@@ -7,7 +7,7 @@ from redis.asyncio import Redis
 
 from ada.core.models.base import Id
 from ada.core.models.events import Event
-from ada.core.ports.events import EventPublisher, EventStream
+from ada.core.ports.events import EventBroadcaster, EventStream
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ def channel(project_id: Id) -> str:
     return f"{CHANNEL_PREFIX}{project_id}"
 
 
-class ValkeyEventPublisher(EventPublisher):
+class ValkeyEventPublisher(EventBroadcaster):
     """Publishes to Valkey, so the event reaches the streams of every API process, whichever
     process (API, worker) caused it. Pub/sub keeps nothing: a client that is not connected
     misses the event and refetches when it reconnects."""
