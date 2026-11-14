@@ -1,0 +1,50 @@
+/* Vahti: ink is currentColor, paper the page background. Eyes stay light with dark pupils. */
+.vahti {
+  --vahti-paper: var(--background);
+  --vahti-eye: oklch(0.985 0 0);
+  --vahti-pupil: oklch(0.145 0 0);
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+/* One small motion per pose, each answering what the agent is doing. */
+.vahti--watching .v-eyes,
+.vahti--peek .v-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: v-blink 7s infinite;
+}
+.vahti--searching .v-swing {
+  animation: v-swing 1.8s ease-in-out infinite alternate;
+}
+.vahti--watching .v-flame,
+.vahti--searching .v-flame {
+  animation: v-flicker 2.4s steps(2, jump-none) infinite;
+}
+.vahti--asleep .v-z {
+  animation: v-z 3s ease-in-out infinite;
+}
+
+@keyframes v-blink {
+  0%, 94%, 100% { transform: scaleY(1); }
+  97% { transform: scaleY(0.08); }
+}
+@keyframes v-swing {
+  from { transform: rotate(-5deg); }
+  to { transform: rotate(5deg); }
+}
+@keyframes v-flicker {
+  0% { transform: scale(1, 1); }
+  50% { transform: scale(0.85, 1.1); }
+}
+@keyframes v-z {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(-3px); opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vahti * {
+    animation: none !important;
+  }
+}
