@@ -6,6 +6,12 @@ are needed. `ada seed-trials --refresh` forces all sources to fetch, then prints
 exact row counts per step through a run. A failure is reported by the command;
 successfully refreshed snapshots remain stored. Rerun to recover.
 
+**Trial doors: Nordic cancer trials Finland lacks** shows registry trial rates,
+recruiting Nordic sites, trials without Finnish sites and pending Finnish CTIS
+listings. **Open cancer trials near you** lists recruiting trials and sites with
+distances and registry eligibility text to discuss with an oncologist. Both
+dashboards attach to the seed session; the command prints their IDs.
+
 ## Sources
 
 One ClinicalTrials.gov URL source per Finland, Sweden, Norway and Denmark uses
@@ -16,8 +22,9 @@ One ClinicalTrials.gov URL source per Finland, Sweden, Norway and Denmark uses
 field list in `trials/sources.py`. Arrays of phases, conditions, interventions and
 locations remain JSON. Pagination passes `nextPageToken` as `pageToken`.
 The daily PROBE repeats that query with `pageSize=1`, `countTotal=true`,
-`sort=LastUpdatePostDate:desc`, `fields=NCTId,LastUpdatePostDate`, comparing totalCount
-and the first study's last-update date. Publisher: U.S. National Library of Medicine;
+`sort=LastUpdatePostDate:desc`, `fields=NCTId,LastUpdatePostDate`, hashing the whole
+probe answer, including the total count and an empty studies array when applicable.
+Publisher: U.S. National Library of Medicine;
 landing page: https://clinicaltrials.gov; reuse licence unknown, unverified.
 
 One CTIS REQUEST source per country POSTs to
@@ -27,10 +34,11 @@ MSC codes are FI 246, SE 752, NO 578, DK 208. This search includes all therapeut
 areas and statuses; SQL selects oncology using C04. Rows are `data`; trialCountries
 and therapeuticAreas remain JSON. While `pagination.nextPage` is true the reader
 increments body `pagination.page`. Daily PROBE uses the same POST with size 1,
-comparing `pagination.totalRecords`, `data.0.ctNumber`, `data.0.lastPublicationUpdate`.
+hashing the whole probe answer, including the total count and an empty data array
+when applicable.
 Publisher: European Medicines Agency; landing page: https://euclinicaltrials.eu;
 reuse licence unknown, unverified. Daily probes can miss changes that alter none
-of their selected fields; force a refresh when a complete reread is needed.
+of their probe answers; force a refresh when a complete reread is needed.
 
 ## Data steps and columns
 
@@ -105,4 +113,4 @@ row's site, not the trial's nearest site.
 Find the project and its **Nordic cancer trials** session, then the recorded
 operator whose note starts `case_trials:`. All seven notes start with their contract
 name. In the seed integration, `TrialSteps` exposes every operator by that same name;
-the marked hand-over in `seed.py` is where dashboard and monitoring builders attach.
+`seed.py` attaches dashboards and leaves a hand-over for monitoring.
