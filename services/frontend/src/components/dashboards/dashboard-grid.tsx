@@ -176,7 +176,12 @@ export function DashboardGrid({
   const pointerDown = (slot: DashboardSlot, mode: Drag['mode']) => (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
     event.preventDefault()
-    event.currentTarget.setPointerCapture?.(event.pointerId)
+    try {
+      // Moves keep coming to the handle when the pointer leaves it (or crosses a frame).
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // A pointer the browser does not know (a synthetic event): the drag works without.
+    }
     begin(slot, mode, 'pointer', { x: event.clientX, y: event.clientY })
   }
   const pointerMove = (event: PointerEvent<HTMLButtonElement>) => {
@@ -282,7 +287,7 @@ export function DashboardGrid({
                       hint="Move"
                       describedBy={helpId}
                       pressed={active && drag?.via === 'keyboard' && drag.mode === 'move'}
-                      className="top-1.5 left-1.5 cursor-grab active:cursor-grabbing"
+                      className="-top-2.5 -left-2.5 cursor-grab active:cursor-grabbing"
                       onPointerDown={pointerDown(slot, 'move')}
                       onPointerMove={pointerMove}
                       onPointerUp={pointerUp}
@@ -297,7 +302,7 @@ export function DashboardGrid({
                       hint={keepsAspect(typeOf(slot)) ? 'Resize (keeps its shape)' : 'Resize'}
                       describedBy={helpId}
                       pressed={active && drag?.via === 'keyboard' && drag.mode === 'resize'}
-                      className="right-1.5 bottom-1.5 cursor-nwse-resize"
+                      className="-right-2.5 -bottom-2.5 cursor-nwse-resize"
                       onPointerDown={pointerDown(slot, 'resize')}
                       onPointerMove={pointerMove}
                       onPointerUp={pointerUp}
