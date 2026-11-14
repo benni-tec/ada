@@ -29,3 +29,8 @@ class Invalid(Exception):
 class Unavailable(Exception):
     """An external dependency (a data source, the task queue) could not be reached or
     answered with an error. Nothing is wrong with the request; retrying later may work."""
+
+
+class NotConfigured(Exception):
+    """The request is fine, but the platform is not set up to carry it out, e.g. storing an
+    API key when no master key (ADA_SECRET_KEY) is set. Says what is missing."""

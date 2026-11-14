@@ -1,28 +1,25 @@
 """The in-platform agent in tests: a scripted model (pydantic-ai's FunctionModel) in place
-of every provider, and a models file with one session agent. Nothing calls a provider."""
+of every provider, and a configuration with one session agent, stored through the settings
+service with a master key of the test's own. Nothing calls a provider."""
 
 import json
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from cryptography.fernet import Fernet
 from dishka import AsyncContainer, Provider, Scope, provide
 from pydantic_ai.messages import ModelMessage, ModelRequest, ToolReturnPart
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
-from ada.adapters.llm.config import (
-    ConfiguredModels,
-    LlmsConfig,
-    LlmsFile,
-    ProviderConfig,
-    ProviderKind,
-)
 from ada.adapters.llm.runtime import PydanticAiRuntime
-from ada.core.models.agents import AgentTurn
+from ada.adapters.secrets.fernet import FernetSecretBox
+from ada.core.models.agents import AgentTurn, ProviderKind
 from ada.core.models.base import Id
-from ada.core.ports.agents import AgentRuntime, LanguageModels
-from ada.core.services.ports.agents import AgentTurnService
+from ada.core.ports.agents import AgentRuntime
+from ada.core.ports.secrets import SecretBox
+from ada.core.services.ports.agents import AgentSettingsService, AgentTurnService
 from ada.entrypoints.mcp.agent import InProcessToolbox
 
 MODEL = "test/scripted"
@@ -31,21 +28,41 @@ AGENT = {"kind": "agent", "name": MODEL}
 type Step = Callable[[list[ModelMessage], AgentInfo], AsyncIterator[Any]]
 
 
-def config(key: str | None = "secret", model: str = MODEL) -> LlmsConfig:
-    """A models file with one provider whose key is set (or not)."""
-    return LlmsConfig(
-        file=LlmsFile(
-            providers={
-                "test": ProviderConfig(
-                    kind=ProviderKind.OPENAI_COMPATIBLE,
-                    base_url="http://127.0.0.1:1/v1",
-                    api_key_env="TEST_LLM_KEY",
-                )
-            },
-            models={"session_agent": model},
-        ),
-        keys={"TEST_LLM_KEY": key} if key else {},
-    )
+# The master key of every test app with the agent.
+MASTER_KEY = Fernet.generate_key().decode()
+
+
+@dataclass(frozen=True)
+class AgentSetup:
+    """One provider, "test", with one model that is the session agent."""
+
+    key: str | None = "secret"
+    model: str = MODEL
+    kind: ProviderKind = ProviderKind.OPENAI_COMPATIBLE
+
+
+def config(
+    key: str | None = "secret",
+    model: str = MODEL,
+    kind: ProviderKind = ProviderKind.OPENAI_COMPATIBLE,
+) -> AgentSetup:
+    """A configuration with one provider whose key is stored (or not)."""
+    return AgentSetup(key=key, model=model, kind=kind)
+
+
+async def configure(container: AsyncContainer, setup: AgentSetup | None) -> None:
+    """Store the setup through the settings service, as the Settings page would."""
+    if setup is None:
+        return
+    provider_name, _, model = setup.model.partition("/")
+    async with container() as request:
+        service = await request.get(AgentSettingsService)
+        provider = await service.add_provider(
+            provider_name, setup.kind, "http://127.0.0.1:1/v1", setup.key
+        )
+        await service.add_model(provider.id, model)
+        settings = await service.view()
+        await service.set_session_agent(setup.model, settings.revision)
 
 
 @dataclass
@@ -119,27 +136,27 @@ def returned(messages: list[ModelMessage], tool: str) -> Any:
 
 
 class AgentOverrides(Provider):
-    """The models file and pydantic-ai on the scripted model, in place of the real ones."""
+    """A master key of the test's own, and pydantic-ai on the scripted model in place of the
+    providers. The configuration itself is stored with `configure`."""
 
     scope = Scope.APP
 
-    def __init__(self, script: Script, llms: LlmsConfig | None = None) -> None:
+    def __init__(self, script: Script) -> None:
         super().__init__()
         self.script = script
-        self.llms = llms or config()
         # Replaces the scripted model, e.g. with a real client of an unreachable provider.
         self.factory: Callable[[str], Model] | None = None
 
     @provide
-    def language_models(self) -> LanguageModels:
-        return ConfiguredModels(self.llms)
+    def secrets(self) -> SecretBox:
+        return FernetSecretBox(MASTER_KEY)
 
     @provide
     def runtime(self) -> AgentRuntime:
         def model(model_id: str) -> Model:
             return self.factory(model_id) if self.factory else self.script.model()
 
-        return PydanticAiRuntime(self.llms, model_factory=model)
+        return PydanticAiRuntime(model_factory=model)
 
 
 async def run_turn(container: AsyncContainer, turn_id: Id) -> AgentTurn:

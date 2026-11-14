@@ -14,11 +14,14 @@ from dishka import Provider, Scope, provide
 
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import (
+    MemoryAgentSettingsRepository,
     MemoryAgentTurnRepository,
     MemoryAlertRepository,
     MemoryAlertRuleRepository,
     MemoryDashboardRepository,
     MemoryDataSourceRepository,
+    MemoryLlmModelRepository,
+    MemoryLlmProviderRepository,
     MemoryOperatorRepository,
     MemoryProjectRepository,
     MemoryReportRepository,
@@ -36,11 +39,14 @@ from ada.adapters.memory.tasks import RecordingTaskDispatcher
 from ada.core.ports.agents import TurnProgress
 from ada.core.ports.events import EventBroadcaster, EventStream
 from ada.core.ports.repositories import (
+    AgentSettingsRepository,
     AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
     DashboardRepository,
     DataSourceRepository,
+    LlmModelRepository,
+    LlmProviderRepository,
     OperatorRepository,
     ProjectRepository,
     ReportRepository,
@@ -91,6 +97,9 @@ class MemoryRepositories(Provider):
     alert_rules = provide(MemoryAlertRuleRepository, provides=AlertRuleRepository)
     alerts = provide(MemoryAlertRepository, provides=AlertRepository)
     agent_turns = provide(MemoryAgentTurnRepository, provides=AgentTurnRepository)
+    llm_providers = provide(MemoryLlmProviderRepository, provides=LlmProviderRepository)
+    llm_models = provide(MemoryLlmModelRepository, provides=LlmModelRepository)
+    agent_settings = provide(MemoryAgentSettingsRepository, provides=AgentSettingsRepository)
     source_checks = provide(MemorySourceCheckLog, provides=SourceCheckLog, scope=Scope.APP)
     source_locks = provide(MemorySourceLocks, provides=SourceLocks, scope=Scope.APP)
     turn_progress = provide(MemoryTurnProgress, provides=TurnProgress, scope=Scope.APP)

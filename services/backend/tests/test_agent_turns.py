@@ -18,13 +18,12 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from taskiq import InMemoryBroker
 
-from ada.adapters.llm.config import LlmsConfig
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import MemoryStore
 from ada.adapters.memory.tasks import RecordingTaskDispatcher
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
-from ada.core.models.agents import AgentTurn
+from ada.core.models.agents import AgentTurn, ProviderKind
 from ada.core.models.events import Event
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.services.agents import service as agent_service
@@ -37,9 +36,11 @@ from agent_support import (
     AGENT,
     MODEL,
     AgentOverrides,
+    AgentSetup,
     Script,
     call,
     config,
+    configure,
     fail,
     returned,
     run_turn,
@@ -58,19 +59,23 @@ def script() -> Script:
 
 
 @pytest.fixture
-def llms() -> LlmsConfig:
+def llms() -> AgentSetup | None:
     return config()
 
 
 @pytest.fixture
-def agent(script: Script, llms: LlmsConfig) -> AgentOverrides:
-    return AgentOverrides(script, llms)
+def agent(script: Script) -> AgentOverrides:
+    return AgentOverrides(script)
 
 
 @pytest.fixture
-def client(unreachable_settings: Settings, agent: AgentOverrides) -> Iterator[TestClient]:
+def client(
+    unreachable_settings: Settings, agent: AgentOverrides, llms: AgentSetup | None
+) -> Iterator[TestClient]:
     app = create_app(unreachable_settings, *memory_adapters(), Overrides(), agent)
     with TestClient(app) as client:
+        assert client.portal is not None
+        client.portal.call(configure, container(client), llms)
         yield client
 
 
@@ -190,9 +195,7 @@ def test_a_message_queues_a_turn_after_its_entry(
 def test_without_a_session_agent_a_message_gets_no_turn(
     unreachable_settings: Settings, script: Script
 ) -> None:
-    app = create_app(
-        unreachable_settings, *memory_adapters(), Overrides(), AgentOverrides(script, LlmsConfig())
-    )
+    app = create_app(unreachable_settings, *memory_adapters(), Overrides(), AgentOverrides(script))
     with TestClient(app) as client:
         project = post(client, "/projects", {"name": "P"})
         session = post(client, f"/projects/{project['id']}/sessions", {"title": "S"})
@@ -204,7 +207,7 @@ def test_without_a_session_agent_a_message_gets_no_turn(
         assert get(client, "/llm/models") == {"models": [], "session_agent": None}
 
 
-@pytest.mark.parametrize("llms", [config(key=None)])
+@pytest.mark.parametrize("llms", [config(key=None, kind=ProviderKind.GEMINI)])
 def test_a_model_without_its_key_fails_the_turn_at_once(
     client: TestClient, session: dict[str, Any]
 ) -> None:
@@ -217,7 +220,7 @@ def test_a_model_without_its_key_fails_the_turn_at_once(
                 "model": "scripted",
                 "purposes": ["session_agent"],
                 "available": False,
-                "reason": "The environment variable TEST_LLM_KEY is not set",
+                "reason": "The provider test needs an API key",
             }
         ],
         "session_agent": MODEL,
@@ -226,7 +229,7 @@ def test_a_model_without_its_key_fails_the_turn_at_once(
     turn = message(client, session, "Hello")["turn"]
 
     assert turn["status"] == "failed"
-    assert turn["error"] == "The environment variable TEST_LLM_KEY is not set"
+    assert turn["error"] == "The provider test needs an API key"
     assert turn["finished_at"] is not None
     assert queued(client) == []
     finished = events(client, "agent.turn_finished")
@@ -621,6 +624,7 @@ async def test_the_worker_task_runs_a_turn(unreachable_settings: Settings, scrip
     app_container = broker.middlewares[0]._container  # type: ignore[attr-defined]
     await broker.startup()
     try:
+        await configure(app_container, config())
         async with app_container() as request:
             project = await (await request.get(ProjectService)).create("P")
             session = await (await request.get(SessionService)).create(project.id, "S")

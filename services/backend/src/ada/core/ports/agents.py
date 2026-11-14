@@ -11,6 +11,7 @@ from ada.core.models.actors import Actor
 from ada.core.models.agents import (
     AgentTurn,
     ModelList,
+    ModelTarget,
     ToolSpec,
     TurnPart,
     TurnRequest,
@@ -30,9 +31,16 @@ class ToolCallFailed(Exception):
 
 
 class LanguageModels(Protocol):
-    """The models file, as far as the core needs it."""
+    """The configured models, as far as running the agent needs them."""
 
-    def catalog(self) -> ModelList: ...
+    async def catalog(self) -> ModelList:
+        """Every configured model, whether each can be used, and the session agent."""
+        ...
+
+    async def target(self, model_id: str) -> ModelTarget:
+        """What the runtime needs to call the model, its key decrypted. Raises Invalid,
+        with the reason, when the model is not configured or cannot be used."""
+        ...
 
 
 class AgentTools(Protocol):

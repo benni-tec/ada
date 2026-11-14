@@ -17,9 +17,16 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol
 
-from ada.core.models.agents import AgentTurn, TurnPart, TurnStatus
+from ada.core.models.agents import (
+    AgentSettings,
+    AgentTurn,
+    LlmModel,
+    LlmProvider,
+    TurnPart,
+    TurnStatus,
+)
 from ada.core.models.alerts import Alert, AlertRule, AlertState
-from ada.core.models.base import Id, JsonObject
+from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
 from ada.core.models.operators import Operator, OperatorId
 from ada.core.models.projects import Project
@@ -95,6 +102,58 @@ class AgentTurnRepository(Protocol):
         ...
 
     async def cancel_requested(self, id: Id) -> bool: ...
+
+
+class LlmProviderRepository(Protocol):
+    """The model providers, shared by all projects. A provider's API key is stored as the
+    token SecretBox made of it; `has_api_key` says whether one is stored."""
+
+    async def get(self, id: Id) -> LlmProvider: ...
+    async def list(self) -> Sequence[LlmProvider]: ...
+    async def add(self, provider: LlmProvider, api_key: str | None) -> LlmProvider:
+        """Store a provider with its encrypted key (or none); returns it as stored."""
+        ...
+
+    async def update(
+        self,
+        provider: LlmProvider,
+        expected_revision: int,
+        api_key: Change[str | None] = UNCHANGED,
+    ) -> LlmProvider:
+        """Name, kind and base URL from `provider`; the key when given (None removes it)."""
+        ...
+
+    async def delete(self, id: Id) -> None:
+        """Remove the provider with its models; a session agent among them is cleared."""
+        ...
+
+    async def api_key(self, id: Id) -> str | None:
+        """The stored, encrypted key."""
+        ...
+
+
+class LlmModelRepository(Protocol):
+    """The models of the providers. A model is addressed by its id, "<provider>/<model>",
+    which follows its provider's current name."""
+
+    async def get(self, id: str) -> LlmModel: ...
+    async def list(self) -> Sequence[LlmModel]: ...
+    async def add(self, model: LlmModel) -> LlmModel:
+        """Store a model of an existing provider; returns it with its id."""
+        ...
+
+    async def delete(self, id: str) -> None:
+        """Remove a model; the session agent is cleared when it was this one."""
+        ...
+
+
+class AgentSettingsRepository(Protocol):
+    """The platform's one AgentSettings record, which always exists."""
+
+    async def get(self) -> AgentSettings: ...
+    async def update(self, settings: AgentSettings, expected_revision: int) -> AgentSettings:
+        """`session_agent` must name a stored model (or be None)."""
+        ...
 
 
 class OperatorRepository(Protocol):

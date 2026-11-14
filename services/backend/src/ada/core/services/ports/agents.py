@@ -2,8 +2,16 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from ada.core.models.actors import Actor
-from ada.core.models.agents import AgentTurn, ModelList, PostedMessage
-from ada.core.models.base import Id
+from ada.core.models.agents import (
+    AgentSettingsView,
+    AgentTurn,
+    LlmProvider,
+    ModelInfo,
+    ModelList,
+    PostedMessage,
+    ProviderKind,
+)
+from ada.core.models.base import UNCHANGED, Change, Id
 from ada.core.models.sessions import Context
 from ada.core.ports.agents import AgentToolbox
 
@@ -11,7 +19,7 @@ from ada.core.ports.agents import AgentToolbox
 class AgentTurnService(Protocol):
     """Messages to the in-platform agent and its answers."""
 
-    def models(self) -> ModelList:
+    async def models(self) -> ModelList:
         """The configured models, whether each can be used, and the session agent."""
         ...
 
@@ -43,4 +51,47 @@ class AgentTurnService(Protocol):
         """Run a queued turn to its end with the tools the toolbox opens, publishing its
         parts as they happen. Never raises for the model's or the tools' failures: those
         end the turn as failed, with the reason."""
+        ...
+
+
+class AgentSettingsService(Protocol):
+    """The agent's configuration, shared by all projects: model providers with their API
+    keys (stored encrypted, never returned), their models, and the session agent."""
+
+    async def view(self) -> AgentSettingsView: ...
+
+    async def add_provider(
+        self, name: str, kind: ProviderKind, base_url: str | None = None, api_key: str | None = None
+    ) -> LlmProvider:
+        """`name` is a slug, unique. An empty `api_key` is none. Storing a key without a
+        master key raises NotConfigured."""
+        ...
+
+    async def update_provider(
+        self,
+        id: Id,
+        expected_revision: int,
+        name: str | None = None,
+        kind: ProviderKind | None = None,
+        base_url: Change[str | None] = UNCHANGED,
+        api_key: Change[str | None] = UNCHANGED,
+    ) -> LlmProvider:
+        """None keeps name and kind; UNCHANGED keeps base URL and key, None or "" clears
+        them. A new key never needs the old one."""
+        ...
+
+    async def delete_provider(self, id: Id) -> None:
+        """With its models; the session agent is cleared when it was one of them."""
+        ...
+
+    async def add_model(self, provider_id: Id, model: str) -> ModelInfo: ...
+
+    async def delete_model(self, id: str) -> None:
+        """`id` is "<provider>/<model>"; the session agent is cleared when it was this one."""
+        ...
+
+    async def set_session_agent(
+        self, model_id: str | None, expected_revision: int
+    ) -> AgentSettingsView:
+        """None leaves sessions without an agent. The model must be configured."""
         ...

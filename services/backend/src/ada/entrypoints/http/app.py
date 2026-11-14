@@ -8,7 +8,7 @@ from fastmcp.utilities.lifespan import combine_lifespans
 
 from ada.composition import create_container
 from ada.config import Settings
-from ada.core.ports.agents import LanguageModels
+from ada.core.ports.secrets import SecretBox
 from ada.discovery import modules
 from ada.entrypoints.http import errors, routers
 from ada.entrypoints.mcp.server import McpPathMiddleware, create_mcp
@@ -25,9 +25,9 @@ def create_app(settings: Settings | None = None, *providers: Provider) -> FastAP
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        # A models file that cannot be used stops the start with a message naming every
-        # problem, rather than failing the first message sent to the agent.
-        await container.get(LanguageModels)
+        # A master key that is set but malformed stops the start, rather than failing the
+        # first key saved or the first turn.
+        await container.get(SecretBox)
         yield
         await container.close()
 

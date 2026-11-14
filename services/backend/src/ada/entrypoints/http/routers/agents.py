@@ -13,9 +13,10 @@ router = APIRouter(route_class=DishkaRoute, tags=["agent"])
 
 @router.get("/llm/models")
 async def list_models(service: FromDishka[AgentTurnService]) -> ModelList:
-    """The models of the models file, whether each can be used (a missing key makes one
-    unavailable, with the reason), and the session agent. Keys are never returned."""
-    return service.models()
+    """The configured models (see the settings routes), whether each can be used (a
+    provider without the key it needs makes its models unavailable, with the reason), and
+    the session agent. Keys are never returned."""
+    return await service.models()
 
 
 @router.get("/sessions/{session_id}/turns")

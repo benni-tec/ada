@@ -9,6 +9,7 @@ from ada.core.models.actors import ActorKind
 from ada.core.models.agents import (
     AgentTurn,
     HistoryMessage,
+    ModelTarget,
     SourcePart,
     TextPart,
     ToolPart,
@@ -94,6 +95,7 @@ class Briefing:
     async def request(
         self,
         turn: AgentTurn,
+        target: ModelTarget,
         project: Project,
         session: Session,
         entries: Sequence[SessionEntry],
@@ -111,6 +113,7 @@ class Briefing:
         ]
         return TurnRequest(
             model=turn.model,
+            target=target,
             instructions="\n".join(section for section in sections if section),
             history=tuple(history(earlier, {t.id: t for t in turns})[-MAX_HISTORY:]),
             prompt=prompt_entry.text,

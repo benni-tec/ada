@@ -1,30 +1,35 @@
-from dishka import Provider, Scope, provide
+from dishka import AnyOf, Provider, Scope, provide
 
-from ada.adapters.llm.config import ConfiguredModels, LlmsConfig, load_llms_config
 from ada.adapters.llm.runtime import PydanticAiRuntime
+from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.config import Settings
 from ada.core.ports.agents import AgentRuntime, LanguageModels
+from ada.core.ports.secrets import SecretBox
 from ada.core.services.agents.service import AgentTurns
-from ada.core.services.ports.agents import AgentTurnService
+from ada.core.services.agents.settings import AgentConfiguration
+from ada.core.services.ports.agents import AgentSettingsService, AgentTurnService
 
 
 class AgentProvider(Provider):
-    """The in-platform agent: the models file, pydantic-ai to run it, and its turns. Its
-    tools are not bound here: whoever runs a turn passes them (the worker serves the MCP
-    tools in process)."""
+    """The in-platform agent: its configuration in the database (keys encrypted with the
+    master key), pydantic-ai to run it, and its turns. Its tools are not bound here:
+    whoever runs a turn passes them (the worker serves the MCP tools in process)."""
 
     @provide(scope=Scope.APP)
-    def llms_config(self, settings: Settings) -> LlmsConfig:
-        # Read once per process, with the keys of that moment's environment.
-        return load_llms_config(settings.llms_config)
+    def secrets(self, settings: Settings) -> SecretBox:
+        # A master key that is set but malformed stops the start (InvalidMasterKey).
+        return FernetSecretBox(settings.master_key())
 
     @provide(scope=Scope.APP)
-    def language_models(self, config: LlmsConfig) -> LanguageModels:
-        return ConfiguredModels(config)
+    def runtime(self) -> AgentRuntime:
+        return PydanticAiRuntime()
 
-    @provide(scope=Scope.APP)
-    def runtime(self, config: LlmsConfig) -> AgentRuntime:
-        return PydanticAiRuntime(config)
+    # One service: the settings page's use cases, and the catalog the turns read.
+    configuration = provide(
+        AgentConfiguration,
+        provides=AnyOf[AgentSettingsService, LanguageModels],
+        scope=Scope.REQUEST,
+    )
 
     turns = provide(AgentTurns, provides=AgentTurnService, scope=Scope.REQUEST)
 

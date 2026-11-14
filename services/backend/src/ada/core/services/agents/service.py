@@ -95,8 +95,8 @@ class AgentTurns(AgentTurnService):
         self.clock = clock
         self.briefing = Briefing(operators, dashboards, widgets, data_sources)
 
-    def models(self) -> ModelList:
-        return self.language_models.catalog()
+    async def models(self) -> ModelList:
+        return await self.language_models.catalog()
 
     async def post_message(
         self,
@@ -106,7 +106,7 @@ class AgentTurns(AgentTurnService):
         context: Sequence[Context] = (),
         model: str | None = None,
     ) -> PostedMessage:
-        catalog = self.language_models.catalog()
+        catalog = await self.language_models.catalog()
         if model is not None and all(known.id != model for known in catalog.models):
             known = ", ".join(info.id for info in catalog.models) or "none"
             raise Invalid(f"No model {model!r} is configured (configured: {known})")
@@ -187,8 +187,11 @@ class AgentTurns(AgentTurnService):
         recorder = _Recorder(self, session.project_id, turn)
         status, error = TurnStatus.FAILED, None
         try:
+            # The key is read now, so a key entered after the message was posted is used.
+            target = await self.language_models.target(turn.model)
             request = await self.briefing.request(
                 turn,
+                target,
                 await self.projects.get(session.project_id),
                 session,
                 await self.sessions.entries(session.id),
@@ -197,7 +200,8 @@ class AgentTurns(AgentTurnService):
             )
             async with toolbox.connect(_agent(turn.model), session.id) as tools:
                 status = await self.runtime.run(request, tools, recorder)
-        except AgentFailed as failure:
+        except (AgentFailed, Invalid) as failure:
+            # Invalid: the model was removed, or became unusable, since the message.
             error = str(failure)
         except Exception as failure:
             # Whatever went wrong, the turn must end: a turn left running would show a

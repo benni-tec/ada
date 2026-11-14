@@ -8,7 +8,7 @@ from ada.adapters.db.migrate import _config, migrate
 def test_migrations_build_every_table_from_an_empty_database(database_url: str) -> None:
     applied = migrate(database_url)
 
-    assert applied == ["0001", "0002", "0003", "0004"]
+    assert applied == ["0001", "0002", "0003", "0004", "0005"]
     engine = create_engine(database_url)
     try:
         tables = set(inspect(engine).get_table_names())
@@ -36,7 +36,7 @@ def test_every_migration_can_be_undone(database_url: str) -> None:
     finally:
         engine.dispose()
     assert "condition_sql" not in columns
-    assert migrate(database_url) == ["0002", "0003", "0004"]
+    assert migrate(database_url) == ["0002", "0003", "0004", "0005"]
 
 
 def test_0003_adds_turns_context_and_copies_and_takes_them_back(database_url: str) -> None:
@@ -59,4 +59,23 @@ def test_0003_adds_turns_context_and_copies_and_takes_them_back(database_url: st
         assert "copied_from" not in {c["name"] for c in inspector.get_columns("widgets")}
     finally:
         engine.dispose()
-    assert migrate(database_url) == ["0003", "0004"]
+    assert migrate(database_url) == ["0003", "0004", "0005"]
+
+
+def test_0005_adds_the_agent_configuration_with_its_one_settings_row(database_url: str) -> None:
+    migrate(database_url)
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            settings = connection.exec_driver_sql(
+                "SELECT id, session_agent_model_id, revision FROM agent_settings"
+            ).all()
+        assert [tuple(row) for row in settings] == [(1, None, 1)]
+
+        command.downgrade(_config(database_url), "0004")
+
+        tables = set(inspect(engine).get_table_names())
+        assert not tables & {"llm_providers", "llm_models", "agent_settings"}
+    finally:
+        engine.dispose()
+    assert migrate(database_url) == ["0005"]
