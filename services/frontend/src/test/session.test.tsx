@@ -498,6 +498,57 @@ test('a research session is listed under its parent in the sidebar, labelled res
   expect(child).toHaveTextContent('research')
 })
 
+test('in a research session the research model answers unless another is picked', async () => {
+  const sent: Record<string, unknown>[] = []
+  serveSession({
+    'GET /api/sessions/s1': session({ agent: 'research' }),
+    'GET /api/llm/models': models({ research_agent: 'gemini/pro' }),
+    'POST /api/sessions/s1/messages': (body: Record<string, unknown>) => {
+      sent.push(body)
+      return json({ entry: question, turn: turn({ id: 't2', status: 'queued' }) }, 201)
+    },
+    'GET /api/turns/t2': turn({ id: 't2', status: 'queued' }),
+  })
+  renderAt('/projects/p1/sessions/s1')
+  await items()
+
+  const send = async (text: string) => {
+    fireEvent.change(within(composer()).getByLabelText('Message'), { target: { value: text } })
+    fireEvent.click(within(composer()).getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(within(composer()).getByLabelText('Message')).toHaveValue(''))
+  }
+  expect(await within(composer()).findByRole('button', { name: 'Model: gemini/pro' })).toBeInTheDocument()
+  await send('Look for registries')
+  expect(sent[0]).not.toHaveProperty('model')
+
+  fireEvent.pointerDown(within(composer()).getByRole('button', { name: 'Model: gemini/pro' }), { button: 0, ctrlKey: false })
+  fireEvent.click(await screen.findByRole('menuitemradio', { name: /gemini\/flash/ }))
+  await send('Now the cancer ones')
+  expect(sent[1]).toMatchObject({ model: 'gemini/flash' })
+})
+
+test('a research model that cannot run gives way to the session agent’s, which the message names', async () => {
+  const sent: Record<string, unknown>[] = []
+  serveSession({
+    'GET /api/sessions/s1': session({ agent: 'research' }),
+    'GET /api/llm/models': models({ research_agent: 'mistral/large' }),
+    'POST /api/sessions/s1/messages': (body: Record<string, unknown>) => {
+      sent.push(body)
+      return json({ entry: question, turn: turn({ id: 't2', status: 'queued' }) }, 201)
+    },
+    'GET /api/turns/t2': turn({ id: 't2', status: 'queued' }),
+  })
+  renderAt('/projects/p1/sessions/s1')
+  await items()
+
+  expect(await within(composer()).findByRole('button', { name: 'Model: gemini/flash' })).toBeInTheDocument()
+  expect(within(composer()).queryByRole('note')).not.toBeInTheDocument()
+  fireEvent.change(within(composer()).getByLabelText('Message'), { target: { value: 'Look for registries' } })
+  fireEvent.click(within(composer()).getByRole('button', { name: 'Send' }))
+  await waitFor(() => expect(sent).toHaveLength(1))
+  expect(sent[0]).toMatchObject({ model: 'gemini/flash' })
+})
+
 test('attachments are tabs beside the conversation: attached from the chooser or by an agent, remembered, detached', async () => {
   const other = session({ id: 's2', title: 'Mortality', created_at: '2026-11-02T09:00:00Z' })
   const page = attachment({ id: 'att2', kind: 'web_page', ref: 'https://thl.fi/screening', title: 'thl.fi' })

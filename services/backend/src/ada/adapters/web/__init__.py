@@ -31,7 +31,7 @@ async def send_json(
         raise Unavailable(f"{method} {url} failed: {str(error) or type(error).__name__}") from error
     if response.is_error:
         raise ProviderAnswered(
-            f"{method} {url} answered {response.status_code}{_error_code(response, token)}",
+            f"{method} {url} answered {response.status_code}{_body_code(response, token)}",
             response.status_code,
         )
     try:
@@ -43,14 +43,21 @@ async def send_json(
     return answer
 
 
-def _error_code(response: httpx.Response, token: str) -> str:
-    """ ": <code>" from the short error code field of an error answer, else nothing. The raw
-    body is never quoted: an authentication error may echo the key."""
+def _body_code(response: httpx.Response, token: str) -> str:
+    """ ": <code>" from the error code of an error answer, else nothing."""
     try:
         body = response.json()
     except ValueError:
         return ""
-    code = body.get("error_code") if isinstance(body, dict) else None
+    code = error_code(body, token) if isinstance(body, dict) else None
+    return f": {code}" if code else ""
+
+
+def error_code(answer: dict[str, Any], token: str) -> str | None:
+    """The short `error_code` field of a provider's answer, when it is one. Nothing else of
+    an answer is ever quoted in an error: an authentication error may echo the key, and a
+    page's own text is no message of ours."""
+    code = answer.get("error_code")
     if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", code) and token not in code:
-        return f": {code}"
-    return ""
+        return code
+    return None

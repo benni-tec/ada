@@ -207,6 +207,18 @@ body,
   color: var(--stale-fg);
 }
 
+.ada-sources {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ada-sources a {
+  color: inherit;
+}
+
 /* The same markers on a single value, in the line of the text. */
 .ada-flag-inline {
   display: inline-block;

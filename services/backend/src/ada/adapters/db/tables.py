@@ -79,6 +79,8 @@ class DataSourceRow(Base):
     monitor_id: Mapped[str | None] = mapped_column(Text)
     # Sealed by the SecretBox; never on the model.
     monitor_secret_encrypted: Mapped[str | None] = mapped_column(Text)
+    # What unwatching restores; set while a monitor is.
+    freshness_before_watch: Mapped[Json | None] = mapped_column(JSONB)
     revision: Mapped[int] = mapped_column(Integer)
 
     __mapper_args__ = {"version_id_col": revision}
@@ -198,10 +200,14 @@ class SessionAttachmentRow(Base):
 
 class AgentTurnRow(Base):
     """The in-platform agent's turns. Written by the worker as the turn runs, outside any
-    revision; `cancel_requested` is the one column someone else writes."""
+    revision; `cancel_requested` is the one column someone else writes. `settled` says
+    that the turn's end was announced (its finished event, a research turn's report)."""
 
     __tablename__ = "agent_turns"
-    __table_args__ = (Index("ix_agent_turns_session_created", "session_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_agent_turns_session_created", "session_id", "created_at"),
+        Index("ix_agent_turns_unsettled", "status", postgresql_where=text("NOT settled")),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     session_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("sessions.id", ondelete="CASCADE"))
@@ -213,7 +219,9 @@ class AgentTurnRow(Base):
     parts: Mapped[list[Json]] = mapped_column(JSONB)
     error: Mapped[str | None] = mapped_column(Text)
     cancel_requested: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    settled: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(_timestamp)
+    started_at: Mapped[datetime | None] = mapped_column(_timestamp)
     finished_at: Mapped[datetime | None] = mapped_column(_timestamp)
 
 

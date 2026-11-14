@@ -4486,6 +4486,14 @@
           "run_id": {
             "$ref": "#/components/schemas/Id"
           },
+          "sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReportSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
           "truncated": {
             "default": false,
             "title": "Truncated",

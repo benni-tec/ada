@@ -20,7 +20,8 @@
     document.
 `"extract"`
     The rows a model reads off the page at the address, following `instruction`, in the
-    declared columns (null where the page states no value). Model-extracted. `options.pdf`
+    declared columns (null where the page states no value). Model-extracted. A page too
+    long to extract whole is refused rather than stored with rows missing. `options.pdf`
     as for scrape.
 
 Each fetch spends the project's daily web credits first (WebBudget): its price, or for a
@@ -149,6 +150,12 @@ class WebPageReader(SourceReader):
                 if extraction.credits != WEB_EXTRACT_CREDITS:
                     await self.budget.adjust(
                         source.project_id, self._day(), extraction.credits - WEB_EXTRACT_CREDITS
+                    )
+                if extraction.truncated:
+                    # A source has no way to say its rows stop part way down the page.
+                    raise Invalid(
+                        f"{source.address} is too long for Context.dev to read whole, so the"
+                        " extracted rows would be incomplete; extract from a shorter page"
                     )
                 content = await asyncio.to_thread(_records_parquet, source, extraction.rows, None)
                 origin = source.address

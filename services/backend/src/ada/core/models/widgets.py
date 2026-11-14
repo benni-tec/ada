@@ -4,6 +4,7 @@ from ada.core.models.actors import Actor
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.judges import Verdict
 from ada.core.models.operators import OperatorId
+from ada.core.models.reports import ReportSource
 from ada.core.models.schema import Column, Schema
 
 # The name of a widget's own operator among its inputs.
@@ -65,3 +66,5 @@ class WidgetData(DomainModel):
     is_scenario: bool = False
     # A source behind this could not be refreshed; the data is the last good snapshot.
     is_stale: bool = False
+    # The sources behind the numbers as this run read them: address and fetch time.
+    sources: tuple[ReportSource, ...] = ()
