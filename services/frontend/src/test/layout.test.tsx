@@ -39,13 +39,19 @@ const nav = () => screen.getByRole('navigation', { name: 'Project' })
 const sidebar = () => screen.findByRole('navigation', { name: 'Project' })
 const group = (name: string) => within(nav()).getByRole('group', { name })
 
-test('the sidebar groups the project’s items, newest sessions first, with the project in its header', async () => {
-  serveProject()
+test('the sidebar groups the project’s items, newest sessions first, with the project switcher in its header', async () => {
+  serveProject({ 'GET /api/projects': [project(), project({ id: 'p2', name: 'Mortality study' })] })
   renderAt('/projects/p1')
 
-  expect(await screen.findByRole('link', { name: /Project\s*Screening/ })).toHaveAttribute('href', '/projects/p1')
-  expect(screen.getByRole('link', { name: 'All projects' })).toHaveAttribute('href', '/')
+  // The header names the project and switches to another, or back to all of them.
+  const switcher = await screen.findByRole('button', { name: /Project\s*Screening.*switch project/ })
+  fireEvent.keyDown(switcher, { key: 'Enter' })
+  const menu = await screen.findByRole('menu')
+  expect(await within(menu).findByRole('menuitem', { name: 'Mortality study' })).toHaveAttribute('href', '/projects/p2')
+  expect(within(menu).getByRole('menuitem', { name: 'All projects' })).toHaveAttribute('href', '/')
+  fireEvent.keyDown(menu, { key: 'Escape' })
 
+  expect(within(nav()).getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '/projects/p1')
   const sessions = group('Sessions')
   await waitFor(() => expect(within(sessions).getAllByRole('link')).toHaveLength(2))
   expect(within(sessions).getAllByRole('link').map((link) => link.textContent)).toEqual(['Mortality', 'Why did coverage drop?'])
@@ -58,14 +64,32 @@ test('the sidebar groups the project’s items, newest sessions first, with the 
   expect(within(group('Dashboards')).getByRole('button', { name: 'New dashboard' })).toBeInTheDocument()
   expect(await within(group('Reports')).findByRole('link', { name: 'Findings' })).toHaveAttribute('href', '/projects/p1/reports/rep1')
   expect(within(group('Reports')).getByRole('link', { name: 'Generate a report' })).toHaveAttribute('href', '/projects/p1/reports/new')
-  const alerts = within(group('Alerts')).getByRole('link', { name: 'Feed and rules' })
+  const alerts = within(nav()).getByRole('link', { name: 'Alerts' })
   expect(alerts).toHaveAttribute('href', '/projects/p1/alerts')
-  expect(await within(group('Alerts')).findByText('1')).toBeInTheDocument()
-  // Data sources have no page: each leads to its card on the overview.
+  expect(await within(alerts.closest('li')!).findByText('1')).toBeInTheDocument()
+  // Data sources are folded at first, and have no page: each leads to its card on the overview.
+  const sources = within(group('Data sources')).getByRole('button', { name: 'Data sources' })
+  expect(sources).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(sources)
   expect(await within(group('Data sources')).findByRole('link', { name: 'Sotkanet screening' })).toHaveAttribute(
     'href',
     '/projects/p1#source-ds1',
   )
+})
+
+test('the sidebar collapses to icons, and a type’s icon opens it again', async () => {
+  serveProject()
+  renderAt('/projects/p1')
+  await sidebar()
+
+  const sidebarElement = document.querySelector('[data-slot="sidebar"][data-state]')!
+  expect(sidebarElement).toHaveAttribute('data-state', 'expanded')
+  fireEvent.click(screen.getAllByRole('button', { name: 'Toggle Sidebar' })[0])
+  await waitFor(() => expect(sidebarElement).toHaveAttribute('data-collapsible', 'icon'))
+
+  fireEvent.click(within(group('Dashboards')).getByRole('button', { name: 'Dashboards' }))
+  await waitFor(() => expect(sidebarElement).toHaveAttribute('data-state', 'expanded'))
+  expect(within(group('Dashboards')).getByRole('button', { name: 'Dashboards' })).toHaveAttribute('aria-expanded', 'true')
 })
 
 test('the current item is marked, and every page names its type above its title', async () => {

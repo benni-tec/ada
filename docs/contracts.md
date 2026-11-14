@@ -473,8 +473,8 @@ so whatever it makes is recorded like any client's work.
 
 - **Keys** are never in the file and never returned by the API. A provider names the
   variable that holds its key (`api_key_env`; left out for an endpoint without a key).
-  The full stack passes `.env.local` to the backend and the worker. Keys are read once per
-  process.
+  The full stack and `moon run :dev` pass `.env.local` to the backend and the worker. Keys
+  are read once per process.
 - **Checks.** The file is validated with pydantic: unknown keys are errors, an
   `openai-compatible` provider needs `base_url`, every model names a configured provider,
   purposes are known. Every problem is named with its path. The API's lifespan and the
@@ -824,13 +824,16 @@ receives data from an agent; it asks the server for the output of its operator.
   person's choice (light, dark, or as the system, remembered in `localStorage`
   `ada-theme`), with a script in `index.html` so a dark page does not flash light. The
   theme menu is the sun or moon at the top right. Widget frames follow it (see Widgets).
-- **Sidebar** (`components/project-sidebar.tsx`): "All projects", the project (a link to
-  its overview), then the groups Sessions (and a new session dialog), Dashboards (and a
-  new dashboard dialog), Reports (and a link to `/reports/new`), Alerts ("Feed and rules",
-  with the firing count) and Data sources (each links to its card on the overview,
+- **Sidebar** (`components/project-sidebar.tsx`), after shadcn's sidebar that collapses
+  to icons (`collapsible="icon"`). Its header is the project switcher: the project's name
+  opens a menu of the projects and "All projects". Then Overview; Sessions (with a new
+  session dialog), Dashboards (a new dashboard dialog) and Reports (a link to
+  `/reports/new`), each a collapsible item listing its items; Alerts, one link with the
+  firing count; and Data sources, folded at first (each links to its card on the overview,
   `#source-<id>`, marked when its last refresh failed). Sessions and reports newest first.
   The current item is marked (`data-active`, and the router's `aria-current="page"`).
-  Collapsible (the top bar's toggle, Ctrl/Cmd+B); a sheet on phones.
+  Collapsed, the icons have tooltips and a type's icon opens the sidebar again. Toggled by
+  the top bar's button, the rail or Ctrl/Cmd+B; a sheet on phones.
 - **Pages** fill the width under a top bar with the sidebar toggle, the live indicator and
   the theme menu; each page scrolls inside.
 - **Type labels, no breadcrumbs.** Every page shows its type with the sidebar's icon above

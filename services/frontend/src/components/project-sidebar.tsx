@@ -1,21 +1,32 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { ArrowLeft, CircleAlert, Plus } from 'lucide-react'
-import { useId, type ReactNode } from 'react'
+import { Check, ChevronRight, ChevronsUpDown, CircleAlert, LayoutGrid, Plus } from 'lucide-react'
+import { useId, useState, type ReactNode } from 'react'
 
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupAction,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import {
   alertFeedQuery,
@@ -25,6 +36,7 @@ import {
   dashboardsQuery,
   keys,
   projectQuery,
+  projectsQuery,
   reportsQuery,
   sessionsQuery,
   sourcesQuery,
@@ -36,45 +48,36 @@ import { CreateDialog } from './create-dialog'
 import { Hint } from './icon-action'
 
 /**
- * The project's navigation: its name, the way back to all projects, and its groups, each
- * listing its items with a "new" action where there is one. The current page is marked
+ * The project's navigation, after shadcn's sidebar that collapses to icons: the project
+ * switcher in its header, then the overview and one collapsible item per type, listing
+ * its items with a "new" action where there is one. The current page is marked
  * (`aria-current`), so the sidebar also says where one is, in place of breadcrumbs.
  */
 export function ProjectSidebar({ projectId }: { projectId: Id }) {
-  const { data: project } = useQuery(projectQuery(projectId))
   return (
-    <Sidebar>
-      <SidebarHeader className="gap-1">
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-hidden"
-        >
-          <ArrowLeft aria-hidden="true" className="size-3.5" />
-          All projects
-        </Link>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg">
-              <Link to="/projects/$projectId" params={{ projectId }} activeOptions={{ exact: true, includeSearch: false }}>
-                <span className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                  <pageTypes.project.icon aria-hidden="true" className="size-4" />
-                </span>
-                <span className="flex min-w-0 flex-col">
-                  <span className="text-xs text-sidebar-foreground/70">Project</span>
-                  <span className="truncate font-semibold">{project?.name ?? '…'}</span>
-                </span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <ProjectSwitcher projectId={projectId} />
       </SidebarHeader>
       <SidebarContent>
         <nav aria-label="Project" className="contents">
-          <Sessions projectId={projectId} />
-          <Dashboards projectId={projectId} />
-          <Reports projectId={projectId} />
-          <Alerts projectId={projectId} />
-          <Sources projectId={projectId} />
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Overview">
+                  <Link to="/projects/$projectId" params={{ projectId }} activeOptions={{ exact: true, includeHash: false }} activeProps={{ 'data-active': true }}>
+                    <LayoutGrid aria-hidden="true" />
+                    <span>Overview</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <Sessions projectId={projectId} />
+              <Dashboards projectId={projectId} />
+              <Reports projectId={projectId} />
+              <Alerts projectId={projectId} />
+              <Sources projectId={projectId} />
+            </SidebarMenu>
+          </SidebarGroup>
         </nav>
       </SidebarContent>
       <SidebarRail />
@@ -82,36 +85,126 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
   )
 }
 
-/** One group: its label with the type's icon, a "new" action, and its items. */
+/** The project's name, opening a menu of the other projects and the way to all of them. */
+function ProjectSwitcher({ projectId }: { projectId: Id }) {
+  const { isMobile } = useSidebar()
+  const { data: project } = useQuery(projectQuery(projectId))
+  const { data: projects } = useQuery(projectsQuery())
+  const Icon = pageTypes.project.icon
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton size="lg" aria-label={`Project ${project?.name ?? ''}: switch project`} className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+              <span className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <Icon aria-hidden="true" className="size-4" />
+              </span>
+              <span className="grid flex-1 text-left leading-tight">
+                <span className="text-xs text-sidebar-foreground/70">Project</span>
+                <span className="truncate font-semibold">{project?.name ?? '…'}</span>
+              </span>
+              <ChevronsUpDown aria-hidden="true" className="ml-auto" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            align="start"
+            side={isMobile ? 'bottom' : 'right'}
+            sideOffset={4}
+          >
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Projects</DropdownMenuLabel>
+            {projects?.map((other) => (
+              <DropdownMenuItem key={other.id} asChild className="gap-2 p-2">
+                <Link to="/projects/$projectId" params={{ projectId: other.id }}>
+                  <span className="flex size-6 items-center justify-center rounded-md border">
+                    <Icon aria-hidden="true" className="size-3.5 shrink-0" />
+                  </span>
+                  <span className="truncate">{other.name}</span>
+                  {other.id === projectId && <Check aria-label="Current" className="ml-auto" />}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="gap-2 p-2">
+              <Link to="/">
+                <span className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+                  <LayoutGrid aria-hidden="true" className="size-3.5" />
+                </span>
+                All projects
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  )
+}
+
+/**
+ * One type: its icon and label, which fold its items away, a "new" action, and its items.
+ * Collapsed to icons, the icon opens the sidebar instead, since the items cannot show.
+ */
 function Group({
   type,
   label,
   action,
+  defaultOpen = true,
   children,
 }: {
   type: PageTypeName
   label: string
   action?: ReactNode
+  defaultOpen?: boolean
   children: ReactNode
 }) {
   const labelId = useId()
+  const { state, setOpen: setSidebarOpen } = useSidebar()
+  const [open, setOpen] = useState(defaultOpen)
   const Icon = pageTypes[type].icon
   return (
-    <SidebarGroup role="group" aria-labelledby={labelId}>
-      <SidebarGroupLabel id={labelId} className="gap-2">
-        <Icon aria-hidden="true" />
-        {label}
-      </SidebarGroupLabel>
-      {action}
-      <SidebarGroupContent>
-        <SidebarMenu>{children}</SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
+    <Collapsible asChild open={open} onOpenChange={setOpen} className="group/collapsible">
+      <SidebarMenuItem role="group" aria-labelledby={labelId}>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            tooltip={label}
+            onClick={(event) => {
+              if (state !== 'collapsed') return
+              event.preventDefault()
+              setSidebarOpen(true)
+              setOpen(true)
+            }}
+          >
+            <Icon aria-hidden="true" />
+            <span id={labelId}>{label}</span>
+            <ChevronRight
+              aria-hidden="true"
+              className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+            />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        {action}
+        <CollapsibleContent>
+          <SidebarMenuSub>{children}</SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
   )
 }
 
 function Empty({ children }: { children: ReactNode }) {
   return <li className="px-2 py-1 text-xs text-sidebar-foreground/60">{children}</li>
+}
+
+/** One item of a type, as a link. */
+function Item({ active, children }: { active?: boolean; children: ReactNode }) {
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild isActive={active}>
+        {children}
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
+  )
 }
 
 function Sessions({ projectId }: { projectId: Id }) {
@@ -128,9 +221,9 @@ function Sessions({ projectId }: { projectId: Id }) {
         <CreateDialog
           hint="New session"
           trigger={
-            <SidebarGroupAction aria-label="New session">
+            <SidebarMenuAction aria-label="New session">
               <Plus />
-            </SidebarGroupAction>
+            </SidebarMenuAction>
           }
           title="New session"
           description="A session holds one line of questions: the conversation and what was made in it."
@@ -147,13 +240,11 @@ function Sessions({ projectId }: { projectId: Id }) {
     >
       {data && sessions.length === 0 && <Empty>No sessions yet.</Empty>}
       {sessions.map((session) => (
-        <SidebarMenuItem key={session.id}>
-          <SidebarMenuButton asChild isActive={session.id === sessionId}>
+        <Item key={session.id} active={session.id === sessionId}>
             <Link to="/projects/$projectId/sessions/$sessionId" params={{ projectId, sessionId: session.id }}>
               <span>{session.title}</span>
             </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+        </Item>
       ))}
     </Group>
   )
@@ -172,9 +263,9 @@ function Dashboards({ projectId }: { projectId: Id }) {
         <CreateDialog
           hint="New dashboard"
           trigger={
-            <SidebarGroupAction aria-label="New dashboard">
+            <SidebarMenuAction aria-label="New dashboard">
               <Plus />
-            </SidebarGroupAction>
+            </SidebarMenuAction>
           }
           title="New dashboard"
           description="A dashboard keeps widgets on a grid, all at one run of their data."
@@ -194,13 +285,11 @@ function Dashboards({ projectId }: { projectId: Id }) {
     >
       {dashboards?.length === 0 && <Empty>No dashboards yet.</Empty>}
       {dashboards?.map((dashboard) => (
-        <SidebarMenuItem key={dashboard.id}>
-          <SidebarMenuButton asChild isActive={dashboard.id === dashboardId}>
+        <Item key={dashboard.id} active={dashboard.id === dashboardId}>
             <Link to="/projects/$projectId/dashboards/$dashboardId" params={{ projectId, dashboardId: dashboard.id }}>
               <span>{dashboard.name}</span>
             </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+        </Item>
       ))}
     </Group>
   )
@@ -216,69 +305,65 @@ function Reports({ projectId }: { projectId: Id }) {
       label="Reports"
       action={
         <Hint label="Generate a report">
-          <SidebarGroupAction asChild>
+          <SidebarMenuAction asChild>
             <Link to="/projects/$projectId/reports/new" params={{ projectId }} aria-label="Generate a report">
               <Plus />
             </Link>
-          </SidebarGroupAction>
+          </SidebarMenuAction>
         </Hint>
       }
     >
       {data && reports.length === 0 && <Empty>No reports yet.</Empty>}
       {reports.map((report) => (
-        <SidebarMenuItem key={report.id}>
-          <SidebarMenuButton asChild isActive={report.id === reportId}>
+        <Item key={report.id} active={report.id === reportId}>
             <Link to="/projects/$projectId/reports/$reportId" params={{ projectId, reportId: report.id }}>
               <span>{report.name}</span>
             </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+        </Item>
       ))}
     </Group>
   )
 }
 
+/** One page, not a list: the feed and the rules, with the firing alerts counted. */
 function Alerts({ projectId }: { projectId: Id }) {
   const { data: firing } = useQuery(alertFeedQuery(projectId, 'firing'))
   const count = firing?.length ?? 0
+  const Icon = pageTypes.alerts.icon
   return (
-    <Group type="alerts" label="Alerts">
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild>
-          <Link to="/projects/$projectId/alerts" params={{ projectId }} activeProps={{ 'data-active': true }}>
-            <span>Feed and rules</span>
-          </Link>
-        </SidebarMenuButton>
-        {count > 0 && (
-          <SidebarMenuBadge className="bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200">
-            {count}
-            <span className="sr-only"> firing</span>
-          </SidebarMenuBadge>
-        )}
-      </SidebarMenuItem>
-    </Group>
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild tooltip={count > 0 ? `Alerts: ${count} firing` : 'Alerts'}>
+        <Link to="/projects/$projectId/alerts" params={{ projectId }} activeProps={{ 'data-active': true }}>
+          <Icon aria-hidden="true" />
+          <span>Alerts</span>
+        </Link>
+      </SidebarMenuButton>
+      {count > 0 && (
+        <SidebarMenuBadge className="bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200">
+          {count}
+          <span className="sr-only"> firing</span>
+        </SidebarMenuBadge>
+      )}
+    </SidebarMenuItem>
   )
 }
 
-/** The sources have no page of their own: each leads to its card on the overview. */
+/** The sources have no page of their own: each leads to its card on the overview. Folded
+ * at first: there are many, and they are looked up less than the rest. */
 function Sources({ projectId }: { projectId: Id }) {
   const { data: sources } = useQuery(sourcesQuery(projectId))
   return (
-    <Group type="source" label="Data sources">
+    <Group type="source" label="Data sources" defaultOpen={false}>
       {sources?.length === 0 && <Empty>None yet. Agents register them over MCP.</Empty>}
       {sources?.map((source) => (
-        <SidebarMenuItem key={source.id}>
-          <SidebarMenuButton asChild>
-            <Link to="/projects/$projectId" params={{ projectId }} hash={`source-${source.id}`} activeOptions={{ exact: true, includeHash: true }}>
-              <span>{source.name}</span>
-            </Link>
-          </SidebarMenuButton>
-          {source.last_error && (
-            <SidebarMenuBadge>
-              <CircleAlert aria-label="Last refresh failed" className="size-3.5 text-amber-600 dark:text-amber-400" />
-            </SidebarMenuBadge>
-          )}
-        </SidebarMenuItem>
+        <Item key={source.id}>
+          <Link to="/projects/$projectId" params={{ projectId }} hash={`source-${source.id}`} activeOptions={{ exact: true, includeHash: true }}>
+            {source.last_error && (
+              <CircleAlert aria-label="Last refresh failed" className="text-amber-600! dark:text-amber-400!" />
+            )}
+            <span>{source.name}</span>
+          </Link>
+        </Item>
       ))}
     </Group>
   )
