@@ -35,13 +35,17 @@ writes the requested periods into `params` or `body` before it calls the reader
 """
 
 import asyncio
+import contextlib
+import functools
 import hashlib
 import ipaddress
 import json
 import socket
+from collections.abc import Iterable
 from datetime import date
 from typing import Any, Literal
 
+import httpcore
 import httpx
 from pydantic import Field, ValidationError
 
@@ -90,9 +94,14 @@ class SourceUnavailable(Unavailable):
     source records as its last error, so it says which request failed and how."""
 
 
-def create_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
-    """The client every HTTP reader shares, for its connection pool. Tests pass a
+def create_client(
+    transport: httpx.AsyncBaseTransport | None = None, allow_private: bool = False
+) -> httpx.AsyncClient:
+    """The client every HTTP reader shares, for its connection pool. It connects to
+    public addresses only (_PublicNetwork) unless private ones are allowed. Tests pass a
     transport that replays recorded answers."""
+    if transport is None and not allow_private:
+        transport = _public_transport()
     return httpx.AsyncClient(
         headers={"User-Agent": USER_AGENT},
         timeout=TIMEOUT,
@@ -316,18 +325,74 @@ def _url(source: DataSource, options: HttpOptions) -> httpx.URL:
 
 
 async def _check_public(url: httpx.URL) -> None:
-    """Raises Invalid unless every address the host resolves to is public: not loopback,
-    private, link-local (cloud metadata services), multicast or unspecified."""
+    """Refuses a host that is not public before anything is sent to it. The address
+    connected to is checked again by _PublicNetwork."""
     port = url.port or (443 if url.scheme == "https" else 80)
     try:
-        found = await asyncio.get_running_loop().getaddrinfo(
-            url.host, port, type=socket.SOCK_STREAM
-        )
+        await _public_addresses(url.host, port)
     except OSError as error:
         raise SourceUnavailable(f"{url.host} could not be resolved: {error}") from None
+
+
+async def _public_addresses(host: str, port: int) -> list[str]:
+    """The addresses the host resolves to. Raises Invalid unless every one is public: not
+    loopback, private, link-local (cloud metadata services), multicast or unspecified."""
+    found = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    addresses = []
     for *_, address in found:
         ip = ipaddress.ip_address(address[0])
         if ip.is_multicast or not ip.is_global:
             raise Invalid(
-                f"{url.host} is not a public address ({ip}); sources read public addresses only"
+                f"{host} is not a public address ({ip}); sources read public addresses only"
             )
+        addresses.append(str(ip))
+    return list(dict.fromkeys(addresses))
+
+
+class _PublicNetwork(httpcore.AsyncNetworkBackend):
+    """Connects only to public addresses: it resolves the host itself and connects to the
+    addresses it checked, so a name that is public when checked and private a moment
+    later (DNS rebinding) cannot reach the platform's network. TLS still verifies the
+    host's name, which httpcore passes to start_tls, and the Host header is unchanged."""
+
+    def __init__(self) -> None:
+        self.network = httpcore.AnyIOBackend()
+
+    async def connect_tcp(  # noqa: ASYNC109 (httpcore's signature)
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Iterable[Any] | None = None,
+    ) -> httpcore.AsyncNetworkStream:
+        try:
+            async with asyncio.timeout(timeout):
+                addresses = await _public_addresses(host, port)
+        except TimeoutError:
+            raise httpcore.ConnectTimeout(f"{host} was not resolved in time") from None
+        except OSError as error:
+            raise httpcore.ConnectError(f"{host} could not be resolved: {error}") from None
+        connect = functools.partial(
+            self.network.connect_tcp,
+            port=port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+        # Each in turn, as a client given the name would try them.
+        for address in addresses[:-1]:
+            with contextlib.suppress(httpcore.ConnectError, httpcore.ConnectTimeout):
+                return await connect(address)
+        return await connect(addresses[-1])
+
+    async def sleep(self, seconds: float) -> None:
+        await self.network.sleep(seconds)
+
+
+def _public_transport() -> httpx.AsyncHTTPTransport:
+    transport = httpx.AsyncHTTPTransport()
+    # httpx 0.28 takes no network backend, but the httpcore pool it builds does; set
+    # there, the pool keeps httpx's TLS settings and limits.
+    transport._pool._network_backend = _PublicNetwork()
+    return transport

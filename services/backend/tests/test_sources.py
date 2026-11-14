@@ -5,6 +5,7 @@ import asyncio
 import csv
 import io
 import json
+import socket
 import time
 from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
@@ -708,6 +709,41 @@ async def test_only_public_addresses_are_read_redirects_included() -> None:
         "93.184.216.34",
         "127.0.0.1",
     ]
+
+
+async def test_the_address_connected_to_is_the_one_checked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def answer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.readuntil(b"\r\n\r\n")
+        writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\na\n1\n")
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_server(answer, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    resolve = socket.getaddrinfo
+    answers = iter(["93.184.216.34"])
+
+    def rebinding(host: str | bytes, *args: Any, **kwargs: Any) -> Any:
+        # Public when the reader checks the name, this machine when it is connected to.
+        if host not in ("rebind.test", b"rebind.test"):
+            return resolve(host, *args, **kwargs)
+        ip = next(answers, "127.0.0.1")
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", rebinding)
+    rebound = source(address=f"http://rebind.test:{port}/data.csv")
+    async with server:
+        async with create_client() as client:
+            public = HttpSourceReaders(client, FixedClock()).for_kind(AccessKind.URL)
+            with pytest.raises(Invalid, match=r"rebind.test is not a public address \(127"):
+                await public.fetch(rebound, TimeRange())
+        async with create_client(allow_private=True) as client:
+            private = HttpSourceReaders(client, FixedClock(), allow_private=True)
+            fetched = await private.for_kind(AccessKind.URL).fetch(rebound, TimeRange())
+
+    assert fetched.content == b"a\n1\n"
 
 
 async def test_an_answer_over_the_size_limit_is_refused() -> None:

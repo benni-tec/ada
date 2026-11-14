@@ -46,7 +46,7 @@ class SourceProvider(Provider):
         # One HTTP client for the process, so its connections are pooled; it is closed with
         # the container. Kept out of the container itself, so nothing else picks it up.
         key = settings.context_dev_api_key
-        async with create_client() as client:
+        async with create_client(allow_private=settings.allow_private_sources) as client:
             # A research turn's paid reads count against its web calls.
             http = HttpSourceReaders(
                 client,
