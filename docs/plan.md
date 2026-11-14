@@ -207,6 +207,11 @@ implementations; one set of service fakes in `tests/fakes.py`; a shorter long-ch
 markers for the PostgreSQL and Valkey tests; parallel runs with `pytest-xdist`. No change
 in behaviour.
 
+Backend done: 808 tests in 51 files (15,039 lines with the helpers) are now 244 in 11
+files by feature (9,309 lines); the suite takes 34 s instead of 217 s, run back to back on
+the same busy machine (load average about 20), with one migrated database per run and one
+app per module instead of `pytest-xdist`.
+
 ## Later, not planned here
 
 Agent operators and the recommendation widget; Input operators with simulation bindings;
