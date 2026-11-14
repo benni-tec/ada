@@ -23,6 +23,19 @@ class WidgetService(Protocol):
         data passes through the caller. With a session id it is also recorded there."""
         ...
 
+    async def update(
+        self,
+        id: Id,
+        title: str | None = None,
+        note: str | None = None,
+        type: str | None = None,
+        spec: JsonObject | None = None,
+    ) -> Widget:
+        """Change a widget in place; what is left out stays. A new spec replaces the old
+        one whole and is checked against the operator like a new widget's. Copies on
+        dashboards are widgets of their own and do not change with it."""
+        ...
+
     async def get(self, id: Id) -> Widget: ...
     async def list(self, project_id: Id) -> Sequence[Widget]: ...
     async def list_by_session(self, session_id: Id) -> Sequence[Widget]: ...

@@ -112,6 +112,37 @@ class Demo:
     chart: Widget
 
 
+# Vega-Lite: survival per sex over the five-year windows, with its confidence interval.
+LUNG_SURVIVAL_CHART: JsonObject = {
+    "encoding": {
+        "x": {
+            "field": "period_start",
+            "type": "temporal",
+            "title": "Five-year window (start)",
+            "axis": {"format": "%Y"},
+        },
+        "color": {"field": "sex", "type": "nominal", "title": None, "legend": {"orient": "top"}},
+    },
+    "layer": [
+        {
+            "mark": {"type": "area", "opacity": 0.2},
+            "encoding": {
+                "y": {
+                    "field": "survival_lower",
+                    "type": "quantitative",
+                    "title": "Five-year survival, %",
+                },
+                "y2": {"field": "survival_upper"},
+            },
+        },
+        {
+            "mark": {"type": "line", "point": True},
+            "encoding": {"y": {"field": "survival", "type": "quantitative"}},
+        },
+    ],
+}
+
+
 async def seed_demo(container: AsyncContainer, refresh: bool = False) -> Id:
     """Create what is missing of the demo project and print what it holds. With `refresh`,
     fetch the demo's data now and queue a refresh of the other sources for the worker."""
@@ -230,16 +261,17 @@ async def _demo(request: AsyncContainer, project_id: Id, sources: dict[str, Data
         )
     # The session's widgets: the dashboard holds copies of them (copied_from).
     project_widgets = await widgets.list(project_id)
-    existing = {
-        (w.operator_id, w.type, w.title): w for w in project_widgets if w.session_id == session.id
-    }
+    existing = {(w.operator_id, w.title): w for w in project_widgets if w.session_id == session.id}
     original = {w.id: w.copied_from or w.id for w in project_widgets}
 
     async def widget(
         operator: Operator, type: str, title: str, spec: JsonObject, note: str
     ) -> Widget:
-        found = existing.get((operator.id, type, title))
+        found = existing.get((operator.id, title))
         if found is not None:
+            # A demo seeded with older widget specs gets the current ones.
+            if (found.type, found.spec, found.note) != (type, spec, note):
+                return await widgets.update(found.id, type=type, spec=spec, note=note)
             return found
         return await widgets.create(
             project_id, operator.id, type, title, SEED, spec=spec, note=note, session_id=session.id
@@ -252,15 +284,20 @@ async def _demo(request: AsyncContainer, project_id: Id, sources: dict[str, Data
         counties,
         "table",
         TABLE_TITLE,
-        {"columns": ["name", "value", "count", "period_start"]},
+        {
+            "columns": ["name", "value", "count"],
+            "labels": {"name": "County", "value": "Participation", "count": "Women screened"},
+            "format": {"value": "percent", "count": "integer"},
+            "decimals": 1,
+        },
         "The same numbers, with the number of women screened",
     )
     chart = await widget(
         survival,
-        "line-chart",
+        "chart",
         CHART_TITLE,
-        {"y": "survival", "series": "sex"},
-        "The spec's Nordic comparison, Finland's side",
+        LUNG_SURVIVAL_CHART,
+        "Finland's side of the Nordic comparison; shaded: 95% confidence interval. NORDCAN",
     )
 
     dashboard = next(

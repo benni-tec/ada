@@ -109,6 +109,26 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         )
         return WidgetView(widget=widget, url=widget_url(widget))
 
+    @mcp.tool(app=AppConfig(resource_uri=ANY_WIDGET))
+    @inject
+    async def update_widget(
+        widget_id: Id,
+        widgets: FromDishka[WidgetService],
+        title: str | None = None,
+        note: str | None = None,
+        type: str | None = None,
+        spec: JsonObject | None = None,
+    ) -> WidgetView:
+        """Change a widget in place: its title, note, type or spec; what you leave out stays.
+        A new `spec` replaces the old one whole (send all of it) and is checked against the
+        operator as in `create_widget`, whose description lists every type's settings. Use
+        it to fix a chart or add labels instead of creating a second widget. The widget's
+        operator cannot change: for other data, create a widget. A copy on a dashboard is a
+        widget of its own (its id is in the dashboard's slots) and does not change with the
+        original. Returns the widget and its `url`."""
+        widget = await widgets.update(widget_id, title=title, note=note, type=type, spec=spec)
+        return WidgetView(widget=widget, url=widget_url(widget))
+
     # For the widget itself, inside an MCP host: the model never needs the numbers.
     @mcp.tool(app=AppConfig(visibility=["app"]))
     @inject

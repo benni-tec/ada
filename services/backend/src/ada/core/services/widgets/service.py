@@ -97,6 +97,46 @@ class Widgets(WidgetService):
             await self.session_records.record_widget(session_id, widget.id, note, actor)
         return widget
 
+    async def update(
+        self,
+        id: Id,
+        title: str | None = None,
+        note: str | None = None,
+        type: str | None = None,
+        spec: JsonObject | None = None,
+    ) -> Widget:
+        widget = await self.widgets.get(id)
+        changes: dict[str, object] = {}
+        if title is not None:
+            if not title.strip():
+                raise Invalid("A widget needs a title")
+            changes["title"] = title.strip()
+        if note is not None:
+            changes["note"] = note
+        if type is not None:
+            if not type.strip():
+                raise Invalid("A widget needs a type")
+            changes["type"] = type.strip()
+        if spec is not None:
+            changes["spec"] = spec
+        updated = widget.model_copy(update=changes)
+        if updated.type != widget.type or updated.spec != widget.spec:
+            operator = await self.operators.get(widget.operator_id)
+            check_widget(updated.type, operator.output, updated.spec)
+        await self.widgets.save(updated)
+        payload = {"widget_id": str(updated.id)}
+        if updated.session_id is not None:
+            payload["session_id"] = str(updated.session_id)
+        await self.events.publish(
+            Event(
+                type=EventType.WIDGET_UPDATED,
+                project_id=updated.project_id,
+                payload=payload,
+                at=self.clock.now(),
+            )
+        )
+        return updated
+
     async def get(self, id: Id) -> Widget:
         return await self.widgets.get(id)
 

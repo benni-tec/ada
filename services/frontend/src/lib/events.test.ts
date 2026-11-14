@@ -70,3 +70,14 @@ test('an agent turn refreshes the record and the turn; a part goes into the cach
   // A part without its index cannot be placed.
   expect(event('agent.turn_part', { session_id: 's1', turn_id: 't1', part }).turnPart).toBeUndefined()
 })
+
+test('a changed widget is read again and its frames reload', () => {
+  const effects = event('widget.updated', { widget_id: 'w1', session_id: 's1' })
+  expect(effects.invalidate).toEqual([
+    ['sessions', 's1', 'widgets'],
+    ['projects', 'p1', 'widgets'],
+    ['widgets', 'w1'],
+  ])
+  expect(effects.reloadWidgets).toBe(true)
+  expect(event('widget.created', { widget_id: 'w1' }).reloadWidgets).toBe(false)
+})

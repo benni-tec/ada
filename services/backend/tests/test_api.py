@@ -23,6 +23,7 @@ from ada.composition import create_container, providers
 from ada.composition import unbuilt as unbuilt_module
 from ada.composition.unbuilt import Unbuilt
 from ada.config import Settings
+from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.errors import Unavailable
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.repositories import ProjectRepository
@@ -280,6 +281,33 @@ def test_a_widget_carries_no_data_and_reads_it_in_a_run(
         True,
     )
     assert foreign.status_code == 422
+
+
+def test_a_widget_is_changed_in_place_and_its_spec_checked(
+    client: TestClient, project: dict[str, Any], source_operator: dict[str, Any]
+) -> None:
+    path = f"/projects/{project['id']}/widgets"
+    body = {"operator_id": source_operator["id"], "type": "table", "title": "Regions"}
+    widget = send(client, "POST", path, body, 201)
+
+    changed = send(
+        client,
+        "PATCH",
+        f"/widgets/{widget['id']}",
+        {"title": "Regions by name", "spec": {"labels": {"region": "Region"}}},
+    )
+    refused = client.patch(
+        f"/api/widgets/{widget['id']}", json={"spec": {"labels": {"nope": "Nope"}}}
+    )
+
+    assert (changed["title"], changed["spec"], changed["note"]) == (
+        "Regions by name",
+        {"labels": {"region": "Region"}},
+        "",
+    )
+    assert send(client, "GET", f"/widgets/{widget['id']}") == changed
+    assert refused.status_code == 422 and "nope" in refused.json()["detail"]
+    assert [e.type for e in events(client, project["id"])][-1] == "widget.updated"
 
 
 def test_widget_data_is_stale_while_a_source_upstream_failed_its_refresh(
@@ -542,14 +570,19 @@ async def test_tool_errors_say_what_is_wrong_and_change_nothing(
 
 @pytest.mark.parametrize(
     "client_params",
-    [None, SimpleNamespace(client_info=Implementation(name=" ", version="1"))],
+    [
+        None,
+        SimpleNamespace(client_info=Implementation(name=" ", version="1")),
+        SimpleNamespace(client_info=Implementation(name="fastmcp", version="3")),
+    ],
 )
-def test_without_a_client_name_the_actor_is_an_unknown_client(client_params: object) -> None:
+def test_without_a_client_name_the_actor_has_none(client_params: object) -> None:
+    # A library's default name says nothing about the agent, so it is not recorded either.
     context = SimpleNamespace(session=SimpleNamespace(client_params=client_params))
     with patch.object(actor, "get_context", return_value=context):
-        assert actor.calling_agent().name == "unknown client"
+        assert actor.calling_agent() == Actor(kind=ActorKind.EXTERNAL_AGENT, name="")
     with patch.object(actor, "get_context", side_effect=RuntimeError("No active context")):
-        assert actor.calling_agent().name == "unknown client"
+        assert actor.calling_agent().name == ""
 
 
 # The built widgets: served to the frontend over REST, and to MCP hosts as MCP Apps

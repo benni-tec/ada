@@ -61,6 +61,24 @@ async def get_widget(widget_id: Id, service: FromDishka[WidgetService]) -> Widge
     return await service.get(widget_id)
 
 
+class WidgetChange(Request):
+    """Fields left out stay as they are; a spec replaces the old one whole."""
+
+    title: str | None = None
+    note: str | None = None
+    type: str | None = None
+    spec: JsonObject | None = None
+
+
+@router.patch("/widgets/{widget_id}")
+async def update_widget(
+    widget_id: Id, body: WidgetChange, service: FromDishka[WidgetService]
+) -> Widget:
+    return await service.update(
+        widget_id, title=body.title, note=body.note, type=body.type, spec=body.spec
+    )
+
+
 @router.get("/widgets/{widget_id}/data")
 async def get_widget_data(
     widget_id: Id,

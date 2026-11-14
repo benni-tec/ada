@@ -21,6 +21,7 @@ export const EVENT_TYPES: readonly EventType[] = [
   'session.created',
   'session.entry_added',
   'widget.created',
+  'widget.updated',
   'run.started',
   'run.finished',
   'run.failed',
@@ -58,7 +59,10 @@ export function effectsOf(event: LiveEvent): Effects {
       if (session) invalidate.push(keys.entries(session))
       break
     }
+    case 'widget.updated':
     case 'widget.created': {
+      // A changed spec or type is read by the frames when they load.
+      if (event.type === 'widget.updated') reloadWidgets = true
       const session = id(payload, 'session_id')
       if (session) invalidate.push(keys.sessionWidgets(session))
       invalidate.push(keys.projectWidgets(projectId))

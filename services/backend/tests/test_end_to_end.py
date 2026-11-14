@@ -557,7 +557,7 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
         ]
         # The session's three, and the dashboard's copies of the map and the table.
         assert sorted(widget.type for widget in widgets) == [
-            "line-chart",
+            "chart",
             "map",
             "map",
             "table",

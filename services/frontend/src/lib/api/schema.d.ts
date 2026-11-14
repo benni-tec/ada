@@ -1112,7 +1112,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Widget */
+        patch: operations["update_widget_api_widgets__widget_id__patch"];
         trace?: never;
     };
     "/api/widgets/{widget_id}/data": {
@@ -2486,6 +2487,19 @@ export interface components {
             title: string;
             /** Type */
             type: string;
+        };
+        /**
+         * WidgetChange
+         * @description Fields left out stay as they are; a spec replaces the old one whole.
+         */
+        WidgetChange: {
+            /** Note */
+            note?: string | null;
+            spec?: components["schemas"]["JsonObject"] | null;
+            /** Title */
+            title?: string | null;
+            /** Type */
+            type?: string | null;
         };
         /**
          * WidgetContext
@@ -4812,6 +4826,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Widget"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_widget_api_widgets__widget_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WidgetChange"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

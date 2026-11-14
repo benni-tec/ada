@@ -281,6 +281,21 @@ class SqlWidgetRepository(WidgetRepository):
         )
         await add_row(self.session, row)
 
+    async def save(self, widget: Widget) -> None:
+        table = WidgetRow.__table__
+        result = await self.session.execute(
+            update(table)
+            .where(table.c.id == widget.id)
+            .values(
+                type=widget.type,
+                title=widget.title,
+                spec=json_object(widget.spec),
+                note=widget.note,
+            )
+        )
+        if result.rowcount == 0:  # type: ignore[attr-defined]
+            raise NotFound("widget", widget.id)
+
     async def list(self, project_id: Id) -> Sequence[Widget]:
         statement = oldest_first(WidgetRow, WidgetRow.project_id == project_id)
         return [_widget(row) for row in await rows(self.session, statement)]

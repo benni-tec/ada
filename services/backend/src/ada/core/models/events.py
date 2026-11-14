@@ -11,6 +11,7 @@ class EventType(StrEnum):
     SESSION_CREATED = "session.created"
     SESSION_ENTRY_ADDED = "session.entry_added"
     WIDGET_CREATED = "widget.created"
+    WIDGET_UPDATED = "widget.updated"
     RUN_STARTED = "run.started"
     RUN_FINISHED = "run.finished"
     RUN_FAILED = "run.failed"

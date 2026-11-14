@@ -272,6 +272,10 @@ class MemoryWidgetRepository(WidgetRepository):
     async def add(self, widget: Widget) -> None:
         self.store.widgets[widget.id] = widget
 
+    async def save(self, widget: Widget) -> None:
+        _get(self.store.widgets, "widget", widget.id)
+        self.store.widgets[widget.id] = widget
+
     async def list(self, project_id: Id) -> Sequence[Widget]:
         return _in_project(self.store.widgets, project_id)
 

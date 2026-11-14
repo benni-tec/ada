@@ -725,6 +725,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /snapshots/{id}` | A snapshot a run fixed (`Run.snapshots` names them by id): `fetched_at`, `content_hash`, `row_count`, `period` (`RunService.snapshot`) |
 | `GET /projects/{id}/widgets`, `POST /projects/{id}/widgets` | Every widget of the project, oldest first; create |
 | `GET /widgets/{id}`, `GET /widgets/{id}/data?run_id=&limit=` | Read; `WidgetData` (without `run_id` a new run is started) |
+| `PATCH /widgets/{id}` | `{title?, note?, type?, spec?}`: change in place (a spec replaces the old one whole and is checked); announced with `widget.updated` |
 | `GET /widget-bundles/{type}.html` | A built widget (see Widgets) |
 | `GET /projects/{id}/events` | The live stream |
 | `GET /projects/{id}/dashboards`, `POST /projects/{id}/dashboards {name}` | List, oldest first; create |
@@ -766,14 +767,17 @@ Tool names are snake case and start with a verb (`list create register update re
 add get preview system pin edit set show generate check build query`; `tests/test_api.py`). Tools
 that create something in a session take an optional `session_id` and a `note`: one line
 on why the agent is doing this, shown in the session. The acting `Actor` is
-`external_agent` with the client name the MCP host reported when it connected; the
-in-platform agent's calls act as `agent` with its model id (see The agent).
+`external_agent` with the client name the MCP host reported when it connected; a client
+that reports none, or only its library's default (`fastmcp`, `mcp`, …:
+`LIBRARY_DEFAULTS` in `entrypoints/mcp/actor.py`), is recorded with an empty name, and the
+frontend then shows no creator. The in-platform agent's calls act as `agent` with its
+model id (see The agent).
 
 | Group | Tools |
 | --- | --- |
 | Projects, sources | `list_projects`, `create_project`, `register_source`, `list_sources`, `update_source`, `refresh_source` (`wait` and `timeout_seconds` up to 60: fetch in the call and answer `{status, snapshot, error}`; else `status: "queued"`) |
 | Sessions, pipelines | `create_session`, `add_source_operator`, `add_transform` (mentions DuckDB's `UNPIVOT` for wide tables), `list_pipelines` (the pipelines list: look there before building), `get_lineage`, `preview_operator`, `query_operator`, `build_pipeline` (below) |
-| Widgets | `create_widget`, `list_session_widgets`, and `get_widget_data` for the widget itself (MCP Apps visibility `app`) |
+| Widgets | `create_widget`, `update_widget` (title, note, type or a whole new spec, checked like a new widget's; the operator stays; dashboard copies do not follow), `list_session_widgets`, and `get_widget_data` for the widget itself (MCP Apps visibility `app`) |
 | Dashboards | `create_dashboard`, `list_dashboards`, `get_dashboard`, `list_dashboard_versions`, `pin_widget` (its description says the dashboard gets a copy; optional `layout`), `edit_dashboard` (any widget of the project; one new to the dashboard is copied), `set_dashboard_time_range` (ISO dates), `show_dashboard_in_session` (the session's revision). They return `{dashboard, version, url}` |
 | Reports | `create_report`, `add_report_version`, `generate_report_from_dashboard`, `list_reports`, `get_report` (optional `version`), `create_template`, `list_templates`. They return `{report, version, versions, url}` |
 | Alerts | `create_alert_rule` (its description carries the formula format), `list_alert_rules`, `get_alert_rule`, `update_alert_rule` (a `clear` list empties the interval, maximum age or alert pipeline), `check_alert_rule` (`{rule, changed, firing}`), `list_alerts` (`{alert, rule_name, severity, dashboard_id, url}`) |
@@ -854,6 +858,7 @@ connection open. Events are broadcast after the unit of work that caused them co
 | `session.created` | `session_id` |
 | `session.entry_added` | `session_id`, `entry_id` |
 | `widget.created` | `widget_id`, `session_id` if any |
+| `widget.updated` | `widget_id`, `session_id` if any; the frontend reloads its widget frames, which read the spec when they load |
 | `run.started`, `run.finished`, `run.failed` | `run_id`, `operator_id`; `error` on failure |
 | `source.refreshed`, `source.refresh_failed` | `data_source_id`, `changed` (any period's content too); `error` on failure |
 | `dashboard.changed` | `dashboard_id`, `version_id` (the new version for an edit or pin; the current one, or null, for a new dashboard or a range change) |

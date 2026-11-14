@@ -37,6 +37,7 @@ export type EventType =
   | 'session.created'
   | 'session.entry_added'
   | 'widget.created'
+  | 'widget.updated'
   | 'run.started'
   | 'run.finished'
   | 'run.failed'

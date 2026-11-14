@@ -6,7 +6,9 @@ from fastmcp.server.dependencies import get_context
 
 from ada.core.models.actors import Actor, ActorKind
 
-UNKNOWN_CLIENT = "unknown client"
+# What MCP libraries report when the program using them names nothing: they say which
+# library connected, not which agent, so the actor is recorded without a name.
+LIBRARY_DEFAULTS = frozenset({"fastmcp", "mcp", "mcp-client", "python-mcp", "mcp-python-sdk"})
 
 # Set only by the in-platform agent's in-process client (ada.entrypoints.mcp.agent), in the
 # worker's own task, from which the in-memory server's tasks inherit it. A client over HTTP
@@ -21,12 +23,16 @@ def calling_agent() -> Actor:
     initialize handshake, e.g. "claude-code").
 
     FastMCP has no helper for this; the name sits on `client_info` of the session's
-    `client_params`, which is None when the client sent none. Without a name the actor is
-    still recorded, so the session shows that an agent acted, just not which.
+    `client_params`, which is None when the client sent none. Without a name, or with only
+    a library's default one, the actor is recorded with an empty name: the session shows
+    that an agent acted, not which.
     """
     if (agent := _in_platform_agent.get()) is not None:
         return agent
-    return Actor(kind=ActorKind.EXTERNAL_AGENT, name=_client_name() or UNKNOWN_CLIENT)
+    name = _client_name() or ""
+    return Actor(
+        kind=ActorKind.EXTERNAL_AGENT, name="" if name.lower() in LIBRARY_DEFAULTS else name
+    )
 
 
 @contextmanager

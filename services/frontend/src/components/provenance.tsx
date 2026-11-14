@@ -14,14 +14,15 @@ export function Time({ value }: { value: string }) {
 /**
  * Who did something, when, and why. Work by an external agent is set apart: the session
  * may be driven from another client, whose conversation is not here, so the client's name
- * and the agent's one-line note are what explain each step.
+ * and the agent's one-line note are what explain each step. A client that gave no name of
+ * its own shows no creator, only the time and the note.
  */
 export function Provenance({ actor, at, note }: { actor: Actor; at: string; note?: string }) {
   const external = actor.kind === 'external_agent'
   return (
     <div className="flex min-w-0 flex-col gap-0.5 text-xs">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-neutral-600 dark:text-neutral-400">
-        {external ? (
+        {external && !actor.name ? null : external ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 font-medium text-violet-800 dark:bg-violet-950 dark:text-violet-200">
             <span className="sr-only">External agent: </span>
             <span aria-hidden="true">↗</span>
