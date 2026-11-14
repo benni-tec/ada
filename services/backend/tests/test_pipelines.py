@@ -63,6 +63,7 @@ from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
 from ada.core.services.schema import geo
 from ada.core.services.schema.roles import check_compatible, check_widget
+from ada.core.services.widgets import text
 from ada.entrypoints.mcp.server import create_mcp
 from api_support import call
 from conftest import settings_in
@@ -965,6 +966,139 @@ def test_a_chart_table_and_value_take_their_options() -> None:
         ("value", {"compare_to": 80}),
     ]:
         check_widget(type, schema(Roles()), spec)
+
+
+# The text widget: placeholders, checked against every input
+
+
+TEXT_INPUTS = {
+    "main": Schema(
+        columns=(
+            Column(name="county", type=ColumnType.TEXT),
+            Column(name="period_start", type=ColumnType.DATE),
+            Column(name="period_end", type=ColumnType.DATE),
+            Column(name="share", type=ColumnType.NUMBER),
+        ),
+        roles=Roles(time=TimeRole(start="period_start", end="period_end")),
+    ),
+    "gap": Schema(columns=(Column(name="gap", type=ColumnType.INTEGER),)),
+}
+
+
+def test_text_placeholders_parse_in_every_form_and_escape() -> None:
+    segments, problems = text.parse(
+        "# Gap\n{{gap.gap}} and {{ main.share:percent }} in "
+        "{{main.share[county=North Karelia][period_end=2024-12-31]:signed1}};\n"
+        "{{gap}} \\{{not.this}} {{oops"
+    )
+
+    found = [s for s in segments if isinstance(s, text.Placeholder)]
+    assert [(p.input, p.column, p.filters, p.format, p.line) for p in found] == [
+        ("gap", "gap", (), None, 2),
+        ("main", "share", (), "percent", 2),
+        (
+            "main",
+            "share",
+            (("county", "North Karelia"), ("period_end", "2024-12-31")),
+            "signed1",
+            2,
+        ),
+        ("gap", None, (), None, 3),
+    ]
+    literal = "".join(s for s in segments if isinstance(s, str))
+    assert "{{not.this}}" in literal and "\\" not in literal
+    assert len(problems) == 1 and "line 3: `{{oops` is not a placeholder" in problems[0]
+
+
+def test_a_text_widget_is_checked_against_its_inputs_and_names_every_problem() -> None:
+    markdown = (
+        "{{nope.share}} {{main.missing}} {{main.county:percent}} {{main.share[region=x]}} "
+        "{{main.share:fancy}} <script>x</script> ![chart](https://x.test/a.png)"
+    )
+
+    with pytest.raises(Invalid) as refused:
+        check_widget("text", TEXT_INPUTS["main"], {"markdown": markdown}, TEXT_INPUTS)
+
+    message = str(refused.value)
+    for problem in (
+        "there is no input 'nope'; the widget has main, gap",
+        "the input 'main' has no column 'missing'",
+        "the format 'percent' needs a number, and 'county' is text",
+        "has no column 'region' to filter on",
+        'the format must be "integer", "number1", "percent", "plain" or "signed1"',
+        "raw HTML is not allowed",
+        "images are not allowed",
+    ):
+        assert problem in message, problem
+    with pytest.raises(Invalid, match="holds only `markdown`"):
+        check_widget("text", TEXT_INPUTS["main"], {"markdown": "x", "rows": [1]}, TEXT_INPUTS)
+    with pytest.raises(Invalid, match="at most 20,000"):
+        check_widget("text", TEXT_INPUTS["main"], {"markdown": "x" * 20_001}, TEXT_INPUTS)
+    # An input no placeholder reads is only a warning; an autolink is a link, not HTML.
+    assert check_widget(
+        "text", TEXT_INPUTS["main"], {"markdown": "{{main.share}} <https://thl.fi>"}, TEXT_INPUTS
+    ) == ["the input 'gap' is not used by any placeholder"]
+
+
+def test_a_placeholder_shows_the_latest_period_or_the_only_row() -> None:
+    main = text.InputRows(
+        output=TEXT_INPUTS["main"],
+        columns=TEXT_INPUTS["main"].columns,
+        rows=(
+            ("Kainuu", date(2023, 1, 1), date(2023, 12, 31), 61.25),
+            ("Kainuu", date(2024, 1, 1), date(2024, 12, 31), 64.5),
+            ("Lappi", date(2024, 1, 1), date(2024, 12, 31), 70.0),
+        ),
+    )
+    gap = text.InputRows(
+        output=TEXT_INPUTS["gap"], columns=TEXT_INPUTS["gap"].columns, rows=((1346,),)
+    )
+    many = text.InputRows(output=gap.output, columns=gap.columns, rows=((1,), (2,)))
+    segments, _ = text.parse(
+        "{{main.share[county=Kainuu]:percent}} {{main.share}} {{gap.gap}} "
+        "{{main.share[county=Uusimaa]}} {{gap}}"
+    )
+
+    assert text.resolve(segments, {"main": main, "gap": gap}) == (
+        "⟦main.share[county=Kainuu] = 64.5 %⟧ "
+        "⟦main.share: no value, 2 rows remain in the latest period; pick one with "
+        "[column=value]⟧ ⟦gap.gap = 1,346⟧ "
+        "⟦main.share[county=Uusimaa]: no value, no row matches⟧ ⟦gap: the input's table, 1 rows⟧"
+    )
+    assert "2 rows remain and no time role" in text.resolve(
+        text.parse("{{gap.gap}}")[0], {"gap": many}
+    )
+
+
+@pytest.mark.parametrize(
+    ("cell", "column", "format", "shown"),
+    [
+        # The cases the widget bundle writes the same (services/widgets text/model.ts).
+        (1234.567, "share", None, "1,235"),
+        (12.345, "share", None, "12.35"),
+        (12.0, "share", None, "12"),
+        (13462, "cases", None, "13,462"),
+        (2024, "year", None, "2024"),
+        (12345.678, "share", "integer", "12,346"),
+        (12345.678, "share", "number1", "12,345.7"),
+        (72.0, "share", "number1", "72.0"),
+        (72.46, "share", "percent", "72.5 %"),
+        (72.0, "share", "percent", "72 %"),
+        (12345.678, "share", "plain", "12345.678"),
+        (1.25, "share", "signed1", "+1.3"),
+        (-1.25, "share", "signed1", "\u22121.3"),
+        (0.02, "share", "signed1", "\u00b10.0"),
+        (-0.04, "share", "signed1", "\u00b10.0"),
+        ("Kainuu", "county", None, "Kainuu"),
+    ],
+)
+def test_a_placeholder_value_is_written_as_the_widget_writes_it(
+    cell: object, column: str, format: str | None, shown: str
+) -> None:
+    kind = {str: ColumnType.TEXT, int: ColumnType.INTEGER}.get(type(cell), ColumnType.NUMBER)
+    output = Schema(columns=(Column(name=column, type=kind),))
+
+    assert text.formatted(cell, output.columns[0], format, output) == shown
 
 
 async def test_create_widget_returns_invalid_with_the_reason(tables: Tables) -> None:

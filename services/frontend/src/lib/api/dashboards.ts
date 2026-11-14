@@ -3,6 +3,7 @@
 
 import { queryOptions } from '@tanstack/react-query'
 
+import { attach } from './attachments'
 import { api, ApiFailure, type ApiError, type Schemas } from './client'
 import type { Id } from './models'
 
@@ -48,6 +49,15 @@ export const createDashboard = (projectId: Id, name: string) =>
     }),
   )
 
+/** Every dashboard of the project, once, in the new order; answers the reordered list. */
+export const reorderDashboards = (projectId: Id, ids: Id[]) =>
+  unwrap(
+    api.PUT('/api/projects/{project_id}/dashboards/order', {
+      params: { path: { project_id: projectId } },
+      body: { ids },
+    }),
+  )
+
 export const getDashboard = (id: Id) =>
   unwrap(api.GET('/api/dashboards/{dashboard_id}', { params: { path: { dashboard_id: id } } }))
 
@@ -89,7 +99,8 @@ export const startDashboardRun = (id: Id, range: DashboardTimeRange) =>
     }),
   )
 
-/** A session that starts from the dashboard and shows it beside the conversation. */
+/** A session that starts from the dashboard and shows it beside the conversation, attached
+ * as its first tab (attaching is idempotent, should the server have attached it already). */
 export async function startSessionFromDashboard(projectId: Id, dashboardId: Id, title: string) {
   const session = await unwrap(
     api.POST('/api/projects/{project_id}/sessions', {
@@ -97,12 +108,8 @@ export async function startSessionFromDashboard(projectId: Id, dashboardId: Id, 
       body: { title, origin_dashboard_id: dashboardId },
     }),
   )
-  return unwrap(
-    api.PATCH('/api/sessions/{session_id}', {
-      params: { path: { session_id: session.id } },
-      body: { panel_dashboard_id: dashboardId, expected_revision: session.revision },
-    }),
-  )
+  await attach(session.id, 'dashboard', dashboardId)
+  return session
 }
 
 export const dashboardKeys = {

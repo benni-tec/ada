@@ -69,7 +69,7 @@ class InProcessToolbox(AgentToolbox):
                     for tool in listed
                     if _offered(tool.name, profile)
                 ]
-                yield _McpTools(client, specs, session_id)
+                yield _McpTools(client, specs, session_id, profile is SessionAgent.RESEARCH)
 
 
 def _session_optional(schema: JsonObject) -> JsonObject:
@@ -99,10 +99,14 @@ def application(container: AsyncContainer) -> AsyncContainer:
 
 
 class _McpTools(AgentTools):
-    def __init__(self, client: Client, specs: Sequence[ToolSpec], session_id: Id) -> None:
+    def __init__(
+        self, client: Client, specs: Sequence[ToolSpec], session_id: Id, bound: bool
+    ) -> None:
         self.client = client
         self._specs = list(specs)
         self.session_id = session_id
+        # Whether every call is in the turn's session, whatever the model passes.
+        self.bound = bound
         self._by_name = {spec.name: spec for spec in specs}
 
     def specs(self) -> Sequence[ToolSpec]:
@@ -113,9 +117,10 @@ class _McpTools(AgentTools):
         if spec is None:
             raise ToolCallFailed(f"There is no tool {name!r}")
         arguments = dict(arguments)
-        # The turn's session, when the model leaves it out: its work belongs there.
-        if "session_id" in spec.input_schema.get("properties", {}) and not arguments.get(
-            "session_id"
+        # The turn's session, when the model leaves it out: its work belongs there. The
+        # research agent works in its own session only, so it cannot spend its parent's.
+        if "session_id" in spec.input_schema.get("properties", {}) and (
+            self.bound or not arguments.get("session_id")
         ):
             arguments["session_id"] = str(self.session_id)
         result = await self.client.call_tool(name, arguments, raise_on_error=False)

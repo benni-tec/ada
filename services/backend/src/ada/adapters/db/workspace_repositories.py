@@ -28,6 +28,7 @@ from ada.adapters.db.tables import (
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.errors import NotFound
+from ada.core.models.judges import Verdict
 from ada.core.models.projects import Project
 from ada.core.models.schema import Schema
 from ada.core.models.sessions import EntryKind, Session, SessionAgent, SessionEntry
@@ -183,14 +184,22 @@ class SqlDataSourceRepository(DataSourceRepository):
             raise NotFound("data source", id)
 
     async def set_monitor(
-        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+        self,
+        id: Id,
+        monitor_id: str | None,
+        secret_encrypted: str | None,
+        freshness_before: FreshnessPolicy | None,
     ) -> None:
         # Outside the revision, like a check: watching never conflicts with an edit.
         table = DataSourceRow.__table__
         result = await self.session.execute(
             update(table)
             .where(table.c.id == id)
-            .values(monitor_id=monitor_id, monitor_secret_encrypted=secret_encrypted)
+            .values(
+                monitor_id=monitor_id,
+                monitor_secret_encrypted=secret_encrypted,
+                freshness_before_watch=dump(freshness_before) if freshness_before else None,
+            )
         )
         if result.rowcount == 0:
             raise NotFound("data source", id)
@@ -199,6 +208,11 @@ class SqlDataSourceRepository(DataSourceRepository):
         row = await fetch(self.session, DataSourceRow, id, "data source")
         return row.monitor_secret_encrypted
 
+    async def freshness_before_watch(self, id: Id) -> FreshnessPolicy | None:
+        row = await fetch(self.session, DataSourceRow, id, "data source")
+        before = row.freshness_before_watch
+        return FreshnessPolicy.model_validate(before) if before is not None else None
+
 
 def _session(row: SessionRow) -> Session:
     return Session(
@@ -206,7 +220,6 @@ def _session(row: SessionRow) -> Session:
         project_id=row.project_id,
         title=row.title,
         origin_dashboard_id=row.origin_dashboard_id,
-        panel_dashboard_id=row.panel_dashboard_id,
         created_at=row.created_at,
         agent=SessionAgent(row.agent),
         parent_session_id=row.parent_session_id,
@@ -245,7 +258,6 @@ class SqlSessionRepository(SessionRepository):
             project_id=session.project_id,
             title=session.title,
             origin_dashboard_id=session.origin_dashboard_id,
-            panel_dashboard_id=session.panel_dashboard_id,
             created_at=session.created_at,
             agent=session.agent.value,
             parent_session_id=session.parent_session_id,
@@ -259,11 +271,7 @@ class SqlSessionRepository(SessionRepository):
             "session",
             session.id,
             expected_revision,
-            {
-                "title": session.title,
-                "origin_dashboard_id": session.origin_dashboard_id,
-                "panel_dashboard_id": session.panel_dashboard_id,
-            },
+            {"title": session.title, "origin_dashboard_id": session.origin_dashboard_id},
         )
         return _session(row)
 
@@ -300,6 +308,9 @@ def _widget(row: WidgetRow) -> Widget:
         created_by=Actor.model_validate(row.created_by),
         created_at=row.created_at,
         copied_from=row.copied_from,
+        inputs=dict(row.inputs or {}),
+        render_error=row.render_error,
+        verdict=Verdict.model_validate(row.verdict) if row.verdict is not None else None,
     )
 
 
@@ -324,8 +335,19 @@ class SqlWidgetRepository(WidgetRepository):
             created_by=dump(widget.created_by),
             created_at=widget.created_at,
             copied_from=widget.copied_from,
+            inputs=dict(widget.inputs),
+            render_error=widget.render_error,
+            verdict=dump(widget.verdict) if widget.verdict is not None else None,
         )
         await add_row(self.session, row)
+
+    async def set_render_error(self, id: Id, error: str | None) -> None:
+        table = WidgetRow.__table__
+        result = await self.session.execute(
+            update(table).where(table.c.id == id).values(render_error=error)
+        )
+        if result.rowcount == 0:  # type: ignore[attr-defined]
+            raise NotFound("widget", id)
 
     async def save(self, widget: Widget) -> None:
         table = WidgetRow.__table__
@@ -337,10 +359,23 @@ class SqlWidgetRepository(WidgetRepository):
                 title=widget.title,
                 spec=json_object(widget.spec),
                 note=widget.note,
+                inputs=dict(widget.inputs),
+                render_error=widget.render_error,
+                verdict=dump(widget.verdict) if widget.verdict is not None else None,
             )
         )
         if result.rowcount == 0:  # type: ignore[attr-defined]
             raise NotFound("widget", widget.id)
+
+    async def set_verdict(self, id: Id, verdict: Verdict | None) -> None:
+        table = WidgetRow.__table__
+        result = await self.session.execute(
+            update(table)
+            .where(table.c.id == id)
+            .values(verdict=dump(verdict) if verdict is not None else None)
+        )
+        if result.rowcount == 0:  # type: ignore[attr-defined]
+            raise NotFound("widget", id)
 
     async def list(self, project_id: Id) -> Sequence[Widget]:
         statement = oldest_first(WidgetRow, WidgetRow.project_id == project_id)

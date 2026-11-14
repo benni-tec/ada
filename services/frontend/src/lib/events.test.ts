@@ -12,14 +12,19 @@ test('each event makes stale the queries of what it names', () => {
   const invalidated = (type: EventType, payload: Record<string, unknown>) => event(type, payload).invalidate
   expect(invalidated('session.created', { session_id: 's1' })).toEqual([['projects', 'p1', 'sessions']])
   expect(invalidated('session.entry_added', { session_id: 's1', entry_id: 'e1' })).toEqual([['sessions', 's1', 'entries']])
+  for (const type of ['session.attachment_added', 'session.attachment_removed'] as const) {
+    expect(invalidated(type, { session_id: 's1', attachment: { id: 'att1' } })).toEqual([['sessions', 's1', 'attachments']])
+  }
   expect(invalidated('widget.created', { widget_id: 'w1', session_id: 's1' })).toEqual([
     ['sessions', 's1', 'widgets'],
     ['projects', 'p1', 'widgets'],
     ['widgets', 'w1'],
+    ['projects', 'p1', 'verdicts'],
   ])
   expect(invalidated('widget.created', { widget_id: 'w1' })).toEqual([
     ['projects', 'p1', 'widgets'],
     ['widgets', 'w1'],
+    ['projects', 'p1', 'verdicts'],
   ])
   for (const type of ['run.started', 'run.finished', 'run.failed'] as const) {
     expect(invalidated(type, { run_id: 'r1', operator_id: 'op_1' })).toEqual([['runs', 'r1']])
@@ -78,7 +83,13 @@ test('a changed widget is read again and its frames reload', () => {
     ['sessions', 's1', 'widgets'],
     ['projects', 'p1', 'widgets'],
     ['widgets', 'w1'],
+    // Its verdict may have changed: the judges' lists of the project.
+    ['projects', 'p1', 'verdicts'],
   ])
   expect(effects.reloadWidgets).toBe(true)
   expect(event('widget.created', { widget_id: 'w1' }).reloadWidgets).toBe(false)
+  // A frame's report of how it drew: the cards refetch, the frames stay.
+  const reported = event('widget.updated', { widget_id: 'w1', render_only: true })
+  expect(reported.reloadWidgets).toBe(false)
+  expect(reported.invalidate).toContainEqual(['widgets', 'w1'])
 })

@@ -18,7 +18,7 @@ version also carries `sources`, which the platform generates (sources.py); a cal
 writes it.
 """
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -166,6 +166,23 @@ def fill(blocks: Sequence[Block], widgets: dict[str, Id]) -> tuple[Block, ...]:
         return block
 
     return tuple(filled(block) for block in blocks)
+
+
+def renamed(blocks: Sequence[Block], widgets: Mapping[Id, Id]) -> tuple[Block, ...]:
+    """The tree with each widget block naming the widget `widgets` maps its widget to."""
+
+    def named(block: Block) -> Block:
+        if isinstance(block, Section):
+            return block.model_copy(update={"blocks": tuple(named(b) for b in block.blocks)})
+        if (
+            isinstance(block, WidgetBlock)
+            and block.widget_id is not None
+            and block.widget_id in widgets
+        ):
+            return block.model_copy(update={"widget_id": widgets[block.widget_id]})
+        return block
+
+    return tuple(named(block) for block in blocks)
 
 
 def stored_blocks(content: JsonObject) -> tuple[Block, ...]:

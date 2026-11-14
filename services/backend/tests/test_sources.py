@@ -3,10 +3,14 @@ into a table, and the example registrations against their recorded answers."""
 
 import asyncio
 import csv
+import gzip
 import io
 import json
+import socket
 import time
-from collections.abc import Callable, Iterator
+import tracemalloc
+import zlib
+from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -74,6 +78,7 @@ from ada.core.models.time import TimeRange
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.sources import SourceReaders
 from ada.core.ports.web import WebExplorer
+from ada.core.services.agents.research import ResearchReaders
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.refreshes import RefreshStatus, SnapshotSummary
 from ada.core.services.ports.sources import SourceService
@@ -356,7 +361,7 @@ async def test_an_edit_from_before_watching_keeps_the_monitor(world: World) -> N
     source = await world.register()
     repository = MemoryDataSourceRepository(world.memory)
 
-    await repository.set_monitor(source.id, "mon_1", "sealed")
+    await repository.set_monitor(source.id, "mon_1", "sealed", None)
     await repository.update(source.model_copy(update={"name": "Renamed"}), source.revision)
 
     stored = await repository.get(source.id)
@@ -585,7 +590,9 @@ async def test_the_container_shares_the_readers_and_closes_them(
     container = create_container(unreachable_settings, FastapiProvider(), MemoryRepositories())
     try:
         readers = await container.get(SourceReaders)
-        assert isinstance(readers, HttpSourceReaders)
+        # Wrapped, so a research turn counts its paid reads.
+        assert isinstance(readers, ResearchReaders)
+        assert isinstance(readers.readers, HttpSourceReaders)
         async with container() as request:
             service = await request.get(SourceService)
             assert isinstance(service, DataSources)
@@ -593,7 +600,7 @@ async def test_the_container_shares_the_readers_and_closes_them(
             assert service.readers is readers
     finally:
         await container.close()
-    assert readers.readers[AccessKind.URL].client.is_closed
+    assert readers.readers.readers[AccessKind.URL].client.is_closed
 
 
 # The HTTP readers
@@ -610,10 +617,10 @@ class Server:
         self.requests.append(request)
         return self.handler(request)
 
-    def reader(self, kind: AccessKind = AccessKind.URL):  # noqa: ANN201
-        return HttpSourceReaders(create_client(httpx.MockTransport(self)), FixedClock()).for_kind(
-            kind
-        )
+    def reader(self, kind: AccessKind = AccessKind.URL, **settings: Any):  # noqa: ANN201
+        client = create_client(httpx.MockTransport(self))
+        settings = {"allow_private": True} | settings
+        return HttpSourceReaders(client, FixedClock(), **settings).for_kind(kind)
 
 
 def source(kind: AccessKind = AccessKind.URL, **changes: Any) -> DataSource:
@@ -672,6 +679,122 @@ async def test_an_error_answer_or_no_answer_makes_the_source_unavailable() -> No
         await Server(refuse).reader().fetch(source(), TimeRange())
     with pytest.raises(Invalid):
         await Server(refuse).reader().fetch(source(address="ftp://x.test/a.csv"), TimeRange())
+
+
+async def test_only_public_addresses_are_read_redirects_included() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/moved":
+            return httpx.Response(302, headers={"Location": "https://93.184.215.14/data.csv"})
+        if request.url.path == "/metadata":
+            return httpx.Response(302, headers={"Location": "http://169.254.169.254/latest"})
+        return httpx.Response(200, content=b"a\n1\n")
+
+    server = Server(handler)
+    public = server.reader(allow_private=False)
+
+    fetched = await public.fetch(source(address="https://93.184.216.34/moved"), TimeRange())
+    with pytest.raises(Invalid, match="localhost is not a public address"):
+        await public.fetch(source(address="http://localhost:8000/admin"), TimeRange())
+    with pytest.raises(Invalid, match="169.254.169.254"):
+        await public.fetch(source(address="https://93.184.216.34/metadata"), TimeRange())
+    # A document at an address is downloaded by the URL reader, under the same rule.
+    with pytest.raises(Invalid, match="localhost is not a public address"):
+        await server.reader(AccessKind.DOCUMENT, allow_private=False).fetch(
+            source(AccessKind.DOCUMENT, address="http://localhost/a.pdf"), TimeRange()
+        )
+    allowed = await server.reader().fetch(source(address="http://127.0.0.1/a"), TimeRange())
+
+    assert (fetched.content, fetched.origin) == (b"a\n1\n", "https://93.184.215.14/data.csv")
+    assert allowed.content == b"a\n1\n"
+    assert [r.url.host for r in server.requests] == [
+        "93.184.216.34",
+        "93.184.215.14",
+        "93.184.216.34",
+        "127.0.0.1",
+    ]
+
+
+async def test_the_address_connected_to_is_the_one_checked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def answer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.readuntil(b"\r\n\r\n")
+        writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\na\n1\n")
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_server(answer, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    resolve = socket.getaddrinfo
+    answers = iter(["93.184.216.34"])
+
+    def rebinding(host: str | bytes, *args: Any, **kwargs: Any) -> Any:
+        # Public when the reader checks the name, this machine when it is connected to.
+        if host not in ("rebind.test", b"rebind.test"):
+            return resolve(host, *args, **kwargs)
+        ip = next(answers, "127.0.0.1")
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", rebinding)
+    # A proxy from the environment keeps working; this test then connects directly.
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.test:3128")
+    async with create_client() as client:
+        assert client._mounts
+    monkeypatch.setenv("NO_PROXY", "*")
+    rebound = source(address=f"http://rebind.test:{port}/data.csv")
+    async with server:
+        async with create_client() as client:
+            public = HttpSourceReaders(client, FixedClock()).for_kind(AccessKind.URL)
+            with pytest.raises(Invalid, match=r"rebind.test is not a public address \(127"):
+                await public.fetch(rebound, TimeRange())
+        async with create_client(allow_private=True) as client:
+            private = HttpSourceReaders(client, FixedClock(), allow_private=True)
+            fetched = await private.for_kind(AccessKind.URL).fetch(rebound, TimeRange())
+
+    assert fetched.content == b"a\n1\n"
+
+
+async def test_an_answer_over_the_size_limit_is_refused() -> None:
+    async def chunks() -> AsyncIterator[bytes]:
+        for _ in range(3):
+            yield b"x" * 40
+
+    declared = Server(lambda request: httpx.Response(200, content=b"x" * 101))
+    streamed = Server(lambda request: httpx.Response(200, content=chunks()))
+
+    for server in (declared, streamed):
+        with pytest.raises(SourceUnavailable, match="more than 100 bytes"):
+            await server.reader(max_bytes=100).fetch(source(), TimeRange())
+    # The probe's HEAD request has no body, whatever length GET's would have.
+    tagged = Server(lambda r: httpx.Response(200, headers={"ETag": "v", "Content-Length": "101"}))
+    assert await tagged.reader(max_bytes=100).probe(source()) == "etag:v"
+
+
+async def test_an_encoded_answer_is_decoded_within_the_size_limit() -> None:
+    layered = gzip.compress(zlib.compress(b"a\n1\n"))
+    # About 200 bytes that hold 20 MB of zeros.
+    bomb = gzip.compress(gzip.compress(bytes(20_000_000)))
+
+    def encoded(content: bytes, encoding: str) -> Server:
+        headers = {"Content-Encoding": encoding}
+        # A stream, as from the network: httpx decodes `content` when it is given.
+        stream = httpx.ByteStream(content)
+        return Server(lambda request: httpx.Response(200, headers=headers, stream=stream))
+
+    fetched = await encoded(layered, "deflate, gzip").reader().fetch(source(), TimeRange())
+    tracemalloc.start()
+    try:
+        with pytest.raises(SourceUnavailable, match="more than 100,000 bytes"):
+            await encoded(bomb, "gzip, gzip").reader(max_bytes=100_000).fetch(
+                source(), TimeRange()
+            )
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert fetched.content == b"a\n1\n"
+    # Refused while decoding, not after the 20 MB are in memory.
+    assert peak < 2_000_000
 
 
 async def test_the_probe_reads_a_declared_field_or_hashes_the_answer() -> None:
@@ -840,7 +963,11 @@ class Documents:
         self.store = DuckDbAnalysisStore(data_dir)
         self.files = LocalFileStore(data_dir)
         readers = HttpSourceReaders(
-            create_client(httpx.MockTransport(self.server)), FixedClock(), self.files, "ctxt_test"
+            create_client(httpx.MockTransport(self.server)),
+            FixedClock(),
+            self.files,
+            "ctxt_test",
+            allow_private=True,
         )
         self.service, _ = data_sources(memory, readers, self.store, FixedClock())
 
@@ -962,13 +1089,15 @@ async def test_an_uploaded_pdf_is_parsed_by_context_dev_into_pages_or_table_rows
     assert [r.url.path for r in parse] == ["/v1/parse", "/v1/parse"]
     assert parse[0].headers["authorization"] == "Bearer ctxt_test"
     assert parse[0].content == STRATEGY_PDF
-    # Context.dev's refusals are the source's readable last error.
-    documents.parsed = (402, {"message": "Insufficient credits"})
+    # Context.dev's refusals are the source's readable last error: only the status and the
+    # error code, since an authentication error may echo the key.
+    documents.parsed = (402, {"error_code": "NO_CREDITS", "message": "key ctxt_test is out"})
     broke = await documents.register(
         address=stored.address, options=engine | {"extract": "tables"}, name="B"
     )
-    with pytest.raises(Invalid, match="no credits left: Insufficient credits"):
+    with pytest.raises(Invalid, match=r"no credits left: NO_CREDITS \(HTTP 402\)$") as refused:
         await documents.service.refresh(broke.id)
+    assert "ctxt_test" not in str(refused.value)
     with pytest.raises(Invalid, match="options.engine must be one of"):
         await documents.register(options={"engine": "magic"})
 
@@ -1010,7 +1139,9 @@ def recorded() -> Recorded:
     project = factories.project()
     memory.projects[project.id] = project
     store = FakeAnalysisStore()
-    readers = HttpSourceReaders(create_client(httpx.MockTransport(replay)), clock)
+    readers = HttpSourceReaders(
+        create_client(httpx.MockTransport(replay)), clock, allow_private=True
+    )
     service, _ = data_sources(memory, readers, store, clock)
     return Recorded(service, store, replay, clock, project.id)
 
@@ -1109,10 +1240,11 @@ async def test_watch_stores_encrypted_secret_and_sets_push(
         await pages.service.watch(elsewhere.id)
 
 
-async def test_watching_again_replaces_the_monitor_and_unwatch_clears_it(
+async def test_watching_again_replaces_the_monitor_and_unwatch_restores_the_policy(
     pages: World, explorer: FakeExplorer
 ) -> None:
-    source = await pages.register(**web_page())
+    weekly = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=WEEK)
+    source = await pages.register(**web_page(freshness=weekly))
     await pages.service.watch(source.id)
 
     await pages.service.watch(source.id)
@@ -1120,8 +1252,23 @@ async def test_watching_again_replaces_the_monitor_and_unwatch_clears_it(
 
     assert [call[0] for call in explorer.calls] == ["watch", "watch", "unwatch", "unwatch"]
     assert explorer.calls[2] == ("unwatch", {"monitor_id": "mon_1"})
-    assert (unwatched.monitor_id, unwatched.freshness.kind) == (None, FreshnessKind.MANUAL)
+    assert (unwatched.monitor_id, unwatched.freshness) == (None, weekly)
     assert source.id not in pages.memory.monitor_secrets
+
+
+async def test_a_watched_address_cannot_change(pages: World) -> None:
+    source = await pages.register(**web_page())
+    watched = await pages.service.watch(source.id)
+
+    renamed = await pages.service.update(
+        source.id, watched.revision, name="Renamed", address=f" {source.address} "
+    )
+    with pytest.raises(Invalid, match="Stop watching it before changing the address"):
+        await pages.service.update(source.id, renamed.revision, address="https://x.test/b")
+    unwatched = await pages.service.unwatch(source.id)
+    moved = await pages.service.update(source.id, unwatched.revision, address="https://x.test/b")
+
+    assert moved.address == "https://x.test/b"
 
 
 async def test_a_failed_replacement_keeps_the_old_monitor(
@@ -1227,10 +1374,7 @@ def test_hook_unknown_source_is_404(watched: tuple[TestClient, str]) -> None:
     assert dispatcher(client).refreshes == []
 
 
-async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str) -> None:
-    explorer = FakeExplorer()
-    secrets = FernetSecretBox(KEY)
-
+def postgres_sources(explorer: FakeExplorer) -> Callable[[Repos], DataSources]:
     def service(repos: Repos) -> DataSources:
         session = repos.data_sources.session  # type: ignore[attr-defined]
         readers = FakeSourceReaders({AccessKind.WEB: FakeSourceReader()})
@@ -1246,9 +1390,17 @@ async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str)
             FixedClock(),
             SqlSourceLocks(session),
             explorer,
-            secrets,
+            FernetSecretBox(KEY),
             PUBLIC_URL,
         )
+
+    return service
+
+
+async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str) -> None:
+    explorer = FakeExplorer()
+    secrets = FernetSecretBox(KEY)
+    service = postgres_sources(explorer)
 
     async with engine_for(migrated_database_url) as engine:
         async with unit_of_work(engine) as repos:
@@ -1272,3 +1424,46 @@ async def test_watch_is_stored_encrypted_in_postgres(migrated_database_url: str)
     assert verified
     assert (watched.monitor_id, watched.freshness.kind) == ("mon_1", FreshnessKind.PUSH)
     assert "test-secret" not in watched.model_dump_json()
+
+
+async def test_a_policy_edit_waits_for_unwatch_in_postgres(migrated_database_url: str) -> None:
+    explorer = FakeExplorer()
+    service = postgres_sources(explorer)
+    weekly = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=WEEK)
+    deleting, deleted = asyncio.Event(), asyncio.Event()
+
+    async def unwatch(monitor_id: str) -> None:
+        deleting.set()
+        await deleted.wait()
+
+    async with engine_for(migrated_database_url) as engine:
+        async with unit_of_work(engine) as repos:
+            project = factories.project()
+            await repos.projects.add(project)
+            source = await service(repos).register(
+                project.id, "Page", AccessKind.WEB, PAGE, DataFormat.HTML, freshness=weekly
+            )
+            watched = await service(repos).watch(source.id)
+        explorer.unwatch = unwatch  # type: ignore[method-assign]
+
+        async def unwatch_source() -> DataSource:
+            async with unit_of_work(engine) as repos:
+                return await service(repos).unwatch(source.id)
+
+        async def edit() -> DataSource:
+            async with unit_of_work(engine) as repos:
+                daily = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=86_400)
+                return await service(repos).update(source.id, watched.revision, freshness=daily)
+
+        unwatching = asyncio.create_task(unwatch_source())
+        await deleting.wait()
+        editing = asyncio.create_task(edit())
+        done, _ = await asyncio.wait({editing}, timeout=0.3)
+        deleted.set()
+        unwatched = await unwatching
+        # It waited for unwatch, then found the source changed instead of being undone.
+        with pytest.raises(Conflict):
+            await editing
+
+    assert not done
+    assert unwatched.freshness == weekly

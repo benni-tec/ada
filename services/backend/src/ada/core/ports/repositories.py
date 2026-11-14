@@ -26,14 +26,16 @@ from ada.core.models.agents import (
     TurnStatus,
 )
 from ada.core.models.alerts import Alert, AlertRule, AlertState
+from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
+from ada.core.models.judges import JudgeDefaults, JudgeOverride, Verdict
 from ada.core.models.operators import Operator, OperatorId
 from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionEntry
-from ada.core.models.sources import DataSource
+from ada.core.models.sources import DataSource, FreshnessPolicy
 from ada.core.models.widgets import Widget
 
 
@@ -62,14 +64,23 @@ class DataSourceRepository(Protocol):
         ...
 
     async def set_monitor(
-        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+        self,
+        id: Id,
+        monitor_id: str | None,
+        secret_encrypted: str | None,
+        freshness_before: FreshnessPolicy | None,
     ) -> None:
-        """Store (or with None clear) the monitor that watches the source and its secret,
-        already sealed. Leaves the revision alone."""
+        """Store (or with None clear) the monitor that watches the source, its secret,
+        already sealed, and the freshness policy the source had before it was watched.
+        Leaves the revision alone."""
         ...
 
     async def monitor_secret_encrypted(self, id: Id) -> str | None:
         """The sealed secret of the source's monitor; it is never part of a DataSource."""
+        ...
+
+    async def freshness_before_watch(self, id: Id) -> FreshnessPolicy | None:
+        """The freshness policy stored with the source's monitor."""
         ...
 
 
@@ -91,12 +102,14 @@ class AgentTurnRepository(Protocol):
     async def add(self, turn: AgentTurn) -> None: ...
     async def list(self, session_id: Id) -> Sequence[AgentTurn]: ...
 
-    async def start(self, id: Id) -> bool:
-        """Move a queued turn to running. False, changing nothing, when it is not queued
-        (it was cancelled before it started, or another worker took it)."""
+    async def start(self, id: Id, at: datetime) -> bool:
+        """Move a queued turn to running, started `at`. False, changing nothing, when it is
+        not queued (it was cancelled before it started, or another worker took it)."""
         ...
 
-    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> None: ...
+    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> bool:
+        """False, changing nothing, when the turn is no longer running."""
+        ...
 
     async def finish(
         self,
@@ -105,7 +118,22 @@ class AgentTurnRepository(Protocol):
         parts: Sequence[TurnPart],
         error: str | None,
         at: datetime,
-    ) -> AgentTurn: ...
+    ) -> AgentTurn | None:
+        """End a running turn. None, changing nothing, when it is no longer running: it was
+        failed elsewhere after its worker seemed to have stopped, and stays failed."""
+        ...
+
+    async def settle(self, id: Id) -> bool:
+        """Note that an ended turn's end was announced. False when it was already, or when
+        the turn has not ended: whoever gets True announces it, once."""
+        ...
+
+    async def unsettled(
+        self, started_before: datetime, finished_before: datetime
+    ) -> Sequence[AgentTurn]:
+        """Turns whose end may never be announced: running since before `started_before`,
+        or ended before `finished_before` without their end announced."""
+        ...
 
     async def request_cancel(self, id: Id, at: datetime) -> AgentTurn:
         """Stop a turn: a queued one is cancelled at once, a running one is flagged and
@@ -224,13 +252,50 @@ class WidgetRepository(Protocol):
         change wins."""
         ...
 
+    async def set_render_error(self, id: Id, error: str | None) -> None:
+        """Store only what went wrong drawing the widget, so a frame's report never undoes
+        a change made at the same moment."""
+        ...
+
     async def list(self, project_id: Id) -> Sequence[Widget]: ...
     async def list_by_session(self, session_id: Id) -> Sequence[Widget]: ...
+
+    async def set_verdict(self, id: Id, verdict: Verdict | None) -> None:
+        """Store a judge's verdict on the widget, and nothing else: a plain write of that
+        one field, so a review that ends during an edit never puts back an old spec."""
+        ...
+
+
+class JudgeSettingsRepository(Protocol):
+    """The judges' global defaults (one record per kind, which always exists) and the
+    projects' overrides. Model ids name a stored model; a deleted model is cleared, as for
+    the session agent."""
+
+    async def defaults(self) -> Sequence[JudgeDefaults]: ...
+
+    async def update_defaults(
+        self, defaults: JudgeDefaults, expected_revision: int
+    ) -> JudgeDefaults: ...
+
+    async def overrides(self, project_id: Id) -> Sequence[JudgeOverride]:
+        """The project's overrides that exist, at most one per kind."""
+        ...
+
+    async def save_override(self, override: JudgeOverride, expected_revision: int) -> JudgeOverride:
+        """Store the override; `expected_revision` 0 adds it (Conflict when one exists)."""
+        ...
 
 
 class DashboardRepository(Protocol):
     async def get(self, id: Id) -> Dashboard: ...
-    async def list(self, project_id: Id) -> Sequence[Dashboard]: ...
+    async def list(self, project_id: Id) -> Sequence[Dashboard]:
+        """In the order people gave them, then the unplaced ones oldest first."""
+        ...
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        """Place the given dashboards in this order, leaving their revisions as they are."""
+        ...
+
     async def add(self, dashboard: Dashboard) -> None: ...
     async def update(self, dashboard: Dashboard, expected_revision: int) -> Dashboard: ...
     async def add_version(self, version: DashboardVersion) -> None: ...
@@ -247,7 +312,14 @@ class TemplateRepository(Protocol):
 
 class ReportRepository(Protocol):
     async def get(self, id: Id) -> Report: ...
-    async def list(self, project_id: Id) -> Sequence[Report]: ...
+    async def list(self, project_id: Id) -> Sequence[Report]:
+        """In the order people gave them, then the unplaced ones oldest first."""
+        ...
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        """Place the given reports in this order, leaving their revisions as they are."""
+        ...
+
     async def add(self, report: Report) -> None: ...
     async def update(self, report: Report, expected_revision: int) -> Report: ...
     async def add_version(self, version: ReportVersion) -> None: ...
@@ -285,4 +357,26 @@ class AlertRepository(Protocol):
 
     async def list(self, project_id: Id, state: AlertState | None = None) -> Sequence[Alert]:
         """Newest first."""
+        ...
+
+
+class AttachmentRepository(Protocol):
+    """What is attached to sessions. An attachment is only added or removed; a session has
+    each thing (kind and ref) attached at most once."""
+
+    async def get(self, id: Id) -> Attachment: ...
+    async def list(self, session_id: Id) -> Sequence[Attachment]: ...
+
+    async def add(self, attachment: Attachment) -> Attachment:
+        """Store the attachment, or return the stored one when the session already has the
+        same kind and ref attached: attaching twice is not an error. The session must
+        exist."""
+        ...
+
+    async def remove(self, id: Id) -> None:
+        """Remove an attachment; NotFound when there is none."""
+        ...
+
+    async def sessions_with(self, kind: AttachmentKind, ref: str) -> Sequence[Id]:
+        """The sessions that have this thing attached, in the order it was attached."""
         ...

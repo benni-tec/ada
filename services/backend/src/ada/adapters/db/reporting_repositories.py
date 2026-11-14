@@ -11,10 +11,12 @@ from ada.adapters.db.support import (
     dump,
     dump_all,
     fetch,
+    in_position_order,
     json_object,
     oldest_first,
     require,
     rows,
+    set_positions,
     update_row,
 )
 from ada.adapters.db.tables import (
@@ -45,6 +47,7 @@ def _dashboard(row: DashboardRow) -> Dashboard:
         default_time_range=TimeRange(start=row.default_time_start, end=row.default_time_end),
         created_at=row.created_at,
         revision=row.revision,
+        position=row.position,
     )
 
 
@@ -77,8 +80,11 @@ class SqlDashboardRepository(DashboardRepository):
         return _dashboard(await fetch(self.session, DashboardRow, id, "dashboard"))
 
     async def list(self, project_id: Id) -> Sequence[Dashboard]:
-        statement = oldest_first(DashboardRow, DashboardRow.project_id == project_id)
+        statement = in_position_order(DashboardRow, DashboardRow.project_id == project_id)
         return [_dashboard(row) for row in await rows(self.session, statement)]
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        await set_positions(self.session, DashboardRow, project_id, ids)
 
     async def add(self, dashboard: Dashboard) -> None:
         row = DashboardRow(
@@ -190,6 +196,7 @@ def _report(row: ReportRow) -> Report:
         latest_version_id=row.latest_version_id,
         created_at=row.created_at,
         revision=row.revision,
+        position=row.position,
     )
 
 
@@ -225,8 +232,11 @@ class SqlReportRepository(ReportRepository):
         return _report(await fetch(self.session, ReportRow, id, "report"))
 
     async def list(self, project_id: Id) -> Sequence[Report]:
-        statement = oldest_first(ReportRow, ReportRow.project_id == project_id)
+        statement = in_position_order(ReportRow, ReportRow.project_id == project_id)
         return [_report(row) for row in await rows(self.session, statement)]
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        await set_positions(self.session, ReportRow, project_id, ids)
 
     async def add(self, report: Report) -> None:
         row = ReportRow(

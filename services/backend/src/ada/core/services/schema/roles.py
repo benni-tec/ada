@@ -2,13 +2,15 @@
 fills, and a widget against the roles and columns it needs. Everything here runs before
 any data is fetched (spec: Operators declare their output schema)."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from ada.core.models.base import JsonObject
 from ada.core.models.errors import Invalid
 from ada.core.models.schema import Column, ColumnType, MeasureRole, OutputKind, Roles, Schema
+from ada.core.models.widgets import MAIN_INPUT
 from ada.core.services.schema.geo import MIXED
 from ada.core.services.widgets.specs import chart_problems, table_problems, value_problems
+from ada.core.services.widgets.text import TEXT_TYPE, text_problems
 
 NUMERIC = frozenset({ColumnType.INTEGER, ColumnType.NUMBER})
 TIME = frozenset({ColumnType.DATE, ColumnType.TIMESTAMP})
@@ -91,18 +93,32 @@ def check_compatible(slot: Roles, bound: Roles, what: str) -> None:
         raise Invalid(f"{what} does not have the slot's roles: " + "; ".join(problems))
 
 
-def check_widget(type: str, output: Schema, spec: JsonObject) -> None:
+def check_widget(
+    type: str, output: Schema, spec: JsonObject, inputs: Mapping[str, Schema] | None = None
+) -> list[str]:
     """Whether a widget of this type can show the output: the roles and columns it needs
     are declared, and what its spec names exists. Columns that are not known yet (a
     source registered without a schema) are not checked; roles always are. Types the
-    platform does not know are not checked."""
+    platform does not know are not checked.
+
+    A text widget reads all its inputs (`inputs`, by name, "main" among them): its
+    placeholders are checked against them. Returns the warnings: what is not wrong but
+    likely unintended, e.g. an input no placeholder reads."""
+    if type == TEXT_TYPE:
+        problems, warnings = text_problems(
+            spec, inputs if inputs is not None else {MAIN_INPUT: output}
+        )
+        if problems:
+            raise Invalid("A text widget cannot show its inputs: " + "; ".join(problems))
+        return warnings
     if type not in _NEEDS:
-        return
+        return []
     if output.kind is not OutputKind.TABLE:
         raise Invalid(f"A {type} widget shows a table; operator output is a {output.kind.value}")
     problems = _NEEDS[type](output, spec, {column.name: column for column in output.columns})
     if problems:
         raise Invalid(f"A {type} widget cannot show this output: " + "; ".join(problems))
+    return []
 
 
 type _Columns = dict[str, Column]

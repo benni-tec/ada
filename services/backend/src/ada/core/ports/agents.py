@@ -103,12 +103,18 @@ class TurnProgress(Protocol):
     invisible until the end, and the turn's row would stay locked, so a cancel request
     would wait for the turn it means to stop."""
 
-    async def start(self, id: Id) -> bool:
+    async def start(self, id: Id, at: datetime) -> bool:
         """As AgentTurnRepository.start."""
         ...
 
     async def checkpoint(self, id: Id, parts: Sequence[TurnPart]) -> bool:
-        """Store the parts; True when a cancel was requested meanwhile."""
+        """Store the parts; True when the turn should stop: a cancel was requested
+        meanwhile, or it no longer runs (and nothing is stored)."""
+        ...
+
+    async def running(self, id: Id) -> bool:
+        """Whether the turn still runs. Asked before each tool call, so a worker whose turn
+        was failed meanwhile changes nothing more."""
         ...
 
     async def finish(
@@ -118,7 +124,9 @@ class TurnProgress(Protocol):
         parts: Sequence[TurnPart],
         error: str | None,
         at: datetime,
-    ) -> AgentTurn: ...
+    ) -> AgentTurn | None:
+        """As AgentTurnRepository.finish."""
+        ...
 
     async def session_turns(self, id: Id) -> Sequence[AgentTurn]:
         """The turns of turn `id`'s session, oldest first: read afresh at every call, by a

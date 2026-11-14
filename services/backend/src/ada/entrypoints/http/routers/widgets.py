@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, status
 
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.operators import OperatorId
-from ada.core.models.widgets import Widget, WidgetData
+from ada.core.models.widgets import MAIN_INPUT, Widget, WidgetData
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.http.actor import WEB
@@ -25,6 +25,8 @@ class NewWidget(Request):
     spec: JsonObject | None = None
     note: str = ""
     session_id: Id | None = None
+    # Further operators the widget reads, by name; its own is the input "main".
+    inputs: dict[str, OperatorId] | None = None
 
 
 @router.post("/projects/{project_id}/widgets", status_code=status.HTTP_201_CREATED)
@@ -44,6 +46,7 @@ async def create_widget(
         spec=body.spec,
         note=body.note,
         session_id=body.session_id,
+        inputs=body.inputs,
     )
 
 
@@ -62,12 +65,13 @@ async def get_widget(widget_id: Id, service: FromDishka[WidgetService]) -> Widge
 
 
 class WidgetChange(Request):
-    """Fields left out stay as they are; a spec replaces the old one whole."""
+    """Fields left out stay as they are; a spec or inputs replace the old ones whole."""
 
     title: str | None = None
     note: str | None = None
     type: str | None = None
     spec: JsonObject | None = None
+    inputs: dict[str, OperatorId] | None = None
 
 
 @router.patch("/widgets/{widget_id}")
@@ -75,8 +79,28 @@ async def update_widget(
     widget_id: Id, body: WidgetChange, service: FromDishka[WidgetService]
 ) -> Widget:
     return await service.update(
-        widget_id, title=body.title, note=body.note, type=body.type, spec=body.spec
+        widget_id,
+        title=body.title,
+        note=body.note,
+        type=body.type,
+        spec=body.spec,
+        inputs=body.inputs,
     )
+
+
+class RenderReport(Request):
+    """What the widget's frame found when it drew: the error, or null when it drew."""
+
+    error: str | None
+
+
+@router.post("/widgets/{widget_id}/render", status_code=status.HTTP_204_NO_CONTENT)
+async def report_render(
+    widget_id: Id, body: RenderReport, service: FromDishka[WidgetService]
+) -> None:
+    """Called by the widget's frame only. Kept as `render_error`, so the agent that wrote the
+    widget sees it; announced with `widget.updated` when it changed."""
+    await service.report_render(widget_id, body.error)
 
 
 @router.get("/widgets/{widget_id}/data")
@@ -85,7 +109,8 @@ async def get_widget_data(
     service: FromDishka[WidgetService],
     run_id: Id | None = None,
     limit: Annotated[int, Query(ge=1, le=MAX_ROWS)] = 1000,
+    input: str = MAIN_INPUT,
 ) -> WidgetData:
-    """What the widget shows. Without `run_id` a new run is started, with no bindings and
-    an open time range."""
-    return await service.data(widget_id, run_id, limit)
+    """What the widget shows: one input ("main", its own operator, by default). Without
+    `run_id` a new run is started, with no bindings and an open time range."""
+    return await service.data(widget_id, run_id, limit, input)

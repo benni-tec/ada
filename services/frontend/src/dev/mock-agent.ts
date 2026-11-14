@@ -7,7 +7,7 @@
 // never written to the backend. Every other request goes through unchanged. Its turns
 // stream like the real ones, as `agent.turn_part` events on the page's live stream.
 
-import type { AgentTurn, Context, LlmModels, Part, Pipeline, Session, SessionEntry } from '@/lib/api'
+import type { AgentTurn, Attachment, Context, LlmModels, Part, Pipeline, Session, SessionEntry } from '@/lib/api'
 
 const flag = 'ada-mock-agent'
 
@@ -34,6 +34,8 @@ const models: LlmModels = {
 const entries = new Map<string, SessionEntry[]>()
 const turns = new Map<string, AgentTurn>()
 const panelSessions = new Map<string, Session>()
+/** A dashboard agent session's attachments: its dashboard, as the backend attaches it. */
+const panelAttachments = new Map<string, Attachment[]>()
 const streams: EventSource[] = []
 let counter = 0
 const nextId = (prefix: string) => `${prefix}-mock-${++counter}`
@@ -142,16 +144,28 @@ export function installMockAgent() {
           project_id: view.dashboard.project_id,
           title: `${view.dashboard.name} (agent)`,
           origin_dashboard_id: dashboardId,
-          panel_dashboard_id: dashboardId,
           agent: 'session',
           created_at: new Date().toISOString(),
           revision: 1,
         }
         panelSessions.set(dashboardId, session)
+        panelAttachments.set(session.id, [
+          {
+            id: nextId('attachment'),
+            session_id: session.id,
+            kind: 'dashboard',
+            ref: dashboardId,
+            title: view.dashboard.name,
+            actor: { kind: 'system', name: 'ada' },
+            created_at: session.created_at,
+          },
+        ])
         sessionProjects.set(session.id, session.project_id)
       }
       return respond(session, 201)
     }
+    if (method === 'GET' && (match = /^\/api\/sessions\/([^/]+-mock-[^/]+)\/attachments$/.exec(pathname)))
+      return respond(panelAttachments.get(match[1]) ?? [])
     if ((match = /^\/api\/sessions\/([^/]+)\/(entries|widgets|messages)$/.exec(pathname))) {
       const [, sessionId, what] = match
       const mockSession = sessionId.includes('-mock-')

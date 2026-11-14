@@ -5,7 +5,8 @@ Called over REST (https://api.context.dev/v1, `Authorization: Bearer <key>`). Ex
 the parameters of the WebExplorer port are sent, and every request that reads carries the
 caller's `tags`; nothing else of the API (screenshots, browser actions, profiles,
 policies, ZDR) is reachable from here. A read that fails keeps HTTP 200 with
-`success: false` in its format; only a malformed request is an HTTP error.
+`success: false` in its format; only a malformed request is an HTTP error. Such a failure
+quotes only its checked error code: the rest of the answer may carry the page's own text.
 """
 
 from collections.abc import Sequence
@@ -14,6 +15,7 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
+from ada.adapters.web import error_code
 from ada.core.models.base import JsonObject
 from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.web import (
@@ -54,7 +56,7 @@ class ContextDevWeb(WebExplorer):
             body["sharedParams"] = {"mainContentOnly": True}
             body["markdownParams"] = {"includeLinks": False}
         answer = await self._send("POST", "/web/scrape", f"read {url}", tags, json=body)
-        markdown = _format(answer, "markdown", url)
+        markdown = self._format(answer, "markdown", url)
         metadata = answer.get("metadata") or {}
         return WebPage(
             url=str(answer.get("url") or url),
@@ -87,7 +89,7 @@ class ContextDevWeb(WebExplorer):
             "jsonParams": {"schema": schema, "instructions": instruction},
         }
         answer = await self._send("POST", "/web/scrape", f"extract from {url}", tags, json=body)
-        data = _format(answer, "json", url)
+        data = self._format(answer, "json", url)
         rows = data.get("rows") if isinstance(data, dict) else None
         return Extraction(
             rows=[row for row in rows or [] if isinstance(row, dict)],
@@ -169,6 +171,15 @@ class ContextDevWeb(WebExplorer):
             # Deleted at Context.dev already: the goal is reached.
             pass
 
+    def _format(self, answer: JsonObject, name: str, url: str) -> Any:
+        """The data of one requested format, or Invalid with Context.dev's error code."""
+        part = answer.get(name) or {}
+        if part.get("success") and part.get("data") is not None:
+            return part["data"]
+        assert self.api_key  # it answered, so the key was sent
+        code = error_code(part, self.api_key) or error_code(answer, self.api_key)
+        raise Invalid(f"Context.dev could not read {url}: {code or f'no {name}'}")
+
     async def _send(
         self, method: str, path: str, what: str, tags: Sequence[str] | None, **kwargs: Any
     ) -> JsonObject:
@@ -214,15 +225,6 @@ class ContextDevWeb(WebExplorer):
 
 class _Gone(Invalid):
     """What was to be deleted is not there."""
-
-
-def _format(answer: JsonObject, name: str, url: str) -> Any:
-    """The data of one requested format, or Invalid with Context.dev's reason."""
-    part = answer.get(name) or {}
-    if part.get("success") and part.get("data") is not None:
-        return part["data"]
-    reason = part.get("message") or part.get("error_code") or f"no {name}"
-    raise Invalid(f"Context.dev could not read {url}: {reason}")
 
 
 def _credits(answer: JsonObject, default: int) -> int:

@@ -80,6 +80,8 @@ moon run root:logs
 moon run root:down
 ```
 
+CI deploys main to a shared VM: see [docs/deploy.md](docs/deploy.md).
+
 ### Versions
 
 CI publishes every image to `ghcr.io/benni-tec/ada/<service>` with two tags: `latest`, and

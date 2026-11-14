@@ -15,6 +15,7 @@ MAX_SEARCH_RESULTS = 10
 MAX_READ_CHARS = 60_000
 MAX_EXTRACT_COLUMNS = 30
 MAX_INSTRUCTION_CHARS = 2000
+MAX_COLUMN_CHARS = 100
 MAX_MAP_LINKS = 500
 
 # What each web tool spends of the project's daily web credits. Context.dev's are its own

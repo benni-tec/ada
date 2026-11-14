@@ -30,15 +30,21 @@ from ada.core.ports.repositories import (
     WidgetRepository,
 )
 from ada.core.ports.system import Clock
+from ada.core.services.order import check_order, order_changed
 from ada.core.services.ports.dashboards import DashboardService
+from ada.core.services.ports.judges import JudgeService
 from ada.core.services.ports.reports import ReportService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.reports import content as tree
 from ada.core.services.reports.sources import SourcesList
 from ada.core.services.reports.versions import FIRST, State, decide, parse_version, required
+from ada.core.services.widgets.review import WidgetJudging, store_verdict
+from ada.core.services.widgets.text import TEXT_TYPE
 
 # The content that fills a template instead of spelling out a tree: {"slots": {name: id}}.
 FILL_KEY = "slots"
+# What a widget shows a reader; a version's copy keeps all of it.
+SHOWN = {"operator_id", "inputs", "type", "title", "spec", "note"}
 
 
 class Reports(ReportService):
@@ -62,6 +68,7 @@ class Reports(ReportService):
         data_sources: DataSourceRepository,
         dashboards: DashboardService,
         runs: RunService,
+        judges: JudgeService,
         events: EventPublisher,
         clock: Clock,
     ) -> None:
@@ -75,12 +82,20 @@ class Reports(ReportService):
         self.events = events
         self.clock = clock
         self.sources_list = SourcesList(operators, snapshots, data_sources)
+        self.judging = WidgetJudging(runs, operators, judges)
 
     async def get(self, id: Id) -> Report:
         return await self.reports.get(id)
 
     async def list(self, project_id: Id) -> Sequence[Report]:
         await self.projects.get(project_id)
+        return await self.reports.list(project_id)
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> Sequence[Report]:
+        current = await self.list(project_id)
+        check_order("report", [report.id for report in current], ids)
+        await self.reports.reorder(project_id, ids)
+        await self.events.publish(order_changed(project_id, "reports", self.clock.now()))
         return await self.reports.list(project_id)
 
     async def version(self, version_id: Id) -> ReportVersion:
@@ -213,6 +228,7 @@ class Reports(ReportService):
         await self._check_owner(project_id, session_id, dashboard_id)
         if await self._named(project_id, name, session_id, dashboard_id) is not None:
             raise Invalid(f"There is a report named {name!r} already; add a version to it instead")
+        run = await self._prepare(blocks, run)
         version_id = uuid7()
         report = Report(
             id=uuid7(),
@@ -249,17 +265,18 @@ class Reports(ReportService):
         template_id: Id | None,
         dashboard_version_id: Id | None,
     ) -> ReportVersion:
+        stored = tree.stored_blocks(latest.content)
         previous = State(
-            operators=await self._operators(tree.stored_blocks(latest.content)),
+            operators=await self._operators(stored),
             run_id=latest.run_id,
             time_range=latest.time_range,
-            blocks=latest.content.get(tree.BLOCKS_KEY, []),
+            blocks=await self._as_read(stored),
         )
         following = State(
             operators=await self._operators(blocks),
             run_id=run.id,
             time_range=time_range,
-            blocks=tree.dump(blocks),
+            blocks=await self._as_read(blocks),
         )
         need = required(previous, following)
         if need is None:
@@ -268,6 +285,7 @@ class Reports(ReportService):
                 "range and text"
             )
         number = decide(latest.version, need, bump)
+        run = await self._prepare(blocks, run)
         version_id = uuid7()
         # Moving the pointer is the write that two concurrent versions conflict on.
         report = await self.reports.update(
@@ -297,11 +315,13 @@ class Reports(ReportService):
         template_id: Id | None,
         dashboard_version_id: Id | None,
     ) -> ReportVersion:
-        widgets = [await self.widgets.get(id) for id in tree.widget_ids(blocks)]
-        for operator_id in dict.fromkeys(widget.operator_id for widget in widgets):
-            # Fixes the snapshots the widget reads; a run reused by a later version
-            # keeps what it fixed first.
-            run = await self.runs.execute(run.id, operator_id)
+        # Read after `_prepare` ran and reviewed them, so the copies carry the verdicts.
+        originals = [await self.widgets.get(id) for id in tree.widget_ids(blocks)]
+        # The version shows copies of its own, so it keeps every widget's spec (a custom
+        # widget's code too) when the original is changed later.
+        copies = {widget.id: await self._copy(widget, actor) for widget in originals}
+        blocks = tree.renamed(blocks, {id: copy.id for id, copy in copies.items()})
+        widgets = list(copies.values())
         version = ReportVersion(
             id=version_id,
             report_id=report.id,
@@ -332,6 +352,84 @@ class Reports(ReportService):
         )
         return version
 
+    async def _copy(self, original: Widget, actor: Actor) -> Widget:
+        """A version's own copy of a widget it shows, made as a dashboard's copy is: it
+        points at the original made in a session, has no session, and carries the
+        original's inputs and verdict."""
+        copy = Widget(
+            id=uuid7(),
+            project_id=original.project_id,
+            operator_id=original.operator_id,
+            inputs=original.inputs,
+            type=original.type,
+            title=original.title,
+            spec=original.spec,
+            note=original.note,
+            verdict=original.verdict,
+            created_by=actor,
+            created_at=self.clock.now(),
+            copied_from=original.copied_from or original.id,
+        )
+        await self.widgets.add(copy)
+        await self.events.publish(
+            Event(
+                type=EventType.WIDGET_CREATED,
+                project_id=copy.project_id,
+                payload={"widget_id": str(copy.id)},
+                at=self.clock.now(),
+            )
+        )
+        return copy
+
+    async def _as_read(self, blocks: Sequence[tree.Block]) -> list[Any]:
+        """The stored form of the blocks with each widget named by what it shows instead
+        of its id: every version names copies of its own, so two versions show the same
+        widgets when their copies show the same."""
+        shown = {
+            str(id): (await self._widget(id)).model_dump(mode="json", include=SHOWN)
+            for id in tree.widget_ids(blocks)
+        }
+        return _named_by(tree.dump(blocks), shown)
+
+    async def _prepare(self, blocks: Sequence[tree.Block], run: Run) -> Run:
+        """The run with every widget's operators executed, and the text widgets reviewed on
+        it, before anything of the version is written."""
+        widgets = [await self.widgets.get(id) for id in tree.widget_ids(blocks)]
+        # Every input of every widget, so a widget with several inputs is frozen whole.
+        operators = (op for widget in widgets for op in widget.all_inputs().values())
+        for operator_id in dict.fromkeys(operators):
+            # Fixes the snapshots the widget reads; a run reused by a later version
+            # keeps what it fixed first.
+            run = await self.runs.execute(run.id, operator_id)
+        await self._review(widgets, run)
+        return run
+
+    async def _review(self, widgets: Sequence[Widget], run: Run) -> None:
+        """The judge reads every text widget as the version shows it, on the version's run.
+        A blocking verdict refuses the version, naming the findings; any other is stored
+        on its widget."""
+        refused: list[str] = []
+        for widget in widgets:
+            if widget.type != TEXT_TYPE:
+                continue
+            verdict = await self.judging.review(widget, run.id)
+            if verdict is None:
+                continue
+            if verdict.blocking:
+                findings = "; ".join(
+                    f'{finding.message} ("{finding.excerpt}")'
+                    for finding in verdict.findings
+                    if finding.severity == "error"
+                )
+                refused.append(f'"{widget.title}" ({widget.id}): {findings}')
+            else:
+                await store_verdict(self.widgets, self.events, self.clock, widget, verdict)
+        if refused:
+            raise Invalid(
+                "The judge refused text widgets of this version; fix them with update_widget "
+                "and try again: " + " | ".join(refused)
+            )
+
     # Checks
 
     async def _blocks(
@@ -361,7 +459,8 @@ class Reports(ReportService):
             raise Invalid(f"The content shows widget {widget_id}, which does not exist") from None
 
     async def _operators(self, blocks: Sequence[tree.Block]) -> frozenset[str]:
-        return frozenset([(await self._widget(id)).operator_id for id in tree.widget_ids(blocks)])
+        widgets = [await self._widget(id) for id in tree.widget_ids(blocks)]
+        return frozenset(op for widget in widgets for op in widget.all_inputs().values())
 
     async def _template(self, template_id: Id | None, project_id: Id) -> Template | None:
         if template_id is None:
@@ -463,6 +562,17 @@ def _fill(template: Template, given: Any) -> tuple[tree.Block, ...]:
     if missing:
         raise Invalid(f"Fill every slot of the template; missing: {missing}")
     return tree.fill(tree.stored_blocks(template.content), widgets)
+
+
+def _named_by(node: Any, shown: dict[str, Any]) -> Any:
+    """Stored blocks with each widget block's `widget_id` replaced by what it shows."""
+    if isinstance(node, list):
+        return [_named_by(item, shown) for item in node]
+    if isinstance(node, dict):
+        if node.get("type") == "widget" and node.get("widget_id") in shown:
+            return {**node, "widget_id": shown[node["widget_id"]]}
+        return {key: _named_by(value, shown) for key, value in node.items()}
+    return node
 
 
 def _dashboard_blocks(slots: Sequence[Slot]) -> tuple[tree.Block, ...]:

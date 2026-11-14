@@ -57,12 +57,18 @@ function withPlainYears(node: unknown, years: Set<string>): unknown {
   return out
 }
 
+/** Whether the chart has a height of its own (a composed view, or a single view whose
+ * spec sets its height, e.g. `{step: 20}` for a heatmap) rather than taking the frame's. */
+export function sizesItself(spec: Record<string, unknown>): boolean {
+  return !isSingleView(spec as Json) || (spec.height !== undefined && spec.height !== 'container')
+}
+
 /**
  * The spec to render: the widget's Vega-Lite spec with the operator's rows as its data.
  * A single view fills the frame (`width`/`height: "container"`, autosize fit) unless the
  * spec sizes itself. Year columns are written without thousands separators.
  */
-export function chartSpec({ widget, data, roles }: Loaded): Json {
+export function chartSpec({ widget, data, roles }: Pick<Loaded, 'widget' | 'data' | 'roles'>): Json {
   const years = new Set(data.columns.filter((column) => isPlainColumn(column, roles)).map((column) => column.name))
   const spec = withPlainYears(widget.spec, years) as Json
   const single = isSingleView(spec)

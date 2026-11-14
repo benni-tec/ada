@@ -5,7 +5,9 @@ those directly."""
 import hashlib
 import hmac
 import json
+import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -13,9 +15,11 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
+from ada.core.models.agents import ModelTarget
 from ada.core.models.analysis import FetchedData, Query, Rows, StoredSnapshot
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.errors import Invalid
+from ada.core.models.judges import Finding, JudgeContext
 from ada.core.models.schema import Column, Schema
 from ada.core.models.sources import AccessKind, DataFormat, DataSource
 from ada.core.models.time import TimeRange
@@ -30,6 +34,7 @@ from ada.core.models.web import (
     WebPage,
 )
 from ada.core.ports.analysis import AnalysisStore
+from ada.core.ports.judges import JudgeModel
 from ada.core.ports.sources import SourceReader, SourceReaders
 from ada.core.ports.system import Clock
 from ada.core.ports.web import WebExplorer, WebSearch
@@ -318,3 +323,44 @@ def context_signature(secret: str, body: bytes, at: int) -> str:
     """The x-context-signature header Context.dev sends for a delivery made at unix time `at`."""
     digest = hmac.new(secret.encode(), f"{at}.".encode() + body, hashlib.sha256).hexdigest()
     return f"t={at},v1={digest}"
+
+
+# Outside a resolved placeholder (⟦...⟧): a number with digits, a figure the text typed.
+_TYPED = re.compile(r"⟦[^⟧]*⟧|(\d[\d,.]*\s*%?)")
+# A literal array of three or more numbers in code.
+_ARRAY = re.compile(r"\[\s*-?\d[\d.]*(\s*,\s*-?\d[\d.]*){2,}\s*\]")
+
+
+@dataclass
+class JudgeCall:
+    model: ModelTarget
+    system: str
+    content: str
+    context: JudgeContext
+
+
+class FakeJudgeModel(JudgeModel):
+    """A judge that applies a crude rule of its kind: a text widget fails for a number typed
+    outside a resolved placeholder, widget code for a literal array of numbers. Set
+    `failure` to make the call fail. Records every call."""
+
+    def __init__(self) -> None:
+        self.calls: list[JudgeCall] = []
+        self.failure: Exception | None = None
+
+    async def decide(
+        self, model: ModelTarget, system: str, content: str, context: JudgeContext
+    ) -> tuple[Finding, ...]:
+        self.calls.append(JudgeCall(model, system, content, context))
+        if self.failure is not None:
+            raise self.failure
+        if "text widgets" in system:
+            typed = [m.group(1) for m in _TYPED.finditer(content) if m.group(1)]
+            return tuple(
+                Finding(message="Use a placeholder for this figure", excerpt=figure.strip())
+                for figure in typed
+            )
+        return tuple(
+            Finding(message="Data comes from the inputs", excerpt=m.group(0))
+            for m in _ARRAY.finditer(content)
+        )

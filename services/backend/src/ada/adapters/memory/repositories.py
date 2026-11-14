@@ -18,15 +18,17 @@ from ada.core.models.agents import (
     TurnStatus,
 )
 from ada.core.models.alerts import Alert, AlertRule, AlertState
+from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
 from ada.core.models.errors import Conflict, NotFound
+from ada.core.models.judges import JudgeDefaults, JudgeKind, JudgeOverride, Verdict
 from ada.core.models.operators import Operator, OperatorId, OperatorKind
 from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionAgent, SessionEntry
-from ada.core.models.sources import DataSource
+from ada.core.models.sources import DataSource, FreshnessPolicy
 from ada.core.models.widgets import Widget
 from ada.core.ports.agents import ResearchCalls, TurnProgress
 from ada.core.ports.repositories import (
@@ -34,8 +36,10 @@ from ada.core.ports.repositories import (
     AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
+    AttachmentRepository,
     DashboardRepository,
     DataSourceRepository,
+    JudgeSettingsRepository,
     LlmModelRepository,
     LlmProviderRepository,
     OperatorRepository,
@@ -59,6 +63,7 @@ class MemoryStore:
         self.data_sources: dict[Id, DataSource] = {}
         self.sessions: dict[Id, Session] = {}
         self.session_entries: list[SessionEntry] = []
+        self.attachments: dict[Id, Attachment] = {}
         self.operators: dict[OperatorId, Operator] = {}
         self.snapshots: dict[Id, Snapshot] = {}
         self.runs: dict[Id, Run] = {}
@@ -72,6 +77,8 @@ class MemoryStore:
         self.alerts: dict[Id, Alert] = {}
         self.agent_turns: dict[Id, AgentTurn] = {}
         self.cancel_requests: set[Id] = set()
+        self.turn_starts: dict[Id, datetime] = {}
+        self.settled_turns: set[Id] = set()
         self.llm_providers: dict[Id, LlmProvider] = {}
         # Provider id -> the encrypted key.
         self.llm_api_keys: dict[Id, str] = {}
@@ -84,8 +91,16 @@ class MemoryStore:
         self.research_agent: tuple[Id, str] | None = None
         # Source id -> the sealed secret of its monitor.
         self.monitor_secrets: dict[Id, str] = {}
+        self.freshness_before_watch: dict[Id, FreshnessPolicy] = {}
         # Session id -> its paid web calls.
         self.web_calls: dict[Id, int] = {}
+        # The judges' defaults, one per kind from the start, as the migration seeds them;
+        # and the projects' overrides. Their model ids are checked when read, so a deleted
+        # model reads as none, as the database's SET NULL has it.
+        self.judge_defaults: dict[JudgeKind, JudgeDefaults] = {
+            kind: JudgeDefaults(kind=kind, revision=1) for kind in JudgeKind
+        }
+        self.judge_overrides: dict[tuple[Id, JudgeKind], JudgeOverride] = {}
 
     def forget_model(self, key: tuple[Id, str]) -> None:
         """Remove a model and clear the selections naming it, as ON DELETE SET NULL does."""
@@ -117,6 +132,22 @@ def _update[M: DomainModel](records: dict[Any, M], kind: str, model: M, expected
 
 def _in_project[M](records: dict[Any, M], project_id: Id) -> list[M]:
     return [r for r in records.values() if r.project_id == project_id]  # type: ignore[attr-defined]
+
+
+def _in_position_order[M: Dashboard | Report](records: list[M]) -> list[M]:
+    return sorted(
+        records,
+        key=lambda r: (r.position is None, r.position or 0, r.created_at, r.id),
+    )
+
+
+def _set_positions[M: Dashboard | Report](
+    records: dict[Id, M], project_id: Id, ids: Sequence[Id]
+) -> None:
+    for position, id in enumerate(ids):
+        record = records.get(id)
+        if record is not None and record.project_id == project_id:
+            records[id] = record.model_copy(update={"position": position})
 
 
 class MemoryProjectRepository(ProjectRepository):
@@ -167,7 +198,11 @@ class MemoryDataSourceRepository(DataSourceRepository):
         )
 
     async def set_monitor(
-        self, id: Id, monitor_id: str | None, secret_encrypted: str | None
+        self,
+        id: Id,
+        monitor_id: str | None,
+        secret_encrypted: str | None,
+        freshness_before: FreshnessPolicy | None,
     ) -> None:
         source = await self.get(id)
         self.store.data_sources[id] = source.model_copy(update={"monitor_id": monitor_id})
@@ -175,10 +210,18 @@ class MemoryDataSourceRepository(DataSourceRepository):
             self.store.monitor_secrets.pop(id, None)
         else:
             self.store.monitor_secrets[id] = secret_encrypted
+        if freshness_before is None:
+            self.store.freshness_before_watch.pop(id, None)
+        else:
+            self.store.freshness_before_watch[id] = freshness_before
 
     async def monitor_secret_encrypted(self, id: Id) -> str | None:
         await self.get(id)
         return self.store.monitor_secrets.get(id)
+
+    async def freshness_before_watch(self, id: Id) -> FreshnessPolicy | None:
+        await self.get(id)
+        return self.store.freshness_before_watch.get(id)
 
 
 class MemorySessionRepository(SessionRepository):
@@ -203,6 +246,34 @@ class MemorySessionRepository(SessionRepository):
 
     async def entries(self, session_id: Id) -> Sequence[SessionEntry]:
         return [e for e in self.store.session_entries if e.session_id == session_id]
+
+
+class MemoryAttachmentRepository(AttachmentRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def get(self, id: Id) -> Attachment:
+        return _get(self.store.attachments, "attachment", id)
+
+    async def list(self, session_id: Id) -> Sequence[Attachment]:
+        return [a for a in self.store.attachments.values() if a.session_id == session_id]
+
+    async def add(self, attachment: Attachment) -> Attachment:
+        _get(self.store.sessions, "session", attachment.session_id)
+        for stored in await self.list(attachment.session_id):
+            if (stored.kind, stored.ref) == (attachment.kind, attachment.ref):
+                return stored
+        self.store.attachments[attachment.id] = attachment
+        return attachment
+
+    async def remove(self, id: Id) -> None:
+        await self.get(id)
+        del self.store.attachments[id]
+
+    async def sessions_with(self, kind: AttachmentKind, ref: str) -> Sequence[Id]:
+        return [
+            a.session_id for a in self.store.attachments.values() if (a.kind, a.ref) == (kind, ref)
+        ]
 
 
 class MemoryOperatorRepository(OperatorRepository):
@@ -306,11 +377,19 @@ class MemoryWidgetRepository(WidgetRepository):
         _get(self.store.widgets, "widget", widget.id)
         self.store.widgets[widget.id] = widget
 
+    async def set_render_error(self, id: Id, error: str | None) -> None:
+        widget = _get(self.store.widgets, "widget", id)
+        self.store.widgets[id] = widget.model_copy(update={"render_error": error})
+
     async def list(self, project_id: Id) -> Sequence[Widget]:
         return _in_project(self.store.widgets, project_id)
 
     async def list_by_session(self, session_id: Id) -> Sequence[Widget]:
         return [w for w in self.store.widgets.values() if w.session_id == session_id]
+
+    async def set_verdict(self, id: Id, verdict: Verdict | None) -> None:
+        widget = _get(self.store.widgets, "widget", id)
+        self.store.widgets[id] = widget.model_copy(update={"verdict": verdict})
 
 
 class MemoryDashboardRepository(DashboardRepository):
@@ -321,7 +400,10 @@ class MemoryDashboardRepository(DashboardRepository):
         return _get(self.store.dashboards, "dashboard", id)
 
     async def list(self, project_id: Id) -> Sequence[Dashboard]:
-        return _in_project(self.store.dashboards, project_id)
+        return _in_position_order(_in_project(self.store.dashboards, project_id))
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        _set_positions(self.store.dashboards, project_id, ids)
 
     async def add(self, dashboard: Dashboard) -> None:
         self.store.dashboards[dashboard.id] = dashboard
@@ -368,7 +450,10 @@ class MemoryReportRepository(ReportRepository):
         return _get(self.store.reports, "report", id)
 
     async def list(self, project_id: Id) -> Sequence[Report]:
-        return _in_project(self.store.reports, project_id)
+        return _in_position_order(_in_project(self.store.reports, project_id))
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
+        _set_positions(self.store.reports, project_id, ids)
 
     async def add(self, report: Report) -> None:
         self.store.reports[report.id] = report
@@ -460,6 +545,9 @@ class MemorySourceCheckLog(SourceCheckLog):
         await MemoryDataSourceRepository(self.store).record_check(id, at, probe_token, error)
 
 
+UNFINISHED = (TurnStatus.QUEUED, TurnStatus.RUNNING)
+
+
 class MemoryAgentTurnRepository(AgentTurnRepository):
     def __init__(self, store: MemoryStore) -> None:
         self.store = store
@@ -474,16 +562,20 @@ class MemoryAgentTurnRepository(AgentTurnRepository):
     async def list(self, session_id: Id) -> Sequence[AgentTurn]:
         return [t for t in self.store.agent_turns.values() if t.session_id == session_id]
 
-    async def start(self, id: Id) -> bool:
+    async def start(self, id: Id, at: datetime) -> bool:
         turn = await self.get(id)
         if turn.status is not TurnStatus.QUEUED:
             return False
         self.store.agent_turns[id] = turn.model_copy(update={"status": TurnStatus.RUNNING})
+        self.store.turn_starts[id] = at
         return True
 
-    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> None:
+    async def save_parts(self, id: Id, parts: Sequence[TurnPart]) -> bool:
         turn = await self.get(id)
+        if turn.status is not TurnStatus.RUNNING:
+            return False
         self.store.agent_turns[id] = turn.model_copy(update={"parts": tuple(parts)})
+        return True
 
     async def finish(
         self,
@@ -492,12 +584,48 @@ class MemoryAgentTurnRepository(AgentTurnRepository):
         parts: Sequence[TurnPart],
         error: str | None,
         at: datetime,
+    ) -> AgentTurn | None:
+        turn = await self.get(id)
+        if turn.status is not TurnStatus.RUNNING:
+            return None
+        return self._end(turn, status, parts, error, at)
+
+    def _end(
+        self,
+        turn: AgentTurn,
+        status: TurnStatus,
+        parts: Sequence[TurnPart],
+        error: str | None,
+        at: datetime,
     ) -> AgentTurn:
-        turn = (await self.get(id)).model_copy(
+        turn = turn.model_copy(
             update={"status": status, "parts": tuple(parts), "error": error, "finished_at": at}
         )
-        self.store.agent_turns[id] = turn
+        self.store.agent_turns[turn.id] = turn
         return turn
+
+    async def settle(self, id: Id) -> bool:
+        turn = await self.get(id)
+        if turn.status in UNFINISHED or id in self.store.settled_turns:
+            return False
+        self.store.settled_turns.add(id)
+        return True
+
+    async def unsettled(
+        self, started_before: datetime, finished_before: datetime
+    ) -> Sequence[AgentTurn]:
+        def due(turn: AgentTurn) -> bool:
+            if turn.status is TurnStatus.RUNNING:
+                return self.store.turn_starts[turn.id] < started_before
+            if turn.status in UNFINISHED or turn.finished_at is None:
+                return False
+            return turn.finished_at < finished_before
+
+        return [
+            turn
+            for turn in self.store.agent_turns.values()
+            if turn.id not in self.store.settled_turns and due(turn)
+        ]
 
     async def request_cancel(self, id: Id, at: datetime) -> AgentTurn:
         turn = await self.get(id)
@@ -535,13 +663,15 @@ class MemoryTurnProgress(TurnProgress):
     def __init__(self, store: MemoryStore) -> None:
         self.store = store
 
-    async def start(self, id: Id) -> bool:
-        return await MemoryAgentTurnRepository(self.store).start(id)
+    async def start(self, id: Id, at: datetime) -> bool:
+        return await MemoryAgentTurnRepository(self.store).start(id, at)
 
     async def checkpoint(self, id: Id, parts: Sequence[TurnPart]) -> bool:
         turns = MemoryAgentTurnRepository(self.store)
-        await turns.save_parts(id, parts)
-        return await turns.cancel_requested(id)
+        return not await turns.save_parts(id, parts) or await turns.cancel_requested(id)
+
+    async def running(self, id: Id) -> bool:
+        return (await MemoryAgentTurnRepository(self.store).get(id)).status is TurnStatus.RUNNING
 
     async def finish(
         self,
@@ -550,7 +680,7 @@ class MemoryTurnProgress(TurnProgress):
         parts: Sequence[TurnPart],
         error: str | None,
         at: datetime,
-    ) -> AgentTurn:
+    ) -> AgentTurn | None:
         return await MemoryAgentTurnRepository(self.store).finish(id, status, parts, error, at)
 
     async def session_turns(self, id: Id) -> Sequence[AgentTurn]:
@@ -560,10 +690,10 @@ class MemoryTurnProgress(TurnProgress):
     async def abandon(self, id: Id, error: str, at: datetime) -> AgentTurn | None:
         turns = MemoryAgentTurnRepository(self.store)
         turn = await turns.get(id)
-        if turn.status not in (TurnStatus.QUEUED, TurnStatus.RUNNING):
+        if turn.status not in UNFINISHED:
             return None
         self.store.cancel_requests.add(id)
-        return await turns.finish(id, TurnStatus.FAILED, turn.parts, error, at)
+        return turns._end(turn, TurnStatus.FAILED, turn.parts, error, at)
 
 
 class MemoryLlmProviderRepository(LlmProviderRepository):
@@ -678,3 +808,54 @@ class MemoryAgentSettingsRepository(AgentSettingsRepository):
 
     def _key(self, model_id: str | None) -> tuple[Id, str] | None:
         return _model_key(self.store, model_id) if model_id is not None else None
+
+
+class MemoryJudgeSettingsRepository(JudgeSettingsRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def defaults(self) -> Sequence[JudgeDefaults]:
+        return [self._current(defaults) for defaults in self.store.judge_defaults.values()]
+
+    async def update_defaults(
+        self, defaults: JudgeDefaults, expected_revision: int
+    ) -> JudgeDefaults:
+        stored = self.store.judge_defaults[defaults.kind]
+        if stored.revision != expected_revision:
+            raise Conflict("judge defaults", defaults.kind, expected_revision, stored.revision)
+        self._check(defaults.model_id)
+        updated = defaults.model_copy(update={"revision": expected_revision + 1})
+        self.store.judge_defaults[defaults.kind] = updated
+        return self._current(updated)
+
+    async def overrides(self, project_id: Id) -> Sequence[JudgeOverride]:
+        return [
+            self._current(override)
+            for (project, _), override in self.store.judge_overrides.items()
+            if project == project_id
+        ]
+
+    async def save_override(self, override: JudgeOverride, expected_revision: int) -> JudgeOverride:
+        _get(self.store.projects, "project", override.project_id)
+        key = (override.project_id, override.kind)
+        stored = self.store.judge_overrides.get(key)
+        actual = stored.revision if stored is not None else 0
+        if actual != expected_revision:
+            raise Conflict("judge override", override.kind, expected_revision, actual)
+        self._check(override.model_id)
+        updated = override.model_copy(update={"revision": expected_revision + 1})
+        self.store.judge_overrides[key] = updated
+        return self._current(updated)
+
+    def _check(self, model_id: str | None) -> None:
+        if model_id is not None:
+            _model_key(self.store, model_id)
+
+    def _current[M: JudgeDefaults | JudgeOverride](self, record: M) -> M:
+        if record.model_id is None:
+            return record
+        try:
+            _model_key(self.store, record.model_id)
+        except NotFound:
+            return record.model_copy(update={"model_id": None})
+        return record

@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from pydantic_core import to_jsonable_python
-from sqlalchemy import Select, select
+from sqlalchemy import Select, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
@@ -39,6 +39,30 @@ def oldest_first(row_type: Any, *conditions: Any, by: Any = None) -> Select[Any]
     the records were made."""
     column = by if by is not None else row_type.created_at
     return select(row_type).where(*conditions).order_by(column, row_type.id)
+
+
+def in_position_order(row_type: Any, *conditions: Any) -> Select[Any]:
+    """Select rows in the order people gave them (`position`), then the unplaced ones in
+    creation order."""
+    return (
+        select(row_type)
+        .where(*conditions)
+        .order_by(row_type.position.asc().nulls_last(), row_type.created_at, row_type.id)
+    )
+
+
+async def set_positions(
+    session: AsyncSession, row_type: Any, project_id: object, ids: Sequence[object]
+) -> None:
+    """Number the project's rows in the given order. A bulk update, so the revision stays:
+    reordering conflicts with no edit."""
+    for position, id in enumerate(ids):
+        await session.execute(
+            update(row_type)
+            .where(row_type.id == id, row_type.project_id == project_id)
+            .values(position=position)
+            .execution_options(synchronize_session=False)
+        )
 
 
 def newest_first(row_type: Any, column: Any, *conditions: Any) -> Select[Any]:
