@@ -339,6 +339,7 @@ def test_instructions_are_revision_checked_and_the_web_settings_read_the_configu
     assert web.json() == {
         "context_dev_configured": False,
         "exa_configured": False,
+        "search_engine": None,
         "watching_configured": False,
         "daily_credit_limit": 300,
     }

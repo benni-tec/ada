@@ -62,7 +62,10 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         at least 7 days), "extract" (`instruction`: which rows a model reads off the page;
         you declare the columns it fills; model-extracted; ttl at least 7 days) or "answers"
         (`task` and `json_format`, an example object with one array of records; you declare
-        the columns; model-extracted rows plus `sources`; ttl at least 30 days); freshness
+        the columns; model-extracted rows plus `sources`; ttl at least 30 days). When the
+        web address is a PDF, scrape and extract take `options.pdf`, e.g. {"start": 25,
+        "end": 26, "ocr": true}: only those pages, with OCR for tables that are images
+        (each page starts with a `<!-- page N -->` line); freshness
         "ttl", "manual", or "push" once watch_source watches the page; a forced refresh of a
         crawl, extract or answers source within its minimum is refused unless it is
         watched. `freshness` says when the data counts as outdated; without it the source

@@ -1,0 +1,60 @@
+{
+  "results": [
+    {
+      "url": "https://pubmed.ncbi.nlm.nih.gov/2273358/",
+      "title": "Geographical variation in cancer patient survival in Finland: chance, confounding, or effect of treatment? - PubMed",
+      "description": "1990 Sep;44(3):210-4. doi: 10.1136/jech.44.3.210. ... Study objective: The aim was to determine whether survival of cancer patients in Finland varies with their place of residence, and if so, what proportion of the variation might be due to health services rather than to confounding variables. Design: Patients with breast and prostatic cancer diagnosed in Finland between 1970 and 1981 were classified by place of residence (from 21 hospital districts), and area specific 5 year relative survival rates were estimated.",
+      "relevance": "high",
+      "markdown": {
+        "markdown": null,
+        "code": "NOT_REQUESTED"
+      },
+      "highlights": {
+        "highlights": [
+          "[Geographical variation in cancer patient survival in Finland: chance, confounding, or effect of treatment? > Abstract]\n\n**Patients:** 16,754 cases of breast cancer and 9483 cases of prostatic cancer were identified. Of these, 0.5% of breast cancers and 4.1% of prostatic cancers were excluded because diagnosis was based only on necropsy findings or because the only information available was from the death certificate.\n\n…\n\n&#x20;There was a large variation in rates, ranging from 59% to 76% for breast cancer, and from 30% to 65% for prostatic cancer.&#x20;"
+        ],
+        "code": "SUCCESS"
+      }
+    },
+    {
+      "url": "https://onlinelibrary.wiley.com/doi/10.1002/sim.4046",
+      "title": "Cure fraction model with random effects for regional variation in cancer survival - Seppä - 2010 - Statistics in Medicine - Wiley Online Library",
+      "description": "Department of Mathematical Sciences, University of Oulu, FinlandSearch for more papers by this author ... Assessing regional differences in the survival of cancer patients is important but difficult when separate regions are small or sparsely populated. In this paper, we apply a mixture cure fraction model with random effects to cause-specific survival data of female breast cancer patients collected by the population-based Finnish Cancer Registry.",
+      "relevance": "high",
+      "markdown": {
+        "markdown": null,
+        "code": "NOT_REQUESTED"
+      },
+      "highlights": {
+        "highlights": [
+          "Department of Mathematical Sciences, University of Oulu, FinlandSearch for more papers by this author ... Assessing regional differences in the survival of cancer patients is important but difficult when separate regions are small or sparsely populated. In this paper, we apply a mixture cure fraction model with random effects to cause-specific survival data of female breast cancer patients collected by the population-based Finnish Cancer Registry."
+        ],
+        "code": "SUCCESS"
+      }
+    },
+    {
+      "url": "https://pubmed.ncbi.nlm.nih.gov/25688742",
+      "title": "Mammography screening in three Finnish residential areas: comprehensive population-based study of breast cancer incidence and incidence-based mortality 1976-2009 - PubMed",
+      "description": "Results: In Turku, a significant (> 20%) reduction in IBM occurred during 1987-2009 among women aged 60-74 years at diagnosis compared with Helsinki (IBMRR: 0.75, 95% CI: 0.57-1.00), and in women aged 75-84 years at death compared with the rest of Finland (IBMRR: 0.72, 95% CI: 0.53-0.96). Conclusions: The wide mammography screening programme in Turku was effective in decreasing BC mortality in the elderly age groups. These results support the implementation of BC screening from age 50 up to 74 years. ... Breast cancer (BC) incidence and mortality per 100 000 women-years in three Finnish residential areas; four age groups and three calendar periods from 1976–2009 are included.",
+      "relevance": "medium",
+      "markdown": {
+        "markdown": null,
+        "code": "NOT_REQUESTED"
+      },
+      "highlights": {
+        "highlights": [
+          "Results: In Turku, a significant (> 20%) reduction in IBM occurred during 1987-2009 among women aged 60-74 years at diagnosis compared with Helsinki (IBMRR: 0.75, 95% CI: 0.57-1.00), and in women aged 75-84 years at death compared with the rest of Finland (IBMRR: 0.72, 95% CI: 0.53-0.96). Conclusions: The wide mammography screening programme in Turku was effective in decreasing BC mortality in the elderly age groups. These results support the implementation of BC screening from age 50 up to 74 years. ... Breast cancer (BC) incidence and mortality per 100 000 women-years in three Finnish reside"
+        ],
+        "code": "SUCCESS"
+      }
+    }
+  ],
+  "query": "breast cancer survival in Finland by region",
+  "cache_metadata": {
+    "status": "miss",
+    "age_ms": 0
+  },
+  "key_metadata": {
+    "credits_consumed": 2
+  }
+}

@@ -1,5 +1,5 @@
-"""The web on ADA's own accounts: Exa searches it, Context.dev reads, extracts, maps,
-crawls and watches it, for agents (the web tools) and for web sources."""
+"""The web on ADA's own accounts: Exa or Context.dev searches it, Context.dev reads,
+extracts, maps, crawls and watches it, for agents (the web tools) and for web sources."""
 
 from collections.abc import Sequence
 from datetime import date
@@ -11,7 +11,8 @@ from ada.core.models.web import (
     Crawl,
     Extraction,
     Monitor,
-    SearchHit,
+    PdfOptions,
+    SearchResults,
     SearchScope,
     WebLink,
     WebPage,
@@ -19,15 +20,22 @@ from ada.core.models.web import (
 
 
 class WebSearch(Protocol):
-    """Exa's search. Raises Invalid (search_not_configured) without a key, Unavailable
-    when the call fails."""
+    """A web search engine: Exa or Context.dev, whichever has a key (Exa first). Raises
+    Invalid (search_not_configured) without a key, Invalid or Unavailable when the call
+    fails, as the engine's refusal reads."""
 
     @property
     def configured(self) -> bool:
         """Whether a key is set; without one every call raises Invalid."""
         ...
 
-    async def search(self, query: str, scope: SearchScope, limit: int) -> list[SearchHit]: ...
+    async def search(
+        self, query: str, scope: SearchScope, limit: int, *, tags: Sequence[str]
+    ) -> SearchResults:
+        """At most `limit` hits on the scope's sites, each with a snippet of the passages
+        that match the query, and what the search cost when the engine says (Context.dev's
+        credits). `tags` say on whose behalf it was made, where the engine takes them."""
+        ...
 
 
 class WebExplorer(Protocol):
@@ -43,16 +51,31 @@ class WebExplorer(Protocol):
         ...
 
     async def read(
-        self, url: str, *, tags: Sequence[str], main_content_only: bool = False
+        self,
+        url: str,
+        *,
+        tags: Sequence[str],
+        main_content_only: bool = False,
+        focus: str | None = None,
+        pdf: PdfOptions | None = None,
     ) -> WebPage:
-        """The page as Markdown; with `main_content_only` without navigation and footers."""
+        """The page as Markdown; with `main_content_only` without navigation and footers.
+        With `focus`, only the passages relevant to it (Markdown excerpts in page order,
+        separated by blank lines) instead of the whole page. `pdf` reads only some pages of
+        a PDF, or with OCR."""
         ...
 
     async def extract(
-        self, url: str, instruction: str, columns: Sequence[str], *, tags: Sequence[str]
+        self,
+        url: str,
+        instruction: str,
+        columns: Sequence[str],
+        *,
+        tags: Sequence[str],
+        pdf: PdfOptions | None = None,
     ) -> Extraction:
         """Rows with the given columns, as a model reads them off the page following
-        `instruction` (null where the page does not state a value)."""
+        `instruction` (null where the page does not state a value); `pdf` as for read."""
         ...
 
     async def map(

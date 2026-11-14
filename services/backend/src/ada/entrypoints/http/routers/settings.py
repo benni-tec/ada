@@ -2,6 +2,8 @@
 instructions and the research agent; and what the web may do. Instance-wide, shared by all
 projects. No response ever carries an API key."""
 
+from typing import Literal
+
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, status
@@ -64,13 +66,16 @@ class WebSettings(BaseModel):
 
     # Whether a Context.dev key is set (CONTEXT_DEV_API_KEY or CONTEXT_API_KEY).
     context_dev_configured: bool
-    # Whether an Exa key is set (EXA_API_KEY), for search_web.
+    # Whether an Exa key is set (EXA_API_KEY).
     exa_configured: bool = False
+    # Which engine search_web uses: Exa when its key is set, else Context.dev when its key
+    # is set, else none (composition/providers/web.py).
+    search_engine: Literal["exa", "context.dev"] | None = None
     # Whether pages can be watched: a Context.dev key and ADA_PUBLIC_URL, where Context.dev
     # calls back.
     watching_configured: bool = False
-    # Web credits per project and day (WEB_DAILY_CREDIT_LIMIT): the web tools, Exa
-    # searches included, and web sources together.
+    # Web credits per project and day (WEB_DAILY_CREDIT_LIMIT): the web tools, searches
+    # included, and web sources together.
     daily_credit_limit: int
 
 
@@ -138,9 +143,11 @@ async def set_agent_instructions(
 @router.get("/settings/web")
 async def get_web_settings(settings: FromDishka[Settings]) -> WebSettings:
     context_dev = _set(settings.context_dev_api_key)
+    exa = _set(settings.exa_api_key)
     return WebSettings(
         context_dev_configured=context_dev,
-        exa_configured=_set(settings.exa_api_key),
+        exa_configured=exa,
+        search_engine="exa" if exa else "context.dev" if context_dev else None,
         watching_configured=context_dev and bool((settings.ada_public_url or "").strip()),
         daily_credit_limit=settings.web_daily_credit_limit,
     )

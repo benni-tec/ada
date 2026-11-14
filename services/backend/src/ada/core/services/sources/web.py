@@ -12,6 +12,7 @@ from ada.core.models.sources import (
     MODEL_EXTRACTED,
     WEB_CRAWL_MAX_PAGES,
     WEB_MINIMUM_TTL,
+    WEB_PDF_OPERATIONS,
     WEB_SOURCES_COLUMN,
     AccessKind,
     DataFormat,
@@ -20,6 +21,7 @@ from ada.core.models.sources import (
     WebOperation,
     document_extract,
     web_operation,
+    web_pdf,
 )
 
 # The columns an extraction may fill.
@@ -60,6 +62,10 @@ def check_web(source: DataSource) -> None:
     operation = web_operation(source.options)
     _check_freshness(source, operation)
     options = source.options
+    if web_pdf(options) is not None and operation not in WEB_PDF_OPERATIONS:
+        raise Invalid(
+            f'options.pdf is for the operations "scrape" and "extract", not "{operation.value}"'
+        )
     if operation is WebOperation.ANSWERS:
         _check_answers(source)
         return

@@ -1,19 +1,22 @@
-"""Context.dev's web API on ADA's key: scrape (Markdown, or a schema's JSON), map, crawl,
-answers and page monitors.
+"""Context.dev's web API on ADA's key: scrape (Markdown, the passages relevant to a
+question, or a schema's JSON; a PDF's page range and OCR), map, crawl, answers and page
+monitors (ContextDevWeb), and web and news search (ContextDevSearch).
 
 Called over REST (https://api.context.dev/v1, `Authorization: Bearer <key>`). Exactly
-the parameters of the WebExplorer port are sent, and every request that reads carries the
-caller's `tags`; nothing else of the API (screenshots, browser actions, profiles,
-policies, ZDR) is reachable from here. A read that fails keeps HTTP 200 with
+the parameters of the WebExplorer and WebSearch ports are sent, and every request that
+reads carries the caller's `tags`; nothing else of the API (screenshots, browser actions,
+profiles, policies, ZDR) is reachable from here. A read that fails keeps HTTP 200 with
 `success: false` in its format; only a malformed request is an HTTP error.
 """
 
+import html
 from collections.abc import Sequence
 from typing import Any
 
 import httpx
 from pydantic import SecretStr
 
+from ada.adapters.web.scopes import DOMAINS
 from ada.core.models.base import JsonObject
 from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.web import (
@@ -21,11 +24,17 @@ from ada.core.models.web import (
     Crawl,
     Extraction,
     Monitor,
+    PdfOptions,
+    SearchHit,
+    SearchResults,
+    SearchScope,
     WebLink,
+    WebNotConfigured,
     WebPage,
     reading_not_configured,
+    search_not_configured,
 )
-from ada.core.ports.web import WebExplorer
+from ada.core.ports.web import WebExplorer, WebSearch
 
 BASE_URL = "https://api.context.dev/v1"
 # A crawl stops itself after about 80 seconds; an answer takes up to a few minutes.
@@ -34,9 +43,15 @@ TIMEOUT = httpx.Timeout(180.0, connect=10.0)
 EXTRACT_CREDITS = 5
 # Watched pages are checked once a day.
 SCHEDULE = {"type": "interval", "frequency": 1, "unit": "days"}
+# The passages a focused read returns at most (Context.dev allows 100 to 20,000).
+FOCUS_CHARACTERS = 8000
+# A search hit's snippet: its passages relevant to the query, at most this long.
+SNIPPET_CHARACTERS = 600
 
 
-class ContextDevWeb(WebExplorer):
+class _ContextDev:
+    """ADA's key and the one way a request is sent: tagged, the key never in a message."""
+
     def __init__(self, client: httpx.AsyncClient, api_key: str | None, base_url: str = BASE_URL):
         self.client = client
         self.api_key = api_key
@@ -46,24 +61,100 @@ class ContextDevWeb(WebExplorer):
     def configured(self) -> bool:
         return bool(self.api_key)
 
+    def _not_configured(self) -> WebNotConfigured:
+        return reading_not_configured()
+
+    async def _send(
+        self, method: str, path: str, what: str, tags: Sequence[str] | None, **kwargs: Any
+    ) -> JsonObject:
+        if not self.api_key:
+            raise self._not_configured()
+        if tags is not None and "json" in kwargs:
+            kwargs["json"] = {**kwargs["json"], "tags": list(tags)}
+        elif tags is not None:
+            # A comma-separated list in the query.
+            kwargs["params"] = {**kwargs["params"], "tags": ",".join(tags)}
+        try:
+            answer = await self.client.request(
+                method,
+                f"{self.base_url}{path}",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=TIMEOUT,
+                **kwargs,
+            )
+        except httpx.HTTPError as error:
+            raise Unavailable(f"Context.dev could not be reached: {error}") from error
+        if answer.status_code in (200, 201):
+            try:
+                body = answer.json()
+            except ValueError:
+                body = None
+            if not isinstance(body, dict):
+                raise Unavailable(f"Context.dev answered {what} with something other than JSON")
+            return body
+        # The key never goes into a message: an authentication error may echo it.
+        reason = _message(answer).replace(self.api_key, "…")
+        match answer.status_code:
+            case 401 | 403:
+                raise Invalid(f"Context.dev refused the key: {reason}")
+            case 402:
+                raise Invalid(f"Context.dev has no credits left: {reason}")
+            case 404 if method == "DELETE":
+                raise _Gone(reason)
+            case 408 | 429 | 500 | 503 | 504:
+                raise Unavailable(f"Context.dev is busy and could not {what}: {reason}")
+            case _:
+                raise Invalid(f"Context.dev could not {what}: {reason}")
+
+
+class ContextDevWeb(_ContextDev, WebExplorer):
     async def read(
-        self, url: str, *, tags: Sequence[str], main_content_only: bool = False
+        self,
+        url: str,
+        *,
+        tags: Sequence[str],
+        main_content_only: bool = False,
+        focus: str | None = None,
+        pdf: PdfOptions | None = None,
     ) -> WebPage:
-        body: JsonObject = {"url": url, "formats": {"markdown": True}}
+        body: JsonObject = (
+            {
+                "url": url,
+                "formats": {"highlights": True},
+                "highlightsParams": {"query": focus, "maxCharacters": FOCUS_CHARACTERS},
+            }
+            if focus
+            else {"url": url, "formats": {"markdown": True}}
+        )
+        shared = _pdf_params(pdf)
         if main_content_only:
-            body["sharedParams"] = {"mainContentOnly": True}
-            body["markdownParams"] = {"includeLinks": False}
+            shared["mainContentOnly"] = True
+            if not focus:
+                body["markdownParams"] = {"includeLinks": False}
+        if shared:
+            body["sharedParams"] = shared
         answer = await self._send("POST", "/web/scrape", f"read {url}", tags, json=body)
-        markdown = _format(answer, "markdown", url)
+        if focus:
+            passages = _format(answer, "highlights", url)
+            markdown = "\n\n".join(str(passage) for passage in passages or [])
+        else:
+            markdown = str(_format(answer, "markdown", url) or "")
         metadata = answer.get("metadata") or {}
         return WebPage(
             url=str(answer.get("url") or url),
             title=metadata.get("title") or None,
-            markdown=str(markdown or ""),
+            markdown=markdown,
+            credits=_stated_credits(answer),
         )
 
     async def extract(
-        self, url: str, instruction: str, columns: Sequence[str], *, tags: Sequence[str]
+        self,
+        url: str,
+        instruction: str,
+        columns: Sequence[str],
+        *,
+        tags: Sequence[str],
+        pdf: PdfOptions | None = None,
     ) -> Extraction:
         # The schema must be a top-level object, so the rows sit in a property. Nullable
         # columns keep the model from guessing a value the page does not state.
@@ -81,11 +172,13 @@ class ContextDevWeb(WebExplorer):
             },
             "required": ["rows"],
         }
-        body = {
+        body: JsonObject = {
             "url": url,
             "formats": {"json": True},
             "jsonParams": {"schema": schema, "instructions": instruction},
         }
+        if shared := _pdf_params(pdf):
+            body["sharedParams"] = shared
         answer = await self._send("POST", "/web/scrape", f"extract from {url}", tags, json=body)
         data = _format(answer, "json", url)
         rows = data.get("rows") if isinstance(data, dict) else None
@@ -169,47 +262,62 @@ class ContextDevWeb(WebExplorer):
             # Deleted at Context.dev already: the goal is reached.
             pass
 
-    async def _send(
-        self, method: str, path: str, what: str, tags: Sequence[str] | None, **kwargs: Any
-    ) -> JsonObject:
-        if not self.api_key:
-            raise reading_not_configured()
-        if tags is not None and "json" in kwargs:
-            kwargs["json"] = {**kwargs["json"], "tags": list(tags)}
-        elif tags is not None:
-            # A comma-separated list in the query.
-            kwargs["params"] = {**kwargs["params"], "tags": ",".join(tags)}
-        try:
-            answer = await self.client.request(
-                method,
-                f"{self.base_url}{path}",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=TIMEOUT,
-                **kwargs,
+
+class ContextDevSearch(_ContextDev, WebSearch):
+    """Web search (POST /web/search) on the scope's sites, with the passages of each hit
+    relevant to the query as its snippet; news (POST /news/search) in Context.dev's news
+    index, by a natural-language query."""
+
+    def _not_configured(self) -> WebNotConfigured:
+        return search_not_configured()
+
+    async def search(
+        self, query: str, scope: SearchScope, limit: int, *, tags: Sequence[str]
+    ) -> SearchResults:
+        if scope is SearchScope.NEWS:
+            return await self._news(query, limit, tags)
+        body: JsonObject = {
+            "query": query,
+            "numResults": limit,
+            "highlightsOptions": {"enabled": True, "maxCharacters": SNIPPET_CHARACTERS},
+        }
+        if (domains := DOMAINS[scope]) is not None:
+            body["includeDomains"] = domains
+        answer = await self._send("POST", "/web/search", "search the web", tags, json=body)
+        hits = []
+        for result in answer.get("results") or []:
+            if not result.get("url"):
+                continue
+            passages = (result.get("highlights") or {}).get("highlights") or []
+            snippet = " ".join(str(passage) for passage in passages) or str(
+                result.get("description") or ""
             )
-        except httpx.HTTPError as error:
-            raise Unavailable(f"Context.dev could not be reached: {error}") from error
-        if answer.status_code in (200, 201):
-            try:
-                body = answer.json()
-            except ValueError:
-                body = None
-            if not isinstance(body, dict):
-                raise Unavailable(f"Context.dev answered {what} with something other than JSON")
-            return body
-        # The key never goes into a message: an authentication error may echo it.
-        reason = _message(answer).replace(self.api_key, "…")
-        match answer.status_code:
-            case 401 | 403:
-                raise Invalid(f"Context.dev refused the key: {reason}")
-            case 402:
-                raise Invalid(f"Context.dev has no credits left: {reason}")
-            case 404 if method == "DELETE":
-                raise _Gone(reason)
-            case 408 | 429 | 500 | 503 | 504:
-                raise Unavailable(f"Context.dev is busy and could not {what}: {reason}")
-            case _:
-                raise Invalid(f"Context.dev could not {what}: {reason}")
+            hits.append(
+                SearchHit(
+                    url=str(result["url"]),
+                    title=result.get("title") or str(result["url"]),
+                    snippet=_snippet(snippet),
+                )
+            )
+        return SearchResults(hits=hits, credits=_stated_credits(answer))
+
+    async def _news(self, query: str, limit: int, tags: Sequence[str]) -> SearchResults:
+        body: JsonObject = {
+            "searchBy": {"type": "natural_language", "query": query},
+            "limit": limit,
+        }
+        answer = await self._send("POST", "/news/search", "search the news", tags, json=body)
+        hits = [
+            SearchHit(
+                url=str(article["url"]),
+                title=article.get("title") or str(article["url"]),
+                published=article.get("published_at") or None,
+                snippet=_snippet(str(article.get("description") or "")),
+            )
+            for article in answer.get("data") or []
+            if article.get("url")
+        ]
+        return SearchResults(hits=hits, credits=_stated_credits(answer))
 
 
 class _Gone(Invalid):
@@ -226,9 +334,35 @@ def _format(answer: JsonObject, name: str, url: str) -> Any:
 
 
 def _credits(answer: JsonObject, default: int) -> int:
+    consumed = _stated_credits(answer)
+    return default if consumed is None else consumed
+
+
+def _stated_credits(answer: JsonObject) -> int | None:
+    """What Context.dev says it charged, or None when it does not say."""
     metadata = answer.get("key_metadata") or {}
     consumed = metadata.get("credits_consumed")
-    return consumed if isinstance(consumed, int) and consumed >= 0 else default
+    return consumed if isinstance(consumed, int) and consumed >= 0 else None
+
+
+def _pdf_params(pdf: PdfOptions | None) -> JsonObject:
+    """`sharedParams` reading a PDF's page range, with OCR when asked, each page starting
+    with its `<!-- page N -->` line; nothing without PDF options."""
+    if pdf is None:
+        return {}
+    options: JsonObject = {"ocr": "auto" if pdf.ocr else "off", "includeNumberedPages": True}
+    if pdf.start is not None:
+        options["startPage"] = pdf.start
+    if pdf.end is not None:
+        options["endPage"] = pdf.end
+    return {"parsers": {"pdf": options}}
+
+
+def _snippet(text: str) -> str:
+    """Passages as one line of plain text (Context.dev escapes some spaces as entities),
+    at most SNIPPET_CHARACTERS long."""
+    text = " ".join(html.unescape(text).split())
+    return text if len(text) <= SNIPPET_CHARACTERS else text[: SNIPPET_CHARACTERS - 1] + "…"
 
 
 def _message(answer: httpx.Response) -> str:

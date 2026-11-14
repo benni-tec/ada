@@ -14,7 +14,9 @@ class Health(DomainModel):
     queue: Part = Field(description="Valkey, the task queue broker")
     worker: Part = Field(description="Task worker and scheduler, judged by their heartbeat")
     analysis_store: Part = Field(description="DuckDB over the snapshot directory")
-    web_search: bool = Field(description="Web search is configured (EXA_API_KEY is set)")
+    web_search: bool = Field(
+        description="Web search is configured (EXA_API_KEY or CONTEXT_DEV_API_KEY is set)"
+    )
     page_reading: bool = Field(
         description="Page reading is configured (CONTEXT_DEV_API_KEY is set)"
     )

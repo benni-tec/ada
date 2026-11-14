@@ -4,7 +4,7 @@ FakeExplorer) or answered by recordings (WebReplay) or httpx's MockTransport."""
 
 import json
 import tempfile
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -25,8 +25,9 @@ from ada.adapters.memory.repositories import MemoryStore
 from ada.adapters.memory.web import MemoryWebBudget
 from ada.adapters.sources.http import create_client
 from ada.adapters.sources.web import WebPageReader
-from ada.adapters.web.context_dev import ContextDevWeb
-from ada.adapters.web.exa import DATA_DOMAINS, ExaSearch
+from ada.adapters.web.context_dev import ContextDevSearch, ContextDevWeb
+from ada.adapters.web.exa import ExaSearch
+from ada.adapters.web.scopes import DATA_DOMAINS, RESEARCH_DOMAINS
 from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
@@ -40,7 +41,9 @@ from ada.core.models.sources import (
     FreshnessPolicy,
 )
 from ada.core.models.time import TimeRange
-from ada.core.models.web import SearchHit, SearchScope, WebPage
+from ada.core.models.web import PdfOptions, SearchHit, SearchResults, SearchScope, WebPage
+from ada.core.ports.web import WebSearch
+from ada.core.services.exploration.web import WebExploration
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.web import EXPLORATION_NOTE
@@ -50,6 +53,7 @@ from conftest import settings_in
 from db_helpers import engine_for, unit_of_work
 from fakes import (
     PAGE_MARKDOWN,
+    PAGE_TABLE,
     FakeAnalysisStore,
     FakeExplorer,
     FakeSourceReaders,
@@ -65,6 +69,8 @@ pytestmark = pytest.mark.anyio
 DAY = 24 * 60 * 60
 KEY = SecretStr("test-key")
 SOTKANET = "https://sotkanet.fi/sotkanet/en/metadata/indicators/3625"
+# The Cancer Registry's report on lung cancer: Table 3.7 on pages 25-26 is an image.
+LUNG_REPORT = "https://syoparekisteri.fi/assets/files/2024/12/Keuhkosyopa_Suomessa.pdf"
 WEB_TOOLS = ("search_web", "read_page", "extract_table", "map_site")
 
 
@@ -189,6 +195,95 @@ async def test_a_web_tool_takes_a_session_of_its_own_project_only(
     assert explorer.calls == []
 
 
+async def test_read_page_returns_the_passages_on_a_query_and_reads_pdf_pages(
+    web: tuple[Client, Seen, FakeWebSearch, FakeExplorer],
+) -> None:
+    client, _, _, explorer = web
+    project_id, session_id = await _project_and_session(client)
+    ids = {"project_id": project_id, "session_id": session_id}
+    explorer.calls.clear()
+    question = "lung cancer surgery by wellbeing services county"
+
+    focused = await call(
+        client,
+        "read_page",
+        **ids,
+        url=LUNG_REPORT,
+        query=question,
+        pdf_pages="25-26",
+        ocr=True,
+        max_chars=30,
+    )
+    # Refused before anything is sent or counted.
+    with pytest.raises(ToolError, match="pdf_pages is a page or a range of pages"):
+        await call(client, "read_page", **ids, url=LUNG_REPORT, pdf_pages="25 to 26")
+    with pytest.raises(ToolError, match="end page of a PDF is not before its start"):
+        await call(client, "read_page", **ids, url=LUNG_REPORT, pdf_pages="26-25")
+
+    # The passages come back in place of the page, cut at max_chars like a page.
+    assert focused["markdown"] == PAGE_TABLE[:30] and focused["truncated"] is True
+    assert explorer.calls == [
+        (
+            "read",
+            {
+                "url": LUNG_REPORT,
+                "tags": ("ada", f"project:{project_id}"),
+                "focus": question,
+                "pdf": PdfOptions(start=25, end=26, ocr=True),
+            },
+        )
+    ]
+    tools = {tool.name: tool for tool in await client.list_tools()}
+    assert {"query", "pdf_pages", "ocr"} <= set(tools["read_page"].input_schema["properties"])
+    assert "check a figure" in (tools["read_page"].description or "")
+    assert "ADA's web search" in (tools["search_web"].description or "")
+    assert "PubMed Central" in (tools["search_web"].description or "")
+
+
+async def test_searches_and_reads_count_what_context_dev_charged() -> None:
+    project_id, session_id = factories.project().id, factories.project().id
+    budget = MemoryWebBudget()
+    search = FakeWebSearch(hits=[SearchHit(url="https://pubmed.test/1", title="A")], credits=2)
+    explorer = FakeExplorer()
+    explorer.page = explorer.page.model_copy(update={"credits": 3})
+    service = WebExploration(search, explorer, budget, FixedClock(), 300)
+
+    await service.search(project_id, session_id, "survival", SearchScope.RESEARCH, 3)
+    await service.read(project_id, session_id, LUNG_REPORT, pdf_pages="25-26", ocr=True)
+    # Five reserved for the search and three given back; one for the read and two added.
+    assert sum(budget.spent.values()) == 2 + 3
+    assert search.tags == [("ada", f"project:{project_id}")]
+
+    # An engine that states nothing (Exa) counts its fixed weight; so does a plain read.
+    exa_budget = MemoryWebBudget()
+    exa = WebExploration(FakeWebSearch(), FakeExplorer(), exa_budget, FixedClock(), 300)
+    await exa.search(project_id, session_id, "survival")
+    await exa.read(project_id, session_id, "https://example.test/a", ocr=True)
+    assert sum(exa_budget.spent.values()) == 5 + 1
+
+
+async def test_search_is_exas_with_its_key_else_context_devs(
+    unreachable_settings: Settings,
+) -> None:
+    async def engine(**keys: SecretStr) -> WebSearch:
+        settings = unreachable_settings.model_copy(update=keys)
+        container = create_container(settings, FastapiProvider(), MemoryBackground())
+        try:
+            return await container.get(WebSearch)
+        finally:
+            await container.close()
+
+    both = await engine(exa_api_key=SecretStr("e"), context_dev_api_key=SecretStr("c"))
+    context = await engine(context_dev_api_key=SecretStr("c"))
+    blank_exa = await engine(exa_api_key=SecretStr(" "), context_dev_api_key=SecretStr("c"))
+    neither = await engine()
+
+    assert isinstance(both, ExaSearch) and both.configured
+    assert isinstance(context, ContextDevSearch) and context.configured
+    assert isinstance(blank_exa, ContextDevSearch)
+    assert isinstance(neither, ExaSearch) and not neither.configured
+
+
 async def test_web_tools_without_keys_fail_with_the_setting_named(
     unreachable_settings: Settings,
 ) -> None:
@@ -196,7 +291,9 @@ async def test_web_tools_without_keys_fail_with_the_setting_named(
     async with mcp_client(unreachable_settings, unconfigured) as (client, _):
         project_id, session_id = await _project_and_session(client)
         ids = {"project_id": project_id, "session_id": session_id}
-        with pytest.raises(ToolError, match="EXA_API_KEY is not set"):
+        with pytest.raises(
+            ToolError, match="web search is not configured: set EXA_API_KEY or CONTEXT_DEV_API_KEY"
+        ):
             await call(client, "search_web", **ids, query="x")
         with pytest.raises(ToolError, match="CONTEXT_DEV_API_KEY is not set"):
             await call(client, "read_page", **ids, url="https://example.com")
@@ -211,7 +308,10 @@ async def test_system_status_reports_web_configuration(unreachable_settings: Set
     keyed = unreachable_settings.model_copy(
         update={"exa_api_key": SecretStr("k"), "context_dev_api_key": SecretStr("k")}
     )
+    context_only = unreachable_settings.model_copy(update={"context_dev_api_key": SecretStr("k")})
     assert await flags(unreachable_settings) == [False, False, False]
+    # Without an Exa key, Context.dev searches.
+    assert await flags(context_only) == [True, True, False]
     assert await flags(keyed) == [True, True, False]
     full = keyed.model_copy(update={"ada_public_url": "https://ada.example"})
     assert await flags(full) == [True, True, True]
@@ -226,8 +326,10 @@ class TimedOutSearch(FakeWebSearch):
         self.engine: AsyncEngine | None = None
         self.held: list[int] = []
 
-    async def search(self, query: str, scope: SearchScope, limit: int) -> list[SearchHit]:
-        await super().search(query, scope, limit)
+    async def search(
+        self, query: str, scope: SearchScope, limit: int, *, tags: Sequence[str]
+    ) -> SearchResults:
+        await super().search(query, scope, limit, tags=tags)
         assert self.engine is not None
         self.held.append(self.engine.pool.checkedout())
         raise Unavailable("Exa did not answer in time")
@@ -389,6 +491,62 @@ async def test_a_web_source_fails_readably_and_stays_counted() -> None:
     assert sum(budget.spent.values()) == 1
 
 
+async def test_web_sources_read_pdf_pages_with_ocr_and_check_the_option() -> None:
+    memory = MemoryStore()
+    clock = FixedClock()
+    explorer = FakeExplorer(rows=[{"county": "Koko maa", "treated": "746"}])
+    explorer.page = explorer.page.model_copy(update={"credits": 2})
+    project = factories.project()
+    memory.projects[project.id] = project
+    budget = MemoryWebBudget()
+    reader = WebPageReader(explorer, budget, clock, 300)
+    service, _ = data_sources(
+        memory, FakeSourceReaders({AccessKind.WEB: reader}), FakeAnalysisStore(), clock
+    )
+    report = {
+        "name": "Lung cancer in Finland",
+        "access_kind": AccessKind.WEB,
+        "address": LUNG_REPORT,
+        "format": DataFormat.HTML,
+    }
+    pdf = {"start": 25, "end": 26, "ocr": True}
+    weekly = FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=7 * DAY)
+
+    pages = await service.register(project.id, **report, options={"pdf": pdf})
+    table = await service.register(
+        project.id,
+        **report,
+        options={"operation": "extract", "instruction": "Table 3.7", "pdf": pdf},
+        declared_schema=Schema(
+            columns=(
+                Column(name="county", type=ColumnType.TEXT),
+                Column(name="treated", type=ColumnType.INTEGER),
+            )
+        ),
+        freshness=weekly,
+    )
+    await service.refresh(pages.id)
+    await service.refresh(table.id)
+
+    expected = PdfOptions(start=25, end=26, ocr=True)
+    assert [(name, arguments["pdf"]) for name, arguments in explorer.calls] == [
+        ("read", expected),
+        ("extract", expected),
+    ]
+    # The read charged two credits (one per page read with OCR), the extraction five.
+    assert sum(budget.spent.values()) == 2 + 5
+    for options, message in [
+        ({"pdf": {"start": 0}}, "start page of a PDF is a page number from 1"),
+        ({"pdf": {"start": 26, "end": 25}}, "end page of a PDF is not before its start"),
+        ({"pdf": {"pages": "25-26"}}, "options.pdf is an object"),
+        ({"pdf": "25-26"}, "options.pdf is an object"),
+        ({"pdf": {"ocr": "yes"}}, "ocr is true or false"),
+        ({"operation": "crawl", "pdf": {"ocr": True}}, 'for the operations "scrape" and "extract"'),
+    ]:
+        with pytest.raises(Invalid, match=message):
+            await service.register(project.id, **report, options=options, freshness=weekly)
+
+
 async def test_web_sources_keep_their_minimum_freshness_and_refuse_early_forced_refreshes() -> None:
     memory = MemoryStore()
     clock = FixedClock()
@@ -449,13 +607,14 @@ def _client(handler: Any) -> httpx.AsyncClient:
 async def test_exa_search_sends_data_domains_and_parses_hits() -> None:
     replay = WebReplay()
     async with _client(replay) as http:
-        hits = await ExaSearch(http, KEY).search(
-            "cancer survival by hospital district Finland", SearchScope.DATA, 5
+        found = await ExaSearch(http, KEY).search(
+            "cancer survival by hospital district Finland", SearchScope.DATA, 5, tags=["ada"]
         )
-    assert json.loads(replay.requests[0].content)["includeDomains"] == DATA_DOMAINS
+    sent = json.loads(replay.requests[0].content)
+    assert sent["includeDomains"] == DATA_DOMAINS and "tags" not in sent
     assert replay.requests[0].headers["Authorization"] == "Bearer test-key"
-    assert hits
-    assert all(hit.url.startswith("https://") and hit.title for hit in hits)
+    assert found.hits and found.credits is None
+    assert all(hit.url.startswith("https://") and hit.title for hit in found.hits)
 
 
 async def test_context_dev_reads_extracts_and_watches_against_its_recorded_answers() -> None:
@@ -484,6 +643,156 @@ async def test_context_dev_reads_extracts_and_watches_against_its_recorded_answe
     assert [body.get("tags") for body in bodies] == [tags, tags, None]
     assert "secret" not in bodies[2]["webhook"]
     assert replay.requests[3].method == "DELETE"
+
+
+async def test_context_dev_searches_the_research_sites_with_passages_as_snippets() -> None:
+    replay = WebReplay()
+    tags = ["ada", "project:p"]
+    async with _client(replay) as http:
+        found = await ContextDevSearch(http, "test-key").search(
+            "breast cancer survival in Finland by region", SearchScope.RESEARCH, 3, tags=tags
+        )
+
+    request = replay.requests[0]
+    sent = json.loads(request.content)
+    assert request.url.path == "/v1/web/search"
+    assert request.headers["Authorization"] == "Bearer test-key"
+    assert sent["includeDomains"] == RESEARCH_DOMAINS and sent["tags"] == tags
+    assert sent["highlightsOptions"] == {"enabled": True, "maxCharacters": 600}
+    assert found.credits == 2
+    assert [hit.url for hit in found.hits] == [
+        "https://pubmed.ncbi.nlm.nih.gov/2273358/",
+        "https://onlinelibrary.wiley.com/doi/10.1002/sim.4046",
+        "https://pubmed.ncbi.nlm.nih.gov/25688742",
+    ]
+    first = found.hits[0]
+    assert first.title.startswith("Geographical variation in cancer patient survival")
+    # The passages relevant to the query, on one line, entities decoded.
+    assert "16,754 cases of breast cancer" in first.snippet
+    assert "&#x20;" not in first.snippet and "\n" not in first.snippet
+    assert all(len(hit.snippet) <= 600 and hit.published is None for hit in found.hits)
+
+
+async def test_context_dev_searches_news_in_its_news_index() -> None:
+    replay = WebReplay()
+    async with _client(replay) as http:
+        found = await ContextDevSearch(http, "test-key").search(
+            "cancer screening in Finland", SearchScope.NEWS, 3, tags=["ada"]
+        )
+
+    request = replay.requests[0]
+    assert request.url.path == "/v1/news/search"
+    assert json.loads(request.content)["searchBy"] == {
+        "type": "natural_language",
+        "query": "cancer screening in Finland",
+    }
+    assert found.credits == 1 and len(found.hits) == 3
+    first = found.hits[0]
+    assert first.published == "2025-11-27T09:00:54.000Z"
+    assert first.title.startswith("As cancer cases surge toward 35 million by 2050")
+    assert first.snippet.startswith("Gosta Labs, a Helsinki-based HealthTech company")
+    assert all(len(hit.snippet) <= 600 for hit in found.hits)
+
+
+async def test_context_dev_search_falls_back_to_descriptions_and_names_both_keys() -> None:
+    sent: list[httpx.Request] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        result = {
+            "url": "https://example.test/a",
+            "title": "",
+            "description": "Coverage was 71&#x20;%\nin Uusimaa",
+            "relevance": "high",
+            "markdown": {"markdown": None, "code": "NOT_REQUESTED"},
+            "highlights": {"highlights": None, "code": "WEBSITE_BLOCKED"},
+        }
+        return httpx.Response(200, json={"results": [result], "query": "coverage"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+        found = await ContextDevSearch(client, "key").search(
+            "coverage", SearchScope.ANY, 1, tags=[]
+        )
+        with pytest.raises(
+            Invalid, match="web search is not configured: set EXA_API_KEY or CONTEXT_DEV_API_KEY"
+        ):
+            await ContextDevSearch(client, None).search("x", SearchScope.ANY, 1, tags=[])
+
+    assert len(sent) == 1 and "includeDomains" not in json.loads(sent[0].content)
+    hit = SearchHit(
+        url="https://example.test/a",
+        title="https://example.test/a",
+        snippet="Coverage was 71 % in Uusimaa",
+    )
+    assert found == SearchResults(hits=[hit], credits=None)
+
+
+async def test_context_dev_reads_pdf_pages_with_ocr_and_the_passages_on_a_question() -> None:
+    replay = WebReplay()
+    async with _client(replay) as http:
+        report = await ContextDevWeb(http, "test-key").read(
+            LUNG_REPORT,
+            tags=["ada"],
+            main_content_only=True,
+            pdf=PdfOptions(start=25, end=26, ocr=True),
+        )
+    # Table 3.7 is an image in the PDF: OCR reads its title and figures.
+    assert report.markdown.startswith("<!-- page 25 -->\n\nTAULUKKO 3.7")
+    assert "<!-- page 26 -->" in report.markdown and "Koko maa\n746\n17,3" in report.markdown
+    assert report.credits == 2
+
+    sent: list[dict[str, Any]] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        sent.append(body)
+        if body["formats"] == {"json": True}:
+            data = {"rows": [{"county": "Koko maa"}]}
+            return httpx.Response(200, json={"json": {"success": True, "data": data}})
+        passages = ["[TAULUKKO 3.7]\n\nKoko maa 746 17,3", "Koko maa 1093 25,0"]
+        return httpx.Response(
+            200,
+            json={
+                "url": LUNG_REPORT,
+                "highlights": {"requested": True, "success": True, "data": passages},
+                "metadata": {"title": "Keuhkosyöpä Suomessa"},
+                "key_metadata": {"credits_consumed": 3},
+            },
+        )
+
+    question = "surgery in the whole country"
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+        web = ContextDevWeb(client, "key")
+        page = await web.read(
+            LUNG_REPORT,
+            tags=["ada"],
+            main_content_only=True,
+            focus=question,
+            pdf=PdfOptions(start=25, end=26, ocr=True),
+        )
+        await web.extract(LUNG_REPORT, "Table 3.7", ["county"], tags=[], pdf=PdfOptions(start=25))
+
+    assert sent[0] == {
+        "url": LUNG_REPORT,
+        "formats": {"highlights": True},
+        "highlightsParams": {"query": question, "maxCharacters": 8000},
+        "sharedParams": {
+            "mainContentOnly": True,
+            "parsers": {
+                "pdf": {"startPage": 25, "endPage": 26, "ocr": "auto", "includeNumberedPages": True}
+            },
+        },
+        "tags": ["ada"],
+    }
+    assert page == WebPage(
+        url=LUNG_REPORT,
+        title="Keuhkosyöpä Suomessa",
+        markdown="[TAULUKKO 3.7]\n\nKoko maa 746 17,3\n\nKoko maa 1093 25,0",
+        credits=3,
+    )
+    assert sent[1]["sharedParams"] == {
+        "parsers": {"pdf": {"startPage": 25, "ocr": "off", "includeNumberedPages": True}}
+    }
 
 
 async def test_context_dev_gets_only_the_forwarded_parameters_and_its_refusals_read_well() -> None:
@@ -545,9 +854,13 @@ async def test_exa_errors_never_quote_the_body_and_a_missing_key_is_named() -> N
 
     async with _client(handler) as http:
         with pytest.raises(Unavailable, match="401") as search:
-            await ExaSearch(http, SecretStr("synthetic-secret-key")).search("x", SearchScope.ANY, 1)
-        with pytest.raises(Invalid, match="web search is not configured: EXA_API_KEY is not set"):
-            await ExaSearch(http, None).search("x", SearchScope.ANY, 1)
+            await ExaSearch(http, SecretStr("synthetic-secret-key")).search(
+                "x", SearchScope.ANY, 1, tags=[]
+            )
+        with pytest.raises(
+            Invalid, match="web search is not configured: set EXA_API_KEY or CONTEXT_DEV_API_KEY"
+        ):
+            await ExaSearch(http, None).search("x", SearchScope.ANY, 1, tags=[])
     assert "synthetic-secret-key" not in str(search.value)
 
 

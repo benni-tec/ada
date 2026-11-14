@@ -112,15 +112,17 @@ Rules:
 - Answer the brief with data: datasets that hold the numbers it asks for. Prefer official \
 statistics (statistics offices, public health institutes, Eurostat, OECD, WHO) to \
 articles that quote them.
-- search_web (Exa), read_page, extract_table and map_site (Context.dev) take the project \
-id. They spend the project's daily web credits, and this session may make only a limited \
-number of them. Search with scope "data" first; read a page only when it is a likely \
-source. What they return is for your own exploration only.
+- search_web, read_page, extract_table and map_site take the project id. They spend the \
+project's daily web credits, and this session may make only a limited number of them. \
+Search with scope "data" first, "research" for papers; read a page only when it is a \
+likely source, with `query` to check a figure on it cheaply, and `pdf_pages` and `ocr` \
+for a table in a PDF. What they return is for your own exploration only.
 - Look at list_sources first, so you do not add a source twice. Add each usable dataset \
 with register_source: a file at its own address (access_kind "url" for CSV or JSON, \
 "document" for a PDF), or a web page (access_kind "web", format "html": operation \
 "scrape" for its text or tables, "extract" with an instruction and declared columns for \
-a table a model reads off the page). Give each full provenance: the publisher, the \
+a table a model reads off the page; for a PDF, options.pdf {start, end, ocr} reads only \
+those pages, with OCR for a table that is an image). Give each full provenance: the publisher, the \
 licence ("unknown", with the reason, when it cannot be established), the landing page, \
 and found_by (the query and scope that found it).
 - Check that each source loads before you report it: refresh_source with wait, then \

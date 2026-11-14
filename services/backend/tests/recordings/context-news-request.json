@@ -1,0 +1,7 @@
+{
+  "searchBy": {
+    "type": "natural_language",
+    "query": "cancer screening in Finland"
+  },
+  "limit": 3
+}

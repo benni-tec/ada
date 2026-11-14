@@ -1,0 +1,20 @@
+{
+  "url": "https://syoparekisteri.fi/assets/files/2024/12/Keuhkosyopa_Suomessa.pdf",
+  "formats": {
+    "markdown": true
+  },
+  "sharedParams": {
+    "mainContentOnly": true,
+    "parsers": {
+      "pdf": {
+        "startPage": 25,
+        "endPage": 26,
+        "ocr": "auto",
+        "includeNumberedPages": true
+      }
+    }
+  },
+  "markdownParams": {
+    "includeLinks": false
+  }
+}

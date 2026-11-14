@@ -3,11 +3,12 @@ from typing import NewType
 
 import httpx
 from dishka import Provider, Scope, provide
+from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ada.adapters.db.web_repositories import SqlWebBudget
 from ada.adapters.sources.http import create_client
-from ada.adapters.web.context_dev import ContextDevWeb
+from ada.adapters.web.context_dev import ContextDevSearch, ContextDevWeb
 from ada.adapters.web.exa import ExaSearch
 from ada.config import Settings
 from ada.core.ports.system import Clock
@@ -20,9 +21,12 @@ WebClient = NewType("WebClient", httpx.AsyncClient)
 
 
 class WebProvider(Provider):
-    """Exa search and Context.dev on ADA's keys for the web tools and page monitors, and
+    """Web search and Context.dev on ADA's keys for the web tools and page monitors, and
     the projects' daily credits, which the web sources spend too (providers/sources.py).
-    A missing key does not fail startup; what needs it refuses, naming the setting."""
+
+    Search is Exa's when EXA_API_KEY is set, else Context.dev's when its key is set, else
+    an unconfigured Exa search that refuses naming both keys. A missing key does not fail
+    startup; what needs it refuses, naming the setting."""
 
     @provide(scope=Scope.APP)
     async def client(self) -> AsyncIterator[WebClient]:
@@ -31,12 +35,15 @@ class WebProvider(Provider):
 
     @provide(scope=Scope.APP)
     def search(self, client: WebClient, settings: Settings) -> WebSearch:
-        return ExaSearch(client, settings.exa_api_key)
+        if _set(settings.exa_api_key):
+            return ExaSearch(client, settings.exa_api_key)
+        if key := _set(settings.context_dev_api_key):
+            return ContextDevSearch(client, key)
+        return ExaSearch(client, None)
 
     @provide(scope=Scope.APP)
     def explorer(self, client: WebClient, settings: Settings) -> WebExplorer:
-        key = settings.context_dev_api_key
-        return ContextDevWeb(client, key.get_secret_value() if key else None)
+        return ContextDevWeb(client, _set(settings.context_dev_api_key))
 
     # Its own connection per write, from the engine, not the request's session.
     @provide(scope=Scope.APP)
@@ -53,6 +60,12 @@ class WebProvider(Provider):
         settings: Settings,
     ) -> WebExplorationService:
         return WebExploration(search, explorer, budget, clock, settings.web_daily_credit_limit)
+
+
+def _set(key: SecretStr | None) -> str | None:
+    """The key, unless it is unset or blank."""
+    value = key.get_secret_value().strip() if key is not None else ""
+    return value or None
 
 
 provider = WebProvider()

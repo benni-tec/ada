@@ -1995,7 +1995,7 @@ export interface components {
             watching: boolean;
             /**
              * Web Search
-             * @description Web search is configured (EXA_API_KEY is set)
+             * @description Web search is configured (EXA_API_KEY or CONTEXT_DEV_API_KEY is set)
              */
             web_search: boolean;
             /**
@@ -3156,6 +3156,8 @@ export interface components {
              * @default false
              */
             exa_configured: boolean;
+            /** Search Engine */
+            search_engine?: ("exa" | "context.dev") | null;
             /**
              * Watching Configured
              * @default false

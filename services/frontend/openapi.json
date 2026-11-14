@@ -1207,7 +1207,7 @@
             "type": "boolean"
           },
           "web_search": {
-            "description": "Web search is configured (EXA_API_KEY is set)",
+            "description": "Web search is configured (EXA_API_KEY or CONTEXT_DEV_API_KEY is set)",
             "title": "Web Search",
             "type": "boolean"
           },
@@ -4235,6 +4235,21 @@
             "default": false,
             "title": "Exa Configured",
             "type": "boolean"
+          },
+          "search_engine": {
+            "anyOf": [
+              {
+                "enum": [
+                  "exa",
+                  "context.dev"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Engine"
           },
           "watching_configured": {
             "default": false,

@@ -1,6 +1,6 @@
 {
   "recorded": "2026-11-14",
-  "note": "Answers of Exa and Context.dev, replayed by the web tool tests. Bodies are stored as they came; the monitor webhook secret is replaced by test-secret, headers are reduced to the content type.",
+  "note": "Answers of Exa and Context.dev, replayed by the web tool tests. Bodies are stored as they came; the monitor webhook secret is replaced by test-secret, headers are reduced to the content type. The Context.dev searches and the PDF scrape (recorded later the same day) lost their request_id and credits_remaining. The Exa request's includeDomains follows the data scope's sites, which grew after it was recorded.",
   "exchanges": [
     {
       "method": "POST",
@@ -9,6 +9,30 @@
       "content_type": "application/json; charset=utf-8",
       "body": "exa-search-data.json",
       "request": "exa-search-data-request.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.context.dev/v1/web/search",
+      "status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "body": "context-search-research.json",
+      "request": "context-search-research-request.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.context.dev/v1/news/search",
+      "status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "body": "context-news.json",
+      "request": "context-news-request.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.context.dev/v1/web/scrape",
+      "status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "body": "context-scrape-pdf.json",
+      "request": "context-scrape-pdf-request.json"
     },
     {
       "method": "POST",
