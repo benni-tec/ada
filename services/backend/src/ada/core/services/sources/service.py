@@ -13,12 +13,14 @@ from ada.core.models.operators import Operator, OperatorId, OperatorKind, operat
 from ada.core.models.runs import Snapshot
 from ada.core.models.schema import Schema, TimeRole
 from ada.core.models.sources import (
+    DOCUMENT_COLUMNS,
     AccessKind,
     DataFormat,
     DataSource,
     FreshnessKind,
     FreshnessPolicy,
     RefreshResult,
+    document_extract,
 )
 from ada.core.models.time import Interval, TimeRange
 from ada.core.ports.analysis import AnalysisStore
@@ -105,6 +107,8 @@ class DataSources(SourceService):
         # Fails now for a kind nobody can read yet, instead of at the first refresh.
         self.readers.for_kind(access_kind)
         now = self.clock.now()
+        if access_kind is AccessKind.DOCUMENT:
+            declared_schema = _document_schema(options or {}, declared_schema)
         source = DataSource(
             id=uuid7(),
             project_id=project_id,
@@ -491,11 +495,42 @@ def _check(source: DataSource) -> None:
         raise Invalid("A data source needs an address")
     check_policy(source.freshness)
     shape_options(source.options)
+    _check_document(source)
     declared = source.declared_schema
     if declared is not None and declared.columns:
         check_unique(declared.columns)
         check_roles(declared.roles, declared.columns)
     check_pushdown(source)
+
+
+def _document_schema(options: JsonObject, declared: Schema | None) -> Schema:
+    """A document source's declared schema: the extract mode's fixed columns, with the
+    roles and kind the registration declared, if any. Columns it declares itself are kept
+    for `_check_document` to compare."""
+    columns = DOCUMENT_COLUMNS[document_extract(options)]
+    if declared is None:
+        return Schema(columns=columns)
+    if not declared.columns:
+        return declared.model_copy(update={"columns": columns})
+    return declared
+
+
+def _check_document(source: DataSource) -> None:
+    """A PDF is read by document sources only, and a document source's columns are those
+    of its extract mode, which therefore cannot change after registration."""
+    is_document = source.access_kind is AccessKind.DOCUMENT
+    if is_document != (source.format is DataFormat.PDF):
+        raise Invalid('A document source has the format "pdf", and only a document source has')
+    if not is_document:
+        return
+    extract = document_extract(source.options)
+    expected = [column.name for column in DOCUMENT_COLUMNS[extract]]
+    declared = source.declared_schema
+    if declared is None or [column.name for column in declared.columns] != expected:
+        raise Invalid(
+            f'A document source with extract "{extract.value}" has the columns '
+            f"{', '.join(expected)}; to extract something else, register another source"
+        )
 
 
 def _digest(value: object) -> str:

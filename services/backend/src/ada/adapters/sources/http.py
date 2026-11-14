@@ -36,6 +36,7 @@ from typing import Any, Literal
 import httpx
 from pydantic import Field, ValidationError
 
+from ada.adapters.sources.document import DocumentReader
 from ada.core.models.analysis import FetchedData
 from ada.core.models.base import DomainModel
 from ada.core.models.errors import Invalid, Unavailable
@@ -173,10 +174,14 @@ class HttpReader(SourceReader):
 
 
 class HttpSourceReaders(SourceReaders):
-    """The installed readers. Browser and document sources come later."""
+    """The installed readers: URL, request and document sources, which all go over HTTP.
+    Browser sources come later."""
 
     def __init__(self, client: httpx.AsyncClient, clock: Clock) -> None:
-        self.readers = {kind: HttpReader(client, clock, kind) for kind in HTTP_KINDS}
+        self.readers: dict[AccessKind, SourceReader] = {
+            kind: HttpReader(client, clock, kind) for kind in HTTP_KINDS
+        }
+        self.readers[AccessKind.DOCUMENT] = DocumentReader(self.readers[AccessKind.URL])
 
     def for_kind(self, kind: AccessKind) -> SourceReader:
         try:
