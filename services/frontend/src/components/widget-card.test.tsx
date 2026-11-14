@@ -3,6 +3,7 @@ import { expect, test } from 'vitest'
 
 import type { Widget } from '@/lib/api'
 import { LiveContext } from '@/lib/live'
+import { ThemeContext } from '@/lib/theme-context'
 
 import { WidgetFrame } from './widget-card'
 
@@ -46,4 +47,17 @@ test('a frame pinned to a run, as in a report, ignores data changes', () => {
 test('a map frame is tall enough for a country', () => {
   render(frameAt(0, 'r1', true))
   expect(screen.getByTitle('Widget: Screening').parentElement).toHaveStyle({ height: '420px' })
+})
+
+test('a theme picked apart from the system’s goes to the frame, which cannot see the page’s', () => {
+  const frame = (theme: 'light' | 'dark' | 'system', resolved: 'light' | 'dark') => (
+    <ThemeContext value={{ theme, resolved, setTheme: () => {} }}>{frameAt(0, 'r1', false)}</ThemeContext>
+  )
+  const { rerender } = render(frame('system', 'dark'))
+  const element = screen.getByTitle('Widget: Screening')
+  expect(element.getAttribute('src')).toBe('http://localhost:5174/map.html#widget=w1&run=r1')
+  rerender(frame('light', 'light'))
+  // The same frame, its fragment changed: no reload.
+  expect(screen.getByTitle('Widget: Screening')).toBe(element)
+  expect(element.getAttribute('src')).toBe('http://localhost:5174/map.html#widget=w1&run=r1&theme=light')
 })

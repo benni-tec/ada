@@ -3,6 +3,7 @@ import { useContext, type ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import type { Widget } from '@/lib/api'
 import { useLive } from '@/lib/live'
+import { useTheme } from '@/lib/theme-context'
 import { cn } from '@/lib/utils'
 import type { CardRun } from '@/lib/view-run'
 import { widgetSrc } from '@/lib/widgets'
@@ -50,6 +51,7 @@ export function WidgetFrame({
 }) {
   // Changing key remounts the frame, which reloads the widget and its data.
   const { widgetEpoch } = useLive()
+  const { theme, resolved } = useTheme()
   return (
     <div
       className={fill ? 'min-h-0 flex-1 overflow-hidden' : 'resize-y overflow-hidden'}
@@ -57,7 +59,7 @@ export function WidgetFrame({
     >
       <iframe
         key={reloadOnData ? widgetEpoch : 0}
-        src={widgetSrc(widget, runId)}
+        src={widgetSrc(widget, runId, theme === 'system' ? undefined : resolved)}
         title={`Widget: ${widget.title || widget.type}`}
         sandbox="allow-scripts allow-same-origin"
         loading="lazy"

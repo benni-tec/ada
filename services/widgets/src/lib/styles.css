@@ -1,6 +1,7 @@
 /* Shared by every widget and inlined into each bundle. The page background stays
    transparent so a widget blends into whatever card or host frame embeds it; light and
-   dark follow prefers-color-scheme, since a sandboxed frame cannot ask its host. */
+   dark follow prefers-color-scheme, unless the frame's fragment names a theme (host.ts,
+   followTheme): a page whose theme differs from the system's says so there. */
 
 :root {
   color-scheme: light dark;
@@ -36,8 +37,9 @@
   color: var(--text-primary);
 }
 
+/* The dark palette: from the system unless the page asked for light, or when it asks for dark. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --text-primary: #f0efec;
     --text-secondary: #c3c2b7;
     --text-muted: #9a998f;
@@ -64,6 +66,42 @@
     --seq-5: #b7d3f6;
     --map-missing: #383835;
   }
+}
+
+:root[data-theme='dark'] {
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #9a998f;
+  --grid: #33332f;
+  --surface: #1a1a19;
+  --error: #f97066;
+  --scenario-bg: #2e1065;
+  --scenario-fg: #ddd6fe;
+  --stale-bg: #451a03;
+  --stale-fg: #fde68a;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  /* Flipped: the low end recedes into the dark surface, the high end comes forward. */
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #3987e5;
+  --seq-4: #6da7ec;
+  --seq-5: #b7d3f6;
+  --map-missing: #383835;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 * {
