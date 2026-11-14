@@ -96,7 +96,8 @@ test('the gear opens the settings over the page; the side navigation switches se
   expect(within(web).getByText('300')).toBeInTheDocument()
   // Context.dev has its key; Exa and watching (no ADA_PUBLIC_URL) have not.
   expect(within(web).getAllByText('Configured')).toHaveLength(1)
-  expect(within(web).getByText('EXA_API_KEY')).toBeInTheDocument()
+  expect(within(web).getByText('Web search')).toBeInTheDocument()
+  expect(within(web).getAllByText('EXA_API_KEY').length).toBeGreaterThan(0)
   expect(within(web).getByText('ADA_PUBLIC_URL')).toBeInTheDocument()
 
   fireEvent.click(within(await navGroup('This project')).getByRole('link', { name: 'Data sources' }))

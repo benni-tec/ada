@@ -4236,6 +4236,21 @@
             "title": "Exa Configured",
             "type": "boolean"
           },
+          "search_engine": {
+            "anyOf": [
+              {
+                "enum": [
+                  "exa",
+                  "context.dev"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Engine"
+          },
           "watching_configured": {
             "default": false,
             "title": "Watching Configured",

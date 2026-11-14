@@ -3156,6 +3156,8 @@ export interface components {
              * @default false
              */
             exa_configured: boolean;
+            /** Search Engine */
+            search_engine?: ("exa" | "context.dev") | null;
             /**
              * Watching Configured
              * @default false

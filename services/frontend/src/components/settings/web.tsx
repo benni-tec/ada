@@ -13,7 +13,7 @@ export function WebSection() {
   return (
     <SettingsSection
       title="Web"
-      description="Shared by all projects: agents search the web through ADA’s own Exa key, and read pages, extract tables and map sites through its Context.dev key, so nobody needs an account of their own."
+      description="Shared by all projects: agents search the web through ADA’s own Exa key, or its Context.dev key when no Exa key is set, and read pages, extract tables and map sites through its Context.dev key, so nobody needs an account of their own."
     >
       {isPending ? (
         <Loading what="the web settings" />
@@ -22,7 +22,18 @@ export function WebSection() {
       ) : (
         <>
           <dl className="grid max-w-xl grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-3 text-sm">
-            <dt className="font-medium">Exa key (search)</dt>
+            <dt className="font-medium">Web search</dt>
+            <dd>
+              <Configured configured={web.search_engine != null}>
+                set <code className="font-mono">EXA_API_KEY</code> or <code className="font-mono">CONTEXT_DEV_API_KEY</code>
+              </Configured>
+              {web.search_engine != null && (
+                <span className="ml-2 text-muted-foreground">
+                  through {web.search_engine === 'exa' ? 'Exa' : 'Context.dev (no Exa key is set)'}
+                </span>
+              )}
+            </dd>
+            <dt className="font-medium">Exa key</dt>
             <dd>
               <Configured configured={web.exa_configured ?? false}>
                 set <code className="font-mono">EXA_API_KEY</code>
