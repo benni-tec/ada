@@ -1,14 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { Check, FileText, MessagesSquare, Move, Sparkles } from 'lucide-react'
 import { useId, useMemo, useState, type ReactNode } from 'react'
 
 import { AlertBadges } from '@/components/alerts/alert-badges'
+import { AddWidget } from '@/components/chat/add-widget'
+import { ChatDraftContext, pipelineChip, useChatDraftState } from '@/components/chat/chat-draft'
+import { AgentPanel } from '@/components/dashboards/agent-panel'
 import { DashboardGrid } from '@/components/dashboards/dashboard-grid'
 import { describeRange } from '@/components/dashboards/ranges'
 import { TimeRangeControl } from '@/components/dashboards/time-range-control'
 import { useDashboardRun, useDashboardWrite } from '@/components/dashboards/use-dashboard'
 import { VersionHistory } from '@/components/dashboards/version-history'
+import { IconButton } from '@/components/icon-action'
 import { ConflictNotice, ErrorNotice, Loading } from '@/components/notices'
+import { PageHeader } from '@/components/page-header'
+import { Button } from '@/components/ui/button'
 import {
   dashboardQuery,
   dashboardVersionsQuery,
@@ -17,10 +24,11 @@ import {
   projectWidgetsQuery,
   setDefaultTimeRange,
   startSessionFromDashboard,
+  type DashboardSlot,
   type DashboardTimeRange,
   type DashboardVersion,
+  type Pipeline,
 } from '@/lib/api'
-import { DashboardCrumb } from '@/components/breadcrumbs'
 
 type Search = {
   /** Look at this version number instead of the current one. */
@@ -28,7 +36,6 @@ type Search = {
 }
 
 export const Route = createFileRoute('/projects/$projectId/dashboards/$dashboardId')({
-  staticData: { crumb: DashboardCrumb },
   validateSearch: (search: Record<string, unknown>): Search => {
     const version = Number(search.version)
     return Number.isInteger(version) && version > 0 ? { version } : {}
@@ -48,6 +55,29 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+const panelKey = 'ada-dashboard-agent-panel'
+
+/** Whether the agent panel is open, remembered in this browser. Closed at first: opening
+ * it finds or creates the dashboard's agent session, which a mere look should not do. */
+function usePanelOpen() {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(panelKey) === 'open'
+    } catch {
+      return false
+    }
+  })
+  const set = (next: boolean) => {
+    setOpen(next)
+    try {
+      localStorage.setItem(panelKey, next ? 'open' : 'closed')
+    } catch {
+      // Not remembered, but applied.
+    }
+  }
+  return [open, set] as const
+}
+
 function DashboardPage() {
   const { projectId, dashboardId } = Route.useParams()
   const { version: viewing } = Route.useSearch()
@@ -58,6 +88,9 @@ function DashboardPage() {
   const widgets = useQuery(projectWidgetsQuery(projectId))
   const widgetsById = useMemo(() => new Map((widgets.data ?? []).map((widget) => [widget.id, widget])), [widgets.data])
   const writes = useDashboardWrite(dashboardId)
+  const draft = useChatDraftState()
+  const [panelOpen, setPanelOpen] = usePanelOpen()
+  const [editing, setEditing] = useState(false)
 
   // The range this viewer picked; until then, the dashboard's own.
   const [picked, setPicked] = useState<DashboardTimeRange | null>(null)
@@ -74,8 +107,18 @@ function DashboardPage() {
     },
   })
 
-  if (view.isPending) return <Loading what="the dashboard" />
-  if (view.error) return <ErrorNotice error={view.error} prefix="The dashboard cannot be loaded:" />
+  if (view.isPending)
+    return (
+      <div className="p-6">
+        <Loading what="the dashboard" />
+      </div>
+    )
+  if (view.error)
+    return (
+      <div className="p-6">
+        <ErrorNotice error={view.error} prefix="The dashboard cannot be loaded:" />
+      </div>
+    )
 
   const { dashboard: record, version: current } = view.data
   const old = viewing !== undefined ? versions.data?.find((version) => version.number === viewing) : undefined
@@ -87,100 +130,135 @@ function DashboardPage() {
       .then(async (saved) => {
         if (saved) await navigate({ to: '.', search: {} })
       })
+  // A layout from a drag or a resize: a new version, on the revision last shown.
+  const saveLayout = (slots: DashboardSlot[]) => writes.write((latest) => editDashboard(latest, slots))
+  // "Add widget" puts the pipeline, this dashboard and the slot on the agent's message.
+  const addWidget = (slot?: string) => (pipeline: Pipeline) => {
+    draft.addChip(pipelineChip(pipeline, { id: dashboardId, name: record.name, slot }))
+    setPanelOpen(true)
+  }
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">{record.name}</h1>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Showing {describeRange(range)}
-            {sameAsDefault ? ' (the dashboard’s default)' : ''} · version {shown?.number ?? 'none yet'}
-          </p>
-          <AlertBadges dashboardId={dashboardId} />
-        </div>
-        <div className="flex flex-col items-start gap-1 sm:items-end">
-          <div className="flex flex-wrap gap-2">
-            <Link
-              to="/projects/$projectId/reports/new"
-              params={{ projectId }}
-              search={{ dashboard: dashboardId }}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium dark:border-neutral-700"
-            >
-              Generate report
-            </Link>
-          <button
-            type="button"
-            onClick={() => startSession.mutate()}
-            disabled={startSession.isPending}
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50 dark:border-neutral-700"
-          >
-            {startSession.isPending ? 'Starting…' : 'Start a session from this dashboard'}
-          </button>
+    <ChatDraftContext value={draft}>
+      <div className="flex h-full min-h-0">
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-6 p-4 md:p-6">
+            <PageHeader
+              type="dashboard"
+              title={record.name}
+              below={
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Showing {describeRange(range)}
+                    {sameAsDefault ? ' (the dashboard’s default)' : ''} · version {shown?.number ?? 'none yet'}
+                  </p>
+                  <AlertBadges dashboardId={dashboardId} />
+                </>
+              }
+              actions={
+                <>
+                  <AddWidget projectId={projectId} variant="default" onPick={addWidget()} />
+                  {!old && (shown?.slots.length ?? 0) > 0 && (
+                    <Button variant="outline" size="sm" aria-pressed={editing} onClick={() => setEditing((value) => !value)}>
+                      {editing ? <Check data-icon="inline-start" aria-hidden="true" /> : <Move data-icon="inline-start" aria-hidden="true" />}
+                      {editing ? 'Done' : 'Edit layout'}
+                    </Button>
+                  )}
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/projects/$projectId/reports/new" params={{ projectId }} search={{ dashboard: dashboardId }}>
+                      <FileText data-icon="inline-start" aria-hidden="true" />
+                      Generate report
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => startSession.mutate()} disabled={startSession.isPending}>
+                    <MessagesSquare data-icon="inline-start" aria-hidden="true" />
+                    {startSession.isPending ? 'Starting…' : 'Start a session from this dashboard'}
+                  </Button>
+                  {!panelOpen && (
+                    <IconButton label="Open the agent panel" variant="outline" onClick={() => setPanelOpen(true)}>
+                      <Sparkles />
+                    </IconButton>
+                  )}
+                </>
+              }
+            />
+            {startSession.error && <ErrorNotice error={startSession.error} prefix="No session started:" />}
+
+            <TimeRangeControl
+              // A new default, or a range picked elsewhere, resets the fields.
+              key={describeRange(range)}
+              range={range}
+              isDefault={sameAsDefault}
+              onShow={setPicked}
+              onSaveDefault={(next) =>
+                void writes.write((latest) => setDefaultTimeRange(latest, next)).then((saved) => saved && setPicked(null))
+              }
+              saving={writes.pending}
+            />
+            {writes.conflict && <ConflictNotice message={writes.conflict} onDismiss={writes.dismissConflict} />}
+            {writes.error && <ErrorNotice error={new Error(writes.error)} prefix="Not saved:" />}
+
+            {old && (
+              <p
+                role="status"
+                className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+              >
+                You are looking at version {old.number}, not the current one.{' '}
+                <Link
+                  to="/projects/$projectId/dashboards/$dashboardId"
+                  params={{ projectId, dashboardId }}
+                  className="underline underline-offset-2"
+                >
+                  Back to the current version
+                </Link>
+              </p>
+            )}
+            {viewing !== undefined && !old && versions.isSuccess && (
+              <ErrorNotice error={new Error(`Version ${viewing} does not exist.`)} />
+            )}
+            {editing && !old && (
+              <p className="text-sm text-muted-foreground">
+                Drag a widget by its handle to move it, or by its corner to resize it; maps keep their shape. Each drop
+                saves a new version of the dashboard.
+              </p>
+            )}
+
+            {run.error ? (
+              <ErrorNotice error={run.error} prefix="The data cannot be read:" />
+            ) : widgets.error ? (
+              <ErrorNotice error={widgets.error} prefix="The widgets cannot be loaded:" />
+            ) : run.isPending || widgets.isPending ? (
+              <Loading what="the widgets" />
+            ) : (
+              <DashboardGrid
+                slots={shown?.slots ?? []}
+                widgets={widgetsById}
+                run={{ id: run.data.id, frozen: false, what: 'The dashboard’s current run' }}
+                editing={editing && !old}
+                onSave={old ? undefined : saveLayout}
+                empty={old ? undefined : (slot) => <AddWidget projectId={projectId} onPick={addWidget(slot.name)} />}
+              />
+            )}
+
+            <Section title="Version history">
+              {versions.isPending ? (
+                <Loading what="the versions" />
+              ) : versions.error ? (
+                <ErrorNotice error={versions.error} prefix="The versions cannot be loaded:" />
+              ) : (
+                <VersionHistory
+                  dashboard={record}
+                  versions={versions.data}
+                  viewing={old?.number}
+                  onRestore={restore}
+                  restoring={writes.pending}
+                />
+              )}
+            </Section>
           </div>
-          {startSession.error && <ErrorNotice error={startSession.error} prefix="No session started:" />}
         </div>
-      </header>
-
-      <TimeRangeControl
-        // A new default, or a range picked elsewhere, resets the fields.
-        key={describeRange(range)}
-        range={range}
-        isDefault={sameAsDefault}
-        onShow={setPicked}
-        onSaveDefault={(next) =>
-          void writes.write((latest) => setDefaultTimeRange(latest, next)).then((saved) => saved && setPicked(null))
-        }
-        saving={writes.pending}
-      />
-      {writes.conflict && <ConflictNotice message={writes.conflict} onDismiss={writes.dismissConflict} />}
-      {writes.error && <ErrorNotice error={new Error(writes.error)} prefix="Not saved:" />}
-
-      {old && (
-        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
-          You are looking at version {old.number}, not the current one.{' '}
-          <Link
-            to="/projects/$projectId/dashboards/$dashboardId"
-            params={{ projectId, dashboardId }}
-            className="underline underline-offset-2"
-          >
-            Back to the current version
-          </Link>
-        </p>
-      )}
-      {viewing !== undefined && !old && versions.isSuccess && (
-        <ErrorNotice error={new Error(`Version ${viewing} does not exist.`)} />
-      )}
-
-      {run.error ? (
-        <ErrorNotice error={run.error} prefix="The data cannot be read:" />
-      ) : widgets.error ? (
-        <ErrorNotice error={widgets.error} prefix="The widgets cannot be loaded:" />
-      ) : run.isPending || widgets.isPending ? (
-        <Loading what="the widgets" />
-      ) : (
-        <DashboardGrid
-          slots={shown?.slots ?? []}
-          widgets={widgetsById}
-          run={{ id: run.data.id, frozen: false, what: 'The dashboard’s current run' }}
-        />
-      )}
-
-      <Section title="Version history">
-        {versions.isPending ? (
-          <Loading what="the versions" />
-        ) : versions.error ? (
-          <ErrorNotice error={versions.error} prefix="The versions cannot be loaded:" />
-        ) : (
-          <VersionHistory
-            dashboard={record}
-            versions={versions.data}
-            viewing={old?.number}
-            onRestore={restore}
-            restoring={writes.pending}
-          />
-        )}
-      </Section>
-    </div>
+        {panelOpen && <AgentPanel dashboard={record} onClose={() => setPanelOpen(false)} />}
+      </div>
+    </ChatDraftContext>
   )
 }

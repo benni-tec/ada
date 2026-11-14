@@ -275,24 +275,72 @@ function servePanel(overrides: Record<string, unknown> = {}) {
   })
 }
 
-test('the session panel shows the dashboard compactly, in reading order, on one run', async () => {
+test('a session with a dashboard shows it beside the conversation, under a black bar with its name', async () => {
   servePanel()
   renderAt('/projects/p1/sessions/s1')
 
+  const conversation = await screen.findByRole('region', { name: 'Conversation' })
   const panel = await screen.findByRole('complementary', { name: 'Dashboard' })
-  expect(await within(panel).findByRole('link', { name: 'Screening overview' })).toHaveAttribute(
-    'href',
-    '/projects/p1/dashboards/d1',
-  )
-  expect(within(panel).getByText(/2020 to 2024 · version 2/)).toBeInTheDocument()
+  // Half and half: side by side in one row.
+  expect(conversation.parentElement).toBe(panel.parentElement)
+  expect(conversation).toHaveClass('flex-1')
+  expect(panel).toHaveClass('flex-1')
+
+  const bar = panel.querySelector('header')!
+  expect(bar).toHaveClass('bg-black', 'text-white')
+  expect(bar).toHaveTextContent('Dashboard')
+  expect(await within(bar).findByRole('link', { name: 'Screening overview' })).toHaveAttribute('href', '/projects/p1/dashboards/d1')
+  expect(within(bar).getByRole('button', { name: 'Detach the dashboard' })).toBeInTheDocument()
+
+  expect(await within(panel).findByText(/2020 to 2024 · version 2/)).toBeInTheDocument()
   const cells = within(await within(panel).findByRole('list', { name: 'Dashboard widgets' })).getAllByRole('listitem')
-  expect(cells.map((cell) => cell.querySelector('p')?.textContent)).toEqual(['coverage', 'headline', 'notes'])
+  expect(cells.map((cell) => cell.getAttribute('aria-label'))).toEqual(['coverage', 'headline', 'notes'])
   expect(await within(panel).findByTitle('Widget: Coverage by region')).toHaveAttribute(
     'src',
     'http://localhost:5174/line-chart.html#widget=w1&run=r1',
   )
 })
 
+test('the × detaches the dashboard, and the conversation takes the full width', async () => {
+  let stored = session({ panel_dashboard_id: 'd1', revision: 4 })
+  const patches: unknown[] = []
+  servePanel({
+    'GET /api/sessions/s1': () => stored,
+    'PATCH /api/sessions/s1': (body: unknown) => {
+      patches.push(body)
+      stored = { ...stored, panel_dashboard_id: null, revision: 5 }
+      return stored
+    },
+  })
+  renderAt('/projects/p1/sessions/s1')
+
+  const panel = await screen.findByRole('complementary', { name: 'Dashboard' })
+  fireEvent.click(within(panel).getByRole('button', { name: 'Detach the dashboard' }))
+
+  await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Dashboard' })).not.toBeInTheDocument())
+  expect(patches).toEqual([{ panel_dashboard_id: null, expected_revision: 4 }])
+  expect(screen.getByRole('region', { name: 'Conversation' })).toBeInTheDocument()
+})
+
+test('an empty slot beside a session puts the pipeline, the dashboard and the slot on the message', async () => {
+  servePanel({
+    'GET /api/projects/p1/pipelines': [
+      { operator_id: 'op_p1', name: 'Screening by county', kind: 'transform', sources: [], output: { kind: 'table', columns: [], roles: {}, derived: true }, created_at: '' },
+    ],
+  })
+  renderAt('/projects/p1/sessions/s1')
+
+  const panel = await screen.findByRole('complementary', { name: 'Dashboard' })
+  const notes = await within(panel).findByRole('listitem', { name: 'notes' })
+  fireEvent.click(within(notes).getByRole('button', { name: 'Add widget' }))
+  fireEvent.click(await screen.findByRole('option', { name: /Screening by county/ }))
+
+  const composer = screen.getByRole('form', { name: 'Write a message' })
+  expect(await within(composer).findByRole('list', { name: 'Context' })).toHaveTextContent(
+    'Pipeline: Screening by county → Screening overview, slot “notes”',
+  )
+  expect(within(composer).getByLabelText('Message')).toHaveFocus()
+})
 test('the session panel follows the dashboard when it changes', async () => {
   let current = view()
   servePanel({ 'GET /api/dashboards/d1': () => current })
@@ -347,7 +395,8 @@ test('pins a widget of the session to a dashboard on the dashboard’s latest re
   fireEvent.click(within(form).getByRole('button', { name: 'Pin' }))
 
   const done = await within(card).findByRole('status')
-  expect(done).toHaveTextContent('Pinned to Screening overview')
+  // The dashboard gets a copy (backend), which the message says.
+  expect(done).toHaveTextContent('A copy is pinned to Screening overview')
   expect(within(done).getByRole('link', { name: 'Screening overview' })).toHaveAttribute(
     'href',
     '/projects/p1/dashboards/d1',
@@ -383,7 +432,7 @@ test('pins to a new dashboard, created first', async () => {
   fireEvent.change(await within(form).findByLabelText('Name of the new dashboard'), { target: { value: 'Fresh' } })
   fireEvent.click(within(form).getByRole('button', { name: 'Pin' }))
 
-  expect(await within(card).findByRole('status')).toHaveTextContent('Pinned to Fresh')
+  expect(await within(card).findByRole('status')).toHaveTextContent('A copy is pinned to Fresh')
   expect(calls).toEqual([
     ['create', { name: 'Fresh' }],
     ['pin', { widget_id: 'w1', slot: 'Coverage by region', expected_revision: 1 }],
@@ -415,7 +464,7 @@ test('shows why a pin failed', async () => {
 
 // The project page
 
-test('lists the project’s dashboards and creates one', async () => {
+test('the sidebar lists the project’s dashboards and creates one', async () => {
   let created: unknown
   serveApi({
     'GET /api/projects/p1': project(),
@@ -432,18 +481,18 @@ test('lists the project’s dashboards and creates one', async () => {
   })
   const { router } = renderAt('/projects/p1')
 
-  const section = await screen.findByRole('region', { name: 'Dashboards' })
-  const link = await within(section).findByRole('link', { name: /Screening overview/ })
-  expect(link).toHaveAttribute('href', '/projects/p1/dashboards/d1')
-  expect(link).toHaveTextContent('2020 to 2024')
+  const nav = await screen.findByRole('navigation', { name: 'Project' })
+  const group = within(nav).getByRole('group', { name: 'Dashboards' })
+  expect(await within(group).findByRole('link', { name: 'Screening overview' })).toHaveAttribute('href', '/projects/p1/dashboards/d1')
 
-  fireEvent.change(within(section).getByLabelText('New dashboard'), { target: { value: 'Mortality' } })
-  fireEvent.click(within(section).getByRole('button', { name: 'Create dashboard' }))
+  fireEvent.click(within(group).getByRole('button', { name: 'New dashboard' }))
+  const dialog = await screen.findByRole('dialog', { name: 'New dashboard' })
+  fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Mortality' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Create dashboard' }))
 
   await waitFor(() => expect(router.state.location.pathname).toBe('/projects/p1/dashboards/d8'))
   expect(created).toEqual({ name: 'Mortality' })
 })
-
 // The live stream
 
 test('a dashboard event refreshes the dashboard and the project’s list', () => {
