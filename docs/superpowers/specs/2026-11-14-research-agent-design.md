@@ -49,9 +49,13 @@ flow), and the Gemini API tech challenge (the research agent is built on Gemini)
 
 - **An agent that invents data.** A number that is model-extracted must say so in provenance,
   and the research report must name what it could not find instead of filling the gap.
-- **Hidden spend.** Every paid call (Exa, Context.dev, Gemini) goes through a tool the session
-  record shows; no background loop spends credits on its own. Context.dev reads are
-  materialised as snapshots, so a refresh only re-reads when forced or pushed.
+- **Hidden spend.** No Exa or Context.dev call starts unless a person or an agent asked for it:
+  either a tool call the session record shows, or a refresh of a source someone set up
+  (a forced refresh, or a monitor's webhook). Context.dev reads are materialised as snapshots.
+  Document sources therefore allow only `MANUAL` and `PUSH` freshness, never `TTL`, because
+  the minute sweep would re-read an expired TTL source on its own
+  (`core/services/sources/freshness.py:24`). Model calls are the existing per-turn spend and
+  are not counted here. *(Builder's call, from the builder check.)*
 - **A demo that depends on the network at judging time.** Tests replay recordings; the demo
   project is seeded and its research run done before the freeze.
 
@@ -98,13 +102,17 @@ the page: `{"extract": {"instruction": ..., "columns": [...]}}` turns it into ro
 `extract`; without `extract` the source is the page's Markdown as one row
 (url, title, text). The reader returns `FetchedData` as JSON, so storage, snapshots and
 pipelines are unchanged. Its probe returns nothing (no cheap change check); freshness is
-`MANUAL`, `TTL` or `PUSH`.
+`MANUAL` or `PUSH` (see Anti-goals); registering one with `TTL` fails with a message saying so.
 
 ### 3. Provenance and licence
 
 `DataSource` gets an optional `provenance`:
 `{publisher, licence, landing_page, found_by: {query, scope} | null, extracted_by_model: bool, note}`.
-`register_source` and the HTTP route accept it; the research agent must fill it. Snapshots
+`register_source` and the HTTP route accept it; the research agent must fill it. A licence
+it cannot establish is recorded as `licence: "unknown"` with the reason in `note`; the
+source is still registered, the card shows "licence unknown", and the research report lists
+it as such. Evidence is the publisher's own terms page or dataset metadata, linked in `note`.
+*(Builder's call, from the builder check.)* Snapshots
 persist `FetchedData.origin` (the final URL after redirects), which is dropped today.
 One migration covers both. The source card in the frontend shows publisher, licence and a
 link, and a "model-extracted" badge when `extracted_by_model` is set.
@@ -161,8 +169,9 @@ link, and a "model-extracted" badge when `extracted_by_model` is set.
   new entry in the parent.
 - **Limits.** The research turn runs with a higher step limit than a chat turn (the
   `max_steps` already in the runtime), and each research session caps its paid web calls
-  (Exa and Context.dev together) at a number set in settings, default 40. Over the cap the
-  tools fail with a message telling the agent to report back.
+  (Exa and Context.dev tool calls in that session) at a number set in settings, default 40.
+  Over the cap the tools fail with a message telling the agent to report back. Refreshes of
+  sources it added, later, are not counted against it.
 
 ### 6. Health demo payoff (what the research agent should find)
 
@@ -173,7 +182,12 @@ treatment within target times, equal across regions):
 
 - adds Sotkanet survival indicators 3625–3627 (hospital-district level) with THL's licence;
 - adds the Cancer Registry's county-level figures read through Context.dev (the site blocks
-  plain HTTP fetches), marked model-extracted where they come from a table extraction;
+  plain HTTP fetches), marked model-extracted where they come from a table extraction. This
+  is unproven: the registry's statistics are an interactive application whose CSV export
+  needs a browser session. The first implementation task is a feasibility check with the real
+  key on the registry's published county pages or PDFs. If Context.dev cannot read a usable
+  table, this item drops and the report names the registry under what it could not get, with
+  the reason; the demo still has the Sotkanet survival data. *(Builder's call.)*
 - reports that open waiting-time-to-treatment data by county does not exist, with the places
   it looked, which is the actionable finding for AstraZeneca.
 
