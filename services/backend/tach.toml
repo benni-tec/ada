@@ -64,8 +64,17 @@ depends_on = [
 
 [[modules]]
 path = "ada.entrypoints.cli"
-# migrate runs before any container is usable, so it calls the adapter directly.
-depends_on = ["ada.adapters", "ada.config", "ada.entrypoints.http"]
+# migrate runs before any container is usable, so it calls the adapter directly. seed-demo
+# reads the example registrations, which are data, from the sources adapter.
+depends_on = [
+    "ada.adapters",
+    "ada.composition",
+    "ada.config",
+    "ada.core.models",
+    "ada.core.ports",
+    "ada.core.services.ports",
+    "ada.entrypoints.http",
+]
 
 # The composition root wires everything together.
 [[modules]]
