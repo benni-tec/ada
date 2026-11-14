@@ -1714,6 +1714,8 @@ Settings come from the environment (`services/backend/src/ada/config.py`).
 | `ADA_PUBLIC_URL` | Where Context.dev reaches this platform (`{ADA_PUBLIC_URL}/api/hooks/context/{id}`), for watched sources. Unset: watching refuses, naming it |
 | `WEB_DAILY_CREDIT_LIMIT` | Web credits each project may spend per day, web tools (Exa searches at 5) and web sources together (default 300); shown read only in Settings › Web |
 | `RESEARCH_WEB_CALLS` | Web tool calls a research session may make over all its turns (default 40) |
+| `ALLOW_PRIVATE_SOURCES` | `true` lets URL, request and downloaded document sources read loopback and private addresses (local development, tests); default `false`: every request and redirect must resolve to public addresses |
+| `SOURCE_MAX_BYTES` | The most a URL, request or document source may answer, once decoded (default 50,000,000) |
 
 There are no users and no authentication yet: whoever can reach the gateway can use the
 API and the MCP endpoint. Do not expose it publicly as it is.

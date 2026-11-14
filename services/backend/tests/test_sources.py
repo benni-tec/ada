@@ -6,7 +6,7 @@ import csv
 import io
 import json
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -610,10 +610,10 @@ class Server:
         self.requests.append(request)
         return self.handler(request)
 
-    def reader(self, kind: AccessKind = AccessKind.URL):  # noqa: ANN201
-        return HttpSourceReaders(create_client(httpx.MockTransport(self)), FixedClock()).for_kind(
-            kind
-        )
+    def reader(self, kind: AccessKind = AccessKind.URL, **settings: Any):  # noqa: ANN201
+        client = create_client(httpx.MockTransport(self))
+        settings = {"allow_private": True} | settings
+        return HttpSourceReaders(client, FixedClock(), **settings).for_kind(kind)
 
 
 def source(kind: AccessKind = AccessKind.URL, **changes: Any) -> DataSource:
@@ -672,6 +672,52 @@ async def test_an_error_answer_or_no_answer_makes_the_source_unavailable() -> No
         await Server(refuse).reader().fetch(source(), TimeRange())
     with pytest.raises(Invalid):
         await Server(refuse).reader().fetch(source(address="ftp://x.test/a.csv"), TimeRange())
+
+
+async def test_only_public_addresses_are_read_redirects_included() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/moved":
+            return httpx.Response(302, headers={"Location": "https://93.184.215.14/data.csv"})
+        if request.url.path == "/metadata":
+            return httpx.Response(302, headers={"Location": "http://169.254.169.254/latest"})
+        return httpx.Response(200, content=b"a\n1\n")
+
+    server = Server(handler)
+    public = server.reader(allow_private=False)
+
+    fetched = await public.fetch(source(address="https://93.184.216.34/moved"), TimeRange())
+    with pytest.raises(Invalid, match="localhost is not a public address"):
+        await public.fetch(source(address="http://localhost:8000/admin"), TimeRange())
+    with pytest.raises(Invalid, match="169.254.169.254"):
+        await public.fetch(source(address="https://93.184.216.34/metadata"), TimeRange())
+    # A document at an address is downloaded by the URL reader, under the same rule.
+    with pytest.raises(Invalid, match="localhost is not a public address"):
+        await server.reader(AccessKind.DOCUMENT, allow_private=False).fetch(
+            source(AccessKind.DOCUMENT, address="http://localhost/a.pdf"), TimeRange()
+        )
+    allowed = await server.reader().fetch(source(address="http://127.0.0.1/a"), TimeRange())
+
+    assert (fetched.content, fetched.origin) == (b"a\n1\n", "https://93.184.215.14/data.csv")
+    assert allowed.content == b"a\n1\n"
+    assert [r.url.host for r in server.requests] == [
+        "93.184.216.34",
+        "93.184.215.14",
+        "93.184.216.34",
+        "127.0.0.1",
+    ]
+
+
+async def test_an_answer_over_the_size_limit_is_refused() -> None:
+    async def chunks() -> AsyncIterator[bytes]:
+        for _ in range(3):
+            yield b"x" * 40
+
+    declared = Server(lambda request: httpx.Response(200, content=b"x" * 101))
+    streamed = Server(lambda request: httpx.Response(200, content=chunks()))
+
+    for server in (declared, streamed):
+        with pytest.raises(SourceUnavailable, match="more than 100 bytes"):
+            await server.reader(max_bytes=100).fetch(source(), TimeRange())
 
 
 async def test_the_probe_reads_a_declared_field_or_hashes_the_answer() -> None:
@@ -840,7 +886,11 @@ class Documents:
         self.store = DuckDbAnalysisStore(data_dir)
         self.files = LocalFileStore(data_dir)
         readers = HttpSourceReaders(
-            create_client(httpx.MockTransport(self.server)), FixedClock(), self.files, "ctxt_test"
+            create_client(httpx.MockTransport(self.server)),
+            FixedClock(),
+            self.files,
+            "ctxt_test",
+            allow_private=True,
         )
         self.service, _ = data_sources(memory, readers, self.store, FixedClock())
 
@@ -1010,7 +1060,9 @@ def recorded() -> Recorded:
     project = factories.project()
     memory.projects[project.id] = project
     store = FakeAnalysisStore()
-    readers = HttpSourceReaders(create_client(httpx.MockTransport(replay)), clock)
+    readers = HttpSourceReaders(
+        create_client(httpx.MockTransport(replay)), clock, allow_private=True
+    )
     service, _ = data_sources(memory, readers, store, clock)
     return Recorded(service, store, replay, clock, project.id)
 

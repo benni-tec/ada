@@ -45,6 +45,8 @@ class SourceProvider(Provider):
                 key.get_secret_value() if key else None,
                 web_budget,
                 settings.web_daily_credit_limit,
+                allow_private=settings.allow_private_sources,
+                max_bytes=settings.source_max_bytes,
             )
 
     refreshes = provide(WaitingRefreshes, provides=RefreshService, scope=Scope.REQUEST)
