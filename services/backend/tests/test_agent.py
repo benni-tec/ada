@@ -460,6 +460,16 @@ def test_a_failing_or_unreachable_provider_ends_the_turn_as_failed(
     assert "could not be reached" in (refused.error or "")
 
 
+def test_a_call_timing_out_before_the_turn_limit_ends_the_turn_as_failed(
+    client: TestClient, session: dict[str, Any], script: Script
+) -> None:
+    script.then(fail(TimeoutError("upstream")))
+    failed = run(client, message(client, session, "Hi")["turn"]["id"])
+
+    assert failed.status == "failed"
+    assert failed.error == "The turn failed unexpectedly: TimeoutError: upstream"
+
+
 def test_a_turn_that_cannot_finish_fails(
     client: TestClient,
     project: dict[str, Any],

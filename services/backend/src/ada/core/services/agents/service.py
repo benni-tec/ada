@@ -296,19 +296,18 @@ class AgentTurns(AgentTurnService):
                 agent = _agent(turn.model)
                 async with toolbox.connect(agent, session.id, session.agent) as tools:
                     status = await self.runtime.run(request, tools, recorder)
-        except TimeoutError:
-            if not deadline.expired():
-                raise
-            minutes = TURN_TIME_LIMIT.total_seconds() / 60
-            error = f"The turn did not finish within {minutes:g} minutes"
         except (AgentFailed, Invalid) as failure:
             # Invalid: the model was removed, or became unusable, since the message.
             error = str(failure)
         except Exception as failure:
-            # Whatever went wrong, the turn must end: a turn left running would show a
-            # spinner forever. The worker's log has the details.
-            logger.exception("Agent turn %s failed", id)
-            error = f"The turn failed unexpectedly: {type(failure).__name__}: {failure}"
+            if isinstance(failure, TimeoutError) and deadline.expired():
+                minutes = TURN_TIME_LIMIT.total_seconds() / 60
+                error = f"The turn did not finish within {minutes:g} minutes"
+            else:
+                # Whatever went wrong, the turn must end: a turn left running would show a
+                # spinner forever. The worker's log has the details.
+                logger.exception("Agent turn %s failed", id)
+                error = f"The turn failed unexpectedly: {type(failure).__name__}: {failure}"
         finished = await self.progress.finish(id, status, recorder.parts, error, self.clock.now())
         await self.broadcaster.publish(self._finished(session.project_id, finished))
         await self._report_end(session, finished)
