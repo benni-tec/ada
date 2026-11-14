@@ -26,6 +26,7 @@ from ada.adapters.sources.examples import (
 )
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.alerts import AlertRule, AlertState, Severity
+from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.dashboards import Dashboard, Slot
 from ada.core.models.operators import Operator
@@ -35,6 +36,7 @@ from ada.core.models.time import Grain, TimeRange
 from ada.core.models.widgets import Widget
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.services.ports.alerts import AlertService
+from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
@@ -216,6 +218,7 @@ async def _demo(request: AsyncContainer, project_id: Id, sources: dict[str, Data
     widgets = await request.get(WidgetService)
     dashboards = await request.get(DashboardService)
     alerts = await request.get(AlertService)
+    attachments = await request.get(AttachmentService)
 
     async def source(example: ExampleSource) -> Operator:
         return await pipelines.add_source(project_id, sources[example.name].id, SEED)
@@ -319,8 +322,8 @@ async def _demo(request: AsyncContainer, project_id: Id, sources: dict[str, Data
     ] != [(s.name, s.widget_id) for s in slots]:
         await dashboards.edit(dashboard.id, slots, dashboard.revision, SEED)
         dashboard = await dashboards.get(dashboard.id)
-    if session.panel_dashboard_id != dashboard.id:
-        await sessions.show_dashboard(session.id, dashboard.id, session.revision)
+    # Shown beside the session; attaching again changes nothing.
+    await attachments.attach(session.id, AttachmentKind.DASHBOARD, str(dashboard.id), SEED)
 
     rule = next((r for r in await alerts.list_rules(dashboard.id) if r.name == DEMO_RULE), None)
     if rule is None:

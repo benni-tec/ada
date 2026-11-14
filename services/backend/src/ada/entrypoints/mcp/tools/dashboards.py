@@ -4,12 +4,12 @@ from datetime import date
 from dishka import FromDishka
 from fastmcp import FastMCP
 
+from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion, Slot
-from ada.core.models.sessions import Session
 from ada.core.models.time import TimeRange
+from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
-from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.mcp.actor import calling_agent
 from ada.entrypoints.mcp.injection import Inject
 from ada.entrypoints.mcp.sessions import SessionId
@@ -22,12 +22,6 @@ class DashboardState(DomainModel):
     # None until the dashboard's first edit.
     version: DashboardVersion | None
     # Where a person sees it in the frontend, relative to the host serving ADA.
-    url: str
-
-
-class PanelState(DomainModel):
-    session: Session
-    # The session's page, where the dashboard sits beside the conversation.
     url: str
 
 
@@ -46,13 +40,20 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     @mcp.tool
     @inject
     async def create_dashboard(
-        project_id: Id, session_id: SessionId, name: str, service: FromDishka[DashboardService]
+        project_id: Id,
+        session_id: SessionId,
+        name: str,
+        service: FromDishka[DashboardService],
+        attachments: FromDishka[AttachmentService],
     ) -> DashboardState:
         """Create an empty dashboard in a project: a live view of widgets that follows the
-        latest data, unlike a session, which is a one-off exploration. Fill it with
+        latest data, unlike a session, which is a one-off exploration. It is attached to
+        the session, so the person sees it fill beside the conversation. Fill it with
         `edit_dashboard`, every widget in one call. Returns the dashboard with its id, its
         revision and its `url`: give the url to the person."""
-        dashboard = await service.create(project_id, name, calling_agent())
+        actor = calling_agent()
+        dashboard = await service.create(project_id, name, actor)
+        await attachments.attach(session_id, AttachmentKind.DASHBOARD, str(dashboard.id), actor)
         return await _state(service, dashboard.id)
 
     @mcp.tool
@@ -153,21 +154,4 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         dashboard version. Returns the dashboard with its new revision."""
         return await service.set_default_time_range(
             dashboard_id, TimeRange(start=start, end=end), expected_revision
-        )
-
-    @mcp.tool
-    @inject
-    async def show_dashboard_in_session(
-        session_id: SessionId,
-        expected_revision: int,
-        sessions: FromDishka[SessionService],
-        dashboard_id: Id | None = None,
-    ) -> PanelState:
-        """Show a dashboard beside the conversation in a session, so a person sees it
-        change as you edit it. `expected_revision` is the session's revision, as
-        `create_session` returned it. Leave out `dashboard_id` to clear the panel. The
-        dashboard must be in the session's project."""
-        session = await sessions.show_dashboard(session_id, dashboard_id, expected_revision)
-        return PanelState(
-            session=session, url=f"/projects/{session.project_id}/sessions/{session.id}"
         )

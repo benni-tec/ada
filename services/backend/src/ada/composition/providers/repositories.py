@@ -2,6 +2,7 @@ from dishka import Provider, Scope, provide
 
 from ada.adapters.db.agent_repositories import SqlAgentTurnRepository, SqlTurnProgress
 from ada.adapters.db.alert_repositories import SqlAlertRepository, SqlAlertRuleRepository
+from ada.adapters.db.attachment_repositories import SqlAttachmentRepository
 from ada.adapters.db.llm_repositories import (
     SqlAgentSettingsRepository,
     SqlLlmModelRepository,
@@ -32,6 +33,7 @@ from ada.core.ports.repositories import (
     AgentTurnRepository,
     AlertRepository,
     AlertRuleRepository,
+    AttachmentRepository,
     DashboardRepository,
     DataSourceRepository,
     LlmModelRepository,
@@ -58,6 +60,7 @@ class RepositoryProvider(Provider):
     projects = provide(SqlProjectRepository, provides=ProjectRepository)
     data_sources = provide(SqlDataSourceRepository, provides=DataSourceRepository)
     sessions = provide(SqlSessionRepository, provides=SessionRepository)
+    attachments = provide(SqlAttachmentRepository, provides=AttachmentRepository)
     operators = provide(SqlOperatorRepository, provides=OperatorRepository)
     snapshots = provide(SqlSnapshotRepository, provides=SnapshotRepository)
     runs = provide(SqlRunRepository, provides=RunRepository)

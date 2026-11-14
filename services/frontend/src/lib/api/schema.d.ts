@@ -850,6 +850,48 @@ export interface paths {
         patch: operations["change_session_api_sessions__session_id__patch"];
         trace?: never;
     };
+    "/api/sessions/{session_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Attachments
+         * @description What the session shows beside its conversation, oldest first.
+         */
+        get: operations["list_attachments_api_sessions__session_id__attachments_get"];
+        put?: never;
+        /**
+         * Attach
+         * @description Attach a thing of the session's project, or a web page. Attaching what is attached
+         *     already answers with the attachment as it is.
+         */
+        post: operations["attach_api_sessions__session_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sessions/{session_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Detach */
+        delete: operations["detach_api_sessions__session_id__attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions/{session_id}/entries": {
         parameters: {
             query?: never;
@@ -1512,6 +1554,32 @@ export interface components {
             alert: components["schemas"]["Alert"];
             rule: components["schemas"]["AlertRule"];
         };
+        /**
+         * Attachment
+         * @description Something shown beside a session, as a tab, and listed to its agent. A session has
+         *     each thing attached at most once. An attachment is added or removed, never changed.
+         */
+        Attachment: {
+            actor: components["schemas"]["Actor"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            id: components["schemas"]["Id"];
+            kind: components["schemas"]["AttachmentKind"];
+            /** Ref */
+            ref: string;
+            session_id: components["schemas"]["Id"];
+            /** Title */
+            title: string;
+        };
+        /**
+         * AttachmentKind
+         * @description What can be attached to a session. `ref` is the thing's id, unless said otherwise.
+         * @enum {string}
+         */
+        AttachmentKind: "dashboard" | "report" | "alert_rule" | "source" | "operator" | "session" | "widget" | "web_page";
         /** CheckResult */
         CheckResult: {
             /** Changed */
@@ -1671,7 +1739,7 @@ export interface components {
          * EntryKind
          * @enum {string}
          */
-        EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report";
+        EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report" | "alert";
         /**
          * FoundBy
          * @description How an agent came upon a source: the web search and its scope.
@@ -1918,6 +1986,14 @@ export interface components {
             operator_id: components["schemas"]["OperatorId"];
             /** @default warning */
             severity: components["schemas"]["Severity"];
+        };
+        /** NewAttachment */
+        NewAttachment: {
+            kind: components["schemas"]["AttachmentKind"];
+            /** Ref */
+            ref: string;
+            /** Title */
+            title?: string | null;
         };
         /** NewDashboard */
         NewDashboard: {
@@ -2494,7 +2570,6 @@ export interface components {
             created_at: string;
             id: components["schemas"]["Id"];
             origin_dashboard_id?: components["schemas"]["Id"] | null;
-            panel_dashboard_id?: components["schemas"]["Id"] | null;
             parent_session_id?: components["schemas"]["Id"] | null;
             project_id: components["schemas"]["Id"];
             /**
@@ -2519,15 +2594,14 @@ export interface components {
         };
         /**
          * SessionChange
-         * @description Rename, or put a dashboard in the panel, or both. `panel_dashboard_id` set to null
-         *     clears the panel; leaving it out keeps it.
+         * @description Rename. What is shown beside the conversation is the session's attachments
+         *     (/sessions/{id}/attachments).
          */
         SessionChange: {
             /** Expected Revision */
             expected_revision: number;
-            panel_dashboard_id?: components["schemas"]["Id"] | null;
             /** Title */
-            title?: string | null;
+            title: string;
         };
         /**
          * SessionEntry
@@ -4716,6 +4790,102 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Session"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_attachments_api_sessions__session_id__attachments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attachment"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_api_sessions__session_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewAttachment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attachment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_api_sessions__session_id__attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

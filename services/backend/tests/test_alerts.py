@@ -23,15 +23,20 @@ from taskiq import AsyncBroker
 from ada.adapters.valkey.tasks import ValkeyTaskDispatcher
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.models.actors import PLATFORM
 from ada.core.models.alerts import AlertState, Severity
+from ada.core.models.attachments import AttachmentKind
 from ada.core.models.errors import Conflict, Invalid, NotFound
 from ada.core.models.events import EventType
 from ada.core.models.schema import Column, ColumnType, MeasureRole, Roles, Schema, TimeRole
+from ada.core.models.sessions import EntryKind
 from ada.core.ports.repositories import OperatorRepository, RunRepository
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.services.alerts.formula import compile_rule, describe
+from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
+from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.http.app import create_app
 from ada.entrypoints.mcp.server import create_mcp
@@ -442,6 +447,12 @@ async def test_an_alert_stays_while_its_key_alerts_and_resolves_when_it_stops(
     world: World, setup: Setup
 ) -> None:
     rule = await world.rule(setup)
+    async with world.container() as request:
+        sessions = await request.get(SessionService)
+        watching, elsewhere = [await sessions.create(setup.project_id, t) for t in "AB"]
+        await (await request.get(AttachmentService)).attach(
+            watching.id, AttachmentKind.ALERT_RULE, str(rule.id), TESTER
+        )
     async with world.alerts() as service:
         (north,) = await service.check(rule.id)
     world.clock.advance(hours=1)
@@ -477,6 +488,20 @@ async def test_an_alert_stays_while_its_key_alerts_and_resolves_when_it_stops(
         AlertState.RESOLVED,
     )
     assert again["north"].id != north.id
+    # The session that shows the rule records each start and end, in the check's unit of
+    # work; the other session records nothing.
+    async with world.container() as request:
+        sessions = await request.get(SessionService)
+        recorded = await sessions.entries(watching.id)
+        assert await sessions.entries(elsewhere.id) == []
+    assert {(entry.kind, entry.actor) for entry in recorded} == {(EntryKind.ALERT, PLATFORM)}
+    assert [(entry.text.removeprefix(f"{rule.name}: "), entry.ref) for entry in recorded] == [
+        ("region: north started", str(north.id)),
+        ("region: south started", str(changed["south"].id)),
+        ("region: north ended", str(north.id)),
+        ("region: north started", str(again["north"].id)),
+        ("region: south ended", str(changed["south"].id)),
+    ]
 
 
 async def test_events_go_out_after_the_check_commits_and_not_for_failed_work(

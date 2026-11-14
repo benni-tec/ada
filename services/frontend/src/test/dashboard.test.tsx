@@ -334,7 +334,7 @@ test('the agent panel opens on the dashboard’s agent session, and “Add widge
   serveDashboard({
     'POST /api/dashboards/d1/agent-session': () => {
       opened.push('d1')
-      return json(session({ id: 's7', title: 'Screening overview (agent)', origin_dashboard_id: 'd1', panel_dashboard_id: 'd1' }), 201)
+      return json(session({ id: 's7', title: 'Screening overview (agent)', origin_dashboard_id: 'd1' }), 201)
     },
     'GET /api/sessions/s7/entries': [entry({ id: 'e1', session_id: 's7', text: 'Earlier question' })],
     'GET /api/sessions/s7/widgets': [],
@@ -425,15 +425,23 @@ test('a widget opens full size over the page at its card’s run; Escape, back a
 
 test('a session started from the dashboard has it beside the conversation, which follows it and can detach it', async () => {
   const calls: unknown[] = []
-  let stored = session({ id: 's9', origin_dashboard_id: 'd1', title: 'Questions about Screening overview' })
+  const stored = session({ id: 's9', origin_dashboard_id: 'd1', title: 'Questions about Screening overview' })
+  let attached: unknown[] = []
   let current = view()
   serveDashboard({
     'GET /api/dashboards/d1': () => current,
     'POST /api/projects/p1/sessions': (body: unknown) => (calls.push(['create', body]), json(stored, 201)),
-    'PATCH /api/sessions/s9': (body: { panel_dashboard_id: string | null }) => {
-      calls.push(['panel', body])
-      stored = { ...stored, panel_dashboard_id: body.panel_dashboard_id, revision: stored.revision + 1 }
-      return stored
+    'POST /api/sessions/s9/attachments': (body: { kind: string; ref: string }) => {
+      calls.push(['attach', body])
+      const attachment = { id: 'a1', session_id: 's9', ...body, title: 'Screening overview', actor: web, created_at: '2026-11-01T09:06:00Z' }
+      attached = [attachment]
+      return json(attachment, 201)
+    },
+    'GET /api/sessions/s9/attachments': () => attached,
+    'DELETE /api/sessions/s9/attachments/a1': () => {
+      calls.push(['detach', 'a1'])
+      attached = []
+      return new Response(null, { status: 204 })
     },
     'GET /api/sessions/s9': () => stored,
     'GET /api/sessions/s9/entries': [],
@@ -473,7 +481,7 @@ test('a session started from the dashboard has it beside the conversation, which
   expect(screen.getByRole('region', { name: 'Conversation' })).toBeInTheDocument()
   expect(calls).toEqual([
     ['create', { title: 'Questions about Screening overview', origin_dashboard_id: 'd1' }],
-    ['panel', { panel_dashboard_id: 'd1', expected_revision: 1 }],
-    ['panel', { panel_dashboard_id: null, expected_revision: 2 }],
+    ['attach', { kind: 'dashboard', ref: 'd1' }],
+    ['detach', 'a1'],
   ])
 })

@@ -10,6 +10,7 @@ from ada.core.models.errors import Conflict, NotFound
 from ada.core.models.reports import Report, ReportVersion, Template, TemplateKind, VersionBump
 from ada.core.models.runs import Run
 from ada.core.models.time import TimeRange
+from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.reports import ReportService, TemplateService
 from ada.core.services.ports.runs import RunService
 from ada.entrypoints.mcp.actor import calling_agent
@@ -69,8 +70,9 @@ run's time range.
 
 To fill a report template instead, pass `template_id` and as content
 `{{"slots": {{"<slot name>": "<widget id>", ...}}}}`; slots with a default widget may be left
-out. Returns the report, the version with its sources list, and the `url` to give the
-person."""
+out. The version is attached to the session, so the person reads it beside the
+conversation. Returns the report, the version with its sources list, and the `url` to give
+the person."""
     )
     @inject
     async def create_report(
@@ -80,6 +82,7 @@ person."""
         content: JsonObject,
         reports: FromDishka[ReportService],
         runs: FromDishka[RunService],
+        attachments: FromDishka[AttachmentService],
         run_id: Id | None = None,
         time_range: TimeRange | None = None,
         dashboard_id: Id | None = None,
@@ -99,6 +102,7 @@ person."""
             dashboard_id=dashboard_id,
             template_id=template_id,
         )
+        await attachments.attach_report_version(session_id, version.id, actor)
         return await _view(reports, version)
 
     @mcp.tool(
@@ -116,7 +120,8 @@ on top of a version someone else added meanwhile.
 {CONTENT_FORMAT}
 
 A report made from a template may again be given `{{"slots": {{...}}}}` as content. Start
-from get_report's content, change it, and leave out `sources`. Returns the report, the new
+from get_report's content, change it, and leave out `sources`. The new version takes the
+place of the report's earlier version beside the session. Returns the report, the new
 version and its `url`."""
     )
     @inject
@@ -126,6 +131,7 @@ version and its `url`."""
         content: JsonObject,
         reports: FromDishka[ReportService],
         runs: FromDishka[RunService],
+        attachments: FromDishka[AttachmentService],
         run_id: Id | None = None,
         time_range: TimeRange | None = None,
         bump: VersionBump | None = None,
@@ -144,6 +150,7 @@ version and its `url`."""
             actor,
             bump=bump,
         )
+        await attachments.attach_report_version(session_id, version.id, actor)
         return await _view(reports, version)
 
     @mcp.tool
@@ -153,6 +160,7 @@ version and its `url`."""
         dashboard_id: Id,
         name: str,
         reports: FromDishka[ReportService],
+        attachments: FromDishka[AttachmentService],
         run_id: Id | None = None,
         time_range: TimeRange | None = None,
     ) -> ReportView:
@@ -161,11 +169,14 @@ version and its `url`."""
         started for `time_range`, or else for the dashboard's default range. When the
         dashboard already has a report of this `name`, this adds its next version (minor
         for new data, major when the dashboard's widgets changed) instead of a second
-        report. Add text around the widgets afterwards with add_report_version. Returns
-        the report, the version and its `url`."""
+        report. The version is attached to the session, in place of an earlier version of
+        the same report. Add text around the widgets afterwards with add_report_version.
+        Returns the report, the version and its `url`."""
+        actor = calling_agent()
         version = await reports.generate_from_dashboard(
-            dashboard_id, name, calling_agent(), run_id=run_id, time_range=time_range
+            dashboard_id, name, actor, run_id=run_id, time_range=time_range
         )
+        await attachments.attach_report_version(session_id, version.id, actor)
         return await _view(reports, version)
 
     @mcp.tool

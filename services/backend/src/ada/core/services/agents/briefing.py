@@ -1,6 +1,7 @@
 """What the agent is told for one turn: the system prompt (ADA's model, the session, the
 rules, what the message's context items mean) and the conversation so far."""
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
@@ -17,6 +18,8 @@ from ada.core.models.agents import (
     TurnRequest,
     TurnStatus,
 )
+from ada.core.models.alerts import AlertState
+from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import Id
 from ada.core.models.errors import NotFound
 from ada.core.models.projects import Project
@@ -31,9 +34,12 @@ from ada.core.models.sessions import (
     WidgetContext,
 )
 from ada.core.ports.repositories import (
+    AlertRepository,
+    AttachmentRepository,
     DashboardRepository,
     DataSourceRepository,
     OperatorRepository,
+    ReportRepository,
     WidgetRepository,
 )
 from ada.core.services.pipelines.listing import name as operator_name
@@ -155,11 +161,17 @@ class Briefing:
         dashboards: DashboardRepository,
         widgets: WidgetRepository,
         data_sources: DataSourceRepository,
+        attachments: AttachmentRepository,
+        alerts: AlertRepository,
+        reports: ReportRepository,
     ) -> None:
         self.operators = operators
         self.dashboards = dashboards
         self.widgets = widgets
         self.data_sources = data_sources
+        self.attachments = attachments
+        self.alerts = alerts
+        self.reports = reports
 
     async def request(
         self,
@@ -182,6 +194,7 @@ class Briefing:
             ABOUT_RESEARCH if research else ABOUT_ADA,
             HOW_ADA_WORKS,
             await self._session(project, session),
+            await self._attachments(session),
             RESEARCH_RULES if research else RULES,
             await self._context(prompt_entry.context),
             instructions_section(GLOBAL_INSTRUCTIONS, instructions),
@@ -212,12 +225,42 @@ class Briefing:
                 f"- It was delegated from the session {session.parent_session_id}; "
                 "report_back posts your report there."
             )
-        if session.panel_dashboard_id is not None:
-            lines.append(
-                f"- The dashboard {await self._dashboard_name(session.panel_dashboard_id)} "
-                "is shown beside the conversation; the person sees your changes to it."
-            )
         return "\n".join(lines) + "\n"
+
+    async def _attachments(self, session: Session) -> str:
+        """What the session shows beside the conversation, one line each: kind, title and
+        ref; an alert rule's active alerts and a report version's run."""
+        attachments = await self.attachments.list(session.id)
+        if not attachments:
+            return ""
+        active: Counter[str] = Counter()
+        if any(a.kind is AttachmentKind.ALERT_RULE for a in attachments):
+            firing = await self.alerts.list(session.project_id, AlertState.FIRING)
+            active.update(str(alert.rule_id) for alert in firing)
+        lines = [
+            "Shown beside the conversation, one tab each (attach_to_session adds one; the "
+            "dashboards and reports you create are attached for you):"
+        ]
+        for attachment in attachments:
+            line = f'- {attachment.kind.value} "{attachment.title}", ref {attachment.ref}'
+            match attachment.kind:
+                case AttachmentKind.ALERT_RULE:
+                    count = active[attachment.ref]
+                    line += f"; {count} active alert{'' if count == 1 else 's'}"
+                case AttachmentKind.REPORT:
+                    line += f"; {await self._report_run(attachment.ref)}"
+                case _:
+                    pass
+            lines.append(line)
+        return "\n".join(lines) + "\n"
+
+    async def _report_run(self, version_id: str) -> str:
+        """The run a report version is frozen at."""
+        try:
+            version = await self.reports.get_version(UUID(version_id))
+        except NotFound, ValueError:
+            return "no longer exists"
+        return f"run {version.run_id}"
 
     async def _context(self, context: Sequence[Context]) -> str:
         if not context:

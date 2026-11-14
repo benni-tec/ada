@@ -2,7 +2,8 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import uuid7
 
-from ada.core.models.actors import Actor
+from ada.core.models.actors import PLATFORM, Actor
+from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import Id
 from ada.core.models.errors import Invalid
 from ada.core.models.events import Event, EventType
@@ -20,6 +21,7 @@ from ada.core.models.sessions import (
 )
 from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import (
+    AttachmentRepository,
     DashboardRepository,
     OperatorRepository,
     ProjectRepository,
@@ -27,6 +29,7 @@ from ada.core.ports.repositories import (
     WidgetRepository,
 )
 from ada.core.ports.system import Clock
+from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.sessions import SessionService
 
 
@@ -38,6 +41,8 @@ class Sessions(SessionService):
         dashboards: DashboardRepository,
         operators: OperatorRepository,
         widgets: WidgetRepository,
+        attached: AttachmentRepository,
+        attachments: AttachmentService,
         events: EventPublisher,
         clock: Clock,
     ) -> None:
@@ -46,6 +51,8 @@ class Sessions(SessionService):
         self.dashboards = dashboards
         self.operators = operators
         self.widgets = widgets
+        self.attached = attached
+        self.attachments = attachments
         self.events = events
         self.clock = clock
 
@@ -67,11 +74,11 @@ class Sessions(SessionService):
 
     async def dashboard_agent_session(self, dashboard_id: Id) -> tuple[Session, bool]:
         dashboard = await self.dashboards.get(dashboard_id)
+        showing = await self.attached.sessions_with(AttachmentKind.DASHBOARD, str(dashboard.id))
         panels = [
             session
             for session in await self.sessions.list(dashboard.project_id)
-            if session.origin_dashboard_id == dashboard_id
-            and session.panel_dashboard_id == dashboard_id
+            if session.origin_dashboard_id == dashboard_id and session.id in showing
         ]
         if panels:
             # Ids are UUIDv7, so the largest is the newest even at equal timestamps.
@@ -81,10 +88,12 @@ class Sessions(SessionService):
             project_id=dashboard.project_id,
             title=f"{dashboard.name} (agent)",
             origin_dashboard_id=dashboard_id,
-            panel_dashboard_id=dashboard_id,
             created_at=self.clock.now(),
         )
         await self._add(session)
+        await self.attachments.attach(
+            session.id, AttachmentKind.DASHBOARD, str(dashboard_id), PLATFORM
+        )
         return session, True
 
     async def _add(self, session: Session) -> None:
@@ -114,16 +123,6 @@ class Sessions(SessionService):
         session = await self.sessions.get(id)
         return await self.sessions.update(
             session.model_copy(update={"title": _title(title)}), expected_revision
-        )
-
-    async def show_dashboard(
-        self, id: Id, dashboard_id: Id | None, expected_revision: int
-    ) -> Session:
-        session = await self.sessions.get(id)
-        if dashboard_id is not None:
-            await self._check_dashboard(dashboard_id, session.project_id)
-        return await self.sessions.update(
-            session.model_copy(update={"panel_dashboard_id": dashboard_id}), expected_revision
         )
 
     async def add_message(
@@ -193,6 +192,10 @@ class Sessions(SessionService):
             raise Invalid("A report needs text")
         parent = await self.sessions.get(child.parent_session_id)
         return await self._append(parent, EntryKind.REPORT, text, str(child.id), actor)
+
+    async def record_alert(self, session_id: Id, alert_id: Id, text: str) -> SessionEntry:
+        session = await self.sessions.get(session_id)
+        return await self._append(session, EntryKind.ALERT, text, str(alert_id), PLATFORM)
 
     async def _checked(self, session: Session, item: Context) -> Context:
         """A context item that names something of the session's project. A message about

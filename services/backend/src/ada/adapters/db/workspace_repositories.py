@@ -206,7 +206,6 @@ def _session(row: SessionRow) -> Session:
         project_id=row.project_id,
         title=row.title,
         origin_dashboard_id=row.origin_dashboard_id,
-        panel_dashboard_id=row.panel_dashboard_id,
         created_at=row.created_at,
         agent=SessionAgent(row.agent),
         parent_session_id=row.parent_session_id,
@@ -245,7 +244,6 @@ class SqlSessionRepository(SessionRepository):
             project_id=session.project_id,
             title=session.title,
             origin_dashboard_id=session.origin_dashboard_id,
-            panel_dashboard_id=session.panel_dashboard_id,
             created_at=session.created_at,
             agent=session.agent.value,
             parent_session_id=session.parent_session_id,
@@ -259,11 +257,7 @@ class SqlSessionRepository(SessionRepository):
             "session",
             session.id,
             expected_revision,
-            {
-                "title": session.title,
-                "origin_dashboard_id": session.origin_dashboard_id,
-                "panel_dashboard_id": session.panel_dashboard_id,
-            },
+            {"title": session.title, "origin_dashboard_id": session.origin_dashboard_id},
         )
         return _session(row)
 

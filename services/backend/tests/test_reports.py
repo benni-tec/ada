@@ -29,6 +29,7 @@ from ada.core.models.reports import ReportSource, ReportVersion, TemplateKind, V
 from ada.core.models.runs import Run
 from ada.core.models.time import TimeRange
 from ada.core.ports.repositories import OperatorRepository, WidgetRepository
+from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.reports import ReportService, TemplateService
 from ada.core.services.ports.runs import RunService
@@ -552,6 +553,14 @@ async def test_an_agent_writes_reads_and_versions_a_report(
     assert [s["name"] for s in version["content"]["sources"]] == ["Sotkanet"]
     assert (added["version"]["version"], added["versions"]) == ("2.0.0", ["1.0.0", "2.0.0"])
     assert first["version"]["id"] == version["id"]
+    # Each new version is attached to the session in place of the one before.
+    async with container() as request:
+        [attached] = await (await request.get(AttachmentService)).list(scene.session.id)
+    assert (attached.kind, attached.ref, attached.title) == (
+        "report",
+        added["version"]["id"],
+        "Findings 2.0.0",
+    )
     with pytest.raises(ToolError, match="revision 2, but the write expected revision 1"):
         await call(
             client,

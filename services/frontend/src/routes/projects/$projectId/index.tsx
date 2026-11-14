@@ -146,7 +146,7 @@ function RecentSessions({ projectId }: { projectId: Id }) {
       ) : (
         <ul className={listClass}>
           {recent.map((session) => {
-            const beside = session.panel_dashboard_id ? names.get(session.panel_dashboard_id) : undefined
+            const beside = session.origin_dashboard_id ? names.get(session.origin_dashboard_id) : undefined
             return (
               <li key={session.id}>
                 <Link

@@ -1,13 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 
 import { ChatDraftContext, useChatDraftState } from '@/components/chat/chat-draft'
 import { SessionChat } from '@/components/chat/session-chat'
 import { DashboardPanel } from '@/components/dashboards/dashboard-panel'
 import { EditableTitle } from '@/components/editable-title'
-import { ConflictNotice, ErrorNotice, Loading } from '@/components/notices'
+import { ErrorNotice, Loading } from '@/components/notices'
 import { PageType } from '@/components/page-header'
-import { getSession, keys, renameSession, sessionQuery, setPanelDashboard, type Session } from '@/lib/api'
+import { detachFromSession, getSession, keys, listAttachments, renameSession, sessionQuery, type Id } from '@/lib/api'
 import { useRevisedUpdate } from '@/lib/revisions'
 
 type Search = {
@@ -40,12 +40,13 @@ function SessionPage() {
       'Your title was not saved; save again to replace it.',
     alsoInvalidate: [keys.sessions(projectId)],
   })
-  const detach = useRevisedUpdate({
-    queryKey: keys.session(sessionId),
-    read: () => getSession(sessionId),
-    update: (current: Session) => setPanelDashboard(current, null),
-    describeConflict: () =>
-      'Someone else changed this session meanwhile, so the dashboard was not detached. It has been read again; try again.',
+  // Until the attachments have tabs of their own, the first attached dashboard is the panel.
+  const queryClient = useQueryClient()
+  const attachmentsKey = [...keys.session(sessionId), 'attachments']
+  const attachments = useQuery({ queryKey: attachmentsKey, queryFn: () => listAttachments(sessionId) })
+  const detach = useMutation({
+    mutationFn: (attachmentId: Id) => detachFromSession(sessionId, attachmentId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: attachmentsKey }),
   })
 
   if (session.isPending)
@@ -61,7 +62,7 @@ function SessionPage() {
       </div>
     )
 
-  const panel = session.data.panel_dashboard_id
+  const panel = attachments.data?.find((attachment) => attachment.kind === 'dashboard')
   return (
     <ChatDraftContext value={draft}>
       <div className="flex h-full min-h-0 flex-col lg:flex-row">
@@ -69,16 +70,15 @@ function SessionPage() {
           <header className="mx-auto flex w-full max-w-4xl shrink-0 flex-col gap-1 px-4 pt-4">
             <PageType type="session" />
             <EditableTitle value={session.data.title} label="session title" {...rename} />
-            {detach.conflict && <ConflictNotice message={detach.conflict} onDismiss={detach.reset} />}
-            {detach.error && <ErrorNotice error={new Error(detach.error)} prefix="Not detached:" />}
+            {detach.error && <ErrorNotice error={detach.error} prefix="Not detached:" />}
           </header>
           <SessionChat projectId={projectId} sessionId={sessionId} highlightedWidget={highlighted} />
         </section>
         {panel && (
           <DashboardPanel
-            dashboardId={panel}
-            onDetach={() => void detach.save(null).catch(() => {})}
-            detaching={detach.pending}
+            dashboardId={panel.ref}
+            onDetach={() => detach.mutate(panel.id)}
+            detaching={detach.isPending}
           />
         )}
       </div>
