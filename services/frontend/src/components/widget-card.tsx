@@ -6,12 +6,14 @@ import { useLive } from '@/lib/live'
 import { useTheme } from '@/lib/theme-context'
 import { cn } from '@/lib/utils'
 import type { CardRun } from '@/lib/view-run'
+import { JUDGED_TYPES } from '@/lib/verdicts'
 import { heights, pipelineRequest, postedHeight, widgetSrc } from '@/lib/widgets'
 
 import { PinToDashboard } from './dashboards/pin-to-dashboard'
 import { OpenWidgetLink } from './open-widget-link'
 import { PipelineAccess } from './pipeline/pipeline-access'
 import { Provenance } from './provenance'
+import { VerdictBadge } from './verdict-badge'
 import { WidgetCardActions } from './widget-card-actions'
 
 function frameHeight(widget: Widget, tall?: boolean) {
@@ -169,9 +171,12 @@ export function WidgetCard({
           <h3 className="truncate text-sm font-semibold">{widget.title || 'Untitled widget'}</h3>
           <Provenance actor={widget.created_by} at={widget.created_at} note={widget.note} />
         </div>
-        <Badge variant="secondary" className="shrink-0 font-mono">
-          {widget.type}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {(JUDGED_TYPES.has(widget.type) || widget.verdict) && <VerdictBadge widget={widget} runId={run.id} />}
+          <Badge variant="secondary" className="shrink-0 font-mono">
+            {widget.type}
+          </Badge>
+        </div>
       </header>
       {run.id === null ? (
         <div

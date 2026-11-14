@@ -1,6 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query'
 
-import { agentKeys, alertKeys, dashboardKeys, keys, reportKeys, type EventType, type LiveEvent, type Part } from '@/lib/api'
+import { agentKeys, alertKeys, dashboardKeys, judgeKeys, keys, reportKeys, type EventType, type LiveEvent, type Part } from '@/lib/api'
 
 /** What the page does about one live event. */
 export type Effects = {
@@ -68,6 +68,8 @@ export function effectsOf(event: LiveEvent): Effects {
       invalidate.push(keys.projectWidgets(projectId))
       const widget = id(payload, 'widget_id')
       if (widget) invalidate.push(keys.widget(widget))
+      // A review's verdict arrives as an update; the judges' lists show it.
+      invalidate.push(judgeKeys.verdicts(projectId))
       break
     }
     case 'run.started':

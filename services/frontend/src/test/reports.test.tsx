@@ -1,9 +1,9 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
-import type { DataSource, Operator, Report, ReportSource, ReportVersion } from '@/lib/api'
+import type { DataSource, Operator, Report, ReportSource, ReportVersion, Verdict, Widget } from '@/lib/api'
 
-import { claude, json, project, renderAt, run, serveApi, session, web, widget } from './app'
+import { claude, emit, json, project, renderAt, run, serveApi, session, web, widget } from './app'
 
 // Reports, frozen at a version's run; the pipeline dialog of a widget card; the widget page.
 
@@ -238,6 +238,47 @@ test('a text widget’s value opens the pipeline of the input it comes from', as
   expect(within(graph).getAllByRole('button').map((button) => button.dataset.operator)).toEqual(['op_s', 'op_r', 'op_j'])
   expect(node(dialog, /the widget reads this/)).toHaveAttribute('data-operator', 'op_j')
   expect(node(dialog, /the widget reads this/)).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('a text widget in a report shows its review; “Review again” reviews it at the version’s run, and a new verdict arrives live', async () => {
+  const reviewed: string[] = []
+  const verdict: Verdict = {
+    kind: 'text_widget',
+    outcome: 'fail',
+    passed: false,
+    blocking: false,
+    findings: [{ message: 'No input backs 13.2', excerpt: 'a gap of 13.2', severity: 'error' }],
+    model: 'gemini/pro',
+    reason: null,
+    content_hash: 'sha256:1',
+    checked_at: '2026-11-14T10:00:00Z',
+  }
+  let text: Widget = { ...chart, type: 'text', verdict: null }
+  serveReport({
+    'GET /api/widgets/w1': () => text,
+    'POST /api/widgets/w1/review': (_: unknown, request: Request) => {
+      reviewed.push(new URL(request.url).search)
+      text = { ...text, verdict }
+      return text
+    },
+  })
+  renderAt('/projects/p1/reports/rep1?version=1.1.0')
+
+  const card = await screen.findByRole('article', { name: 'Coverage by region' })
+  // Only text and custom widgets are judged.
+  expect(within(await screen.findByRole('article', { name: 'Latest coverage' })).queryByRole('button', { name: /review/i })).toBeNull()
+  fireEvent.click(await within(card).findByRole('button', { name: /Not reviewed/ }))
+  const popover = await screen.findByRole('dialog')
+  expect(popover).toHaveTextContent('Not reviewed yet')
+  fireEvent.click(within(popover).getByRole('button', { name: 'Review again' }))
+  expect(await within(popover).findByRole('list', { name: 'Findings' })).toHaveTextContent('No input backs 13.2')
+  expect(reviewed).toEqual(['?run_id=r2'])
+  expect(within(card).getByRole('button', { name: /Failed: 1 finding/ })).toBeInTheDocument()
+
+  // The worker stores a new verdict; the update brings it.
+  text = { ...text, verdict: { ...verdict, outcome: 'pass', passed: true, findings: [] } }
+  act(() => emit('widget.updated', { widget_id: 'w1' }))
+  expect(await within(card).findByRole('button', { name: /Reviewed ✓/ })).toBeInTheDocument()
 })
 
 test('the pipeline is read when its dialog opens: the graph, the details and a preview at the version’s run; a source shows its snapshot', async () => {
