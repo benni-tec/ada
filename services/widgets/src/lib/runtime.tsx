@@ -83,8 +83,39 @@ export function WidgetRuntime({ children }: { children: (loaded: Loaded) => Reac
     <div className="ada-widget" data-scenario={data.is_scenario || undefined} data-stale={data.is_stale || undefined}>
       <Flags data={data} />
       <div className="ada-body">{children(result.loaded)}</div>
+      <Sources sources={data.sources ?? []} />
     </div>
   )
+}
+
+/** Where the numbers came from and when they were fetched, under every widget, so no
+ * number is shown without its source. */
+export function Sources({ sources }: { sources: NonNullable<WidgetData['sources']> }) {
+  if (sources.length === 0) return null
+  return (
+    <ul className="ada-sources" aria-label="Sources">
+      {sources.map((source) => (
+        <li key={source.operator_id}>
+          {/^https?:\/\//i.test(source.address) ? (
+            <a href={source.address} target="_blank" rel="noreferrer noopener" title={source.address}>
+              {source.name}
+            </a>
+          ) : (
+            <span title={source.address}>{source.name}</span>
+          )}
+          {' · '}
+          {source.fetched_at ? `fetched ${fetched(source.fetched_at)}` : 'fetch time not recorded'}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function fetched(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 /** A simulated or outdated number must never look like a measured, current one, so these

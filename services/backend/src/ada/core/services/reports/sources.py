@@ -44,6 +44,11 @@ class SourcesList:
         return _stored.validate_python(content.get(SOURCES_KEY, []))
 
     async def build(self, run: Run, widgets: Sequence[Widget]) -> list[JsonObject]:
+        """The sources behind the widgets as they read through `run`, ordered by name, as
+        stored in a version's content."""
+        return [entry.model_dump(mode="json") for entry in await self.entries(run, widgets)]
+
+    async def entries(self, run: Run, widgets: Sequence[Widget]) -> list[ReportSource]:
         """The sources behind the widgets as they read through `run`, ordered by name."""
         uses: dict[OperatorId, list[Id]] = {}
         for widget in widgets:
@@ -53,7 +58,7 @@ class SourcesList:
                     using.append(widget.id)
         entries = [await self._entry(operator_id, run, ids) for operator_id, ids in uses.items()]
         entries.sort(key=lambda entry: (entry.name.lower(), entry.operator_id))
-        return [entry.model_dump(mode="json") for entry in entries]
+        return entries
 
     async def _sources_of(self, operator_id: OperatorId, run: Run) -> list[OperatorId]:
         """The source operators upstream of an operator, as the run reads it: an input

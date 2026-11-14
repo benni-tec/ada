@@ -108,6 +108,7 @@ class World:
             self.operators,
             sessions,
             self.data_sources,
+            self.snapshots,
             Sessions(
                 sessions,
                 projects,

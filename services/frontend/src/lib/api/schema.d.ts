@@ -2840,6 +2840,11 @@ export interface components {
             rows: unknown[][];
             run_id: components["schemas"]["Id"];
             /**
+             * Sources
+             * @default []
+             */
+            sources: components["schemas"]["ReportSource"][];
+            /**
              * Truncated
              * @default false
              */

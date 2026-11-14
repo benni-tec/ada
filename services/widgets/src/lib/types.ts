@@ -51,7 +51,11 @@ export type WidgetData = {
   truncated: boolean
   is_scenario: boolean
   is_stale: boolean
+  /** The sources behind the rows, as the run read them. */
+  sources?: WidgetSource[]
 }
+
+export type WidgetSource = { operator_id: string; name: string; address: string; fetched_at?: string | null }
 
 /** The part of an operator's output schema a widget reads. */
 export type Schema = { columns: Column[]; roles?: Roles }

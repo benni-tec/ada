@@ -183,6 +183,18 @@ body,
   color: var(--stale-fg);
 }
 
+.ada-sources {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ada-sources a {
+  color: inherit;
+}
+
 .ada-note {
   margin: 0;
   font-size: 12px;

@@ -251,6 +251,10 @@ async def test_an_agent_builds_a_widget_from_a_public_source(stack: Stack) -> No
     # The spec's Nordic comparison: Finland 17.9 (men) and 30.8 (women).
     assert [row[:2] for row in data["rows"]] == [[1, 17.9], [2, 30.8]]
     assert (data["is_scenario"], data["is_stale"], data["truncated"]) == (False, False, False)
+    # And where the numbers came from, as this run fetched them.
+    assert [(s["name"], s["fetched_at"] is not None) for s in data["sources"]] == [
+        (NORDCAN_LUNG_SURVIVAL.name, True)
+    ]
 
     # The session records what the agent did, as the agent, with its notes.
     async with stack.api() as request:

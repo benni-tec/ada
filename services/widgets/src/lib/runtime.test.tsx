@@ -40,6 +40,20 @@ test('loads the widget, its data and its roles from the fragment', async () => {
   expect(await screen.findByText('6 rows, 0 measures')).toBeInTheDocument()
   expect(fetch).toHaveBeenCalledWith('/api/widgets/w1/data?limit=1000&run_id=r9')
   expect(screen.queryByRole('list', { name: 'Data warnings' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('list', { name: 'Sources' })).not.toBeInTheDocument()
+})
+
+test('names the source and its fetch time under the numbers', async () => {
+  serve({
+    data: coverage({
+      sources: [{ operator_id: 'op1', name: 'Kainuu', address: 'https://example.test/k', fetched_at: '2026-11-14T10:00:00Z' }],
+    }),
+  })
+  show()
+
+  const sources = await screen.findByRole('list', { name: 'Sources' })
+  expect(within(sources).getByRole('link', { name: 'Kainuu' })).toHaveAttribute('href', 'https://example.test/k')
+  expect(sources).toHaveTextContent(/fetched .*2026/)
 })
 
 test('marks simulated and stale data', async () => {
