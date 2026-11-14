@@ -483,6 +483,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/dashboards/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder Dashboards
+         * @description Put the project's dashboards in a new order, as the sidebar lists them.
+         */
+        put: operations["reorder_dashboards_api_projects__project_id__dashboards_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/events": {
         parameters: {
             query?: never;
@@ -614,13 +634,33 @@ export interface paths {
         };
         /**
          * List Reports
-         * @description The project's reports, oldest first; with `session_id` or `dashboard_id` only the
-         *     ones that session or dashboard produced.
+         * @description The project's reports in the order people gave them, new ones last; with
+         *     `session_id` or `dashboard_id` only the ones that session or dashboard produced.
          */
         get: operations["list_reports_api_projects__project_id__reports_get"];
         put?: never;
         /** Create Report */
         post: operations["create_report_api_projects__project_id__reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/reports/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder Reports
+         * @description Put the project's reports in a new order, as the sidebar lists them.
+         */
+        put: operations["reorder_reports_api_projects__project_id__reports_order_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1629,6 +1669,8 @@ export interface components {
             id: components["schemas"]["Id"];
             /** Name */
             name: string;
+            /** Position */
+            position?: number | null;
             project_id: components["schemas"]["Id"];
             /**
              * Revision
@@ -2305,6 +2347,14 @@ export interface components {
          */
         OperatorKind: "source" | "extract" | "input" | "transform" | "statistic" | "agent";
         /**
+         * Order
+         * @description A new order of a project's dashboards or reports: every id of them, once.
+         */
+        Order: {
+            /** Ids */
+            ids: components["schemas"]["Id"][];
+        };
+        /**
          * Outcome
          * @enum {string}
          */
@@ -2502,6 +2552,8 @@ export interface components {
             latest_version_id?: components["schemas"]["Id"] | null;
             /** Name */
             name: string;
+            /** Position */
+            position?: number | null;
             project_id: components["schemas"]["Id"];
             /**
              * Revision
@@ -4058,6 +4110,41 @@ export interface operations {
             };
         };
     };
+    reorder_dashboards_api_projects__project_id__dashboards_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Order"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     project_events_api_projects__project_id__events_get: {
         parameters: {
             query?: never;
@@ -4311,6 +4398,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_reports_api_projects__project_id__reports_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Order"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"][];
                 };
             };
             /** @description Validation Error */

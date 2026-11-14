@@ -1,4 +1,4 @@
-"""Sessions get attachments; widgets keep a judge's verdict
+"""Sessions get attachments; widgets keep a judge's verdict; dashboards and reports an order
 
 The dashboard shown beside a session becomes its first attachment. The column
 `sessions.panel_dashboard_id` stays, unused, so this migration only adds.
@@ -21,6 +21,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    op.add_column("dashboards", sa.Column("position", sa.Integer(), nullable=True))
+    op.add_column("reports", sa.Column("position", sa.Integer(), nullable=True))
     op.add_column(
         "widgets", sa.Column("verdict", postgresql.JSONB(astext_type=sa.Text()), nullable=True)
     )
@@ -54,3 +56,5 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_session_attachments_session_id"), table_name="session_attachments")
     op.drop_table("session_attachments")
     op.drop_column("widgets", "verdict")
+    op.drop_column("reports", "position")
+    op.drop_column("dashboards", "position")

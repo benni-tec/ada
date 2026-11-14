@@ -111,6 +111,16 @@ What the research merge added to them (the research branch on wave 5; see "Web s
 | `config.py` | `exa_api_key` (`EXA_API_KEY`), `ada_public_url` (`ADA_PUBLIC_URL`), `research_web_calls` (40) |
 | Migration `0009` (down revision `0008`) | `data_sources.provenance` (JSONB), `monitor_id`, `monitor_secret_encrypted`; `snapshots.origin`; `sessions.agent` (`'session'`), `parent_session_id` (to sessions, `SET NULL`, indexed), `web_calls` (0); `agent_settings.research_agent_model_id` (to models, `SET NULL`) |
 
+What ordering the sidebar added to them (see REST):
+
+| Where | Change |
+| --- | --- |
+| `core/models/dashboards.py`, `core/models/reports.py` | `Dashboard.position`, `Report.position` (`int \| None`; None, new, after the placed ones), outside the revision |
+| `core/ports/repositories.py` | `DashboardRepository.reorder`, `ReportRepository.reorder`; both `list`s in that order |
+| `core/services/ports/dashboards.py`, `reports.py` | `reorder(project_id, ids)` |
+| `core/models/events.py` | `project.order_changed` |
+| Migration `0011` | `dashboards.position`, `reports.position` (integer, nullable) |
+
 What named widget inputs added to them (before wave 6 and the text widget; see "Widgets"):
 
 | Where | Change |
@@ -974,7 +984,8 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `PATCH /widgets/{id}` | `{title?, note?, type?, spec?}`: change in place (a spec replaces the old one whole and is checked); announced with `widget.updated` |
 | `GET /widget-bundles/{type}.html` | A built widget (see Widgets) |
 | `GET /projects/{id}/events` | The live stream |
-| `GET /projects/{id}/dashboards`, `POST /projects/{id}/dashboards {name}` | List, oldest first; create |
+| `GET /projects/{id}/dashboards`, `POST /projects/{id}/dashboards {name}` | List in the order people gave them, new ones last (oldest first); create |
+| `PUT /projects/{id}/dashboards/order {ids}`, `PUT /projects/{id}/reports/order {ids}` | Put every dashboard or report of the project in this order (each id once, else 422); answers the list. Changes no revision and adds no version; publishes `project.order_changed` |
 | `GET /dashboards/{id}` | `DashboardView {dashboard, version}`: what it points at, with the revision for the next write |
 | `PATCH /dashboards/{id} {default_time_range, expected_revision}` | Set the default range; `DashboardView` |
 | `PUT /dashboards/{id}/slots {slots, expected_revision}` | Replace the slots (the grid's drag and resize save the full list); a widget new to the dashboard is copied (see Dashboards); adds a version; `DashboardView` |
@@ -982,7 +993,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `POST /dashboards/{id}/agent-session` | The dashboard's agent session (see The agent): 200 when found, 201 when created; `Session` |
 | `GET /dashboards/{id}/versions`, `GET /dashboard-versions/{id}` | Versions, oldest first; one version |
 | `POST /dashboards/{id}/runs {time_range?}` | Start the run the dashboard is viewed at; 201 `Run` |
-| `GET /projects/{id}/reports?session_id=&dashboard_id=` | Reports, oldest first, optionally one owner's |
+| `GET /projects/{id}/reports?session_id=&dashboard_id=` | Reports in the order people gave them, new ones last, optionally one owner's |
 | `POST /projects/{id}/reports {name, content, run_id?, time_range?, session_id?, dashboard_id?, template_id?}` | Create; 201 with version 1.0.0 |
 | `GET /reports/{id}`, `GET /reports/{id}/versions` | The report; its versions, lowest number first |
 | `POST /reports/{id}/versions {content, run_id?, time_range?, bump?, expected_revision?}` | Add a version; 201 |
@@ -1183,6 +1194,7 @@ connection open. Events are broadcast after the unit of work that caused them co
 | `source.refreshed`, `source.refresh_failed` | `data_source_id`, `changed` (any period's content too); `error` on failure |
 | `dashboard.changed` | `dashboard_id`, `version_id` (the new version for an edit or pin; the current one, or null, for a new dashboard or a range change) |
 | `report.version_created` | `report_id`, `version_id`, `version` |
+| `project.order_changed` | `list`: `"dashboards"` or `"reports"`; the sidebar refetches that list |
 | `alert.firing`, `alert.resolved` | `alert_id`, `rule_id` |
 | `agent.turn_started` | `session_id`, `turn_id`. After the commit that queued the turn, and again after the one that started it |
 | `agent.turn_part` | `session_id`, `turn_id`, `index`, `part` (the whole part). At once, not after a commit: token deltas cannot be fetched afterwards. A part with the same `index` replaces the earlier one (text grows; a tool's state moves on) |
@@ -1307,7 +1319,12 @@ receives data from an agent; it asks the server for the output of its operator.
   (with a new session dialog), Dashboards (a new dashboard dialog) and Reports (a link to
   `/reports/new`), each a collapsible item listing its items; research sessions are nested
   under the session that delegated them, labelled "research". Data sources are not in the
-  sidebar: they are in Settings. Sessions and reports newest first. The footer holds
+  sidebar: they are in Settings. Sessions newest first. Dashboards and reports in the
+  order people gave them, new ones last (`components/sortable-list.tsx`, dnd-kit): drag
+  an item, or focus its link, press Space, move it with the arrow keys and press Space to
+  drop it (Escape cancels; Enter still follows the link). The list changes at once and is
+  saved with `PUT .../order`; a refusal brings the old order back with the reason. The
+  click that ends a pointer drag is swallowed, not followed. The footer holds
   Settings (a gear), a link to the current page with `?settings=models`, marked
   (`data-active`) while the settings are open.
   The current item is marked (`data-active`, and the router's `aria-current="page"`).

@@ -47,6 +47,7 @@ export type EventType =
   | 'source.refresh_failed'
   | 'dashboard.changed'
   | 'report.version_created'
+  | 'project.order_changed'
   | 'alert.firing'
   | 'alert.resolved'
   | 'agent.turn_started'

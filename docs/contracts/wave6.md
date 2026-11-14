@@ -14,7 +14,9 @@ Already on main before wave 6 starts:
   - Port: `JudgeService.review` in `core/services/ports/judges.py`.
   - Binding: `UncheckedJudges`. Every verdict is `unchecked`, `passed=False`, `blocking=False`.
   - Another session is building the real judges in parallel (their migration is `0012`). Call only `review`.
-- **Migration `0011`** (this commit). Wave 6 writes no other migration.
+- **Migration `0011`** (this commit). Wave 6 writes no other migration. It also holds
+  `dashboards.position` and `reports.position` for the sidebar's order (already built on
+  main: `reorder` on both services, `PUT /projects/{id}/{dashboards,reports}/order`).
   - `widgets.verdict` (JSONB, nullable).
   - The table `session_attachments`: `id`, `session_id` (cascade), `kind` (≤ 16), `ref` (text), `title` (text, `''`), `actor` (JSONB), `created_at`, unique (`session_id`, `kind`, `ref`).
   - Every non-null `sessions.panel_dashboard_id` is copied into `session_attachments` as a `dashboard` attachment.

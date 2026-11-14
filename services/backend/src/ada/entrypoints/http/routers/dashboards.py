@@ -13,7 +13,7 @@ from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.http.actor import WEB
-from ada.entrypoints.http.requests import Request
+from ada.entrypoints.http.requests import Order, Request
 
 router = APIRouter(route_class=DishkaRoute, tags=["dashboards"])
 
@@ -63,6 +63,14 @@ async def list_dashboards(
     project_id: Id, service: FromDishka[DashboardService]
 ) -> Sequence[Dashboard]:
     return await service.list(project_id)
+
+
+@router.put("/projects/{project_id}/dashboards/order")
+async def reorder_dashboards(
+    project_id: Id, body: Order, service: FromDishka[DashboardService]
+) -> Sequence[Dashboard]:
+    """Put the project's dashboards in a new order, as the sidebar lists them."""
+    return await service.reorder(project_id, body.ids)
 
 
 @router.post("/projects/{project_id}/dashboards", status_code=status.HTTP_201_CREATED)

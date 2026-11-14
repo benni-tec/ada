@@ -356,6 +356,28 @@ def test_pinning_answers_with_the_new_state_or_a_conflict_naming_both_revisions(
     assert [e.payload["version_id"] for e in changes] == [None, pinned["version"]["id"]]
 
 
+def test_dashboards_are_listed_in_the_order_people_gave_them(client: TestClient) -> None:
+    project = new_project(client)
+    first, second, third = (create_dashboard(client, project) for _ in range(3))
+    path = f"/projects/{project['id']}/dashboards"
+
+    reordered = send(
+        client, "PUT", f"{path}/order", {"ids": [third["id"], first["id"], second["id"]]}
+    )
+    added = create_dashboard(client, project)
+    partial = client.put(f"/api{path}/order", json={"ids": [first["id"]]})
+    twice = client.put(f"/api{path}/order", json={"ids": [first["id"]] * 4})
+
+    assert [d["id"] for d in reordered] == [third["id"], first["id"], second["id"]]
+    assert [d["revision"] for d in reordered] == [1, 1, 1]
+    # A new one comes last until it is moved.
+    listed = send(client, "GET", path)
+    assert [d["id"] for d in listed] == [third["id"], first["id"], second["id"], added["id"]]
+    assert (partial.status_code, twice.status_code) == (422, 422)
+    changed = [e for e in events(client, project["id"]) if e.type is EventType.ORDER_CHANGED]
+    assert [e.payload for e in changed] == [{"list": "dashboards"}]
+
+
 def test_a_run_for_a_dashboard_uses_its_range_unless_one_is_given(client: TestClient) -> None:
     project = new_project(client)
     dashboard = create_dashboard(client, project)

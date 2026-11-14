@@ -16,6 +16,7 @@ from ada.core.ports.repositories import (
 )
 from ada.core.ports.system import Clock
 from ada.core.services.dashboards.layout import complete_layout
+from ada.core.services.order import check_order, order_changed
 from ada.core.services.ports.dashboards import DashboardService
 
 
@@ -51,6 +52,13 @@ class Dashboards(DashboardService):
     async def list(self, project_id: Id) -> Sequence[Dashboard]:
         # Read the project first, so an unknown id is a 404 and not an empty list.
         await self.projects.get(project_id)
+        return await self.dashboards.list(project_id)
+
+    async def reorder(self, project_id: Id, ids: Sequence[Id]) -> Sequence[Dashboard]:
+        current = await self.list(project_id)
+        check_order("dashboard", [dashboard.id for dashboard in current], ids)
+        await self.dashboards.reorder(project_id, ids)
+        await self.events.publish(order_changed(project_id, "dashboards", self.clock.now()))
         return await self.dashboards.list(project_id)
 
     async def current(self, id: Id) -> DashboardVersion | None:

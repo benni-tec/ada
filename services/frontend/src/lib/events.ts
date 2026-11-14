@@ -29,6 +29,7 @@ export const EVENT_TYPES: readonly EventType[] = [
   'source.refresh_failed',
   'dashboard.changed',
   'report.version_created',
+  'project.order_changed',
   'alert.firing',
   'alert.resolved',
   'agent.turn_started',
@@ -102,6 +103,11 @@ export function effectsOf(event: LiveEvent): Effects {
       if (report) invalidate.push(reportKeys.report(report))
       break
     }
+    case 'project.order_changed':
+      // Someone put the dashboards or the reports in a new order: the sidebar lists them.
+      if (payload.list === 'dashboards') invalidate.push(dashboardKeys.list(projectId))
+      if (payload.list === 'reports') invalidate.push(reportKeys.reports(projectId))
+      break
     // The payload names the alert and rule only, so every alert view refetches (feed,
     // badges); rules show when they were last checked.
     case 'alert.firing':
