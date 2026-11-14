@@ -113,11 +113,7 @@ async def test_the_areas_pages_become_one_table_and_kajaanis_longer_queue_an_ale
     assert alert.key == {"station": rows(queue, "station")[0][0]}
 
 
-def test_a_station_without_a_callback_time_keeps_its_queue() -> None:
-    line = next(
-        line for line in (PAGES / "kainuu.md").read_text().splitlines() if "Kajaani" in line
-    )
-    row = line.rstrip(" |").rsplit("|", 1)[0] + "|  |"
+def _station_rows(row: str) -> list[dict[str, object]]:
     with duckdb.connect(":memory:") as connection:
         connection.execute(
             "CREATE TABLE input_0 AS SELECT 1 AS page, ? AS text",
@@ -125,5 +121,24 @@ def test_a_station_without_a_callback_time_keeps_its_queue() -> None:
         )
         result = connection.execute(waits.STATION_ROWS)
         names = [column[0] for column in result.description]
-        rows = [dict(zip(names, values, strict=True)) for values in result.fetchall()]
+        return [dict(zip(names, values, strict=True)) for values in result.fetchall()]
+
+
+def test_a_station_without_a_callback_time_keeps_its_queue() -> None:
+    line = next(
+        line for line in (PAGES / "kainuu.md").read_text().splitlines() if "Kajaani" in line
+    )
+    rows = _station_rows(line.rstrip(" |").rsplit("|", 1)[0] + "|  |")
     assert [(r["queue_months"], r["callback_minutes"]) for r in rows] == [(5.0, None)]
+
+
+def test_link_titles_and_line_breaks_stay_out_of_the_station_name() -> None:
+    # As the live page wrote the row on 2026-11-14.
+    title = " '(opens in a new window)')"
+    rows = _station_rows(
+        f"| Kajaani, [poliklinikka](https://k.test/a{title} ja <br>[Vuolijoki](https://k.test/b{title}"
+        " | Hoitotakuu ei toteudu, jonoa on,<br>jonotusaika noin 5 kk | 7  tuntia 10 minuuttia |"
+    )
+    assert [(r["station"], r["queue_months"], r["callback_minutes"]) for r in rows] == [
+        ("Kajaani, poliklinikka ja Vuolijoki", 5.0, 430)
+    ]
