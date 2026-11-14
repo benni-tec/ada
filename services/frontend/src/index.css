@@ -3,6 +3,9 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
+/* streamdown styles the markdown it renders with Tailwind classes of its own. */
+@source "../node_modules/streamdown/dist/*.js";
+
 @custom-variant dark (&:is(.dark *));
 
 /* The page's scheme is the theme's (lib/theme.tsx), not the system's. Widget frames

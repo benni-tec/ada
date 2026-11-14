@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
 
+import { Markdown } from '@/components/chat/markdown'
 import { ErrorNotice } from '@/components/notices'
 import { Time } from '@/components/provenance'
 import { Message, MessageContent, MessageHeader } from '@/components/ui/message'
@@ -68,8 +69,8 @@ export function AgentTurnView({ turn }: { turn: AgentTurn }) {
     <TurnShell model={turn.model} at={turn.created_at}>
       {groups.map((group) =>
         group.kind === 'text' ? (
-          <div key={group.index} className="text-sm leading-relaxed whitespace-pre-wrap" data-part="text">
-            {group.part.text}
+          <div key={group.index} data-part="text">
+            <Markdown streaming={active}>{group.part.text}</Markdown>
           </div>
         ) : (
           <Trace key={group.index} aria-label="Steps">
@@ -143,7 +144,11 @@ function ReasoningRow({ part, running }: { part: ReasoningPart; running: boolean
           <TraceTitle>{running ? 'Thinking' : 'Thought'}</TraceTitle>
         </TraceLine>
       </TraceCollapsibleTrigger>
-      <TraceCollapsibleContent className="whitespace-pre-wrap">{part.text}</TraceCollapsibleContent>
+      <TraceCollapsibleContent>
+        <Markdown streaming={running} className="text-muted-foreground">
+          {part.text}
+        </Markdown>
+      </TraceCollapsibleContent>
     </TraceCollapsible>
   )
 }

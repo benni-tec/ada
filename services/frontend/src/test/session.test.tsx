@@ -144,7 +144,7 @@ test('an agent turn is drawn with Trace: reasoning, tool calls with input and ou
     { type: 'tool', tool_call_id: 'c2', tool_name: 'create_widget', state: 'output-error', input: { type: 'map' }, output: null, error_text: 'No geography role' },
     { type: 'source', source_id: 'ds1', title: 'Sotkanet screening', url: 'https://sotkanet.test/3621' },
     { type: 'source', source_id: 'ds2', title: 'Wellbeing counties', url: null },
-    { type: 'text', text: 'Participation rose in 2024.' },
+    { type: 'text', text: 'Participation **rose** in 2024.' },
   ]
   serveSession({
     'GET /api/sessions/s1/entries': [question, answer, entry({ id: 'e3', kind: 'agent_turn', ref: 't2', actor: answer.actor })],
@@ -169,8 +169,11 @@ test('an agent turn is drawn with Trace: reasoning, tool calls with input and ou
   fireEvent.click(within(steps).getByRole('button', { name: 'Used 2 sources' }))
   expect(within(steps).getByRole('link', { name: /Sotkanet screening/ })).toHaveAttribute('href', 'https://sotkanet.test/3621')
   expect(within(steps).getByText('Wellbeing counties')).toBeInTheDocument()
-  // The text is the answer itself, after the steps.
-  expect(within(reply).getByText('Participation rose in 2024.')).toHaveAttribute('data-part', 'text')
+  // The text is the answer itself, after the steps, as markdown.
+  const text = reply.querySelector('[data-part="text"]')!
+  expect(text).toHaveTextContent('Participation rose in 2024.')
+  expect(within(text as HTMLElement).getByText('rose').tagName).not.toBe('P')
+  expect(text).not.toHaveTextContent('**')
 
   expect(await within(failed).findByRole('alert')).toHaveTextContent('The agent failed: The model is overloaded')
 })

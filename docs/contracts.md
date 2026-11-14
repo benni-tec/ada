@@ -901,7 +901,9 @@ receives data from an agent; it asks the server for the output of its operator.
   while it streams, "Thought" folded after), tool calls ("Calling / Called / Failed:
   <tool>", opening to their input and output or error as JSON), neighbouring sources as
   one line ("Used n sources", each a link when it has a URL). Text parts are the answer
-  between them. Queued, running without parts, failed (with the error, `role="alert"`)
+  between them. Text and reasoning are markdown, drawn by `components/chat/markdown.tsx`
+  with `streamdown` (what AI Elements' Response uses; shadcn's own registry has no
+  markdown component): it copes with text still streaming in and sanitises what it gets. Queued, running without parts, failed (with the error, `role="alert"`)
   and cancelled are said.
 - **Streaming** (`lib/agent-turns.ts`, `lib/events.ts`, `lib/live.ts`): `agent.turn_part`
   puts the part at its index into the cached turn. Parts of running turns are also kept
@@ -1171,7 +1173,6 @@ and queues the remaining sources for the worker.
   them batched.
 - **Source parts come only from source operators in tool results** (`add_source_operator`,
   `get_lineage`); reading a pipeline's data through `preview_operator` does not add one.
-- **The agent's text is plain text.** The record does not render Markdown yet.
 - **No key rotation tool.** Rotating the master key means putting the new key in front
   of `ADA_SECRET_KEY` and saving every provider's key again; nothing re-encrypts them.
 - **No authentication.** Whoever can reach the gateway can use the API and the MCP
