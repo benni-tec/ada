@@ -165,9 +165,9 @@ def test_migrations_from_0006_keep_existing_rows(database_url: str) -> None:
         # 0011: the dashboard beside a session becomes its attachment.
         with engine.connect() as connection:
             attachment = connection.execute(
-                text("SELECT session_id, kind, ref FROM session_attachments")
+                text("SELECT session_id, kind, ref, title FROM session_attachments")
             ).one()
-        assert tuple(attachment) == (session, "dashboard", str(dashboard))
+        assert tuple(attachment) == (session, "dashboard", str(dashboard), "D")
     finally:
         engine.dispose()
 

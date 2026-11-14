@@ -45,9 +45,9 @@ def upgrade() -> None:
     op.execute(
         """
         INSERT INTO session_attachments (id, session_id, kind, ref, title, actor, created_at)
-        SELECT uuidv7(), id, 'dashboard', panel_dashboard_id::text, '',
+        SELECT uuidv7(), s.id, 'dashboard', s.panel_dashboard_id::text, d.name,
                '{"kind": "system", "name": ""}'::jsonb, now()
-        FROM sessions WHERE panel_dashboard_id IS NOT NULL
+        FROM sessions s JOIN dashboards d ON d.id = s.panel_dashboard_id
         """
     )
 
