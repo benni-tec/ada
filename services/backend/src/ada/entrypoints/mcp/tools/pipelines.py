@@ -6,10 +6,11 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 from ada.core.models.analysis import Rows
-from ada.core.models.base import DomainModel, Id
+from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.operators import Operator, OperatorId
 from ada.core.models.pipelines import Pipeline
 from ada.core.models.schema import Column, Roles
+from ada.core.models.statistics import described
 from ada.core.services.ports.batches import BatchService, Step
 from ada.core.services.ports.exploration import (
     MAX_EXPLORATION_ROWS,
@@ -33,6 +34,18 @@ EXPLORATION_NOTE = (
     "For your own exploration only. Do not show or quote these rows to the person: "
     "anything you present must come from a transform and a widget, so it can be traced."
 )
+
+
+ADD_STATISTIC = f"""Add a statistic over one earlier operator: a named analysis the \
+platform has vetted, so its formula is right and its result is traced like a transform's. \
+Prefer it to writing the same statistics in SQL. `input` is the operator, `arguments` \
+name its columns. The statistic is compiled to SQL, stored with the operator and shown in \
+its lineage; a trend's confidence interval is declared as the measure's bounds. The \
+statistics:
+{described()}
+
+Give a one-line `note` on why you add it: the session shows it. Returns the operator with \
+its id and output columns."""
 
 
 class Preview(DomainModel):
@@ -124,6 +137,28 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         actor = calling_agent()
         operator = await pipelines.add_transform(
             project_id, sql, tuple(inputs), actor, roles=roles, materialize=materialize
+        )
+        await sessions.record_operator(session_id, operator.id, note, actor)
+        return operator
+
+    @mcp.tool(description=ADD_STATISTIC)
+    @inject
+    async def add_statistic(
+        project_id: Id,
+        session_id: SessionId,
+        tool: str,
+        input: OperatorId,
+        projects: FromDishka[ProjectService],
+        pipelines: FromDishka[PipelineService],
+        sessions: FromDishka[SessionService],
+        arguments: JsonObject | None = None,
+        materialize: bool = False,
+        note: str = "",
+    ) -> Operator:
+        await projects.get(project_id)
+        actor = calling_agent()
+        operator = await pipelines.add_statistic(
+            project_id, tool, arguments or {}, input, actor, materialize=materialize
         )
         await sessions.record_operator(session_id, operator.id, note, actor)
         return operator

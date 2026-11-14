@@ -39,7 +39,7 @@ from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.base import Id
 from ada.core.models.judges import Finding, Outcome
 from ada.core.models.reports import Report, ReportVersion
-from ada.core.models.sessions import EntryKind
+from ada.core.models.sessions import EntryKind, SessionAgent
 from ada.core.models.sources import AccessKind
 from ada.core.models.time import TimeRange
 from ada.core.models.web import SearchHit, SearchResults, SearchScope
@@ -54,7 +54,14 @@ from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.sessions.service import Sessions
-from ada.entrypoints.mcp.agent import CLIENT, LEFT_OUT, RESEARCH_TOOLS, InProcessToolbox
+from ada.entrypoints.mcp.agent import (
+    ANALYSIS_TOOLS,
+    CHILD_ONLY,
+    CLIENT,
+    LEFT_OUT,
+    RESEARCH_TOOLS,
+    InProcessToolbox,
+)
 from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.worker import create_broker
 from agent_support import (
@@ -794,7 +801,7 @@ def test_research_turn_gets_only_research_tools(
     everything = client.portal.call(every_tool, container(client))
     (_, session_info), (_, research_info) = script.calls
     assert tool_names(research_info) == RESEARCH_TOOLS & everything
-    assert tool_names(session_info) == everything - LEFT_OUT - {"report_back"}
+    assert tool_names(session_info) == everything - LEFT_OUT - CHILD_ONLY
     assert "delegate_research" in tool_names(session_info)
     assert "report_back" in (research_info.instructions or "")
     assert f'Session "Survival", id {child["id"]}' in (research_info.instructions or "")
@@ -1053,7 +1060,7 @@ async def test_the_agent_gets_every_tool_it_can_use_and_acts_in_its_session(
         with pytest.raises(ToolCallFailed, match="no tool"):
             await tools.call("get_widget_data", {"widget_id": str(uuid7())})
 
-    assert names == everything - LEFT_OUT - {"report_back"}
+    assert names == everything - LEFT_OUT - CHILD_ONLY
     assert not [name for name, fields in required.items() if "session_id" in fields]
     assert {"list_pipelines", "create_widget", "pin_widget"} <= names
     # Its calls, the failed ones too, show in its turn: the record has no tool call entries.
@@ -1248,8 +1255,8 @@ async def test_a_research_turn_counts_every_document_read_it_queues(
             project = await (await request.get(ProjectService)).create("P")
             sessions = await request.get(SessionService)
             parent = await sessions.create(project.id, "S")
-            child = await sessions.create_research(
-                parent.id, "R", Actor(kind=ActorKind.USER, name="web")
+            child = await sessions.create_child(
+                parent.id, "R", SessionAgent.RESEARCH, Actor(kind=ActorKind.USER, name="web")
             )
             research = await request.get(ResearchService)
             with researching(child.id):
@@ -1521,3 +1528,84 @@ async def test_a_turn_failed_while_its_worker_stalled_stays_failed(
     # its own end was not stored.
     assert resumed == stored == failed
     assert sources == []
+
+
+# The analyst, in child sessions
+
+
+def test_analysis_findings_are_checked_against_a_run_and_traced(
+    client: TestClient, source: dict[str, Any], session: dict[str, Any], script: Script
+) -> None:
+    project_id = session["project_id"]
+    child = send(
+        client,
+        "POST",
+        f"/sessions/{session['id']}/analysis",
+        {"brief": "Where is participation low?", "title": "Low participation"},
+        201,
+    )
+
+    def made(messages: Any) -> str:
+        return returned(messages, "add_statistic")["id"]  # type: ignore[no-any-return]
+
+    def report(claim: str) -> Any:
+        return lambda messages: {
+            "summary": "The north lags.",
+            "findings": [{"claim": claim, "operator_id": made(messages)}],
+            "caveats": ["Two regions only."],
+        }
+
+    script.then(
+        call("add_source_operator", {"project_id": project_id, "data_source_id": source["id"]}),
+        call(
+            "add_statistic",
+            lambda messages: {
+                "project_id": project_id,
+                "tool": "outliers",
+                "input": returned(messages, "add_source_operator")["id"],
+                "arguments": {"value": "value"},
+            },
+        ),
+        # A figure worked out in the head is refused, and nothing is posted.
+        call("report_findings", report("The north is 4 points behind the south.")),
+        call("report_findings", report("The north stands at 1.5 against 2.5 in the south.")),
+        say("Reported."),
+    )
+    finished = run(client, latest_turn(client, child))
+
+    tools = [part for part in finished.parts if part.type == "tool"]  # type: ignore[union-attr]
+    assert "4 not in the output" in (tools[2].error_text or "")  # type: ignore[union-attr]
+    statistic = send(client, "GET", f"/operators/{tools[1].output['id']}")  # type: ignore[union-attr]
+    assert (statistic["kind"], statistic["params"]["tool"]) == ("statistic", "outliers")
+    assert "median(" in statistic["params"]["sql"]
+    _, posted = entries(client, session)
+    assert (posted["kind"], posted["ref"]) == ("report", child["id"])
+    assert posted["text"].startswith(
+        "The north lags.\n\nFindings, every figure checked against run"
+    )
+    assert f"   Shown by statistic {statistic['id']}: statistic outliers" in posted["text"]
+    assert "   Data: Sotkanet" in posted["text"]
+    assert posted["text"].endswith("Caveats:\n- Two regions only.")
+    (_, info), *_ = script.calls
+    assert client.portal is not None
+    assert tool_names(info) == ANALYSIS_TOOLS & client.portal.call(every_tool, container(client))
+    assert "You are the analyst of ADA" in (info.instructions or "")
+
+
+def test_an_analysis_without_a_checked_report_passes_on_no_figures(
+    client: TestClient, session: dict[str, Any], script: Script
+) -> None:
+    child = send(
+        client,
+        "POST",
+        f"/sessions/{session['id']}/analysis",
+        {"brief": "Why?", "title": "Why"},
+        201,
+    )
+    script.then(say("Participation fell by 12.5 points."))
+    run(client, latest_turn(client, child))
+
+    _, posted = entries(client, session)
+    assert posted["kind"] == "report"
+    assert "12.5" not in posted["text"]
+    assert posted["text"].startswith("The analysis ended without a checked report")

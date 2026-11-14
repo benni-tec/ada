@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from ada.core.models.actors import Actor
-from ada.core.models.base import Id
+from ada.core.models.base import Id, JsonObject
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.operators import (
     InputParams,
@@ -9,6 +9,7 @@ from ada.core.models.operators import (
     OperatorId,
     OperatorKind,
     SourceParams,
+    StatisticParams,
     TransformParams,
     operator_identity,
 )
@@ -28,6 +29,7 @@ from ada.core.services.pipelines.schemas import (
     check_fits,
     check_unique,
 )
+from ada.core.services.pipelines.statistics import compile_statistic
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.schema.intervals import check_bounds
@@ -116,6 +118,40 @@ class Pipelines(PipelineService):
             # The columns are certain; what they mean after arbitrary SQL is not, so roles
             # come only from the caller.
             output=Schema(columns=columns, roles=roles or Roles(), derived=not declared),
+            materializing=materialize,
+            created_by=actor,
+            created_at=self.clock.now(),
+        )
+        return await self.operators.add(operator)
+
+    async def add_statistic(
+        self,
+        project_id: Id,
+        tool: str,
+        arguments: JsonObject,
+        input: OperatorId,
+        actor: Actor,
+        materialize: bool = False,
+    ) -> Operator:
+        upstream = await self._upstream(project_id, input)
+        normalised, compiled = compile_statistic(
+            tool, arguments, await self.columns.of(upstream), upstream.output.roles
+        )
+        params = StatisticParams(tool=tool, arguments=normalised, sql=compiled.sql)
+        dumped = params.model_dump(mode="json")
+        id = operator_identity(project_id, OperatorKind.STATISTIC, dumped, (input,))
+        if existing := await self._find(id):
+            return existing
+        columns = await self.describe(project_id, compiled.sql, (input,))
+        check_roles(compiled.roles, columns)
+        operator = Operator(
+            id=id,
+            project_id=project_id,
+            kind=OperatorKind.STATISTIC,
+            params=dumped,
+            inputs=(input,),
+            # The statistic knows what its columns mean, its bounds included.
+            output=Schema(columns=columns, roles=compiled.roles),
             materializing=materialize,
             created_by=actor,
             created_at=self.clock.now(),

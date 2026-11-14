@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from '@tanstack/react-router'
-import { ArrowUp, Info, Microscope, Square } from 'lucide-react'
+import { ArrowUp, ChartLine, Info, Microscope, Square } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { IconButton } from '@/components/icon-action'
@@ -13,6 +13,7 @@ import { withSettings } from '@/lib/settings-sections'
 import {
   agentKeys,
   cancelTurn,
+  delegateAnalysis,
   delegateResearch,
   keys,
   modelsQuery,
@@ -98,6 +99,23 @@ export function Composer({
       // The turn as queued, so the record shows it before its first event arrives.
       if (turn) queryClient.setQueryData(agentKeys.turn(turn.id), withLiveParts(turn))
       await queryClient.invalidateQueries({ queryKey: keys.entries(sessionId) })
+    },
+  })
+
+  // The draft as a question for the analyst, with the pipelines its chips name.
+  const analysis = useMutation({
+    mutationFn: (brief: string) =>
+      delegateAnalysis(
+        sessionId,
+        brief.split('\n')[0].slice(0, 80),
+        brief,
+        draft.chips.flatMap((chip) => chip.context).flatMap((item) => (item.kind === 'pipeline' ? [item.operator_id] : [])),
+      ),
+    onSuccess: async () => {
+      setText('')
+      draft.clearChips()
+      await queryClient.invalidateQueries({ queryKey: keys.entries(sessionId) })
+      if (projectId) await queryClient.invalidateQueries({ queryKey: keys.sessions(projectId) })
     },
   })
 
@@ -198,6 +216,23 @@ export function Composer({
                 Research
               </Button>
             )}
+            {models.data && session.data?.agent === 'session' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={analysis.isPending || text.trim() === '' || !models.data.session_agent}
+                title={
+                  models.data.session_agent
+                    ? 'Hand the question to the analyst, with the pipelines added as chips'
+                    : 'Pick a session agent in Settings first'
+                }
+                onClick={() => analysis.mutate(text.trim())}
+              >
+                <ChartLine aria-hidden="true" />
+                Analyse
+              </Button>
+            )}
             {activeTurn && isActive(activeTurn) && (
               <IconButton
                 label="Stop the agent"
@@ -217,6 +252,7 @@ export function Composer({
       </div>
       {send.error && <ErrorNotice error={send.error} prefix="Not sent:" />}
       {research.error && <ErrorNotice error={research.error} prefix="Not delegated:" />}
+      {analysis.error && <ErrorNotice error={analysis.error} prefix="Not delegated:" />}
       {stop.error && <ErrorNotice error={stop.error} prefix="Not stopped:" />}
     </form>
   )

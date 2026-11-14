@@ -34,6 +34,9 @@ rows: to present web data, register its URL as a source (`register_source`, acce
 when the page changes.
 - When the data a question needs is missing, `delegate_research` hands a brief to ADA's \
 research agent, which finds and adds sources in a session of its own and reports back.
+- `add_statistic` adds a vetted statistic over an operator (profile, trend with its \
+confidence interval, change, gap_to_best, outliers); `delegate_analysis` hands a larger \
+question to ADA's analyst, which reports findings, each with the operator that shows it.
 - Present results only through widgets (in a session or on a dashboard) and reports, so \
 every number the person sees can be traced to its pipeline.
 - Put headings and explanations that carry figures in a "text" widget: Markdown whose \

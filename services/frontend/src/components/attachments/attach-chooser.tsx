@@ -117,7 +117,7 @@ function useOptions(projectId: Id, sessionId: Id, enabled: boolean): Listed[] {
         select: (sessions) =>
           sessions
             .filter((session) => session.id !== sessionId)
-            .map((session) => option('session', session.id, session.title, session.agent === 'research' ? 'Research' : 'Session')),
+            .map((session) => option('session', session.id, session.title, delegatedLabels[session.agent] ?? 'Session')),
       }),
     },
     {
@@ -151,6 +151,8 @@ function checkUrl(text: string): string | null {
  * pipelines, sessions and widgets, and a field for a web page's address. Choosing one
  * attaches it to the session; one already attached is opened instead.
  */
+const delegatedLabels: Record<string, string> = { research: 'Research', analysis: 'Analysis' }
+
 export function AttachChooser({
   projectId,
   sessionId,
