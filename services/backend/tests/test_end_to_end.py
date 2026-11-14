@@ -442,7 +442,11 @@ async def test_an_agent_maps_a_measure_and_follows_it_with_a_report_and_alerts(
     sotkanet = listed[SOTKANET_BREAST_SCREENING.name]
     assert sotkanet["fetched_at"] is not None
     assert sotkanet["address"] == SOTKANET_BREAST_SCREENING.address
-    assert sotkanet["widget_ids"] == [pinned_id]
+    # The version shows a copy of its own, which leads back to the session's map.
+    [shown_id] = [block["widget_id"] for block in first["version"]["content"]["blocks"]]
+    shown_copy = (await stack.call("get_widget", widget_id=shown_id))["widget"]
+    assert shown_id != pinned_id and shown_copy["copied_from"] == widget["id"]
+    assert sotkanet["widget_ids"] == [shown_id]
     # The stored periods are fresh: freezing the version fetched nothing more.
     assert years_asked(stack.outside) == [["2023", "2024"]]
 
@@ -578,15 +582,18 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
             "Map",
             "By county",
         ]
-        # The session's three, and the dashboard's copies of the map and the table.
+        # The session's three, and the dashboard's and the report's copies of the map and
+        # the table.
         assert sorted(widget.type for widget in widgets) == [
             "chart",
             "map",
             "map",
+            "map",
+            "table",
             "table",
             "table",
         ]
-        assert sum(widget.copied_from is not None for widget in widgets) == 2
+        assert sum(widget.copied_from is not None for widget in widgets) == 4
         assert len(sessions) == 1 and sessions[0].panel_dashboard_id == dashboards[0].id
         assert len(rules) == 1
         # East Uusimaa, West Uusimaa, Vantaa and Kerava, and Helsinki are below 80 % in 2024.

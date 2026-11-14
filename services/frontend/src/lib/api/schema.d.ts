@@ -1287,6 +1287,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/widgets/{widget_id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Render
+         * @description Called by the widget's frame only. Kept as `render_error`, so the agent that wrote the
+         *     widget sees it; announced with `widget.updated` when it changed.
+         */
+        post: operations["report_render_api_widgets__widget_id__render_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1630,6 +1651,19 @@ export interface components {
          * @enum {string}
          */
         EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report";
+        /** Finding */
+        Finding: {
+            /** Excerpt */
+            excerpt: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default error
+             * @enum {string}
+             */
+            severity: "error" | "warning";
+        };
         /**
          * FoundBy
          * @description How an agent came upon a source: the web search and its scope.
@@ -1776,6 +1810,11 @@ export interface components {
         JsonObject: {
             [key: string]: unknown;
         };
+        /**
+         * JudgeKind
+         * @enum {string}
+         */
+        JudgeKind: "text_widget" | "widget_code";
         /** Liveness */
         Liveness: {
             /**
@@ -2101,6 +2140,11 @@ export interface components {
          */
         OperatorKind: "source" | "extract" | "input" | "transform" | "statistic" | "agent";
         /**
+         * Outcome
+         * @enum {string}
+         */
+        Outcome: "pass" | "warn" | "fail" | "unchecked";
+        /**
          * OutputKind
          * @enum {string}
          */
@@ -2278,6 +2322,14 @@ export interface components {
          * @enum {string}
          */
         RefreshStatus: "fetched" | "unchanged" | "failed";
+        /**
+         * RenderReport
+         * @description What the widget's frame found when it drew: the error, or null when it drew.
+         */
+        RenderReport: {
+            /** Error */
+            error: string | null;
+        };
         /**
          * Report
          * @description A name with versions. Owned by the session or the dashboard that produced it.
@@ -2743,6 +2795,31 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** Verdict */
+        Verdict: {
+            /** Blocking */
+            blocking: boolean;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Findings
+             * @default []
+             */
+            findings: components["schemas"]["Finding"][];
+            kind: components["schemas"]["JudgeKind"];
+            /** Model */
+            model?: string | null;
+            outcome: components["schemas"]["Outcome"];
+            /** Passed */
+            passed: boolean;
+            /** Reason */
+            reason?: string | null;
+        };
         /**
          * VersionBump
          * @enum {string}
@@ -2805,6 +2882,7 @@ export interface components {
             title: string;
             /** Type */
             type: string;
+            verdict?: components["schemas"]["Verdict"] | null;
         };
         /**
          * WidgetChange
@@ -5481,6 +5559,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WidgetData"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_render_api_widgets__widget_id__render_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenderReport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

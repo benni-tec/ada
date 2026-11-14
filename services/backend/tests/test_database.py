@@ -32,6 +32,7 @@ from ada.core.models.agents import (
 )
 from ada.core.models.alerts import AlertState
 from ada.core.models.errors import Conflict, NotFound
+from ada.core.models.judges import Finding, JudgeKind, Outcome, Verdict
 from ada.core.models.operators import OperatorKind
 from ada.core.models.schema import GeoRole, Roles, Schema
 from ada.core.models.sessions import DashboardContext, PipelineContext, SessionAgent
@@ -350,14 +351,27 @@ async def test_workspace_records_round_trip(engine: AsyncEngine) -> None:
         await repos.sessions.add_entry(later)
         await repos.sessions.add_entry(first)
         original = db_helpers.widget(world.project.id, world.operator.id, session_id=session.id)
+        verdict = Verdict(
+            kind=JudgeKind.WIDGET_CODE,
+            outcome=Outcome.WARN,
+            passed=True,
+            blocking=False,
+            findings=(Finding(message="Numbers in the code", excerpt="[1, 2]"),),
+            content_hash="abc",
+            checked_at=factories.NOW,
+        )
         copy = db_helpers.widget(
             world.project.id,
             world.operator.id,
             copied_from=original.id,
             created_at=factories.NOW + timedelta(seconds=1),
+            verdict=verdict,
         )
         await repos.widgets.add(original)
         await repos.widgets.add(copy)
+        # A judge's verdict and a drawing error are stored with the widget.
+        original = original.model_copy(update={"verdict": verdict, "render_error": "boom"})
+        await repos.widgets.save(original)
         with pytest.raises(NotFound):
             await repos.sessions.add_entry(db_helpers.entry(uuid7()))
 

@@ -33,6 +33,7 @@ from ada.core.models.operators import Operator
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sources import DataSource
 from ada.core.models.time import TimeRange
+from ada.core.services.judges.unchecked import UncheckedJudges
 from ada.core.services.pipelines.runs import Runs
 from ada.core.services.pipelines.service import Pipelines
 from ada.core.services.sessions.service import Sessions
@@ -118,6 +119,7 @@ class World:
                 self.clock,
             ),
             self.runs,
+            UncheckedJudges(self.clock),
             self.events,
             self.clock,
         )

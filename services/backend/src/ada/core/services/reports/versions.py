@@ -43,7 +43,8 @@ def bumped(version: str, bump: VersionBump) -> str:
 @dataclass(frozen=True)
 class State:
     """What decides the level of a change: the widgets' pipelines, the run and its time
-    range, and the static content (the stored blocks, which include the widget ids)."""
+    range, and the static content (the stored blocks, each widget named by what it shows:
+    every version shows copies of its own)."""
 
     operators: frozenset[OperatorId]
     run_id: Id
@@ -58,8 +59,8 @@ def required(previous: State, next: State) -> VersionBump | None:
     - Major: the set of operators behind the widgets changed. An operator's id is its
       identity, which covers its whole pipeline, so an edited SQL upstream counts too.
     - Minor: the same pipelines on another run or time range.
-    - Patch: the same run and pipelines; only the static parts or the arrangement of
-      widgets changed.
+    - Patch: the same run and pipelines; only the static parts, the widgets' settings or
+      the arrangement of widgets changed.
     """
     if previous.operators != next.operators:
         return VersionBump.MAJOR

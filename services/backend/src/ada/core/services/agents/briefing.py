@@ -19,6 +19,7 @@ from ada.core.models.agents import (
 )
 from ada.core.models.base import Id
 from ada.core.models.errors import NotFound
+from ada.core.models.judges import Outcome
 from ada.core.models.projects import Project
 from ada.core.models.sessions import (
     Context,
@@ -182,6 +183,7 @@ class Briefing:
             ABOUT_RESEARCH if research else ABOUT_ADA,
             HOW_ADA_WORKS,
             await self._session(project, session),
+            await self._widgets_to_fix(session),
             RESEARCH_RULES if research else RULES,
             await self._context(prompt_entry.context),
             instructions_section(GLOBAL_INSTRUCTIONS, instructions),
@@ -269,6 +271,34 @@ class Briefing:
             f'A widget the person refers to: "{widget.title}", id {widget.id}, a '
             f"{widget.type} of operator {widget.operator_id}."
         )
+
+    async def _widgets_to_fix(self, session: Session) -> str:
+        """The session's widgets that could not be drawn, or whose code a judge found fault
+        with: one line each, so the agent fixes them."""
+        lines: list[str] = []
+        for widget in await self.widgets.list_by_session(session.id):
+            problems: list[str] = []
+            if widget.render_error:
+                problems.append(f"it could not be drawn: {widget.render_error}")
+            verdict = widget.verdict
+            if verdict is not None and verdict.outcome in (Outcome.FAIL, Outcome.WARN):
+                findings = "; ".join(
+                    f"{finding.message} (in `{finding.excerpt.strip()}`)"
+                    for finding in verdict.findings
+                )
+                problems.append(
+                    f"the judge's verdict on its code is {verdict.outcome.value}: "
+                    + (findings or verdict.reason or "no findings given")
+                )
+            if problems:
+                lines.append(f'- "{widget.title}", id {widget.id}: ' + "; ".join(problems))
+        if not lines:
+            return ""
+        heading = (
+            "Widgets of this session that need fixing (read one with get_widget, fix it with "
+            "update_widget):"
+        )
+        return "\n".join([heading, *lines]) + "\n"
 
     async def _dashboard_name(self, dashboard_id: Id) -> str:
         try:

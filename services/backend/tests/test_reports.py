@@ -28,6 +28,7 @@ from ada.core.models.operators import OperatorKind
 from ada.core.models.reports import ReportSource, ReportVersion, TemplateKind, VersionBump
 from ada.core.models.runs import Run
 from ada.core.models.time import TimeRange
+from ada.core.models.widgets import Widget
 from ada.core.ports.repositories import OperatorRepository, WidgetRepository
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.reports import ReportService, TemplateService
@@ -226,6 +227,18 @@ def calls(container: AsyncContainer) -> Calls:
     return Calls(container)
 
 
+# What a version's copy of a widget keeps from the original.
+SHOWN = {"operator_id", "inputs", "type", "spec", "title", "note", "verdict"}
+
+
+async def shown(container: AsyncContainer, version: ReportVersion) -> list[Widget]:
+    """The widgets a version shows, in reading order."""
+    async with container() as request:
+        widgets = await request.get(WidgetRepository)
+        ids = tree.widget_ids(tree.stored_blocks(version.content))
+        return [await widgets.get(id) for id in ids]
+
+
 async def test_a_report_starts_at_1_0_0_and_freezes_each_pipeline_once_in_its_run(
     calls: Calls, scene: Scene, container: AsyncContainer
 ) -> None:
@@ -235,11 +248,20 @@ async def test_a_report_starts_at_1_0_0_and_freezes_each_pipeline_once_in_its_ru
     version = await calls.create(scene, content, run=run)
 
     assert (version.version, version.run_id, version.time_range) == ("1.0.0", run.id, YEAR_2024)
+    # It shows copies of its own, as a dashboard does: changing the originals later does not
+    # change what the version shows.
+    copies = await shown(container, version)
     assert version.content["blocks"][1] == {
         "type": "widget",
-        "widget_id": str(scene.value.id),
+        "widget_id": str(copies[0].id),
         "caption": "",
     }
+    originals = (scene.value, scene.table, scene.chart)
+    assert [copy.copied_from for copy in copies] == [widget.id for widget in originals]
+    assert [copy.model_dump(include=SHOWN) for copy in copies] == [
+        widget.model_dump(include=SHOWN) for widget in originals
+    ]
+    assert {copy.session_id for copy in copies} == {None}
     report = await calls.reports("get", version.report_id)
     assert (report.name, report.session_id, report.dashboard_id) == (
         "Findings",
@@ -252,6 +274,13 @@ async def test_a_report_starts_at_1_0_0_and_freezes_each_pipeline_once_in_its_ru
     assert executed == [(run.id, scene.cleaned.id), (run.id, scene.joined.id)]
     pinned = await calls.run_of(run.id)
     assert set(pinned.snapshots) == {scene.operator_a.id, scene.operator_b.id}
+
+    async with container() as request:
+        renamed = scene.value.model_copy(update={"title": "Newest coverage"})
+        await (await request.get(WidgetRepository)).save(renamed)
+    # Only a widget's settings changed: a patch, and the first version shows what it did.
+    assert (await calls.add(version, content)).version == "1.0.1"
+    assert (await shown(container, version))[0].title == "Latest coverage"
 
 
 async def test_a_report_needs_one_owner_widgets_of_its_project_and_a_fitting_run(
@@ -331,10 +360,12 @@ async def test_a_version_is_announced_after_the_commit_and_a_failed_write_announ
 
 
 async def test_the_sources_list_names_every_source_behind_the_widgets(
-    calls: Calls, scene: Scene
+    calls: Calls, scene: Scene, container: AsyncContainer
 ) -> None:
     version = await calls.create(scene, blocks(shows(scene.chart), shows(scene.value)))
     run = await calls.run_of(version.run_id)
+    # The widgets the version shows: its copies of the chart and the value.
+    chart, value = (str(widget.id) for widget in await shown(container, version))
 
     assert version.content["sources"] == [
         {
@@ -347,7 +378,7 @@ async def test_the_sources_list_names_every_source_behind_the_widgets(
             "snapshot_id": str(run.snapshots[scene.operator_a.id]),
             "fetched_at": FETCHED_A.isoformat().replace("+00:00", "Z"),
             "content_hash": "aaa",
-            "widget_ids": [str(scene.chart.id), str(scene.value.id)],
+            "widget_ids": [chart, value],
         },
         {
             "data_source_id": str(scene.source_b.id),
@@ -359,7 +390,7 @@ async def test_the_sources_list_names_every_source_behind_the_widgets(
             "snapshot_id": str(run.snapshots[scene.operator_b.id]),
             "fetched_at": FETCHED_B.isoformat().replace("+00:00", "Z"),
             "content_hash": "bbb",
-            "widget_ids": [str(scene.chart.id)],
+            "widget_ids": [chart],
         },
     ]
     # Served typed, as stored.
@@ -412,9 +443,11 @@ async def test_a_dashboard_is_frozen_into_a_report_of_its_name(
     # At a new run of the dashboard's range; top to bottom on the grid, the empty slot left out.
     assert (first.version, first.time_range) == ("1.0.0", YEAR_2024)
     assert first.dashboard_version_id == scene.dashboard_version.id
+    value, chart = await shown(container, first)
+    assert (value.copied_from, chart.copied_from) == (scene.value.id, scene.chart.id)
     assert first.content["blocks"] == [
-        {"type": "widget", "widget_id": str(scene.value.id), "caption": ""},
-        {"type": "widget", "widget_id": str(scene.chart.id), "caption": ""},
+        {"type": "widget", "widget_id": str(value.id), "caption": ""},
+        {"type": "widget", "widget_id": str(chart.id), "caption": ""},
     ]
     report = await calls.reports("get", first.report_id)
     assert (report.dashboard_id, report.session_id, report.name) == (
@@ -430,7 +463,9 @@ async def test_a_dashboard_is_frozen_into_a_report_of_its_name(
         await generate("Bad", run_id=first.run_id, time_range=TimeRange(start=date(2015, 1, 1)))
 
 
-async def test_a_report_template_is_filled_with_widgets(calls: Calls, scene: Scene) -> None:
+async def test_a_report_template_is_filled_with_widgets(
+    calls: Calls, scene: Scene, container: AsyncContainer
+) -> None:
     template = await calls.templates(
         "create",
         scene.project.id,
@@ -451,13 +486,15 @@ async def test_a_report_template_is_filled_with_widgets(calls: Calls, scene: Sce
     second = await calls.add(version, {"slots": {"gap": str(scene.table.id)}})
 
     assert version.template_id == template.id
+    value, chart = await shown(container, version)
+    assert (value.copied_from, chart.copied_from) == (scene.value.id, scene.chart.id)
     assert version.content["blocks"] == [
         {"type": "heading", "text": "Gap", "level": 2},
-        {"type": "widget", "widget_id": str(scene.value.id), "caption": "Latest year"},
+        {"type": "widget", "widget_id": str(value.id), "caption": "Latest year"},
         {
             "type": "section",
             "title": "Trend",
-            "blocks": [{"type": "widget", "widget_id": str(scene.chart.id), "caption": ""}],
+            "blocks": [{"type": "widget", "widget_id": str(chart.id), "caption": ""}],
         },
     ]
     # The next version may fill the same template again; it keeps the template.
