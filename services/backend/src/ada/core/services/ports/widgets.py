@@ -22,7 +22,9 @@ class WidgetService(Protocol):
     ) -> Widget:
         """A widget on an operator's output, and on further named `inputs` if given (each an
         operator of the project; see Widget.inputs). It is created from an operator id only; no
-        data passes through the caller. With a session id it is also recorded there."""
+        data passes through the caller. With a session id it is also recorded there. A text
+        widget's placeholders are checked against all its inputs, and once it is stored its
+        review by the judge is queued."""
         ...
 
     async def update(
@@ -38,6 +40,11 @@ class WidgetService(Protocol):
         ones whole. A new spec replaces the old
         one whole and is checked against the operator like a new widget's. Copies on
         dashboards are widgets of their own and do not change with it."""
+        ...
+
+    async def warnings(self, id: Id) -> Sequence[str]:
+        """What is not wrong with the widget but likely unintended, e.g. a text widget's
+        input that no placeholder reads. Empty for the other types."""
         ...
 
     async def get(self, id: Id) -> Widget: ...

@@ -12,21 +12,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import db_helpers
 from ada.adapters.db.llm_repositories import (
     SqlAgentSettingsRepository,
+    SqlJudgeSettingsRepository,
     SqlLlmModelRepository,
     SqlLlmProviderRepository,
 )
+from ada.adapters.db.workspace_repositories import SqlProjectRepository
 from ada.adapters.memory.repositories import (
     MemoryAgentSettingsRepository,
+    MemoryJudgeSettingsRepository,
     MemoryLlmModelRepository,
     MemoryLlmProviderRepository,
+    MemoryProjectRepository,
     MemoryStore,
 )
 from ada.core.models.agents import LlmModel, LlmProvider, ProviderKind
 from ada.core.models.errors import Conflict, NotFound
+from ada.core.models.judges import JudgeKind, JudgeOverride, Strictness
+from ada.core.models.projects import Project
 from ada.core.ports.repositories import (
     AgentSettingsRepository,
+    JudgeSettingsRepository,
     LlmModelRepository,
     LlmProviderRepository,
+    ProjectRepository,
 )
 
 pytestmark = pytest.mark.anyio
@@ -39,6 +47,8 @@ class Repos:
     providers: LlmProviderRepository
     models: LlmModelRepository
     settings: AgentSettingsRepository
+    judges: JudgeSettingsRepository
+    projects: ProjectRepository
 
 
 @pytest.fixture(params=["memory", "database"])
@@ -49,6 +59,8 @@ async def repos(request: pytest.FixtureRequest) -> AsyncIterator[Repos]:
             MemoryLlmProviderRepository(store),
             MemoryLlmModelRepository(store),
             MemoryAgentSettingsRepository(store),
+            MemoryJudgeSettingsRepository(store),
+            MemoryProjectRepository(store),
         )
         return
     url: str = request.getfixturevalue("migrated_database_url")
@@ -58,6 +70,8 @@ async def repos(request: pytest.FixtureRequest) -> AsyncIterator[Repos]:
                 SqlLlmProviderRepository(session),
                 SqlLlmModelRepository(session),
                 SqlAgentSettingsRepository(session),
+                SqlJudgeSettingsRepository(session),
+                SqlProjectRepository(session),
             )
 
 
@@ -135,3 +149,45 @@ async def test_the_session_agent_is_cleared_with_its_model_or_provider(repos: Re
     assert (await repos.settings.get()).session_agent is None
     with pytest.raises(NotFound):
         await repos.providers.delete(stored.id)
+
+
+async def test_judge_settings_name_models_and_lose_them_with_the_model(repos: Repos) -> None:
+    _, model = await with_model(repos)
+    project = Project(id=uuid7(), name="P", created_at=AT)
+    await repos.projects.add(project)
+
+    seeded = await repos.judges.defaults()
+    assert [(d.kind, d.strictness, d.model_id, d.revision) for d in seeded] == [
+        (JudgeKind.TEXT_WIDGET, Strictness.WARN, None, 1),
+        (JudgeKind.WIDGET_CODE, Strictness.WARN, None, 1),
+    ]
+    chosen = await repos.judges.update_defaults(
+        seeded[0].model_copy(update={"model_id": model.id, "instructions": "Global"}), 1
+    )
+    assert (chosen.model_id, chosen.instructions, chosen.revision) == (model.id, "Global", 2)
+    with pytest.raises(Conflict):
+        await repos.judges.update_defaults(chosen, 1)
+
+    assert await repos.judges.overrides(project.id) == []
+    override = JudgeOverride(
+        project_id=project.id, kind=JudgeKind.TEXT_WIDGET, strictness=Strictness.BLOCK
+    )
+    added = await repos.judges.save_override(override, 0)
+    assert (added.strictness, added.model_id, added.instructions, added.revision) == (
+        Strictness.BLOCK,
+        None,
+        None,
+        1,
+    )
+    with pytest.raises(Conflict):
+        await repos.judges.save_override(override, 0)
+    changed = await repos.judges.save_override(
+        added.model_copy(update={"strictness": None, "model_id": model.id}), 1
+    )
+    assert (changed.strictness, changed.model_id, changed.revision) == (None, model.id, 2)
+    assert await repos.judges.overrides(project.id) == [changed]
+
+    await repos.models.delete(model.id)
+
+    assert (await repos.judges.defaults())[0].model_id is None
+    assert (await repos.judges.overrides(project.id))[0].model_id is None

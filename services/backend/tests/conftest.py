@@ -126,8 +126,13 @@ def migrated_database_url(_migrated: tuple[str, psycopg.Connection]) -> str:
     # A test that left a connection open would make this wait; fail instead.
     connection.execute("SET lock_timeout = '5s'")
     connection.execute(sql.SQL("TRUNCATE {} CASCADE").format(tables))
-    # What the migrations seed: the one row of the agent settings (0005).
+    # What the migrations seed: the one row of the agent settings (0005)…
     connection.execute(
         "INSERT INTO agent_settings (id, session_agent_model_id, revision) VALUES (1, NULL, 1)"
+    )
+    # And the judges' defaults, one row per kind (0012).
+    connection.execute(
+        "INSERT INTO judge_defaults (kind, strictness, revision) VALUES "
+        "('text_widget', 'warn', 1), ('widget_code', 'warn', 1)"
     )
     return url

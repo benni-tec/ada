@@ -28,6 +28,7 @@ from ada.core.models.agents import (
 from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
 from ada.core.models.dashboards import Dashboard, DashboardVersion
+from ada.core.models.judges import JudgeDefaults, JudgeOverride, Verdict
 from ada.core.models.operators import Operator, OperatorId
 from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
@@ -226,6 +227,31 @@ class WidgetRepository(Protocol):
 
     async def list(self, project_id: Id) -> Sequence[Widget]: ...
     async def list_by_session(self, session_id: Id) -> Sequence[Widget]: ...
+
+    async def set_verdict(self, id: Id, verdict: Verdict | None) -> None:
+        """Store a judge's verdict on the widget, and nothing else: a plain write of that
+        one field, so a review that ends during an edit never puts back an old spec."""
+        ...
+
+
+class JudgeSettingsRepository(Protocol):
+    """The judges' global defaults (one record per kind, which always exists) and the
+    projects' overrides. Model ids name a stored model; a deleted model is cleared, as for
+    the session agent."""
+
+    async def defaults(self) -> Sequence[JudgeDefaults]: ...
+
+    async def update_defaults(
+        self, defaults: JudgeDefaults, expected_revision: int
+    ) -> JudgeDefaults: ...
+
+    async def overrides(self, project_id: Id) -> Sequence[JudgeOverride]:
+        """The project's overrides that exist, at most one per kind."""
+        ...
+
+    async def save_override(self, override: JudgeOverride, expected_revision: int) -> JudgeOverride:
+        """Store the override; `expected_revision` 0 adds it (Conflict when one exists)."""
+        ...
 
 
 class DashboardRepository(Protocol):

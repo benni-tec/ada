@@ -28,6 +28,7 @@ from ada.adapters.db.tables import (
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.errors import NotFound
+from ada.core.models.judges import Verdict
 from ada.core.models.projects import Project
 from ada.core.models.schema import Schema
 from ada.core.models.sessions import EntryKind, Session, SessionAgent, SessionEntry
@@ -302,6 +303,7 @@ def _widget(row: WidgetRow) -> Widget:
         copied_from=row.copied_from,
         inputs=dict(row.inputs or {}),
         render_error=row.render_error,
+        verdict=Verdict.model_validate(row.verdict) if row.verdict is not None else None,
     )
 
 
@@ -328,6 +330,7 @@ class SqlWidgetRepository(WidgetRepository):
             copied_from=widget.copied_from,
             inputs=dict(widget.inputs),
             render_error=widget.render_error,
+            verdict=dump(widget.verdict) if widget.verdict is not None else None,
         )
         await add_row(self.session, row)
 
@@ -343,10 +346,21 @@ class SqlWidgetRepository(WidgetRepository):
                 note=widget.note,
                 inputs=dict(widget.inputs),
                 render_error=widget.render_error,
+                verdict=dump(widget.verdict) if widget.verdict is not None else None,
             )
         )
         if result.rowcount == 0:  # type: ignore[attr-defined]
             raise NotFound("widget", widget.id)
+
+    async def set_verdict(self, id: Id, verdict: Verdict | None) -> None:
+        table = WidgetRow.__table__
+        result = await self.session.execute(
+            update(table)
+            .where(table.c.id == id)
+            .values(verdict=dump(verdict) if verdict is not None else None)
+        )
+        if result.rowcount == 0:  # type: ignore[attr-defined]
+            raise NotFound("widget", id)
 
     async def list(self, project_id: Id) -> Sequence[Widget]:
         statement = oldest_first(WidgetRow, WidgetRow.project_id == project_id)

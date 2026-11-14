@@ -47,10 +47,12 @@ class SourcesList:
         """The sources behind the widgets as they read through `run`, ordered by name."""
         uses: dict[OperatorId, list[Id]] = {}
         for widget in widgets:
-            for operator_id in await self._sources_of(widget.operator_id, run):
-                using = uses.setdefault(operator_id, [])
-                if widget.id not in using:
-                    using.append(widget.id)
+            # Every input: a text widget's figures come from its named inputs too.
+            for input_id in widget.all_inputs().values():
+                for operator_id in await self._sources_of(input_id, run):
+                    using = uses.setdefault(operator_id, [])
+                    if widget.id not in using:
+                        using.append(widget.id)
         entries = [await self._entry(operator_id, run, ids) for operator_id, ids in uses.items()]
         entries.sort(key=lambda entry: (entry.name.lower(), entry.operator_id))
         return [entry.model_dump(mode="json") for entry in entries]

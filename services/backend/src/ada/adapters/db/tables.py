@@ -267,6 +267,41 @@ class AgentSettingsRow(Base):
     __mapper_args__ = {"version_id_col": revision}
 
 
+class JudgeDefaultsRow(Base):
+    """The judges' global settings, one row per kind (inserted by migration 0012)."""
+
+    __tablename__ = "judge_defaults"
+
+    kind: Mapped[str] = mapped_column(String(32), primary_key=True)
+    strictness: Mapped[str] = mapped_column(String(16))
+    model_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("llm_models.id", ondelete="SET NULL")
+    )
+    instructions: Mapped[str] = mapped_column(Text, default="", server_default="")
+    revision: Mapped[int] = mapped_column(Integer)
+
+    __mapper_args__ = {"version_id_col": revision}
+
+
+class ProjectJudgeRow(Base):
+    """A project's overrides of one kind's settings; NULL inherits the global default."""
+
+    __tablename__ = "project_judges"
+
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(String(32), primary_key=True)
+    strictness: Mapped[str | None] = mapped_column(String(16))
+    model_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("llm_models.id", ondelete="SET NULL")
+    )
+    instructions: Mapped[str | None] = mapped_column(Text)
+    revision: Mapped[int] = mapped_column(Integer)
+
+    __mapper_args__ = {"version_id_col": revision}
+
+
 class OperatorRow(Base):
     __tablename__ = "operators"
 
