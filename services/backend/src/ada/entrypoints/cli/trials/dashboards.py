@@ -23,7 +23,6 @@ NEAR_YOU = "Open cancer trials near you"
 
 DISTANCES = {"km_helsinki": "Helsinki, km", "km_kuopio": "Kuopio, km", "km_oulu": "Oulu, km"}
 LABELS = {
-    "listed_by_finnish_hospital": "Listed by a Finnish hospital page",
     "title": "Trial",
     "url": "Registry URL",
     "phase": "Phase",
