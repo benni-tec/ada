@@ -17,6 +17,7 @@ from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.alerts import AlertState, Severity
 from ada.core.models.base import Id
+from ada.core.models.errors import Invalid
 from ada.core.models.sessions import EntryKind
 from ada.core.models.sources import CheckEvery
 from ada.core.ports.repositories import DataSourceRepository
@@ -95,6 +96,8 @@ async def container(
                     },
                 )
             fixture = recorded_pages.get(url)
+            if fixture == "REQUEST_TIMEOUT":
+                raise Invalid("REQUEST_TIMEOUT")
             markdown = (RECORDINGS / "pages" / fixture).read_text() if fixture else "No trial IDs"
             return httpx.Response(
                 200,
@@ -211,6 +214,30 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
         }
     assert before == after
     assert len(after) > 15
+
+
+async def test_refresh_survives_failed_hospital_page(
+    container: AsyncContainer,
+    recorded_pages: dict[str, str],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    page = PAGES[0]
+    recorded_pages[page.address] = "REQUEST_TIMEOUT"
+    project_id = await seed_trials(container, refresh=True)
+    async with container() as request:
+        assert (await (await request.get(ProjectService)).get(project_id)).id == project_id
+        dashboards = await (await request.get(DashboardService)).list(project_id)
+        assert {DOORS, NEAR_YOU, DASHBOARD} <= {d.name for d in dashboards}
+        assert len(await (await request.get(SessionService)).list(project_id)) == 1
+        source = next(
+            s
+            for s in await (await request.get(SourceService)).list(project_id)
+            if s.name == page.name
+        )
+        assert source.last_error == "REQUEST_TIMEOUT"
+    output = capsys.readouterr().out
+    assert f"  {page.name}: refresh failed (REQUEST_TIMEOUT)" in output
+    assert f"  1 web pages failed; their monitors retry them: {page.name}" in output
 
 
 async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(

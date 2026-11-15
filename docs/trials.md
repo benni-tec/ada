@@ -5,6 +5,7 @@ sources plus hospital pages, eleven SQL data steps and a session recording each 
 are needed to register sources. `ada seed-trials --refresh` fetches sources, then prints
 exact row counts per step through a run. A failure is reported by the command;
 successfully refreshed snapshots remain stored. Rerun to recover.
+Web page refresh failures are reported without aborting dashboard, session and monitor creation; their monitors retry them, while registry refresh failures remain fatal.
 
 **Trial doors: Nordic cancer trials Finland lacks** shows registry trial rates,
 recruiting Nordic sites, trials without Finnish sites and pending Finnish CTIS

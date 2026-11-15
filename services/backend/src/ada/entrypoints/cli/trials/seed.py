@@ -121,6 +121,7 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
     hospital_names = sorted(
         s.name for s in web_sources if page_options(s)["kind"] == "hospital_list"
     )
+    failures: list[str] = []
     if refresh:
         for index, source in enumerate(SOURCES):
             if index:
@@ -171,12 +172,16 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                         continue
                 try:
                     await sources.refresh(source.id, force=True)
-                except Invalid as error:
-                    # Only the 7-day extract minimum is expected: a recent snapshot
-                    # exists, and the next seed retries the failed check.
-                    if name not in study_names or "is fetched at most every" not in str(error):
-                        raise
-                    print(f"  {name}: kept the recent snapshot ({error})")
+                except Exception as error:
+                    if (
+                        isinstance(error, Invalid)
+                        and name in study_names
+                        and "is fetched at most every" in str(error)
+                    ):
+                        print(f"  {name}: kept the recent snapshot ({error})")
+                    else:
+                        print(f"  {name}: refresh failed ({error})")
+                        failures.append(name)
         async with container() as request:
             built = await _build(request, project_id, registered)
             for field in fields(built):
@@ -194,6 +199,10 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
     print(f"Project {PROJECT!r}: {project_id}")
     for dashboard in dashboards:
         print(f"  dashboard {dashboard.id}  {dashboard.name}")
+    if failures:
+        print(
+            f"  {len(failures)} web pages failed; their monitors retry them: {', '.join(failures)}"
+        )
     return project_id
 
 
