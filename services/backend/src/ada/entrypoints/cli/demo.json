@@ -310,6 +310,17 @@
       "y": 4
      },
      "widget": "01a1dd43-5e87-7490-995d-a50145b73ddf"
+    },
+    {
+     "name": "expected",
+     "description": "Per lung step: Nordic standard, expected Finland without a pathway, measured in the cases",
+     "layout": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 8
+     },
+     "widget": "01a1dddf-164c-773b-b1b4-62562cc1c0d1"
     }
    ],
    "rules": []
@@ -1222,6 +1233,76 @@
     ]
    },
    "note": "Synthetic cases: median by month of first contact; grey: the Nordic target for that month's case mix"
+  },
+  "01a1dddf-164c-773b-b1b4-62562cc1c0d1": {
+   "operator_id": "op_424f6c07a72c8c72f83ace42013f5c47",
+   "inputs": {},
+   "type": "chart",
+   "title": "Lung: Nordic standard, expected Finland and measured, per step",
+   "spec": {
+    "layer": [
+     {
+      "mark": "bar"
+     },
+     {
+      "mark": {
+       "dy": -6,
+       "type": "text",
+       "fontSize": 10
+      },
+      "encoding": {
+       "text": {
+        "field": "days",
+        "format": ".0f"
+       }
+      }
+     }
+    ],
+    "encoding": {
+     "x": {
+      "axis": {
+       "labelAngle": -20
+      },
+      "type": "nominal",
+      "field": "step",
+      "title": null
+     },
+     "y": {
+      "type": "quantitative",
+      "field": "days",
+      "title": "median days"
+     },
+     "color": {
+      "sort": [
+       "Nordic standard",
+       "Expected Finland, no pathway",
+       "Measured, synthetic cases"
+      ],
+      "type": "nominal",
+      "field": "series",
+      "scale": {
+       "range": [
+        "#475569",
+        "#f59e0b",
+        "#7c3aed"
+       ]
+      },
+      "legend": {
+       "title": null,
+       "orient": "top"
+      }
+     },
+     "xOffset": {
+      "sort": [
+       "Nordic standard",
+       "Expected Finland, no pathway",
+       "Measured, synthetic cases"
+      ],
+      "field": "series"
+     }
+    }
+   },
+   "note": "Expected Finland: the Nordic standard times the Danish effect of no pathway (Jensen 2015, diagnostic steps only); measured: synthetic cases"
   },
   "01a1d9b7-8df1-7388-9115-b98187d1b0fe": {
    "operator_id": "op_250feca43dfed1b6acd1dbb66a236c08",
@@ -2187,6 +2268,26 @@
    "inputs": [
     "op_c38b429cf4221b214e862f5fcbb1fa61",
     "op_0a9e1dcca222d610538d6d164ee0b4ea"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_80dbc8cf6819673b5d6481f3457e8a1d",
+   "kind": "source",
+   "source": "01a1dddd-f011-7323-9fd0-b11e7c40a833"
+  },
+  {
+   "key": "op_424f6c07a72c8c72f83ace42013f5c47",
+   "kind": "transform",
+   "sql": "-- Lung cancer pathways, per step: the Nordic standard, the days expected in Finland without a\n-- standardised cancer pathway, and the median of the synthetic cases (input_0).\n-- Expected Finland = the Nordic standard x the median diagnostic interval before / after\n-- Denmark's cancer patient pathways, both read from Jensen et al. 2015 (input_1). The study\n-- measured the diagnostic interval (first presentation to diagnosis), so the factor applies to\n-- the diagnostic steps; the step from work-up to treatment keeps the Nordic standard.\n-- Nordic standards as the patient pathway model compiles them (work-up to treatment: surgery).\nWITH effect AS (\n  SELECT\n    CAST(regexp_extract(text, 'lower across time: (\\d+) \\(interquartile', 1) AS DOUBLE) AS before_days,\n    CAST(regexp_extract(text, '(\\d+) \\(IQI: \\d+;\\d+\\) days after CPP implementation', 1) AS DOUBLE) AS after_days\n  FROM input_1\n),\nt(step, label, nordic_days, diagnostic) AS (\n  VALUES ('days_contact_to_physician', '1 Contact to physician', 7, true),\n    ('days_physician_to_imaging', '2 Physician to imaging', 6, true),\n    ('days_imaging_to_referral', '3 Imaging to referral', 4, true),\n    ('days_referral_to_specialist', '4 Referral to specialist', 6, true),\n    ('days_specialist_to_workup', '5 Specialist to work-up', 22, true),\n    ('days_workup_to_treatment', '6 Work-up to treatment', 14, false)\n),\nd AS (\n  UNPIVOT (SELECT * FROM input_0 WHERE site = 'lung')\n  ON days_contact_to_physician, days_physician_to_imaging, days_imaging_to_referral,\n    days_referral_to_specialist, days_specialist_to_workup, days_workup_to_treatment\n  INTO NAME step VALUE days\n),\nm AS (SELECT step, median(days) AS measured FROM d GROUP BY step)\nSELECT t.label AS step, s.series, s.series_order, s.days\nFROM t JOIN m USING (step) CROSS JOIN effect,\nLATERAL (VALUES\n  (1, 'Nordic standard', CAST(t.nordic_days AS DOUBLE)),\n  (2, 'Expected Finland, no pathway', round(t.nordic_days * CASE WHEN t.diagnostic THEN effect.before_days / effect.after_days ELSE 1 END, 1)),\n  (3, 'Measured, synthetic cases', CAST(m.measured AS DOUBLE))\n) AS s(series_order, series, days)\nORDER BY t.label, s.series_order",
+   "inputs": [
+    "op_0a9e1dcca222d610538d6d164ee0b4ea",
+    "op_80dbc8cf6819673b5d6481f3457e8a1d"
    ],
    "roles": {
     "time": null,
@@ -6037,6 +6138,53 @@
     "derived": false
    },
    "provenance": null
+  },
+  "01a1dddd-f011-7323-9fd0-b11e7c40a833": {
+   "name": "Diagnostic intervals before and after cancer patient pathways, Denmark (Jensen et al. 2015)",
+   "access_kind": "web",
+   "address": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4412104/",
+   "format": "html",
+   "options": {
+    "extract": "pages",
+    "operation": "scrape"
+   },
+   "freshness": {
+    "kind": "manual",
+    "ttl_seconds": null,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "page",
+      "type": "integer",
+      "nullable": false
+     },
+     {
+      "name": "text",
+      "type": "text",
+      "nullable": false
+     }
+    ],
+    "roles": {
+     "time": null,
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": {
+    "publisher": "BMC Cancer (Springer Nature); Jensen H, Tørring ML, Olesen F, Overgaard J, Fenger-Grøn M, Vedsted P",
+    "licence": "CC BY 4.0",
+    "landing_page": "https://link.springer.com/article/10.1186/s12885-015-1317-7",
+    "found_by": {
+     "query": "Danish cancer patient pathways introduction effect on diagnostic interval median days before after",
+     "scope": "web"
+    },
+    "extracted_by_model": false,
+    "note": "BMC Cancer 2015;15:308. Median diagnostic interval 49 days before (2004/05), 32 days after (2010) Denmark's cancer patient pathways; 17 days shorter (95% CI 15-19). The effect size for 'no standardised pathway'."
+   }
   }
  },
  "case_types": {
