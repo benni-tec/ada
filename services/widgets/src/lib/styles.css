@@ -663,6 +663,11 @@ body,
   padding: 0;
   margin: 0;
   font-variant-numeric: tabular-nums;
+  text-align: inherit;
+}
+
+/* A figure stays on one line; a text value (a target, a name) wraps like the text around it. */
+.ada-placeholder[data-numeric] {
   white-space: nowrap;
 }
 
