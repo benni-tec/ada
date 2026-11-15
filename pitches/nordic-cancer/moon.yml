@@ -1,0 +1,24 @@
+# The Nordic cancer care pitch video, made with Remotion from ADA's own components and a
+# scripted conversation. Not part of CI.
+language: "typescript"
+layer: "application"
+stack: "frontend"
+tags: ["react"]
+
+toolchains:
+  default: "node"
+
+taskOptions:
+  runInCI: false
+
+tasks:
+  studio:
+    description: "Preview and edit the pitch at http://localhost:3000"
+    command: "remotion studio"
+    preset: "server"
+
+  render:
+    description: "Render the pitch to out/nordic-cancer.mp4"
+    command: "remotion render Pitch out/nordic-cancer.mp4"
+    options:
+      cache: false

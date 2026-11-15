@@ -1,0 +1,23 @@
+{
+  "name": "pitch-nordic-cancer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render Pitch out/nordic-cancer.mp4",
+    "still": "remotion still"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.543",
+    "@remotion/tailwind-v4": "4.0.543",
+    "remotion": "4.0.543",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "@remotion/bundler": "4.0.543"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "tailwindcss": "4.3.5",
+    "typescript": "7.0.2"
+  }
+}

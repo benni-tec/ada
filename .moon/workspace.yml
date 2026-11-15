@@ -1,6 +1,7 @@
 projects:
   globs:
     - "services/*"
+    - "pitches/*"
   sources:
     # Repo-level tasks such as the Docker Compose stack.
     root: "."
