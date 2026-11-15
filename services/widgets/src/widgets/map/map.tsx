@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 
 import { formatNumber } from '@/lib/columns'
-import type { Loaded } from '@/lib/runtime'
+import { usePaper, type Loaded } from '@/lib/runtime'
 
 import { binLabel, buildMap, CLASSES, placeLabels, shortNames, type Label, type MapModel, type Region } from './model'
 
@@ -51,6 +51,7 @@ export function RegionMap(loaded: Loaded) {
 
 function Choropleth({ model, title }: { model: MapModel; title: string }) {
   const [active, setActive] = useState<number | null>(null)
+  const paper = usePaper()
   const drawn = model.regions.filter((region) => region.path)
   if (drawn.length === 0) return <p className="ada-note">No region outlines to draw.</p>
 
@@ -65,11 +66,12 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
     })
   }
   const region = active === null ? null : drawn[active]
-  // Labels in the map's own units, so they scale with it: on paper there is no tooltip.
+  // Labels on paper only, where there is no tooltip; in the map's own units, so they scale
+  // with it.
   const size = Math.max(model.box[2], model.box[3]) / 46
   const short = shortNames(drawn.map((r) => r.name))
   const texts = new Map(drawn.map((r, index) => [r.code, [short[index], ...(r.value === null ? [] : [formatNumber(r.value)])]]))
-  const labels = placeLabels(drawn, texts, size)
+  const labels = paper ? placeLabels(drawn, texts, size) : []
   const keyed = labels.filter((label): label is Extract<Label, { number: number }> => 'number' in label)
   const description = `Map of ${model.value} by region, ${drawn.length} regions${
     model.period ? `, ${model.period}` : ''
@@ -79,8 +81,8 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
     <>
       <div className="ada-map">
         <svg
-          // A margin round the outlines, for labels and moved numbers at the edge.
-          viewBox={[model.box[0] - size * 2, model.box[1] - size * 2, model.box[2] + size * 4, model.box[3] + size * 4].join(' ')}
+          // On paper a margin round the outlines, for labels and moved numbers at the edge.
+          viewBox={(paper ? [model.box[0] - size * 2, model.box[1] - size * 2, model.box[2] + size * 4, model.box[3] + size * 4] : model.box).join(' ')}
           preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label={title ? `${title}: ${description}` : description}
@@ -102,6 +104,10 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
               d={r.path}
               fill={fill(r, model.bins.length)}
               fillRule="evenodd"
+              // The borders as attributes: a picture of the widget loses what a class gives.
+              stroke="var(--surface)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
               className={index === active ? 'ada-region ada-region-active' : 'ada-region'}
               onPointerEnter={() => setActive(index)}
               onPointerLeave={() => setActive((current) => (current === index ? null : current))}
@@ -111,6 +117,7 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
           {region && <path d={region.path} className="ada-region-outline" aria-hidden="true" />}
           {/* Colours as attributes, not classes: a picture of the widget (a report's PDF)
               keeps attributes but loses what a class gives. */}
+          {paper && (
           <g
             className="ada-map-labels"
             aria-hidden="true"
@@ -142,6 +149,7 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
               ),
             )}
           </g>
+          )}
         </svg>
         {region && (
           <div className="ada-tooltip ada-map-tooltip" role="status">

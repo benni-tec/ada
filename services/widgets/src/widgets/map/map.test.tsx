@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { latestPerKey } from '@/lib/columns'
 import type { Loaded } from '@/lib/runtime'
@@ -176,15 +176,27 @@ test('names what is missing to draw a map', () => {
   expect(screen.getByRole('alert')).toHaveTextContent('No column "shape" with the region outlines')
 })
 
-test('every region is named on the map, by its name and value where it fits, else by a number in a key', () => {
+test('on paper every region is named on the map, by its name and value where it fits, else by a number in a key', async () => {
+  // On screen the tooltips name the regions: no labels.
   const { container } = render(<RegionMap {...sample()} />)
-  const labels = container.querySelector('.ada-map-labels')!
+  expect(container.querySelector('.ada-map-labels')).toBeNull()
+  expect(container.querySelector('[data-region="19"]')).toHaveAttribute('stroke', 'var(--surface)')
+
+  // Laid out for a report's PDF, it labels them.
+  document.documentElement.dataset.snapshot = ''
+  const labels = await vi.waitFor(() => {
+    const found = container.querySelector('.ada-map-labels')
+    if (!found) throw new Error('no labels yet')
+    return found
+  })
   expect(labels).toHaveAttribute('aria-hidden', 'true')
   // Five regions, each named once: as a label or in the key.
   const named = [...labels.querySelectorAll(':scope > text')].map((text) => text.textContent)
   const key = [...container.querySelectorAll('.ada-map-key li')].map((item) => item.textContent)
   expect(named.length + key.length).toBe(5)
   expect([...named, ...key].join(' ')).toContain('North Ostrobothnia85.6'.slice(0, 18))
+  delete document.documentElement.dataset.snapshot
+  await vi.waitFor(() => expect(container.querySelector('.ada-map-labels')).toBeNull())
 })
 
 test('a label goes inside its region: the centroid, or for a crescent the middle of its widest stretch', () => {

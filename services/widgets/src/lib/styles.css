@@ -487,12 +487,6 @@ body,
 }
 
 /* A thin gap in the surface colour between neighbours, whatever the map's scale. */
-.ada-region {
-  stroke: var(--surface);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
 .ada-region-outline {
   fill: none;
   stroke: var(--text-primary);
