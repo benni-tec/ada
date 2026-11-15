@@ -13,6 +13,8 @@ from ada.core.models.errors import Invalid
 from ada.core.models.operators import Operator
 from ada.core.models.schema import MeasureRole, Roles
 from ada.core.models.sources import DataSource, Provenance
+from ada.core.ports.repositories import SnapshotRepository
+from ada.core.services.pipelines.schemas import SOURCE_KEY
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
@@ -252,11 +254,19 @@ async def _build(request: AsyncContainer, project_id: Id, sources: dict[str, Id]
         " UNION ALL ".join(f"SELECT * FROM input_{i}" for i in range(len(changes))), changes
     )
     gaps = await transform(HOSPITAL_TRIAL_GAPS, [hospital_trials, trials, sites])
-    sponsor_inputs = [
-        await pipelines.add_source(project_id, source.id, SEED)
-        for source in registered_pages
-        if page_options(source).get("kind") == "sponsor_study_page"
-    ]
+    snapshots = await request.get(SnapshotRepository)
+    sponsor_inputs = []
+    for source in registered_pages:
+        if page_options(source).get("kind") != "sponsor_study_page":
+            continue
+        operator = await pipelines.add_source(project_id, source.id, SEED)
+        # A page that failed before its first snapshot (a removed study page) would fail
+        # the whole union, so it stays out until a seed refresh reads it.
+        if source.last_error is not None and (
+            await snapshots.current(operator.id, SOURCE_KEY) is None
+        ):
+            continue
+        sponsor_inputs.append(operator)
     sponsor_sites = await transform(
         " UNION ALL ".join(f"SELECT * FROM input_{i}" for i in range(len(sponsor_inputs)))
         if sponsor_inputs
