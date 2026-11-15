@@ -4,7 +4,7 @@
 > 1. **A scientist (Fable)**, who grounds the model scientifically: read Parts 1, 2 and 4, and answer the questions in Part 4.
 > 2. **The engineers**, who build the platform part: Part 3.
 >
-> It builds on `docs/superpowers/plans/2026-11-14-functions-and-scenarios.md`. Functions and scenarios stay as planned there, for population-level what-ifs. The patient-level model is the new resource described here.
+> Functions and scenarios, planned alongside this for population-level what-ifs, were abandoned on 2026-11-15 in favour of cases and models (`2026-11-15-cases.md`). The patient-level model is the resource described here.
 
 ## Part 1: What we are building and why
 

@@ -22,7 +22,7 @@
 ## Global Constraints
 
 - Hexagonal layout and frozen-code rules from `docs/contracts.md`. Models, ports, `tables.py` and migrations change in an integration step. Coordinate with the platform agent before starting.
-- Migration `0017_statistical_models.py`, down `0016` (built first; functions and scenarios take the next numbers). Add it to the migration list in `contracts.md`.
+- Migration `0017_statistical_models.py`, down `0016` (after main's 0015 and 0016; cases are 0018). Add it to the migration list in `contracts.md`.
 - New backend dependency: `numpy`. Nothing else. No SciPy, no draws: intervals come from the CIs directly.
 - **An evaluation creates no run, snapshot, operator or widget**, and touches no DuckDB. This is for performance and simplicity; privacy rests on the data rule and the banner.
 - Parameters enter the model only from an ADA operator (pinned snapshot) or a registered ADA source with a quoted passage. No literal number in code or in a spec without provenance.
