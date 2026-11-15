@@ -1,11 +1,11 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { coverage, widget } from '@/test/samples'
 import { Any } from '@/widgets/any/any'
 
 import { fetchAll, followFit, followTheme, reportHeight } from './host'
-import { WidgetRuntime } from './runtime'
+import { Sources, WidgetRuntime } from './runtime'
 import type { WidgetData } from './types'
 
 // A widget loads itself from its address in our frontend, or from its MCP host.
@@ -54,6 +54,54 @@ test('names the source and its fetch time under the numbers', async () => {
   const sources = await screen.findByRole('list', { name: 'Sources' })
   expect(within(sources).getByRole('link', { name: 'Kainuu' })).toHaveAttribute('href', 'https://example.test/k')
   expect(sources).toHaveTextContent(/fetched .*2026/)
+})
+
+function sourceList(count: number, fetched_at: string | null = new Date().toISOString()) {
+  return Array.from({ length: count }, (_, i) => ({ operator_id: `op${i}`, name: `Source ${i}`, address: `https://example.test/${i}`, fetched_at }))
+}
+
+test('three sources keep the full list', () => {
+  render(<Sources sources={sourceList(3)} />)
+  expect(within(screen.getByRole('list', { name: 'Sources' })).getAllByRole('listitem')).toHaveLength(3)
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+})
+
+test('five sources summarize the oldest fetch and toggle the full list without a page host', () => {
+  const sources = sourceList(5)
+  sources[2].fetched_at = new Date(Date.now() - 15 * 60 * 60 * 1000).toISOString()
+  render(<Sources sources={sources} />)
+  const button = screen.getByRole('button', { name: '5 sources' })
+  expect(button.parentElement).toHaveTextContent(/5 sources · oldest fetched .*15 h ago/)
+  expect(button.parentElement?.querySelector('time')).toHaveAttribute('dateTime', sources[2].fetched_at)
+  expect(screen.queryByRole('list')).not.toBeInTheDocument()
+  fireEvent.click(button)
+  expect(button).toHaveAttribute('aria-expanded', 'true')
+  expect(within(screen.getByRole('list', { name: 'Sources' })).getAllByRole('listitem')).toHaveLength(5)
+  fireEvent.click(button)
+  expect(screen.queryByRole('list')).not.toBeInTheDocument()
+})
+
+test.each([
+  { stale: true, hours: 0, missing: false, color: 'red', label: 'A source could not be refreshed' },
+  { stale: false, hours: 49, missing: false, color: 'yellow', label: 'A source was fetched more than 48 h ago' },
+  { stale: false, hours: 0, missing: true, color: 'yellow', label: 'A source has no recorded fetch time' },
+  { stale: false, hours: 0, missing: false, color: 'green', label: 'All 5 sources fetched within 48 h' },
+])('source LED is $color: $label', ({ stale, hours, missing, color, label }) => {
+  const sources = sourceList(5, new Date(Date.now() - hours * 60 * 60 * 1000).toISOString())
+  if (missing) sources[0].fetched_at = null
+  render(<Sources sources={sources} stale={stale} />)
+  expect(screen.getByRole('img', { name: label })).toHaveAttribute('data-status', color)
+  expect(screen.getByRole('img', { name: label })).toHaveAttribute('title', label)
+})
+
+test('the source count asks the ada page to open the main pipeline', () => {
+  const parent = { postMessage: vi.fn() }
+  Object.defineProperty(window, 'parent', { value: parent, configurable: true })
+  window.location.hash = '#widget=w1'
+  render(<Sources sources={sourceList(5)} />)
+  fireEvent.click(screen.getByRole('button', { name: '5 sources' }))
+  expect(parent.postMessage).toHaveBeenCalledWith({ type: 'ada:open-pipeline', input: 'main' }, '*')
+  expect(screen.queryByRole('list')).not.toBeInTheDocument()
 })
 
 test('a custom widget lists each source once, with the fetch time any input knows', async () => {
