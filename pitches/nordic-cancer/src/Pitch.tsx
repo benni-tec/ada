@@ -98,7 +98,7 @@ const SECTIONS: Section[] = [
   // 5. What it is built with: the side challenges.
   { name: 'Side challenges', frames: SIDE_CHALLENGE_FRAMES, scene: <SideChallenges /> },
 
-  { name: 'Credits', frames: s(7.5), scene: <Credits /> },
+  { name: 'Credits', frames: s(6), scene: <Credits /> },
 ]
 
 export const PITCH_FRAMES = SECTIONS.reduce((total, section) => total + section.frames, 0)

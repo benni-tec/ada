@@ -16,7 +16,7 @@ const CAMERA = [
   { at: s(8.6), scale: 1.47, x: -486, y: -548 },
   // The steps chart and its bottleneck.
   { at: s(9.5), scale: 1.45, x: -903, y: -520 },
-  { at: s(14), scale: 1.48, x: -930, y: -532 },
+  { at: s(12.5), scale: 1.47, x: -921, y: -528 },
 ]
 
 function camera(frame: number) {
@@ -29,7 +29,7 @@ function camera(frame: number) {
   }
 }
 
-export const CASES_DATA_FRAMES = s(14)
+export const CASES_DATA_FRAMES = s(12.5)
 
 /** The cases are data too: county by county, step by step, as they are entered. */
 export function CasesDataScene() {
