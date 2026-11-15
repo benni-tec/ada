@@ -21,7 +21,7 @@ from ada.core.models.base import Id, JsonObject
 from ada.core.models.errors import Invalid
 from ada.core.models.judges import Finding, JudgeContext
 from ada.core.models.schema import Column, Schema
-from ada.core.models.sources import AccessKind, DataFormat, DataSource
+from ada.core.models.sources import AccessKind, CheckEvery, DataFormat, DataSource
 from ada.core.models.time import TimeRange
 from ada.core.models.web import (
     Answer,
@@ -360,8 +360,10 @@ class FakeExplorer(WebExplorer):
         self._called("answer", task=task, json_format=json_format, **arguments)
         return self.answered
 
-    async def watch(self, url: str, webhook_url: str) -> Monitor:
-        self._called("watch", url=url, webhook_url=webhook_url)
+    async def watch(
+        self, url: str, webhook_url: str, check_every: CheckEvery | None = None
+    ) -> Monitor:
+        self._called("watch", url=url, webhook_url=webhook_url, check_every=check_every)
         self.monitors += 1
         return Monitor(id=f"mon_{self.monitors}", secret=SecretStr(self.secret))
 

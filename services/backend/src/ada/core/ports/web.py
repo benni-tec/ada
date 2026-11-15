@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any, Protocol
 
 from ada.core.models.base import Id
+from ada.core.models.sources import CheckEvery
 from ada.core.models.web import (
     Answer,
     Crawl,
@@ -108,9 +109,11 @@ class WebExplorer(Protocol):
         """A researched answer to `task` in the shape of the example `json_format`."""
         ...
 
-    async def watch(self, url: str, webhook_url: str) -> Monitor:
-        """Watch the page: Context.dev checks it daily and calls the webhook, signed with
-        the monitor's secret, when it changed."""
+    async def watch(
+        self, url: str, webhook_url: str, check_every: CheckEvery | None = None
+    ) -> Monitor:
+        """Watch on the chosen interval or server default; sign change webhooks with
+        the monitor's secret."""
         ...
 
     async def unwatch(self, monitor_id: str) -> None:

@@ -12,7 +12,7 @@
   },
   "schedule": {
     "type": "interval",
-    "frequency": 1,
-    "unit": "days"
+    "frequency": 15,
+    "unit": "minutes"
   }
 }

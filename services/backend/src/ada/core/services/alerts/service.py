@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from uuid import uuid7
 
 from ada.core.models.actors import PLATFORM
-from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
+from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity, key_text
 from ada.core.models.analysis import Rows
 from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, Id, JsonObject
@@ -21,6 +21,7 @@ from ada.core.models.operators import (
 from ada.core.models.runs import Run
 from ada.core.models.schema import ColumnType, OutputKind, Schema
 from ada.core.ports.events import EventPublisher
+from ada.core.ports.notify import AlertNotifier
 from ada.core.ports.repositories import (
     AlertRepository,
     AlertRuleRepository,
@@ -31,6 +32,7 @@ from ada.core.ports.repositories import (
     SnapshotRepository,
 )
 from ada.core.ports.system import Clock
+from ada.core.ports.transactions import AfterCommit
 from ada.core.services.alerts.formula import compile_rule
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.pipelines import PipelineService
@@ -68,6 +70,8 @@ class Alerts(AlertService):
         session_records: SessionService,
         events: EventPublisher,
         clock: Clock,
+        notifier: AlertNotifier,
+        after_commit: AfterCommit,
     ) -> None:
         self.rules = rules
         self.instances = alerts
@@ -82,6 +86,8 @@ class Alerts(AlertService):
         self.session_records = session_records
         self.events = events
         self.clock = clock
+        self.notifier = notifier
+        self.after_commit = after_commit
 
     # Rules
 
@@ -217,6 +223,35 @@ class Alerts(AlertService):
 
     # Checks
 
+    async def test(self, rule_id: Id) -> Alert:
+        rule = await self.rules.get(rule_id)
+        measure = await self._measure(rule)
+        run = await self.run_service.start(rule.project_id, PLATFORM)
+        rows = await self.run_service.read(run.id, measure.id, 1)
+        if not rows.rows:
+            raise Invalid("The rule has no current data to use for a test alert")
+        names = [column.name for column in rows.columns]
+        sample = [
+            {name: _json_value(value) for name, value in zip(names, row, strict=True)}
+            for row in rows.rows
+        ]
+        alert = Alert(
+            id=uuid7(),
+            project_id=rule.project_id,
+            rule_id=rule.id,
+            key={name: sample[0].get(name) for name in rule.key_columns} if sample else {},
+            state=AlertState.FIRING,
+            since_run_id=run.id,
+            last_run_id=run.id,
+            started_at=self.clock.now(),
+        )
+
+        async def notify() -> None:
+            await self.notifier.firing(rule, alert, sample, test=True)
+
+        self.after_commit.add(notify)
+        return alert
+
     async def check(self, rule_id: Id) -> Sequence[Alert]:
         rule = await self.rules.get(rule_id)
         # Recorded as the time the check started: data that arrives while it runs is newer
@@ -237,10 +272,16 @@ class Alerts(AlertService):
             )
         names = [column.name for column in rows.columns]
         alerting_keys: dict[str, JsonObject] = {}
+        samples: dict[str, list[JsonObject]] = {}
         for row in rows.rows:
             values = dict(zip(names, row, strict=True))
             key = {column: _json_value(values[column]) for column in rule.key_columns}
-            alerting_keys.setdefault(_canonical(key), key)
+            canonical = _canonical(key)
+            alerting_keys.setdefault(canonical, key)
+            if self.notifier.configured and len(samples.setdefault(canonical, [])) < 3:
+                samples[canonical].append(
+                    {name: _json_value(value) for name, value in values.items()}
+                )
 
         now = self.clock.now()
         firing = {
@@ -287,6 +328,12 @@ class Alerts(AlertService):
             )
             await self.instances.add(alert)
             started_alerts.append(alert)
+            if self.notifier.configured:
+
+                async def notify(alert: Alert = alert) -> None:
+                    await self.notifier.firing(rule, alert, samples.get(_canonical(alert.key), []))
+
+                self.after_commit.add(notify)
 
         changed = started_alerts + resolved_alerts
         for alert in changed:
@@ -422,13 +469,6 @@ class Alerts(AlertService):
                 at=self.clock.now(),
             )
         )
-
-
-def key_text(key: JsonObject) -> str:
-    """What an alert is about, as the frontend writes it: "region: north", or "all rows"
-    for a rule without key columns."""
-    parts = [f"{column}: {value}" for column, value in key.items()]
-    return ", ".join(parts) if parts else "all rows"
 
 
 def _json_value(value: object) -> object:

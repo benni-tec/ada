@@ -67,6 +67,7 @@ from ada.core.models.operators import OperatorKind, operator_identity
 from ada.core.models.schema import Column, ColumnType, Schema
 from ada.core.models.sources import (
     AccessKind,
+    CheckEvery,
     DataFormat,
     DataSource,
     FoundBy,
@@ -1232,10 +1233,26 @@ async def test_watch_stores_encrypted_secret_and_sets_push(
     assert (watched.monitor_id, watched.freshness.kind) == ("mon_1", FreshnessKind.PUSH)
     assert "test-secret" not in watched.model_dump_json()
     webhook = f"{PUBLIC_URL}/api/hooks/context/{source.id}"
-    assert explorer.calls == [("watch", {"url": PAGE, "webhook_url": webhook})]
+    assert explorer.calls == [("watch", {"url": PAGE, "webhook_url": webhook, "check_every": None})]
     elsewhere = await pages.register(address="ftp://example.test/data.csv")
     with pytest.raises(Invalid, match="http"):
         await pages.service.watch(elsewhere.id)
+
+
+@pytest.mark.parametrize("check_every", list(CheckEvery))
+async def test_watch_interval_is_stored_and_rewatch_without_it_uses_default(
+    pages: World, explorer: FakeExplorer, check_every: CheckEvery
+) -> None:
+    source = await pages.register(**web_page())
+    watched = await pages.service.watch(source.id, check_every)
+    assert watched.check_every == check_every
+    assert (await pages.service.get(source.id)).check_every == check_every
+    assert explorer.calls[-1][1]["check_every"] == check_every
+    edited = await pages.service.update(source.id, watched.revision, name="Renamed")
+    assert edited.check_every == check_every
+    default = await pages.service.watch(source.id)
+    assert default.check_every is None
+    assert explorer.calls[-2][1]["check_every"] is None
 
 
 async def test_watching_again_replaces_the_monitor_and_unwatch_restores_the_policy(
@@ -1512,3 +1529,199 @@ async def test_uploaded_csv_loads_through_the_installed_url_reader(tmp_path: Pat
         other_project = source.model_copy(update={"project_id": factories.project().id})
         with pytest.raises(Invalid, match="must belong"):
             await reader.fetch(other_project, TimeRange())
+
+
+async def test_token_pagination_keeps_params_and_joins_before_shaping() -> None:
+    def answer(request: httpx.Request) -> httpx.Response:
+        page = int(request.url.params.get("pageToken", "1"))
+        return httpx.Response(
+            200,
+            json={
+                "data": {"items": [{"id": page}]},
+                **({"nextPageToken": str(page + 1)} if page < 3 else {}),
+            },
+        )
+
+    server = Server(answer)
+    options = {
+        "rows": "data.items",
+        "params": {"country": "FI"},
+        "paginate": {"token": "nextPageToken", "param": "pageToken", "delay_seconds": 0},
+    }
+    fetched = await server.reader().fetch(
+        source(address="https://x.test/search?size=100", format=DataFormat.JSON, options=options),
+        TimeRange(),
+    )
+    assert json.loads(shape(fetched, options).content) == [{"id": 1}, {"id": 2}, {"id": 3}]
+    assert dict(server.requests[1].url.params) == {"size": "100", "country": "FI", "pageToken": "2"}
+    assert fetched.origin == str(server.requests[0].url)
+    with pytest.raises(SourceUnavailable, match="bytes"):
+        await server.reader(max_bytes=len(fetched.content)).fetch(
+            source(format=DataFormat.JSON, options=options), TimeRange()
+        )
+
+
+async def test_page_pagination_increments_post_body_without_mutating_options() -> None:
+    def answer(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        page = body["pagination"]["page"]
+        assert body["searchCriteria"] == {"msc": [752]}
+        return httpx.Response(
+            200, json={"pagination": {"nextPage": page < 2}, "data": [{"id": page}]}
+        )
+
+    server = Server(answer)
+    options = {
+        "rows": "data",
+        "body": {"pagination": {"page": 1, "size": 1000}, "searchCriteria": {"msc": [752]}},
+        "paginate": {"more": "pagination.nextPage", "page": "pagination.page", "delay_seconds": 0},
+    }
+    fetched = await server.reader(AccessKind.REQUEST).fetch(
+        source(AccessKind.REQUEST, format=DataFormat.JSON, options=options), TimeRange()
+    )
+    assert json.loads(fetched.content)["data"] == [{"id": 1}, {"id": 2}]
+    assert [r.method for r in server.requests] == ["POST", "POST"]
+    assert options["body"]["pagination"]["page"] == 1
+
+
+async def test_pagination_limit_is_recorded_as_source_error(world: World) -> None:
+    server = Server(lambda request: httpx.Response(200, json={"data": [], "next": "again"}))
+    world.service.readers = HttpSourceReaders(
+        create_client(httpx.MockTransport(server)), world.clock, allow_private=True
+    )
+    registered = await world.register(
+        format=DataFormat.JSON,
+        options={
+            "rows": "data",
+            "paginate": {"token": "next", "param": "cursor", "max_pages": 2, "delay_seconds": 0},
+        },
+    )
+    with pytest.raises(Unavailable, match="max_pages"):
+        await world.service.refresh(registered.id)
+    assert "max_pages (2)" in (await world.service.get(registered.id)).last_error
+    assert len(server.requests) == 2
+
+
+async def test_post_probe_fields_include_array_indexes() -> None:
+    updated = "2026-01-01"
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert json.loads(request.content) == {"size": 1}
+        assert request.headers["x-key"] == "test"
+        return httpx.Response(
+            200, json={"pagination": {"total": 10}, "data": [{"id": "a", "updated": updated}]}
+        )
+
+    server = Server(answer)
+    declared = source(
+        options={
+            "headers": {"X-Key": "test"},
+            "probe": {
+                "url": "https://x.test/search",
+                "method": "POST",
+                "body": {"size": 1},
+                "fields": ["pagination.total", "data.0.id", "data.0.updated"],
+            },
+        }
+    )
+    reader = server.reader()
+    first = await reader.probe(declared)
+    assert json.loads(first) == [10, "a", "2026-01-01"]
+    updated = "2026-01-02"
+    assert await reader.probe(declared) != first
+
+
+async def test_url_page_pagination_starts_from_params_and_keeps_top_level_arrays() -> None:
+    server = Server(
+        lambda request: httpx.Response(
+            200,
+            json=[
+                {
+                    "page": int(request.url.params["page"]),
+                    "more": int(request.url.params["page"]) < 4,
+                }
+            ],
+        )
+    )
+    fetched = await server.reader().fetch(
+        source(
+            address="https://x.test/search?page=1",
+            format=DataFormat.JSON,
+            options={
+                "params": {"page": 3},
+                "paginate": {
+                    "more": "0.more",
+                    "page": "page",
+                    "delay_seconds": 0,
+                },
+            },
+        ),
+        TimeRange(),
+    )
+    assert json.loads(fetched.content) == [{"page": 3, "more": True}, {"page": 4, "more": False}]
+
+
+@pytest.mark.parametrize(
+    "paginate",
+    [
+        {"token": "next"},
+        {"token": "next", "param": "cursor", "max_pages": 101},
+        {"more": "more", "page": "page", "delay_seconds": -1},
+    ],
+)
+async def test_malformed_pagination_fails_before_sending(paginate: dict[str, Any]) -> None:
+    server = Server(lambda request: httpx.Response(200, json=[]))
+    with pytest.raises(Invalid, match="Example paginate"):
+        await server.reader().fetch(
+            source(format=DataFormat.JSON, options={"paginate": paginate}), TimeRange()
+        )
+    assert not server.requests
+
+
+async def test_paginated_get_only_uses_a_declared_probe() -> None:
+    server = Server(lambda request: httpx.Response(200, headers={"ETag": "first-page"}, json=5))
+    options: dict[str, Any] = {"paginate": {"token": "next", "param": "cursor"}}
+    reader = server.reader()
+    assert await reader.probe(source(options=options)) is None
+    assert not server.requests
+
+    options["probe"] = {"url": "https://x.test/version"}
+    token = await reader.probe(source(options=options))
+    assert token is not None and token.startswith("sha256:")
+    [request] = server.requests
+    assert (request.method, str(request.url)) == ("GET", "https://x.test/version")
+
+
+@pytest.mark.parametrize("last_page", [{"more": False}, {"more": None}, {}])
+async def test_page_pagination_requires_more_on_every_page(last_page: dict[str, Any]) -> None:
+    answers = iter(
+        [
+            {"data": [], "pagination": {"more": True}},
+            {"data": [], "pagination": last_page},
+        ]
+    )
+    server = Server(lambda request: httpx.Response(200, json=next(answers)))
+    declared = source(
+        format=DataFormat.JSON,
+        options={
+            "rows": "data",
+            "paginate": {"more": "pagination.more", "page": "page", "delay_seconds": 0},
+        },
+    )
+    if last_page:
+        await server.reader().fetch(declared, TimeRange())
+    else:
+        with pytest.raises(Invalid, match="no field 'pagination.more'"):
+            await server.reader().fetch(declared, TimeRange())
+    assert len(server.requests) == 2
+
+
+def test_watch_http_interval_validation_and_storage(watched: tuple[TestClient, str]) -> None:
+    client, source_id = watched
+    url = f"/api/sources/{source_id}/watch"
+    invalid = client.post(url, params={"check_every": "5min"})
+    assert invalid.status_code == 422
+    response = client.post(url, params={"check_every": "hourly"})
+    assert response.status_code == 200
+    assert response.json()["check_every"] == "hourly"

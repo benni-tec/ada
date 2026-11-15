@@ -55,6 +55,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         for a stable URL or an uploaded file address (upload://...) that returns CSV,
         JSON or Parquet (access_kind "url"), or one HTTP
         request with method, headers and body in `options` (access_kind "request").
+        JSON HTTP options: `paginate` (token/param or more/page), `probe` (fields, method, body).
         For URL/request JSON or CSV, `options.include_provenance: true` adds the actual
         source_url and fetched_at to each row after shaping (`rows` selects a JSON array;
         `fields` maps output columns to paths or {path, type}). Prefer a public JSON/CSV
