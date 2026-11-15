@@ -1467,7 +1467,7 @@ async def test_a_policy_edit_waits_for_unwatch_in_postgres(migrated_database_url
     assert unwatched.freshness == weekly
 
 
-def test_json_row_provenance_comes_from_the_fetch_after_field_mapping() -> None:
+def test_row_provenance_comes_from_the_fetch_after_field_mapping() -> None:
     from datetime import UTC, datetime
 
     fetched = FetchedData(
@@ -1488,6 +1488,12 @@ def test_json_row_provenance_comes_from_the_fetch_after_field_mapping() -> None:
             "fetched_at": fetched.fetched_at.isoformat(),
         }
     ]
+
+    spoofed = fetched.model_copy(
+        update={"format": DataFormat.CSV, "content": b"name, SOURCE_URL \nexample,invented\n"}
+    )
+    with pytest.raises(Invalid, match="provenance columns.*reserved"):
+        shape(spoofed, {"include_provenance": True})
 
 
 async def test_uploaded_csv_loads_through_the_installed_url_reader(tmp_path: Path) -> None:

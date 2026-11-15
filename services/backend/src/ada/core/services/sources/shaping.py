@@ -130,7 +130,7 @@ def shape(data: FetchedData, options: JsonObject) -> FetchedData:
             if parsed.include_provenance:
                 rows = list(csv.reader(io.StringIO(content.decode())))
                 if rows:
-                    if {"source_url", "fetched_at"} & {name.casefold() for name in rows[0]}:
+                    if {"source_url", "fetched_at"} & {name.strip().casefold() for name in rows[0]}:
                         raise Invalid(
                             "CSV provenance columns source_url and fetched_at are reserved"
                         )
