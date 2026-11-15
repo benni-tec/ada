@@ -4,6 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { AttachmentPanel } from '@/components/attachments/attachment-panel'
 import { ChatDraftContext, useChatDraftState } from '@/components/chat/chat-draft'
 import { SessionChat } from '@/components/chat/session-chat'
+import { DeleteSession } from '@/components/delete-session'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { PageType } from '@/components/page-header'
@@ -60,7 +61,12 @@ function SessionPage() {
         <section aria-label="Conversation" className="flex min-h-0 min-w-0 flex-1 flex-col">
           <header className="mx-auto flex w-full max-w-4xl shrink-0 flex-col gap-1 px-4 pt-4">
             <PageType type="session" />
-            <EditableTitle value={session.data.title} label="session title" {...rename} />
+            <div className="flex flex-wrap items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <EditableTitle value={session.data.title} label="session title" {...rename} />
+              </div>
+              <DeleteSession projectId={projectId} sessionId={sessionId} title={session.data.title} />
+            </div>
           </header>
           <SessionChat projectId={projectId} sessionId={sessionId} highlightedWidget={highlighted} />
         </section>

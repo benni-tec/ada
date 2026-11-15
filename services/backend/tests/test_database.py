@@ -44,6 +44,7 @@ from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.errors import Conflict, NotFound
 from ada.core.models.judges import Finding, JudgeKind, Outcome, Verdict
 from ada.core.models.operators import OperatorKind
+from ada.core.models.reports import Report
 from ada.core.models.schema import GeoRole, Roles, Schema
 from ada.core.models.sessions import DashboardContext, PipelineContext, SessionAgent
 from ada.core.models.sources import FoundBy, FreshnessKind, FreshnessPolicy, Provenance
@@ -51,6 +52,7 @@ from ada.core.models.time import Interval, TimeRange
 from ada.core.ports.repositories import (
     AttachmentRepository,
     ProjectRepository,
+    ReportRepository,
     SessionRepository,
 )
 from ada.core.services.ports.cases import CaseService
@@ -1040,5 +1042,40 @@ async def test_cases_and_their_results_round_trip_through_the_database(
             on_case = await cases.models(type_id, "SYN-1")
             assert on_case[0].results == 3
             assert len(await cases.open_cases(type_id)) == 2
+    finally:
+        await container.close()
+
+
+async def test_deleting_a_session_takes_its_reports_and_keeps_its_research_sessions(
+    migrated_database_url: str, tmp_path: Path
+) -> None:
+    container = create_container(settings_in(tmp_path, migrated_database_url), MemoryBackground())
+    try:
+        project = factories.project()
+        doomed = factories.session(project.id, title="Doomed")
+        child = factories.session(project.id, title="Research", parent_session_id=doomed.id)
+        report = Report(
+            id=uuid7(),
+            project_id=project.id,
+            name="Owned",
+            session_id=doomed.id,
+            created_at=factories.NOW,
+        )
+        async with container() as request:
+            await (await request.get(ProjectRepository)).add(project)
+            sessions = await request.get(SessionRepository)
+            await sessions.add(doomed)
+            await sessions.add(child)
+            await (await request.get(ReportRepository)).add(report)
+        async with container() as request:
+            await (await request.get(SessionRepository)).delete(doomed.id)
+        async with container() as request:
+            sessions = await request.get(SessionRepository)
+            with pytest.raises(NotFound):
+                await sessions.get(doomed.id)
+            assert (await sessions.get(child.id)).parent_session_id is None
+            # A report has exactly one owner, so the session's reports go with it.
+            with pytest.raises(NotFound):
+                await (await request.get(ReportRepository)).get(report.id)
     finally:
         await container.close()

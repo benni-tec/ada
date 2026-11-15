@@ -88,6 +88,13 @@ export const renameSession = (session: Session, title: string) =>
     }),
   )
 
+/** Deletes a session with its messages, agent turns and reports; its widgets stay. 422
+ * while its agent is working. */
+export async function deleteSession(id: Id): Promise<void> {
+  const { error, response } = await api.DELETE('/api/sessions/{session_id}', { params: { path: { session_id: id } } })
+  if (!response.ok) throw new ApiFailure(response.status, error as ApiError | undefined)
+}
+
 // What is shown beside the session is in attachments.ts.
 
 export const listEntries = (sessionId: Id) =>

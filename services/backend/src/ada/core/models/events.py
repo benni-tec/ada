@@ -9,6 +9,7 @@ class EventType(StrEnum):
     agent.turn_part is the exception."""
 
     SESSION_CREATED = "session.created"
+    SESSION_DELETED = "session.deleted"
     SESSION_ENTRY_ADDED = "session.entry_added"
     # Both carry the attachment besides its id, so a client knows who attached what.
     SESSION_ATTACHMENT_ADDED = "session.attachment_added"

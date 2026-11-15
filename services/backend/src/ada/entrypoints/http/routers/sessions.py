@@ -83,6 +83,13 @@ async def change_session(
     return await service.rename(session_id, body.title, body.expected_revision)
 
 
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_session(session_id: Id, service: FromDishka[SessionService]) -> None:
+    """Delete a session with its messages, attachments, agent turns and reports; its widgets
+    and research sessions stay in the project. 422 while its agent is working."""
+    await service.delete(session_id, WEB)
+
+
 @router.get("/sessions/{session_id}/entries")
 async def list_entries(
     session_id: Id, service: FromDishka[SessionService]
