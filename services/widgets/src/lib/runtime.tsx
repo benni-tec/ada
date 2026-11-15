@@ -140,13 +140,18 @@ export function WidgetRuntime({ children }: { children: (loaded: Loaded) => Reac
   )
 }
 
+// The sources a widget lists under itself; the pipeline, below the card, has them all.
+const SHOWN_SOURCES = 2
+
 /** Where the numbers came from and when they were fetched, under every widget, so no
- * number is shown without its source. */
+ * number is shown without its source: the first two, and for more a pointer to the
+ * pipeline, which lists every one. */
 export function Sources({ sources }: { sources: NonNullable<WidgetData['sources']> }) {
   if (sources.length === 0) return null
+  const hidden = sources.length - SHOWN_SOURCES
   return (
     <ul className="ada-sources" aria-label="Sources">
-      {sources.map((source) => (
+      {sources.slice(0, SHOWN_SOURCES).map((source) => (
         <li key={source.operator_id}>
           {/^https?:\/\//i.test(source.address) ? (
             <a href={source.address} target="_blank" rel="noreferrer noopener" title={source.address}>
@@ -159,6 +164,11 @@ export function Sources({ sources }: { sources: NonNullable<WidgetData['sources'
           {source.fetched_at ? `fetched ${fetched(source.fetched_at)}` : 'fetch time not recorded'}
         </li>
       ))}
+      {hidden > 0 && (
+        <li>
+          and {hidden} more: the Pipeline, under the widget, lists every source
+        </li>
+      )}
     </ul>
   )
 }

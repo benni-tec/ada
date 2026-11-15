@@ -56,6 +56,20 @@ test('names the source and its fetch time under the numbers', async () => {
   expect(sources).toHaveTextContent(/fetched .*2026/)
 })
 
+test('lists the first two sources and points to the pipeline for the rest', async () => {
+  const source = (n: number) => ({ operator_id: `op${n}`, name: `Source ${n}`, address: 'x', fetched_at: null })
+  serve({ data: coverage({ sources: [1, 2, 3, 4].map(source) }) })
+  show()
+
+  const sources = await screen.findByRole('list', { name: 'Sources' })
+  const items = within(sources).getAllByRole('listitem').map((item) => item.textContent)
+  expect(items).toEqual([
+    expect.stringContaining('Source 1'),
+    expect.stringContaining('Source 2'),
+    'and 2 more: the Pipeline, under the widget, lists every source',
+  ])
+})
+
 test('a custom widget lists each source once, with the fetch time any input knows', async () => {
   const fixed = { operator_id: 'op2', name: 'Kainuu', address: 'https://example.test/k', fetched_at: '2026-11-14T10:00:00Z' }
   vi.stubGlobal(
