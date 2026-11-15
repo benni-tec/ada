@@ -267,6 +267,13 @@ class Cases(CaseService):
                 explored = await self.exploration.query(
                     operator_id, clauses, actor, limit=MAX_EXPLORATION_ROWS
                 )
+                # A model reading cut-off data would answer with confidence about part of
+                # it (a count too low, the nearest trial missing): no result instead.
+                if explored.rows.truncated:
+                    raise Invalid(
+                        f"{name} has more than {MAX_EXPLORATION_ROWS} rows, more than one "
+                        "result reads"
+                    )
                 data[name] = explored.rows
                 if explored.run_id is not None:
                     reads[name] = str(explored.run_id)

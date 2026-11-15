@@ -5,7 +5,7 @@ type Match = {
   countries?: string[]
   finnish_site?: boolean
   nearest?: { facility?: string | null; city?: string | null; country: string; km?: number | null } | null
-  sex?: string
+  sex?: string | null
   age?: 'inside' | 'partly' | 'outside' | 'unknown'
   min_age_years?: number | null
   max_age_years?: number | null
@@ -22,10 +22,11 @@ const ageText = {
   unknown: 'no age group given',
 } as const
 
+// A limit the registry did not give is said to be missing, never read as no limit.
 const ages = (min?: number | null, max?: number | null) =>
-  min == null && max == null ? 'any age' : max == null ? `${min} and over` : `${min ?? 0}–${max}`
+  min == null && max == null ? 'age not reported' : max == null ? `${min} and over` : `${min ?? 0}–${max}`
 
-const sexText = (sex?: string) => (!sex || sex === 'ALL' ? 'all sexes' : sex === 'FEMALE' ? 'women' : sex === 'MALE' ? 'men' : sex.toLowerCase())
+const sexText = (sex?: string | null) => (!sex ? 'sex not reported' : sex === 'ALL' ? 'all sexes' : sex === 'FEMALE' ? 'women' : sex === 'MALE' ? 'men' : sex.toLowerCase())
 
 /** The trial matcher's result: the recruiting trials of the case's cancer group, nearest
  * first. Sex and age limits are shown, not applied; the eligibility text is the registry's,

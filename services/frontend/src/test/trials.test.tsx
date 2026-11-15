@@ -64,27 +64,30 @@ test('a trial result lists the trials nearest first, with their registry limits 
   const section: Section = {
     kind: 'trial_matcher',
     title: 'Trial matcher',
-    summary: '2 recruiting trials, nearest 3 km from Oulu',
+    summary: '3 recruiting trials, nearest 3 km from Oulu',
     status: 'info',
-    columns: { trials: 2 },
+    columns: { trials: 3 },
     attention: { open: false },
     reads: { trials: 'run-1' },
     body: {
       city: 'oulu',
-      total: 2,
+      total: 3,
       matches: [
         { nct_id: 'NCT1', title: 'Lung trial in Helsinki', finnish_site: true, countries: ['Finland'], nearest: { facility: 'OYS', city: 'Oulu', country: 'Finland', km: 3 }, sex: 'ALL', min_age_years: 18, max_age_years: 75, age: 'inside', eligibility: 'Inclusion: adults.', url: 'https://clinicaltrials.gov/study/NCT1' },
         { nct_id: 'NCT2', title: 'Men-only trial', finnish_site: false, countries: ['Sweden'], nearest: { city: 'Umeå', country: 'Sweden', km: 410 }, sex: 'MALE', min_age_years: 18, max_age_years: 40, age: 'outside', url: 'https://clinicaltrials.gov/study/NCT2' },
+        { nct_id: 'NCT3', title: 'Trial without limits given', nearest: { city: 'Tampere', country: 'Finland', km: 520 }, sex: null, min_age_years: null, max_age_years: null, age: 'unknown', url: 'https://clinicaltrials.gov/study/NCT3' },
       ],
     },
   }
   render(<SectionView section={section} />)
-  expect(screen.getByText('2 recruiting trials, nearest 3 km from Oulu')).toBeInTheDocument()
+  expect(screen.getByText('3 recruiting trials, nearest 3 km from Oulu')).toBeInTheDocument()
   expect(screen.getByText(/Distances from Oulu/)).toBeInTheDocument()
   const items = screen.getAllByRole('listitem')
   expect(items[0]).toHaveTextContent('Finnish site')
   expect(items[0]).toHaveTextContent('OYS, Oulu, Finland, 3 km')
   // Shown, not applied: the men-only trial for an age group outside its limits stays listed.
   expect(items[1]).toHaveTextContent('Registry limits: men, 18–40 · age group outside the limits')
+  // A limit the registry did not give is not read as no limit.
+  expect(items[2]).toHaveTextContent('Registry limits: sex not reported, age not reported')
   expect(screen.getByText('Eligibility, as registered')).toBeInTheDocument()
 })

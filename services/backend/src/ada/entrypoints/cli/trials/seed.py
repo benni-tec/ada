@@ -11,6 +11,7 @@ from ada.core.models.operators import Operator
 from ada.core.models.schema import MeasureRole, Roles
 from ada.core.models.sources import Provenance
 from ada.core.models.statistical_models import TrialMatcherSpec
+from ada.core.services.ports.cases import CaseService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
@@ -23,17 +24,26 @@ from ada.entrypoints.cli.trials.monitoring import create_monitoring
 from ada.entrypoints.cli.trials.sources import CTGOV, CTIS, SOURCES
 
 PROJECT = "Nordic cancer trials"
-AGENT_INSTRUCTIONS = (
-    'For a patient, save a case on the "Cancer trial candidate" case type with set_case: '
-    "a new key such as PATIENT-1, never a name or identity code, and the site, sex, age group "
-    "and wellbeing services county as told. The trial matcher runs on save: answer from its "
-    "result, in its order, nearest first, with each nearest site's city and km and the city "
-    "the distances are from. Quote each eligibility text as written, never as a verdict. Sex "
-    "and age limits are information only: never filter or judge by them or any other "
-    "criterion, never say a patient qualifies, rank by efficacy or promise anything. End by "
-    "saying to take the list to their oncologist, who decides eligibility. For trials in "
-    "general, use the dashboards and data steps."
-)
+# The case type the matcher makes for itself when the project has none that covers it.
+CASE_TYPE = "Cancer trial candidate"
+
+
+def agent_instructions(case_type: str = CASE_TYPE) -> str:
+    """What the project's agent is told, naming the case type the matcher runs on."""
+    return (
+        f'For a patient, save a case on the "{case_type}" case type with set_case: '
+        "a new key such as PATIENT-1, never a name or identity code, and the site, sex, age group "
+        "and wellbeing services county as told. The trial matcher runs on save: answer from its "
+        "result, in its order, nearest first, with each nearest site's city and km and the city "
+        "the distances are from. Quote each eligibility text as written, never as a verdict. Sex "
+        "and age limits are information only: never filter or judge by them or any other "
+        "criterion, never say a patient qualifies, rank by efficacy or promise anything. End by "
+        "saying to take the list to their oncologist, who decides eligibility. For trials in "
+        "general, use the dashboards and data steps."
+    )
+
+
+AGENT_INSTRUCTIONS = agent_instructions()
 SESSION = "Nordic cancer trials"
 SEED = Actor(kind=ActorKind.SYSTEM, name="ada seed-trials")
 REFRESH_DELAY_SECONDS = 1
@@ -58,7 +68,6 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
         project = next((p for p in await projects.list() if p.name == PROJECT), None)
         if project is None:
             project = await projects.create(PROJECT)
-        await projects.update(project.id, project.revision, agent_instructions=AGENT_INSTRUCTIONS)
         registered = {s.name: s.id for s in await sources.list(project.id)}
         for source in SOURCES:
             if source.name not in registered:
@@ -99,7 +108,14 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                 )
         dashboards = await create_dashboards(request, project_id, session.id, built, SEED)
         await create_monitoring(request, project_id, session.id, registered, built, SEED)
-        await create_matcher(request, project_id, built)
+        case_type = await create_matcher(request, project_id, built)
+        # The instructions name the case type the matcher landed on, which is an existing
+        # one when the project already had a type that covers it.
+        projects = await request.get(ProjectService)
+        current = await projects.get(project_id)
+        await projects.update(
+            project_id, current.revision, agent_instructions=agent_instructions(case_type)
+        )
     if refresh:
         for index, source in enumerate(SOURCES):
             if index:
@@ -122,26 +138,34 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
     return project_id
 
 
-async def create_matcher(request: AsyncContainer, project_id: Id, steps: TrialSteps) -> None:
-    """The project's trial matcher on its "Cancer trial candidate" case type, running on every
-    save of a case and reading case_trials and county_cities when it runs. A reseed that
-    rebuilt those steps gives the matcher a new version reading the new ones."""
+async def create_matcher(request: AsyncContainer, project_id: Id, steps: TrialSteps) -> str:
+    """The project's trial matcher, running on every save of a case of its case type and
+    reading case_trials and county_cities when it runs; the case type's name. A reseed that
+    rebuilt those steps gives the matcher a new version reading the new ones, and turns its
+    runs on save back on."""
     models = await request.get(StatisticalModelService)
+    cases = await request.get(CaseService)
     spec = TrialMatcherSpec(
         operator_id=steps.case_trials.id, county_operator_id=steps.county_cities.id
     )
     matcher = next((m for m in await models.list(project_id) if m.kind == spec.kind), None)
     if matcher is None:
-        await models.create_trial_matcher(
+        version = await models.create_trial_matcher(
             project_id, spec.operator_id, SEED, spec.county_operator_id, auto_run=True
         )
-        return
-    current = (await models.version(matcher.id)).spec
-    if not isinstance(current, TrialMatcherSpec) or (
-        current.operator_id,
-        current.county_operator_id,
-    ) != (spec.operator_id, spec.county_operator_id):
-        await models.add_version(matcher.id, spec, SEED)
+        matcher = await models.get(version.model_id)
+    else:
+        current = (await models.version(matcher.id)).spec
+        if not isinstance(current, TrialMatcherSpec) or (
+            current.operator_id,
+            current.county_operator_id,
+        ) != (spec.operator_id, spec.county_operator_id):
+            await models.add_version(matcher.id, spec, SEED)
+        if matcher.case_type_id is not None and not matcher.auto_run:
+            matcher = await models.set_case_type(matcher.id, matcher.case_type_id, True)
+    if matcher.case_type_id is None:
+        return CASE_TYPE
+    return (await cases.get_type(matcher.case_type_id)).name
 
 
 async def _build(request: AsyncContainer, project_id: Id, sources: dict[str, Id]) -> TrialSteps:

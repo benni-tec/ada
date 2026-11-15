@@ -116,6 +116,11 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
         assert project.agent_instructions == seed.AGENT_INSTRUCTIONS
         assert len(project.agent_instructions) < 900
         await projects.update(project_id, project.revision, agent_instructions="Old instructions")
+        # Someone turned the matcher's runs on save off: the reseed turns them back on, as the
+        # instructions promise a result on every save.
+        models = await request.get(StatisticalModelService)
+        [matcher] = [m for m in await models.list(project_id) if m.kind == "trial_matcher"]
+        await models.set_case_type(matcher.id, matcher.case_type_id, False)
     assert await seed_trials(container) == project_id
     async with container() as request:
         assert (await (await request.get(ProjectService)).get(project_id)).agent_instructions == (

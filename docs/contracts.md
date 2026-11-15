@@ -1116,11 +1116,15 @@ text is shown, never judged; its results never ask for attention. It keeps nothi
 version (`TrialMatcherSpec`: the `case_trials` and `county_cities` operators and the site to
 cancer group map) and reads those steps whenever it runs: a kind names its data queries
 (`ModelKind.queries`), the case service runs them in a new run each and passes the rows to
-`run`, and the result records the runs it read (`Section.reads`). Created with `POST
+`run`, and the result records the runs it read (`Section.reads`). A query cut off at the
+row limit gives a "Could not run" result instead of an answer about part of the data. A
+limit the registry does not give (sex, ages) stays missing and is shown as not reported. Created with `POST
 /projects/{id}/models/trials` (`{operator_id, county_operator_id?, case_type_id?, auto_run?}`)
 or `create_trial_matcher`; a new spec of the same kind is a new version (`add_version`).
 `ada seed-trials` puts one in the "Nordic cancer trials" project, running on every save of a
-"Cancer trial candidate" case, and its agent answers patient questions through it.
+case of its type ("Cancer trial candidate" unless the project already had a type that covers
+it; the agent instructions name the type it is on), and its agent answers patient questions
+through it. A reseed turns its runs on save back on.
 
 Nothing in cases assumes a use case. A model **kind**
 (`core/services/statistical_models/kinds.py`, `KINDS`) says which fields it reads, runs on a

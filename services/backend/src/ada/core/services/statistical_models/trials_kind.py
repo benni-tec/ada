@@ -46,6 +46,18 @@ def _number(value: object) -> float | None:
     return None if value is None else float(str(value))
 
 
+def _site(value: object) -> JsonObject:
+    """The nearest site's record; the fields missing when the trial has no site with a
+    distance from the city."""
+    site = value if isinstance(value, dict) else {}
+    return {
+        "facility": site.get("facility"),
+        "city": site.get("city"),
+        "country": site.get("country"),
+        "km": _number(site.get("km")),
+    }
+
+
 def _band(age_band: object) -> tuple[int, int] | None:
     if not isinstance(age_band, str) or "-" not in age_band:
         return None
@@ -93,9 +105,11 @@ class TrialKind:
         spec = version.spec
         assert isinstance(spec, TrialMatcherSpec)
         group = spec.groups.get(str(values.get("site")), "")
+        # One record per city, so a site's facility, city and distance come from the same
+        # row: arg_min of each field alone skips the rows where that field is NULL.
         nearest = ", ".join(
-            f"arg_min(facility, km_{c}) AS {c}_facility, arg_min(city, km_{c}) AS {c}_city, "
-            f"arg_min(country, km_{c}) AS {c}_country, min(km_{c}) AS {c}_km"
+            f"arg_min({{'facility': facility, 'city': city, 'country': country, "
+            f"'km': km_{c}::DOUBLE}}, km_{c}) AS {c}_site"
             for c in CITIES
         )
         found: dict[str, tuple[str, Clauses]] = {
@@ -138,13 +152,9 @@ class TrialKind:
                     "phase": row.get("phase"),
                     "countries": [c.strip() for c in countries.split(",") if c.strip()],
                     "finnish_site": bool(row.get("finnish_site")),
-                    "nearest": {
-                        "facility": row.get(f"{city}_facility"),
-                        "city": row.get(f"{city}_city"),
-                        "country": row.get(f"{city}_country"),
-                        "km": _number(row.get(f"{city}_km")),
-                    },
-                    "sex": str(row.get("sex") or "ALL").upper(),
+                    "nearest": _site(row.get(f"{city}_site")),
+                    # Kept missing when the registry gives none: "all sexes" would be a claim.
+                    "sex": str(row["sex"]).upper() if row.get("sex") else None,
                     "min_age_years": low,
                     "max_age_years": high,
                     "age": age_fit(low, high, values.get("age_band")),

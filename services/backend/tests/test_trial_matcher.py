@@ -7,6 +7,7 @@ import re
 from typing import Any
 from uuid import uuid7
 
+import duckdb
 import pytest
 
 from ada.adapters.memory.repositories import (
@@ -22,10 +23,11 @@ from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.analysis import Column, Rows
 from ada.core.models.errors import Invalid
 from ada.core.models.projects import Project
-from ada.core.models.statistical_models import TrialMatcherSpec
+from ada.core.models.statistical_models import ModelVersion, TrialCompiled, TrialMatcherSpec
 from ada.core.services.cases.service import Cases
 from ada.core.services.ports.exploration import Clauses, Explored
 from ada.core.services.statistical_models.service import StatisticalModels
+from ada.core.services.statistical_models.trials_kind import TrialKind
 from fakes import FixedClock
 from test_cases import OVERDUE
 
@@ -35,14 +37,16 @@ ACTOR = Actor(kind=ActorKind.USER, name="test")
 TRIALS, COUNTIES = "op_case_trials", "op_county_cities"
 COLUMNS = (
     "nct_id title phase sex min_age_years max_age_years eligibility recruiting_countries "
-    "finnish_site helsinki_facility helsinki_city helsinki_country helsinki_km "
-    "kuopio_facility kuopio_city kuopio_country kuopio_km "
-    "oulu_facility oulu_city oulu_country oulu_km url"
+    "finnish_site helsinki_site kuopio_site oulu_site url"
 ).split()
 
 
 def trial(nct: str, group: str, sex: str, ages: tuple[Any, Any], finnish: bool, km: float):
     site = ("HUS", "Helsinki", "Finland") if finnish else ("Karolinska", "Stockholm", "Sweden")
+
+    def at(km: float) -> dict[str, Any]:
+        return dict(zip(("facility", "city", "country", "km"), (*site, km), strict=True))
+
     return {
         "group": group,
         "row": (
@@ -54,12 +58,9 @@ def trial(nct: str, group: str, sex: str, ages: tuple[Any, Any], finnish: bool, 
             "Inclusion: adults.",
             site[2],
             finnish,
-            *site,
-            km,
-            *site,
-            km + 300,
-            *site,
-            km + 500,
+            at(km),
+            at(km + 300),
+            at(km + 500),
             f"https://clinicaltrials.gov/study/{nct}",
         ),
     }
@@ -202,3 +203,66 @@ async def test_a_new_version_takes_a_spec_of_the_models_own_kind() -> None:
     # The survival model's operations refuse a matcher.
     with pytest.raises(Invalid, match="no profile evaluation"):
         await world.models.population(model.id)
+
+
+async def test_cut_off_trials_give_no_result_rather_than_part_of_one() -> None:
+    world = World()
+    _, model = await world.matcher()
+    answer = world.data.query
+
+    async def cut(*args: Any, **kwargs: Any) -> Explored:
+        explored = await answer(*args, **kwargs)
+        rows = explored.rows.model_copy(update={"truncated": True})
+        return explored.model_copy(update={"rows": rows})
+
+    world.data.query = cut  # type: ignore[method-assign]
+    await world.cases.put_case(model.case_type_id, "SYN-1", OVERDUE, ACTOR)
+    section = (await world.cases.evaluate(model.case_type_id, "SYN-1", model.id, ACTOR)).section
+    assert section.status == "warn"
+    assert section.summary.startswith("Could not run: trials has more than 500 rows")
+
+
+async def test_a_trial_without_a_sex_limit_keeps_it_missing() -> None:
+    world = World()
+    world.data.trials = [trial("NCT9", "lung", "", (None, None), True, 5)]
+    _, model = await world.matcher()
+    await world.cases.put_case(model.case_type_id, "SYN-1", OVERDUE, ACTOR)
+    section = (await world.cases.evaluate(model.case_type_id, "SYN-1", model.id, ACTOR)).section
+    [match] = section.body["matches"]
+    assert (match["sex"], match["min_age_years"], match["max_age_years"]) == (None, None, None)
+
+
+def test_the_nearest_site_is_read_as_one_record() -> None:
+    """In DuckDB: the nearest site has no facility name, and its city and distance still
+    come with it rather than the facility of a site further away."""
+    version = ModelVersion(
+        id=uuid7(),
+        model_id=uuid7(),
+        version=1,
+        spec=TrialMatcherSpec(operator_id=TRIALS),
+        compiled=TrialCompiled(),
+        created_by=ACTOR,
+        created_at=FixedClock().now(),
+    )
+    clauses = TrialKind().queries(version, {"site": "lung"})["trials"][1]
+    connection = duckdb.connect()
+    connection.execute(
+        "CREATE TABLE input_0 AS SELECT * FROM (VALUES "
+        "('N1', 'lung', 'ALL', NULL, 'Espoo', 'Finland', 5.0, 300.0, 600.0), "
+        "('N1', 'lung', 'ALL', 'HUS', 'Helsinki', 'Finland', 9.0, 310.0, 610.0)) "
+        "v(nct_id, cancer_groups, sex, facility, city, country, km_helsinki, km_kuopio, km_oulu)"
+    )
+    connection.execute(
+        "ALTER TABLE input_0 ADD COLUMN title TEXT; ALTER TABLE input_0 ADD COLUMN phase TEXT; "
+        "ALTER TABLE input_0 ADD COLUMN min_age_years DOUBLE; "
+        "ALTER TABLE input_0 ADD COLUMN max_age_years DOUBLE; "
+        "ALTER TABLE input_0 ADD COLUMN eligibility TEXT; "
+        "ALTER TABLE input_0 ADD COLUMN recruiting_countries TEXT; "
+        "ALTER TABLE input_0 ADD COLUMN url TEXT"
+    )
+    relation = connection.sql(
+        f"SELECT {clauses.select} FROM input_0 WHERE {clauses.where} GROUP BY {clauses.group_by}"
+    )
+    [row] = relation.fetchall()
+    site = dict(zip(relation.columns, row, strict=True))["helsinki_site"]
+    assert site == {"facility": None, "city": "Espoo", "country": "Finland", "km": 5.0}
