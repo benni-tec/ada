@@ -1,9 +1,9 @@
 from dishka import AnyOf, Provider, Scope, provide
 
-from ada.adapters.llm.runtime import PydanticAiRuntime
+from ada.adapters.llm.runtime import ModelSpeed, PydanticAiRuntime
 from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.config import Settings
-from ada.core.models.agents import ResearchLimits
+from ada.core.models.agents import AnalysisDepth, ResearchLimits
 from ada.core.ports.agents import AgentRuntime, LanguageModels
 from ada.core.ports.secrets import SecretBox
 from ada.core.services.agents.analysis import Analysis
@@ -29,8 +29,12 @@ class AgentProvider(Provider):
         return FernetSecretBox(settings.master_key())
 
     @provide(scope=Scope.APP)
-    def runtime(self) -> AgentRuntime:
-        return PydanticAiRuntime()
+    def runtime(self, settings: Settings) -> AgentRuntime:
+        return PydanticAiRuntime(
+            speed=ModelSpeed(
+                service_tier=settings.agent_service_tier, thinking=settings.agent_thinking
+            )
+        )
 
     # One service: the settings page's use cases, and the catalog the turns read.
     configuration = provide(
@@ -40,6 +44,10 @@ class AgentProvider(Provider):
     )
 
     turns = provide(AgentTurns, provides=AgentTurnService, scope=Scope.REQUEST)
+
+    @provide(scope=Scope.APP)
+    def analysis_depth(self, settings: Settings) -> AnalysisDepth:
+        return AnalysisDepth(quick=settings.agent_analysis_depth == "quick")
 
     @provide(scope=Scope.APP)
     def research_limits(self, settings: Settings) -> ResearchLimits:

@@ -9,6 +9,7 @@ from uuid import UUID, uuid7
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.agents import (
     AgentTurn,
+    AnalysisDepth,
     ModelList,
     PostedMessage,
     SourcePart,
@@ -64,6 +65,8 @@ MAX_STEPS = 40
 MAX_RESEARCH_STEPS = 60
 # An analysis turn profiles, computes and checks before it reports.
 MAX_ANALYSIS_STEPS = 40
+# A quick analysis looks once, computes and reports (AnalysisDepth.quick).
+MAX_QUICK_ANALYSIS_STEPS = 25
 
 # How long a turn may run. One that takes longer is going in circles or waiting on
 # something that does not answer; it fails, and the session's next turn can start.
@@ -117,6 +120,7 @@ class AgentTurns(AgentTurnService):
         dispatcher: TaskDispatcher,
         units: UnitsOfWork,
         clock: Clock,
+        depth: AnalysisDepth,
     ) -> None:
         self.turn_records = turns
         self.progress = progress
@@ -133,8 +137,17 @@ class AgentTurns(AgentTurnService):
         self.dispatcher = dispatcher
         self.units = units
         self.clock = clock
+        self.depth = depth
         self.briefing = Briefing(
-            operators, dashboards, widgets, data_sources, attachments, alerts, reports, clock
+            operators,
+            dashboards,
+            widgets,
+            data_sources,
+            attachments,
+            alerts,
+            reports,
+            clock,
+            quick_analysis=depth.quick,
         )
 
     async def models(self) -> ModelList:
@@ -321,7 +334,7 @@ class AgentTurns(AgentTurnService):
                     session,
                     await self.sessions.entries(session.id),
                     await self.turn_records.list(session.id),
-                    _steps(session.agent),
+                    _steps(session.agent, self.depth),
                     (await self.agent_settings.get()).instructions,
                 )
                 agent = _agent(turn.model)
@@ -502,11 +515,11 @@ def _operators(output: Any) -> list[dict[str, Any]]:
     ]
 
 
-def _steps(agent: SessionAgent) -> int:
+def _steps(agent: SessionAgent, depth: AnalysisDepth) -> int:
     match agent:
         case SessionAgent.RESEARCH:
             return MAX_RESEARCH_STEPS
         case SessionAgent.ANALYSIS:
-            return MAX_ANALYSIS_STEPS
+            return MAX_QUICK_ANALYSIS_STEPS if depth.quick else MAX_ANALYSIS_STEPS
         case _:
             return MAX_STEPS

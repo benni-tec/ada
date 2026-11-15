@@ -28,7 +28,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from taskiq import InMemoryBroker
 
 import factories
-from ada.adapters.llm.runtime import provider_model
+from ada.adapters.llm.runtime import ModelSpeed, model_settings, provider_model
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import MemoryStore
 from ada.adapters.sources.web import WebPageReader
@@ -59,6 +59,7 @@ from ada.core.ports.system import Clock
 from ada.core.ports.web import WebBudget, WebSearch
 from ada.core.services.agents import service as agent_service
 from ada.core.services.agents.analysis import unsupported
+from ada.core.services.agents.briefing import ANALYSIS_RULES, quick_rules
 from ada.core.services.agents.research import ResearchReaders, researching
 from ada.core.services.ports.agents import AgentTurnService, ResearchService
 from ada.core.services.ports.projects import ProjectService
@@ -1576,6 +1577,24 @@ def test_openai_itself_is_called_through_the_responses_api() -> None:
     assert built("http://localhost:8001/v1") is OpenAIChatModel
 
 
+def test_speed_settings_reach_each_provider_in_its_own_terms() -> None:
+    def sent(kind: ProviderKind, base_url: str | None, speed: ModelSpeed) -> dict[str, Any]:
+        target = ModelTarget(model_id="m", kind=kind, base_url=base_url, model="m")
+        return dict(model_settings(target, speed))
+
+    fast = ModelSpeed(service_tier="fast", thinking="low")
+    assert sent(ProviderKind.OPENAI_COMPATIBLE, None, ModelSpeed()) == {}
+    assert sent(ProviderKind.OPENAI_COMPATIBLE, None, fast) == {
+        "openai_service_tier": "fast",
+        "thinking": "low",
+    }
+    # Gemini calls its fast tier "priority"; a local server is not sent a tier it may refuse.
+    assert sent(ProviderKind.GEMINI, None, fast) == {"service_tier": "priority", "thinking": "low"}
+    assert sent(ProviderKind.OPENAI_COMPATIBLE, "http://localhost:8001/v1", fast) == {
+        "thinking": "low"
+    }
+
+
 # The analyst, in child sessions
 
 
@@ -1670,3 +1689,10 @@ def test_the_gate_reads_each_figure_as_written() -> None:
         "12.7",
         "12.751",
     ]
+
+
+def test_a_quick_analysis_shortens_the_order_but_keeps_the_citing_rules() -> None:
+    rules = quick_rules(ANALYSIS_RULES)
+    assert "This is a quick analysis" in rules
+    assert "1. Profile each input" not in rules
+    assert "Every finding cites the one operator" in rules

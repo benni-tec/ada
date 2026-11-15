@@ -1,0 +1,301 @@
+generic_name,strength,form,country,status,start_date,reason,source
+amlodipine,10 mg,tablet,Netherlands,resolved,2022-01-04,increased demand,Farmanco
+insulin glargine,100 IU/ml,vial,Austria,resolved,2022-01-11,increased demand,BASG
+penicillin V,1.5 MIU,suspension,Italy,ongoing,2022-01-17,transport disruption,AIFA
+salbutamol,100 mcg/dose,inhaler,Spain,anticipated,2022-01-26,quality defect / recall,AEMPS
+salbutamol,100 mcg/dose,inhaler,Sweden,ongoing,2022-02-09,increased demand,Lakemedelsverket
+cisplatin,50 mg/50 ml,infusion,Sweden,resolved,2022-02-21,increased demand,Lakemedelsverket
+penicillin V,1.5 MIU,tablet,Spain,resolved,2022-03-06,manufacturing issue,AEMPS
+amoxicillin,125 mg/5 ml,suspension,Germany,resolved,2022-03-06,manufacturing issue,BfArM
+methylphenidate,20 mg,tablet,Italy,ongoing,2022-03-18,quality defect / recall,AIFA
+methylphenidate,20 mg,tablet,Netherlands,resolved,2022-03-21,raw material shortage,Farmanco
+insulin glargine,100 IU/ml,pen,Netherlands,anticipated,2022-03-21,discontinuation,Farmanco
+furosemide,20 mg,tablet,Italy,anticipated,2022-04-01,raw material shortage,AIFA
+penicillin V,1 MIU,suspension,Switzerland,ongoing,2022-04-03,discontinuation,BWL
+ibuprofen,600 mg,suspension,Italy,ongoing,2022-04-04,regulatory delay,AIFA
+amoxicillin,125 mg/5 ml,capsule,Germany,resolved,2022-04-04,transport disruption,BfArM
+ibuprofen,400 mg,tablet,Switzerland,resolved,2022-04-05,raw material shortage,BWL
+oseltamivir,75 mg,capsule,Austria,resolved,2022-04-13,manufacturing issue,BASG
+cisplatin,50 mg/50 ml,infusion,France,ongoing,2022-04-18,regulatory delay,ANSM
+amoxicillin,125 mg/5 ml,suspension,Netherlands,anticipated,2022-04-20,manufacturing issue,Farmanco
+paracetamol,500 mg,tablet,Austria,ongoing,2022-04-27,increased demand,BASG
+ibuprofen,400 mg,tablet,Sweden,anticipated,2022-04-29,raw material shortage,Lakemedelsverket
+oseltamivir,75 mg,capsule,Netherlands,resolved,2022-05-08,quality defect / recall,Farmanco
+metformin,850 mg,tablet,France,ongoing,2022-05-19,increased demand,ANSM
+salbutamol,100 mcg/dose,inhaler,Spain,ongoing,2022-05-19,manufacturing issue,AEMPS
+cisplatin,50 mg/50 ml,infusion,Spain,anticipated,2022-05-28,manufacturing issue,AEMPS
+penicillin V,1 MIU,tablet,Sweden,ongoing,2022-06-01,discontinuation,Lakemedelsverket
+cisplatin,50 mg/50 ml,infusion,Italy,resolved,2022-06-13,raw material shortage,AIFA
+penicillin V,1.5 MIU,tablet,Netherlands,resolved,2022-06-14,manufacturing issue,Farmanco
+oseltamivir,30 mg,capsule,Germany,resolved,2022-06-15,manufacturing issue,BfArM
+metformin,850 mg,tablet,Sweden,resolved,2022-06-30,manufacturing issue,Lakemedelsverket
+levothyroxine,50 mcg,tablet,Switzerland,resolved,2022-07-07,increased demand,BWL
+insulin glargine,100 IU/ml,pen,Sweden,resolved,2022-07-07,transport disruption,Lakemedelsverket
+metformin,500 mg,tablet,Switzerland,resolved,2022-07-11,increased demand,BWL
+heparin,5000 IU/ml,injection,France,ongoing,2022-07-13,raw material shortage,ANSM
+salbutamol,100 mcg/dose,inhaler,Netherlands,resolved,2022-07-17,increased demand,Farmanco
+ibuprofen,600 mg,suspension,Sweden,ongoing,2022-07-30,increased demand,Lakemedelsverket
+metformin,1000 mg,tablet,Sweden,resolved,2022-07-31,increased demand,Lakemedelsverket
+amlodipine,5 mg,tablet,Spain,resolved,2022-08-01,manufacturing issue,AEMPS
+oseltamivir,30 mg,capsule,Germany,anticipated,2022-08-16,regulatory delay,BfArM
+levothyroxine,50 mcg,tablet,France,ongoing,2022-08-21,increased demand,ANSM
+insulin glargine,100 IU/ml,vial,Sweden,resolved,2022-08-29,increased demand,Lakemedelsverket
+cisplatin,50 mg/50 ml,infusion,Netherlands,resolved,2022-09-03,raw material shortage,Farmanco
+sertraline,50 mg,tablet,Netherlands,resolved,2022-09-25,manufacturing issue,Farmanco
+insulin glargine,100 IU/ml,vial,Sweden,resolved,2022-10-01,discontinuation,Lakemedelsverket
+insulin glargine,100 IU/ml,vial,Austria,resolved,2022-10-15,raw material shortage,BASG
+insulin glargine,100 IU/ml,vial,Spain,resolved,2022-10-18,quality defect / recall,AEMPS
+methylphenidate,10 mg,tablet,Switzerland,anticipated,2022-10-20,manufacturing issue,BWL
+levothyroxine,50 mcg,tablet,Italy,resolved,2022-11-01,regulatory delay,AIFA
+ceftriaxone,1 g,injection,Austria,anticipated,2022-11-07,raw material shortage,BASG
+levothyroxine,50 mcg,tablet,Spain,anticipated,2022-11-09,discontinuation,AEMPS
+ibuprofen,400 mg,suspension,Sweden,resolved,2022-11-10,transport disruption,Lakemedelsverket
+sertraline,50 mg,tablet,Italy,resolved,2022-11-20,quality defect / recall,AIFA
+ibuprofen,600 mg,tablet,Italy,anticipated,2022-11-27,manufacturing issue,AIFA
+insulin glargine,100 IU/ml,pen,Spain,resolved,2022-11-29,transport disruption,AEMPS
+insulin glargine,100 IU/ml,vial,Sweden,ongoing,2022-12-07,transport disruption,Lakemedelsverket
+ceftriaxone,1 g,injection,Italy,resolved,2022-12-09,raw material shortage,AIFA
+amlodipine,10 mg,tablet,France,anticipated,2022-12-26,manufacturing issue,ANSM
+oseltamivir,75 mg,capsule,Spain,resolved,2023-01-13,discontinuation,AEMPS
+paracetamol,125 mg,tablet,Austria,ongoing,2023-01-25,manufacturing issue,BASG
+ibuprofen,200 mg,suspension,Netherlands,resolved,2023-01-26,transport disruption,Farmanco
+insulin glargine,100 IU/ml,pen,France,resolved,2023-02-11,raw material shortage,ANSM
+furosemide,40 mg,injection,Spain,resolved,2023-02-21,quality defect / recall,AEMPS
+paracetamol,500 mg,tablet,Spain,anticipated,2023-02-21,transport disruption,AEMPS
+paracetamol,125 mg,suppository,Sweden,resolved,2023-02-22,transport disruption,Lakemedelsverket
+ceftriaxone,1 g,injection,Italy,resolved,2023-02-23,raw material shortage,AIFA
+metformin,500 mg,tablet,Switzerland,resolved,2023-02-23,raw material shortage,BWL
+furosemide,40 mg,tablet,Sweden,resolved,2023-03-04,manufacturing issue,Lakemedelsverket
+furosemide,40 mg,injection,Spain,anticipated,2023-03-12,manufacturing issue,AEMPS
+amlodipine,10 mg,tablet,Sweden,ongoing,2023-03-13,quality defect / recall,Lakemedelsverket
+levothyroxine,100 mcg,tablet,Sweden,resolved,2023-03-15,transport disruption,Lakemedelsverket
+methylphenidate,20 mg,capsule,France,anticipated,2023-03-20,quality defect / recall,ANSM
+cisplatin,50 mg/50 ml,infusion,Spain,resolved,2023-03-25,increased demand,AEMPS
+penicillin V,1.5 MIU,tablet,Spain,resolved,2023-03-26,transport disruption,AEMPS
+salbutamol,100 mcg/dose,inhaler,Italy,anticipated,2023-03-30,increased demand,AIFA
+salbutamol,100 mcg/dose,inhaler,Spain,ongoing,2023-04-05,discontinuation,AEMPS
+paracetamol,500 mg,tablet,France,resolved,2023-04-09,raw material shortage,ANSM
+furosemide,20 mg,injection,Italy,resolved,2023-04-11,manufacturing issue,AIFA
+amlodipine,10 mg,tablet,Sweden,resolved,2023-04-25,quality defect / recall,Lakemedelsverket
+furosemide,20 mg,injection,Austria,anticipated,2023-04-30,increased demand,BASG
+sertraline,50 mg,tablet,Italy,ongoing,2023-05-06,manufacturing issue,AIFA
+salbutamol,100 mcg/dose,inhaler,Austria,resolved,2023-05-07,manufacturing issue,BASG
+penicillin V,1.5 MIU,tablet,Sweden,resolved,2023-05-09,manufacturing issue,Lakemedelsverket
+metformin,500 mg,tablet,Switzerland,resolved,2023-05-22,manufacturing issue,BWL
+methylphenidate,20 mg,tablet,Switzerland,anticipated,2023-05-23,raw material shortage,BWL
+amlodipine,10 mg,tablet,Germany,ongoing,2023-05-24,transport disruption,BfArM
+penicillin V,1.5 MIU,suspension,Netherlands,resolved,2023-05-24,manufacturing issue,Farmanco
+levothyroxine,50 mcg,tablet,Italy,resolved,2023-05-30,raw material shortage,AIFA
+penicillin V,1 MIU,suspension,Sweden,ongoing,2023-06-03,raw material shortage,Lakemedelsverket
+penicillin V,1.5 MIU,tablet,Spain,ongoing,2023-06-04,raw material shortage,AEMPS
+levothyroxine,100 mcg,tablet,Sweden,ongoing,2023-06-07,regulatory delay,Lakemedelsverket
+sertraline,100 mg,tablet,Italy,resolved,2023-06-20,manufacturing issue,AIFA
+insulin glargine,100 IU/ml,pen,Austria,ongoing,2023-06-26,raw material shortage,BASG
+furosemide,20 mg,tablet,Switzerland,anticipated,2023-07-04,manufacturing issue,BWL
+amlodipine,10 mg,tablet,France,resolved,2023-07-11,manufacturing issue,ANSM
+metformin,1000 mg,tablet,Germany,anticipated,2023-07-12,increased demand,BfArM
+oseltamivir,30 mg,capsule,Netherlands,resolved,2023-07-14,raw material shortage,Farmanco
+metformin,850 mg,tablet,Spain,ongoing,2023-07-14,quality defect / recall,AEMPS
+penicillin V,1.5 MIU,suspension,Spain,ongoing,2023-07-25,increased demand,AEMPS
+furosemide,20 mg,injection,France,resolved,2023-07-26,transport disruption,ANSM
+levothyroxine,50 mcg,tablet,Spain,resolved,2023-07-27,manufacturing issue,AEMPS
+insulin glargine,100 IU/ml,vial,Netherlands,resolved,2023-08-05,manufacturing issue,Farmanco
+paracetamol,500 mg,suppository,Sweden,ongoing,2023-08-09,manufacturing issue,Lakemedelsverket
+oseltamivir,30 mg,capsule,Sweden,ongoing,2023-08-20,regulatory delay,Lakemedelsverket
+ceftriaxone,1 g,injection,Germany,anticipated,2023-08-25,manufacturing issue,BfArM
+amlodipine,5 mg,tablet,France,ongoing,2023-09-09,raw material shortage,ANSM
+ceftriaxone,1 g,injection,France,resolved,2023-09-11,raw material shortage,ANSM
+oseltamivir,30 mg,capsule,Spain,resolved,2023-09-18,increased demand,AEMPS
+amoxicillin,250 mg,suspension,Spain,resolved,2023-09-25,quality defect / recall,AEMPS
+ibuprofen,200 mg,tablet,Spain,anticipated,2023-09-28,raw material shortage,AEMPS
+cisplatin,50 mg/50 ml,infusion,Austria,ongoing,2023-09-29,manufacturing issue,BASG
+methylphenidate,10 mg,tablet,Spain,ongoing,2023-10-01,manufacturing issue,AEMPS
+amlodipine,5 mg,tablet,Sweden,ongoing,2023-10-10,increased demand,Lakemedelsverket
+furosemide,40 mg,tablet,Sweden,resolved,2023-10-12,increased demand,Lakemedelsverket
+heparin,5000 IU/ml,injection,Switzerland,anticipated,2023-10-14,increased demand,BWL
+furosemide,20 mg,tablet,Italy,ongoing,2023-10-21,quality defect / recall,AIFA
+penicillin V,1.5 MIU,tablet,Sweden,resolved,2023-10-22,discontinuation,Lakemedelsverket
+salbutamol,100 mcg/dose,inhaler,Italy,resolved,2023-11-01,transport disruption,AIFA
+insulin glargine,100 IU/ml,vial,Austria,anticipated,2023-11-07,discontinuation,BASG
+oseltamivir,75 mg,capsule,Italy,ongoing,2023-11-07,regulatory delay,AIFA
+levothyroxine,100 mcg,tablet,France,anticipated,2023-11-08,increased demand,ANSM
+ceftriaxone,1 g,injection,France,ongoing,2023-11-14,quality defect / recall,ANSM
+penicillin V,1.5 MIU,tablet,Switzerland,anticipated,2023-11-16,raw material shortage,BWL
+oseltamivir,75 mg,capsule,Netherlands,anticipated,2023-11-26,quality defect / recall,Farmanco
+oseltamivir,30 mg,capsule,Netherlands,resolved,2023-12-17,manufacturing issue,Farmanco
+amlodipine,10 mg,tablet,Spain,resolved,2024-01-16,manufacturing issue,AEMPS
+metformin,850 mg,tablet,Italy,ongoing,2024-01-17,regulatory delay,AIFA
+insulin glargine,100 IU/ml,vial,Sweden,resolved,2024-01-25,manufacturing issue,Lakemedelsverket
+sertraline,50 mg,tablet,Austria,resolved,2024-01-29,increased demand,BASG
+insulin glargine,100 IU/ml,pen,Netherlands,resolved,2024-02-04,manufacturing issue,Farmanco
+amlodipine,10 mg,tablet,Spain,resolved,2024-02-07,manufacturing issue,AEMPS
+insulin glargine,100 IU/ml,pen,France,resolved,2024-02-21,quality defect / recall,ANSM
+sertraline,50 mg,tablet,Spain,ongoing,2024-02-24,quality defect / recall,AEMPS
+metformin,850 mg,tablet,Austria,resolved,2024-02-28,raw material shortage,BASG
+amlodipine,5 mg,tablet,Netherlands,resolved,2024-03-23,manufacturing issue,Farmanco
+heparin,5000 IU/ml,injection,Spain,resolved,2024-04-04,raw material shortage,AEMPS
+cisplatin,50 mg/50 ml,infusion,Austria,anticipated,2024-04-12,discontinuation,BASG
+amlodipine,5 mg,tablet,Netherlands,resolved,2024-04-17,manufacturing issue,Farmanco
+ceftriaxone,2 g,injection,Germany,resolved,2024-04-21,quality defect / recall,BfArM
+heparin,5000 IU/ml,injection,Austria,resolved,2024-04-25,quality defect / recall,BASG
+heparin,5000 IU/ml,injection,Austria,ongoing,2024-04-29,quality defect / recall,BASG
+oseltamivir,75 mg,capsule,Netherlands,ongoing,2024-05-01,raw material shortage,Farmanco
+insulin glargine,100 IU/ml,vial,France,anticipated,2024-05-30,raw material shortage,ANSM
+oseltamivir,75 mg,capsule,Austria,resolved,2024-06-10,raw material shortage,BASG
+insulin glargine,100 IU/ml,vial,France,anticipated,2024-06-11,quality defect / recall,ANSM
+levothyroxine,50 mcg,tablet,Sweden,ongoing,2024-06-15,transport disruption,Lakemedelsverket
+penicillin V,1 MIU,tablet,Spain,anticipated,2024-06-16,manufacturing issue,AEMPS
+ibuprofen,200 mg,tablet,Italy,anticipated,2024-06-16,quality defect / recall,AIFA
+metformin,1000 mg,tablet,Netherlands,resolved,2024-06-17,transport disruption,Farmanco
+amlodipine,10 mg,tablet,Italy,ongoing,2024-06-18,regulatory delay,AIFA
+methylphenidate,36 mg,capsule,Germany,resolved,2024-06-23,increased demand,BfArM
+salbutamol,100 mcg/dose,inhaler,Sweden,resolved,2024-06-24,raw material shortage,Lakemedelsverket
+salbutamol,100 mcg/dose,inhaler,Spain,resolved,2024-06-24,manufacturing issue,AEMPS
+penicillin V,1.5 MIU,suspension,Sweden,resolved,2024-06-25,increased demand,Lakemedelsverket
+cisplatin,50 mg/50 ml,infusion,Germany,ongoing,2024-06-26,quality defect / recall,BfArM
+paracetamol,125 mg,suppository,Austria,anticipated,2024-07-03,increased demand,BASG
+heparin,5000 IU/ml,injection,France,resolved,2024-07-08,regulatory delay,ANSM
+insulin glargine,100 IU/ml,pen,Italy,resolved,2024-07-09,manufacturing issue,AIFA
+penicillin V,1 MIU,tablet,Italy,ongoing,2024-07-17,raw material shortage,AIFA
+ceftriaxone,1 g,injection,Italy,anticipated,2024-07-19,raw material shortage,AIFA
+heparin,5000 IU/ml,injection,Italy,resolved,2024-07-24,discontinuation,AIFA
+salbutamol,100 mcg/dose,inhaler,Italy,anticipated,2024-08-03,raw material shortage,AIFA
+cisplatin,50 mg/50 ml,infusion,Austria,anticipated,2024-08-04,regulatory delay,BASG
+metformin,500 mg,tablet,Germany,resolved,2024-08-11,regulatory delay,BfArM
+salbutamol,100 mcg/dose,inhaler,Sweden,resolved,2024-08-12,transport disruption,Lakemedelsverket
+paracetamol,125 mg,suppository,Germany,resolved,2024-08-20,raw material shortage,BfArM
+amoxicillin,500 mg,suspension,Netherlands,ongoing,2024-09-03,transport disruption,Farmanco
+amoxicillin,500 mg,capsule,Switzerland,anticipated,2024-09-07,increased demand,BWL
+heparin,5000 IU/ml,injection,France,resolved,2024-09-26,increased demand,ANSM
+furosemide,20 mg,tablet,Netherlands,resolved,2024-10-09,transport disruption,Farmanco
+metformin,850 mg,tablet,Italy,resolved,2024-10-12,raw material shortage,AIFA
+insulin glargine,100 IU/ml,vial,Switzerland,resolved,2024-10-15,increased demand,BWL
+heparin,5000 IU/ml,injection,Switzerland,resolved,2024-10-16,manufacturing issue,BWL
+metformin,500 mg,tablet,Austria,resolved,2024-10-25,manufacturing issue,BASG
+ibuprofen,200 mg,tablet,Netherlands,ongoing,2024-10-26,raw material shortage,Farmanco
+metformin,1000 mg,tablet,Austria,resolved,2024-10-28,increased demand,BASG
+amlodipine,10 mg,tablet,Spain,anticipated,2024-11-04,discontinuation,AEMPS
+levothyroxine,50 mcg,tablet,Austria,resolved,2024-11-05,raw material shortage,BASG
+insulin glargine,100 IU/ml,vial,Sweden,ongoing,2024-11-16,increased demand,Lakemedelsverket
+oseltamivir,75 mg,capsule,Austria,ongoing,2024-11-17,regulatory delay,BASG
+methylphenidate,20 mg,tablet,Sweden,resolved,2024-11-20,manufacturing issue,Lakemedelsverket
+methylphenidate,10 mg,capsule,Sweden,resolved,2024-11-28,increased demand,Lakemedelsverket
+levothyroxine,50 mcg,tablet,Sweden,ongoing,2024-11-30,quality defect / recall,Lakemedelsverket
+metformin,1000 mg,tablet,Austria,anticipated,2024-12-08,raw material shortage,BASG
+ibuprofen,400 mg,suspension,Netherlands,anticipated,2024-12-15,increased demand,Farmanco
+amlodipine,5 mg,tablet,Sweden,ongoing,2024-12-15,quality defect / recall,Lakemedelsverket
+methylphenidate,10 mg,tablet,Italy,anticipated,2024-12-16,regulatory delay,AIFA
+methylphenidate,36 mg,capsule,Sweden,resolved,2024-12-27,increased demand,Lakemedelsverket
+sertraline,100 mg,tablet,Germany,ongoing,2025-01-13,raw material shortage,BfArM
+insulin glargine,100 IU/ml,pen,Germany,resolved,2025-01-14,quality defect / recall,BfArM
+ibuprofen,600 mg,tablet,Austria,ongoing,2025-01-16,manufacturing issue,BASG
+insulin glargine,100 IU/ml,vial,Spain,resolved,2025-01-20,raw material shortage,AEMPS
+oseltamivir,30 mg,capsule,Italy,ongoing,2025-02-07,transport disruption,AIFA
+sertraline,100 mg,tablet,Sweden,anticipated,2025-02-07,regulatory delay,Lakemedelsverket
+amoxicillin,500 mg,capsule,Italy,anticipated,2025-02-07,manufacturing issue,AIFA
+paracetamol,125 mg,tablet,Spain,ongoing,2025-02-09,transport disruption,AEMPS
+heparin,5000 IU/ml,injection,Sweden,anticipated,2025-02-11,transport disruption,Lakemedelsverket
+furosemide,40 mg,tablet,Spain,anticipated,2025-02-19,manufacturing issue,AEMPS
+penicillin V,1 MIU,tablet,Germany,resolved,2025-02-24,manufacturing issue,BfArM
+paracetamol,125 mg,suppository,Germany,resolved,2025-03-01,transport disruption,BfArM
+cisplatin,50 mg/50 ml,infusion,Switzerland,ongoing,2025-03-18,raw material shortage,BWL
+salbutamol,100 mcg/dose,inhaler,Spain,anticipated,2025-03-25,raw material shortage,AEMPS
+cisplatin,50 mg/50 ml,infusion,Switzerland,anticipated,2025-04-10,manufacturing issue,BWL
+ceftriaxone,1 g,injection,Switzerland,resolved,2025-04-19,manufacturing issue,BWL
+sertraline,50 mg,tablet,France,resolved,2025-04-20,manufacturing issue,ANSM
+amoxicillin,250 mg,suspension,Netherlands,ongoing,2025-04-27,manufacturing issue,Farmanco
+salbutamol,100 mcg/dose,inhaler,Germany,ongoing,2025-05-01,manufacturing issue,BfArM
+ceftriaxone,2 g,injection,Netherlands,resolved,2025-05-08,manufacturing issue,Farmanco
+methylphenidate,20 mg,tablet,Switzerland,resolved,2025-05-11,manufacturing issue,BWL
+furosemide,20 mg,tablet,Austria,resolved,2025-05-18,quality defect / recall,BASG
+sertraline,50 mg,tablet,Spain,resolved,2025-05-21,increased demand,AEMPS
+oseltamivir,75 mg,capsule,Austria,resolved,2025-05-26,manufacturing issue,BASG
+heparin,5000 IU/ml,injection,Switzerland,resolved,2025-06-01,raw material shortage,BWL
+penicillin V,1.5 MIU,tablet,Austria,resolved,2025-06-14,raw material shortage,BASG
+salbutamol,100 mcg/dose,inhaler,Netherlands,resolved,2025-06-23,manufacturing issue,Farmanco
+salbutamol,100 mcg/dose,inhaler,Spain,resolved,2025-06-30,increased demand,AEMPS
+levothyroxine,50 mcg,tablet,Spain,anticipated,2025-06-30,discontinuation,AEMPS
+sertraline,50 mg,tablet,Sweden,anticipated,2025-07-04,raw material shortage,Lakemedelsverket
+levothyroxine,50 mcg,tablet,Austria,resolved,2025-07-04,increased demand,BASG
+metformin,1000 mg,tablet,Austria,anticipated,2025-07-06,manufacturing issue,BASG
+levothyroxine,100 mcg,tablet,Sweden,resolved,2025-07-07,manufacturing issue,Lakemedelsverket
+penicillin V,1 MIU,tablet,Spain,anticipated,2025-07-07,manufacturing issue,AEMPS
+insulin glargine,100 IU/ml,pen,Austria,resolved,2025-07-09,raw material shortage,BASG
+metformin,850 mg,tablet,Germany,anticipated,2025-07-23,manufacturing issue,BfArM
+amlodipine,10 mg,tablet,Germany,resolved,2025-08-01,manufacturing issue,BfArM
+heparin,5000 IU/ml,injection,Italy,ongoing,2025-08-02,raw material shortage,AIFA
+amlodipine,10 mg,tablet,Germany,ongoing,2025-08-13,increased demand,BfArM
+oseltamivir,30 mg,capsule,Italy,anticipated,2025-08-22,manufacturing issue,AIFA
+penicillin V,1.5 MIU,tablet,Switzerland,anticipated,2025-09-08,manufacturing issue,BWL
+ibuprofen,600 mg,tablet,Austria,resolved,2025-09-11,discontinuation,BASG
+salbutamol,100 mcg/dose,inhaler,Spain,resolved,2025-09-15,increased demand,AEMPS
+insulin glargine,100 IU/ml,vial,Switzerland,resolved,2025-09-17,manufacturing issue,BWL
+penicillin V,1 MIU,suspension,Spain,anticipated,2025-10-01,quality defect / recall,AEMPS
+oseltamivir,30 mg,capsule,Switzerland,ongoing,2025-10-11,regulatory delay,BWL
+furosemide,40 mg,injection,Spain,anticipated,2025-10-21,transport disruption,AEMPS
+sertraline,50 mg,tablet,Spain,resolved,2025-10-24,manufacturing issue,AEMPS
+furosemide,40 mg,injection,France,ongoing,2025-10-25,manufacturing issue,ANSM
+oseltamivir,30 mg,capsule,Germany,anticipated,2025-11-12,discontinuation,BfArM
+heparin,5000 IU/ml,injection,Austria,anticipated,2025-11-13,increased demand,BASG
+levothyroxine,100 mcg,tablet,Switzerland,anticipated,2025-11-14,discontinuation,BWL
+oseltamivir,75 mg,capsule,Germany,resolved,2025-11-16,increased demand,BfArM
+cisplatin,50 mg/50 ml,infusion,Netherlands,ongoing,2025-11-28,raw material shortage,Farmanco
+methylphenidate,10 mg,capsule,Spain,resolved,2026-01-08,manufacturing issue,AEMPS
+methylphenidate,20 mg,tablet,Austria,anticipated,2026-01-16,quality defect / recall,BASG
+levothyroxine,100 mcg,tablet,France,ongoing,2026-01-24,manufacturing issue,ANSM
+sertraline,50 mg,tablet,Spain,resolved,2026-01-29,manufacturing issue,AEMPS
+levothyroxine,50 mcg,tablet,Germany,anticipated,2026-01-29,raw material shortage,BfArM
+penicillin V,1 MIU,suspension,Austria,ongoing,2026-01-30,raw material shortage,BASG
+heparin,5000 IU/ml,injection,Spain,anticipated,2026-02-01,quality defect / recall,AEMPS
+oseltamivir,30 mg,capsule,Switzerland,resolved,2026-02-15,transport disruption,BWL
+oseltamivir,75 mg,capsule,Austria,anticipated,2026-03-04,transport disruption,BASG
+insulin glargine,100 IU/ml,pen,Switzerland,resolved,2026-03-06,increased demand,BWL
+ibuprofen,600 mg,suspension,France,resolved,2026-03-06,quality defect / recall,ANSM
+amoxicillin,500 mg,suspension,Germany,resolved,2026-03-09,raw material shortage,BfArM
+amlodipine,10 mg,tablet,France,ongoing,2026-03-10,transport disruption,ANSM
+furosemide,20 mg,tablet,Germany,anticipated,2026-03-10,raw material shortage,BfArM
+paracetamol,125 mg,suppository,Sweden,anticipated,2026-03-26,manufacturing issue,Lakemedelsverket
+penicillin V,1 MIU,tablet,Austria,anticipated,2026-03-26,raw material shortage,BASG
+paracetamol,500 mg,suppository,Germany,resolved,2026-04-07,quality defect / recall,BfArM
+ceftriaxone,2 g,injection,Spain,anticipated,2026-04-08,manufacturing issue,AEMPS
+metformin,1000 mg,tablet,Germany,resolved,2026-04-12,manufacturing issue,BfArM
+sertraline,50 mg,tablet,Sweden,ongoing,2026-04-12,raw material shortage,Lakemedelsverket
+levothyroxine,100 mcg,tablet,Spain,anticipated,2026-04-14,raw material shortage,AEMPS
+methylphenidate,20 mg,capsule,Austria,anticipated,2026-04-18,raw material shortage,BASG
+paracetamol,500 mg,tablet,Netherlands,anticipated,2026-04-25,quality defect / recall,Farmanco
+cisplatin,50 mg/50 ml,infusion,Spain,resolved,2026-05-05,discontinuation,AEMPS
+insulin glargine,100 IU/ml,pen,Italy,resolved,2026-05-07,quality defect / recall,AIFA
+cisplatin,50 mg/50 ml,infusion,Spain,resolved,2026-05-08,increased demand,AEMPS
+methylphenidate,20 mg,tablet,Germany,resolved,2026-05-12,increased demand,BfArM
+insulin glargine,100 IU/ml,pen,Spain,anticipated,2026-05-17,discontinuation,AEMPS
+furosemide,40 mg,injection,Netherlands,resolved,2026-05-29,raw material shortage,Farmanco
+sertraline,100 mg,tablet,Netherlands,resolved,2026-05-29,manufacturing issue,Farmanco
+cisplatin,50 mg/50 ml,infusion,Austria,resolved,2026-05-31,increased demand,BASG
+heparin,5000 IU/ml,injection,Spain,resolved,2026-06-02,regulatory delay,AEMPS
+metformin,500 mg,tablet,Italy,anticipated,2026-06-04,regulatory delay,AIFA
+furosemide,20 mg,injection,Switzerland,resolved,2026-06-09,quality defect / recall,BWL
+furosemide,20 mg,injection,Sweden,resolved,2026-06-14,increased demand,Lakemedelsverket
+amlodipine,10 mg,tablet,Germany,ongoing,2026-06-19,increased demand,BfArM
+sertraline,50 mg,tablet,Sweden,resolved,2026-07-04,raw material shortage,Lakemedelsverket
+cisplatin,50 mg/50 ml,infusion,Austria,anticipated,2026-07-05,quality defect / recall,BASG
+amlodipine,10 mg,tablet,Spain,ongoing,2026-07-06,manufacturing issue,AEMPS
+metformin,850 mg,tablet,Sweden,resolved,2026-07-17,increased demand,Lakemedelsverket
+oseltamivir,75 mg,capsule,Germany,resolved,2026-07-18,increased demand,BfArM
+paracetamol,500 mg,suppository,Austria,resolved,2026-07-20,manufacturing issue,BASG
+penicillin V,1 MIU,suspension,Spain,resolved,2026-07-24,increased demand,AEMPS
+heparin,5000 IU/ml,injection,Austria,resolved,2026-07-31,manufacturing issue,BASG
+penicillin V,1 MIU,tablet,Italy,ongoing,2026-07-31,manufacturing issue,AIFA
+ceftriaxone,2 g,injection,Germany,resolved,2026-08-04,discontinuation,BfArM
+penicillin V,1 MIU,suspension,Netherlands,resolved,2026-08-04,manufacturing issue,Farmanco
+metformin,850 mg,tablet,France,ongoing,2026-08-11,raw material shortage,ANSM
+heparin,5000 IU/ml,injection,Netherlands,resolved,2026-08-14,raw material shortage,Farmanco
+ibuprofen,200 mg,tablet,Italy,resolved,2026-08-20,manufacturing issue,AIFA
+insulin glargine,100 IU/ml,pen,Switzerland,resolved,2026-08-25,raw material shortage,BWL
+sertraline,100 mg,tablet,Italy,resolved,2026-08-28,quality defect / recall,AIFA
+ibuprofen,600 mg,tablet,Switzerland,ongoing,2026-09-06,raw material shortage,BWL
+levothyroxine,100 mcg,tablet,Netherlands,ongoing,2026-09-06,raw material shortage,Farmanco
+methylphenidate,10 mg,capsule,Netherlands,ongoing,2026-09-12,transport disruption,Farmanco
+insulin glargine,100 IU/ml,vial,Spain,ongoing,2026-09-28,increased demand,AEMPS
+cisplatin,50 mg/50 ml,infusion,Netherlands,ongoing,2026-09-29,manufacturing issue,Farmanco
+amlodipine,10 mg,tablet,Italy,ongoing,2026-11-01,manufacturing issue,AIFA
+levothyroxine,100 mcg,tablet,Spain,ongoing,2026-11-09,manufacturing issue,AEMPS

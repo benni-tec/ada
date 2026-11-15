@@ -126,6 +126,12 @@ class Finding(DomainModel):
     operator_id: str
 
 
+class AnalysisDepth(DomainModel):
+    # True: the analyst follows a short order with fewer steps, and the full order only
+    # when its brief asks for a deep analysis. False: always the full order.
+    quick: bool = False
+
+
 class ResearchLimits(DomainModel):
     # Paid web tool calls a research session may make, over all its turns.
     web_calls: int = 80
