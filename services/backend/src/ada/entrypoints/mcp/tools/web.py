@@ -21,6 +21,7 @@ from ada.core.services.ports.web import (
     WebReadAnswer,
     WebSearchAnswer,
 )
+from ada.entrypoints.mcp.bounds import bound_rows
 from ada.entrypoints.mcp.injection import Inject
 from ada.entrypoints.mcp.sessions import SessionId
 
@@ -34,6 +35,10 @@ What it returns is for your own exploration only: never show or quote it to the 
 To present web data, register its URL as a source (register_source, access_kind "web" or
 "document") and build on it, so it can be traced. Each call spends the project's daily web
 credits; in a research session it also counts against the session's web calls."""
+
+
+class ExtractAnswer(WebExtractAnswer):
+    dropped_rows: int = 0
 
 
 def register(mcp: FastMCP, inject: Inject) -> None:
@@ -126,7 +131,8 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         every figure needs checking against the page. To keep such rows, register the page
         as a web source with operation "extract". For JS-loaded data, wait_for is
         milliseconds (0–30000) or a CSS selector.
-        About five credits."""
+        String cells are cut after 300 characters, and results are capped at 20 KB;
+        `dropped_rows` counts omitted rows. About five credits."""
         )
     )
     @inject
@@ -139,11 +145,12 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         web: FromDishka[WebExplorationService],
         research: FromDishka[ResearchService],
         wait_for: int | str | None = None,
-    ) -> WebExtractAnswer:
+    ) -> ExtractAnswer:
         await research.use_web_call(session_id)
-        return await web.extract(
+        answer = await web.extract(
             project_id, session_id, url, instruction, columns, wait_for=wait_for
         )
+        return bound_rows(ExtractAnswer(**answer.model_dump()))
 
     @mcp.tool(
         description=_described(
