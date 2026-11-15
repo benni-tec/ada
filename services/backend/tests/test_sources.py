@@ -1465,3 +1465,21 @@ async def test_a_policy_edit_waits_for_unwatch_in_postgres(migrated_database_url
 
     assert not done
     assert unwatched.freshness == weekly
+
+
+async def test_uploaded_csv_loads_through_the_installed_url_reader(tmp_path: Path) -> None:
+    files = LocalFileStore(tmp_path)
+    project_id = factories.project().id
+    stored = await files.put(project_id, b"name,quantity\nExample,4\n", ".csv")
+    source = factories.data_source(project_id, address=stored.address)
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _: pytest.fail("No HTTP for uploads"))
+    ) as client:
+        reader = HttpSourceReaders(client, FixedClock(), files).for_kind(AccessKind.URL)
+        fetched = await reader.fetch(source, TimeRange())
+        assert fetched.content == b"name,quantity\nExample,4\n"
+        assert fetched.origin == stored.address
+        assert await reader.probe(source) == stored.address
+        other_project = source.model_copy(update={"project_id": factories.project().id})
+        with pytest.raises(Invalid, match="must belong"):
+            await reader.fetch(other_project, TimeRange())

@@ -58,7 +58,7 @@ from ada.adapters.web.context_dev import ContextDevWeb
 from ada.core.models.analysis import FetchedData
 from ada.core.models.base import DomainModel, Id
 from ada.core.models.errors import Invalid, Unavailable
-from ada.core.models.sources import AccessKind, DataSource, StoredFile
+from ada.core.models.sources import UPLOAD_SCHEME, AccessKind, DataSource, StoredFile
 from ada.core.models.time import TimeRange
 from ada.core.ports.sources import FileStore, SourceReader, SourceReaders
 from ada.core.ports.system import Clock
@@ -127,18 +127,33 @@ class HttpReader(SourceReader):
         kind: AccessKind,
         allow_private: bool = False,
         max_bytes: int = MAX_BYTES,
+        files: FileStore | None = None,
     ) -> None:
         if kind not in (AccessKind.URL, AccessKind.REQUEST):
             raise ValueError(f"HTTP reads URL and request sources, not {kind.value}")
         self.client = client
         self.clock = clock
         self.kind = kind
+        self.files = files
         self.allow_private = allow_private
         self.max_bytes = max_bytes
 
     async def fetch(self, source: DataSource, time_range: TimeRange) -> FetchedData:
         # The time range is already in the options where the source can take it (see the
         # module's docstring); it is not sent a second time.
+        if source.address.startswith(UPLOAD_SCHEME):
+            if self.kind is not AccessKind.URL or self.files is None:
+                raise Invalid(
+                    "Uploaded CSV, JSON and Parquet files need a URL source and file store"
+                )
+            if not source.address.startswith(f"{UPLOAD_SCHEME}{source.project_id}/"):
+                raise Invalid("An uploaded file must belong to the source's project")
+            return FetchedData(
+                content=await self.files.get(source.address),
+                format=source.format,
+                fetched_at=self.clock.now(),
+                origin=source.address,
+            )
         options = _options(source)
         method = self._method(options)
         body = options.body if self.kind is AccessKind.REQUEST else None
@@ -157,6 +172,8 @@ class HttpReader(SourceReader):
         )
 
     async def probe(self, source: DataSource) -> str | None:
+        if source.address.startswith(UPLOAD_SCHEME):
+            return source.address
         options = _options(source)
         if options.probe is not None:
             return await self._declared_probe(options.probe, options.headers)
@@ -317,7 +334,8 @@ class HttpSourceReaders(SourceReaders):
         max_bytes: int = MAX_BYTES,
     ) -> None:
         self.readers: dict[AccessKind, SourceReader] = {
-            kind: HttpReader(client, clock, kind, allow_private, max_bytes) for kind in HTTP_KINDS
+            kind: HttpReader(client, clock, kind, allow_private, max_bytes, files)
+            for kind in HTTP_KINDS
         }
         self.readers[AccessKind.DOCUMENT] = DocumentReader(
             self.readers[AccessKind.URL],
