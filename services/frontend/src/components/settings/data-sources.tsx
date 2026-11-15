@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 
 import { IconButton } from '@/components/icon-action'
 import { LiveTime } from '@/components/live-time'
+import { WatchInterval } from '@/components/watch-interval'
 import { ConflictNotice, ErrorNotice, Loading } from '@/components/notices'
 import { SourceProvenance } from '@/components/provenance'
 import { Badge } from '@/components/ui/badge'
@@ -135,6 +136,7 @@ function SourceItem({ projectId, source, marked }: { projectId: Id; source: Data
           </p>
           <p className="text-xs text-muted-foreground">
             Refresh: {describeFreshness(source.freshness)}
+            <WatchInterval source={source} />
             {source.last_checked_at && (
               <>
                 {' · '}last checked <LiveTime value={source.last_checked_at} />

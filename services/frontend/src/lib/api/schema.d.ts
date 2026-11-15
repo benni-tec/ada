@@ -1777,6 +1777,11 @@ export interface components {
          * @enum {string}
          */
         AttachmentKind: "dashboard" | "report" | "alert_rule" | "source" | "operator" | "session" | "widget" | "web_page";
+        /**
+         * CheckEvery
+         * @enum {string}
+         */
+        CheckEvery: "10min" | "hourly" | "daily";
         /** CheckResult */
         CheckResult: {
             /** Changed */
@@ -1898,6 +1903,7 @@ export interface components {
             access_kind: components["schemas"]["AccessKind"];
             /** Address */
             address: string;
+            check_every?: components["schemas"]["CheckEvery"] | null;
             /**
              * Created At
              * Format: date-time
@@ -6057,7 +6063,9 @@ export interface operations {
     };
     watch_source_api_sources__source_id__watch_post: {
         parameters: {
-            query?: never;
+            query?: {
+                check_every?: components["schemas"]["CheckEvery"] | null;
+            };
             header?: never;
             path: {
                 source_id: string;

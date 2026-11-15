@@ -34,6 +34,7 @@ from ada.core.models.schema import Schema
 from ada.core.models.sessions import EntryKind, Session, SessionAgent, SessionEntry
 from ada.core.models.sources import (
     AccessKind,
+    CheckEvery,
     DataFormat,
     DataSource,
     FreshnessPolicy,
@@ -112,6 +113,7 @@ def _data_source(row: DataSourceRow) -> DataSource:
         last_probe_token=row.last_probe_token,
         last_error=row.last_error,
         monitor_id=row.monitor_id,
+        check_every=row.check_every,
         revision=row.revision,
     )
 
@@ -189,6 +191,7 @@ class SqlDataSourceRepository(DataSourceRepository):
         monitor_id: str | None,
         secret_encrypted: str | None,
         freshness_before: FreshnessPolicy | None,
+        check_every: CheckEvery | None = None,
     ) -> None:
         # Outside the revision, like a check: watching never conflicts with an edit.
         table = DataSourceRow.__table__
@@ -197,6 +200,7 @@ class SqlDataSourceRepository(DataSourceRepository):
             .where(table.c.id == id)
             .values(
                 monitor_id=monitor_id,
+                check_every=check_every,
                 monitor_secret_encrypted=secret_encrypted,
                 freshness_before_watch=dump(freshness_before) if freshness_before else None,
             )

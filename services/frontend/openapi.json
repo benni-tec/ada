@@ -630,6 +630,15 @@
         "title": "AttachmentKind",
         "type": "string"
       },
+      "CheckEvery": {
+        "enum": [
+          "10min",
+          "hourly",
+          "daily"
+        ],
+        "title": "CheckEvery",
+        "type": "string"
+      },
       "CheckResult": {
         "properties": {
           "changed": {
@@ -934,6 +943,16 @@
           "address": {
             "title": "Address",
             "type": "string"
+          },
+          "check_every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckEvery"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "created_at": {
             "format": "date-time",
@@ -8768,6 +8787,22 @@
               "format": "uuid",
               "title": "Source Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "check_every",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CheckEvery"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Check Every"
             }
           }
         ],
