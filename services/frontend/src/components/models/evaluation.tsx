@@ -10,7 +10,7 @@ import {
   type Evaluation,
   type EvaluationInputs,
   type Id,
-  type ModelVersion,
+  type PathwayVersion,
   type PathwayStep,
 } from '@/lib/api'
 
@@ -22,7 +22,7 @@ const selectClass = 'h-9 rounded-md border bg-background px-2 text-sm'
  * this order, the trigger and the deadlines (exact), the days behind target, the survival
  * figures per setting (second, graded), the support to offer and the cautions. The form's
  * state lives here only, never in the URL. */
-export function EvaluationTab({ modelId, version }: { modelId: Id; version: ModelVersion }) {
+export function EvaluationTab({ modelId, version }: { modelId: Id; version: PathwayVersion }) {
   const { spec } = version
   const level = (term: string) => spec.terms.find((t) => t.name === term)
   const [inputs, setInputs] = useState<EvaluationInputs>({
@@ -193,7 +193,7 @@ function Select({ label, value, options, onChange }: { label: string; value: str
 }
 
 
-function Result({ result, version, inputs, onToggle }: { result: Evaluation; version: ModelVersion; inputs: EvaluationInputs; onToggle: (name: string, on: boolean) => void }) {
+function Result({ result, version, inputs, onToggle }: { result: Evaluation; version: PathwayVersion; inputs: EvaluationInputs; onToggle: (name: string, on: boolean) => void }) {
   const { trigger, deadlines, pathway, survival, levers, flags, warnings } = result
   const next = deadlines.find((d) => d.status === 'overdue') ?? deadlines.find((d) => d.status === 'due')
   const max = 60

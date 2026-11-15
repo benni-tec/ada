@@ -1107,6 +1107,19 @@ of the type's push cases sources after the commit (`Cases` through `DataSourceRe
 /models/{id}/cases`, `PUT /models/{id}/case-type`. MCP: `list_case_types`,
 `create_case_type`, `set_case`, `get_case`, `evaluate_case`, `list_open_cases`.
 
+**The trial matcher** (`trial_matcher`, `statistical_models/trials_kind.py`) is the second kind.
+A version pins the recruiting trials of its cancer groups from a `case_trials` data step
+(docs/trials.md), read in a new run with one row per trial and its nearest recruiting Nordic
+site from Helsinki, Kuopio and Oulu (`TrialMatcherSpec`, `TrialCompiled`). On a case it
+matches site against cancer group, sex, and the age group against the trial's limits (a
+group only partly inside is marked uncertain), puts trials with a Finnish site first, then
+the nearest from the city of the case's county; eligibility text is shown, never judged,
+and its results never ask for attention. Created with `POST
+/projects/{id}/models/trials` (`{operator_id, case_type_id?, auto_run?}`) or the MCP tool
+`create_trial_matcher`; `POST /models/{id}/refresh` or `refresh_trial_matcher` makes a new
+version with the trials read again. It lands on the cancer pathway case type when the
+project has one (a type that covers it), and runs on request by default.
+
 Nothing in cases assumes a use case. A model **kind**
 (`core/services/statistical_models/kinds.py`, `KINDS`) says which fields it reads, runs on a
 case's values, declares its result columns and brings a default case type; the patient
@@ -1115,8 +1128,8 @@ pathway model is the first kind (`pathway_kind.py`). Each result's `Section.atte
 needing attention" across every model on the type, by status, then the most overdue, then
 the soonest due. `ModelOnCase.reads` names the fields a model reads; `GET
 /case-types/{id}/cases` returns each case with the latest result of every model on it. A
-model's spec carries its `kind`; the first kind with a spec of its own makes
-`ModelVersion.spec` a union tagged by it. A profile's evaluation and the population view
+model's spec and build carry its `kind`: `ModelVersion.spec` and `compiled` are unions
+tagged by it. A profile's evaluation and the population view
 belong to the survival kind and refuse others.
 
 ## REST

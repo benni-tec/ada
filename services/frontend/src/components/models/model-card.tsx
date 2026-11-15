@@ -1,4 +1,4 @@
-import { gradeLabels, pathwaySteps, type EvidenceGrade, type ModelVersion, type PathwayStep } from '@/lib/api'
+import { gradeLabels, pathwaySteps, type EvidenceGrade, type PathwayVersion, type PathwayStep } from '@/lib/api'
 
 /** The pill a figure's evidence grade shows in; the national standards stand out, the
  * assumptions are marked. */
@@ -24,7 +24,7 @@ const stepLabel = (step: PathwayStep | null) =>
 /** What the model is built from: the criteria per country, the standard times per country
  * and their median, every parameter with its source, scale and evidence grade, the
  * toggles, the intended use and the cautions. */
-export function ModelCard({ version }: { version: ModelVersion }) {
+export function ModelCard({ version }: { version: PathwayVersion }) {
   const { spec, compiled } = version
   const stages = [
     { stage: 'suspicion', title: 'Suspicion → imaging' },

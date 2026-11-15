@@ -7,6 +7,7 @@ import { ResultBadge, RunsBadge } from '@/components/cases/labels'
 import { ResultSheet, type SheetTarget } from '@/components/cases/result-sheet'
 import { EvaluationTab } from '@/components/models/evaluation'
 import { ModelCard } from '@/components/models/model-card'
+import { TrialCard } from '@/components/models/trial-card'
 import { PopulationTab } from '@/components/models/population'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { PageHeader } from '@/components/page-header'
@@ -25,6 +26,8 @@ import {
   type Id,
   type Section,
   type StatisticalModel,
+  isPathwayVersion,
+  isTrialVersion,
 } from '@/lib/api'
 import { displayValue, triggerLabel, when } from '@/lib/cases'
 
@@ -85,21 +88,25 @@ function ModelPage() {
         <TabsList variant="line" className="w-full justify-start">
           <TabsTrigger value="card">Model card</TabsTrigger>
           <TabsTrigger value="cases">Cases</TabsTrigger>
-          <TabsTrigger value="evaluation">Evaluation</TabsTrigger>
-          <TabsTrigger value="population">Population</TabsTrigger>
+          {isPathwayVersion(version) && <TabsTrigger value="evaluation">Evaluation</TabsTrigger>}
+          {isPathwayVersion(version) && <TabsTrigger value="population">Population</TabsTrigger>}
         </TabsList>
         <TabsContent value="cases" className="pt-4">
           <ModelCases projectId={projectId} model={model} caseType={caseType} />
         </TabsContent>
         <TabsContent value="card" className="pt-4">
-          <ModelCard version={version} />
+          {isPathwayVersion(version) ? <ModelCard version={version} /> : isTrialVersion(version) ? <TrialCard version={version} /> : null}
         </TabsContent>
-        <TabsContent value="evaluation" className="pt-4">
-          <EvaluationTab modelId={modelId} version={version} />
-        </TabsContent>
-        <TabsContent value="population" className="pt-4">
-          <PopulationTab modelId={modelId} version={version} />
-        </TabsContent>
+        {isPathwayVersion(version) && (
+          <>
+            <TabsContent value="evaluation" className="pt-4">
+              <EvaluationTab modelId={modelId} version={version} />
+            </TabsContent>
+            <TabsContent value="population" className="pt-4">
+              <PopulationTab modelId={modelId} version={version} />
+            </TabsContent>
+          </>
+        )}
       </Tabs>
     </div>
   )
@@ -107,8 +114,9 @@ function ModelPage() {
 
 // What a pathway result's columns say: open until treatment has started; overdue when a
 // deadline is.
-const isOpen = (s: Section) => s.columns.trigger !== 'none' && !['met', 'late'].includes(String(s.columns.treatment_start_status))
-const isOverdue = (s: Section) => Object.entries(s.columns).some(([k, v]) => k.endsWith('_status') && v === 'overdue')
+// Whether a result says the case needs someone, as its model kind filled it in.
+const isOpen = (s: Section) => s.attention.open
+const isOverdue = (s: Section) => (s.attention.overdue_by ?? 0) > 0
 
 type Filter = 'all' | 'overdue' | 'open' | 'not_run'
 
@@ -151,7 +159,11 @@ function ModelCases({ projectId, model, caseType }: { projectId: Id; model: Stat
         <Stat value={rows.length} label="eligible cases" />
         <Stat value={withResult.length} label="with a result" />
         <Stat value={count('overdue')} label="open, a deadline overdue" warn={count('overdue') > 0} />
-        <Stat value={started.length > 0 ? `${Math.round((onTarget.length / started.length) * 100)} %` : '–'} label="treatment started on target" />
+        {model.kind === 'patient_pathway' ? (
+          <Stat value={started.length > 0 ? `${Math.round((onTarget.length / started.length) * 100)} %` : '–'} label="treatment started on target" />
+        ) : (
+          <Stat value={count('open')} label="open" />
+        )}
       </div>
 
       <section className="rounded-xl border bg-card" aria-labelledby="model-cases-title">

@@ -10,6 +10,21 @@ import type { Id } from './models'
 export type StatisticalModel = Schemas['StatisticalModel']
 export type ModelVersion = Schemas['ModelVersion']
 export type ModelSpec = Schemas['ModelSpec']
+export type Compiled = Schemas['Compiled']
+export type TrialMatcherSpec = Schemas['TrialMatcherSpec']
+export type TrialCompiled = Schemas['TrialCompiled']
+export type PinnedTrial = Schemas['PinnedTrial']
+/** A version of the patient pathway model: the survival spec and its build. */
+export type PathwayVersion = ModelVersion & { spec: ModelSpec; compiled: Compiled }
+/** A version of a trial matcher: the trials it pinned. */
+export type TrialVersion = ModelVersion & { spec: TrialMatcherSpec; compiled: TrialCompiled }
+
+/** The kind a version is for; versions made before kinds were tagged are pathway ones. */
+export const versionKind = (version: ModelVersion) => version.spec?.kind ?? 'patient_pathway'
+export const isPathwayVersion = (version: ModelVersion): version is PathwayVersion =>
+  versionKind(version) === 'patient_pathway'
+export const isTrialVersion = (version: ModelVersion): version is TrialVersion =>
+  versionKind(version) === 'trial_matcher'
 export type Criterion = Schemas['Criterion']
 export type TargetTime = Schemas['TargetTime']
 export type Parameter = Schemas['Parameter']

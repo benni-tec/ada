@@ -52,7 +52,7 @@ const version: ModelVersion = {
     intended_use: 'Educational use with synthetic profiles.',
     cautions: ['Survival is counted from diagnosis (lead time).'],
   },
-  compiled: { targets: { lung: { pathway: { surgery: 43 } }, colorectal: { pathway: { surgery: 36 } } }, parameters: {}, population: [], validation: [], warnings: [] },
+  compiled: { kind: 'patient_pathway', targets: { lung: { pathway: { surgery: 43 } }, colorectal: { pathway: { surgery: 36 } } }, parameters: {}, population: [], validation: [], warnings: [] },
   created_by: web,
   created_at: '2026-11-14T10:00:00Z',
 }

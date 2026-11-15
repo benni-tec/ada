@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { ErrorNotice, Loading } from '@/components/notices'
-import { pathwaySteps, populationQuery, type Id, type ModelVersion } from '@/lib/api'
+import { pathwaySteps, populationQuery, type Id, type PathwayVersion } from '@/lib/api'
 
 /** How much of the comparison country's survival shortfall waiting times can explain: per
  * site and sex, the baseline, the baseline with that country's extra days, and its
  * observed survival, all 5-year relative survival per 100. What is left is not timing. */
-export function PopulationTab({ modelId, version }: { modelId: Id; version: ModelVersion }) {
+export function PopulationTab({ modelId, version }: { modelId: Id; version: PathwayVersion }) {
   const { data: figures, error } = useQuery(populationQuery(modelId))
   const comparison = version.spec.comparison
   return (

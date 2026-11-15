@@ -8,6 +8,7 @@ import { caseQuery, evaluateCase, invalidateCase, type CaseResult, type Evaluati
 import { when } from '@/lib/cases'
 
 import { PathwayResult } from './pathway-result'
+import { TrialResult } from './trial-result'
 
 /** Which model's results the sheet shows, and the one to open at. */
 export type SheetTarget = { modelId: Id; modelName: string; result?: CaseResult }
@@ -123,11 +124,14 @@ function merge(results: CaseResult[]) {
   return [...byId.values()].sort((a, b) => b.created_at.localeCompare(a.created_at))
 }
 
-/** What a model said: the pathway model's condensed result, or any other model's summary
- * and columns. */
+/** What a model said: the pathway model's condensed result, the trial matcher's trials,
+ * or any other model's summary and columns. */
 export function SectionView({ section }: { section: Section }) {
   if (section.kind === 'patient_pathway' && isEvaluation(section.body)) {
     return <PathwayResult evaluation={section.body} summary={section.summary} />
+  }
+  if (section.kind === 'trial_matcher' && Array.isArray(section.body.matches)) {
+    return <TrialResult body={section.body} summary={section.summary} />
   }
   const columns = Object.entries(section.columns)
   return (

@@ -114,3 +114,6 @@ Find the project and its **Nordic cancer trials** session, then the recorded
 operator whose note starts `case_trials:`. All seven notes start with their contract
 name. In the seed integration, `TrialSteps` exposes every operator by that same name;
 `seed.py` attaches dashboards and leaves a hand-over for monitoring.
+
+The trial matcher model (`trial_matcher`, docs/contracts.md "Cases") reads `case_trials`:
+`create_trial_matcher` with that operator puts a matcher on the project's cancer case type.
