@@ -3,6 +3,7 @@ import { AbsoluteFill, Img, interpolate, Sequence, spring, staticFile, useCurren
 
 import { s } from './frame'
 import { LowerThird } from './LowerThird'
+import { CASES_FRAMES, CasesScene } from './scenes/CasesScene'
 import { CHAT_FRAMES, ChatScene } from './scenes/ChatScene'
 import { Credits } from './scenes/Credits'
 import { FeedbackLoop, LOOP_FRAMES } from './scenes/FeedbackLoop'
@@ -50,12 +51,27 @@ function Planned({ title, shows }: { title: string; shows: string }) {
 
 type Section = { name: string; frames: number; scene: ReactNode }
 
-/** The pitch, three minutes, in the order of the story. Sections still planned show what
- * they will be; cases, timelines and trials wait for their branches to reach main. */
+/** The pitch, three minutes, in the order of the story: the case and its models first,
+ * then where their data comes from, then the cases as data, which closes the loop. */
 const SECTIONS: Section[] = [
   { name: 'Title', frames: s(4), scene: <Punch sub="Promoting better and equal cancer care">ada</Punch> },
+  { name: 'No clock', frames: s(5), scene: <Punch sub="Finland has no trigger, no clock and no measurement">No clock</Punch> },
 
-  // 1. The analysis: how ADA got and integrated the data.
+  // 1. The central tool: cases with models.
+  { name: 'Cases', frames: CASES_FRAMES, scene: <CasesScene /> },
+  {
+    name: 'Trials',
+    frames: s(8),
+    scene: (
+      <Planned
+        title="And the trials worth discussing"
+        shows="The trial matcher on the same case: recruiting Nordic trials matched on cancer group, sex and age, Finnish sites first, then the nearest site from the case's county."
+      />
+    ),
+  },
+
+  // 2. Where the models' data comes from: ADA's analysis.
+  { name: 'Data', frames: s(2.5), scene: <Punch sub="where the models' data comes from">The data</Punch> },
   { name: 'Ask', frames: CHAT_FRAMES, scene: <ChatScene /> },
   {
     name: 'Sources',
@@ -63,17 +79,17 @@ const SECTIONS: Section[] = [
     scene: (
       <Planned
         title="Open data, integrated in minutes"
-        shows="Sotkanet, Statistics Finland, NORDCAN, the National Cancer Strategy PDF and the Espoo handout come in as sources, each with its address, fetch time and licence; PDFs are read with Context.dev."
+        shows="Sotkanet, Statistics Finland, NORDCAN, ClinicalTrials.gov, the National Cancer Strategy PDF and the Espoo handout come in as sources, each with its address, fetch time and licence."
       />
     ),
   },
   {
     name: 'Trace',
-    frames: s(14),
+    frames: s(12),
     scene: (
       <Planned
         title="Every number traced to its source"
-        shows="The survival chart draws itself; a click opens its pipeline: the transform's SQL, then the NORDCAN snapshot it read."
+        shows="A chart draws itself; a click opens its pipeline: the transform's SQL, then the snapshot it read."
       />
     ),
   },
@@ -83,56 +99,42 @@ const SECTIONS: Section[] = [
     scene: <Screen src="session.png" title="Goal 3 on one dashboard" line="Survival gap, mortality against target, screening by county" />,
   },
   {
-    name: 'Dashboard detail',
+    name: 'Evidence',
     frames: s(10),
     scene: (
       <Planned
-        title="Equal care, county by county"
-        shows="Breast screening by wellbeing services county on the map, referral delays, deaths against the 11,970 target."
+        title="The model's figures cite their papers"
+        shows="The pathway model's card: the Nordic standard times, Finnish education effects (Zai 2025) and delay effects (Hanna 2020), each with the passage it was read from."
       />
     ),
   },
 
-  // 2. What the registries cannot tell.
+  // 3. The gaps, and the cases that fill them.
   {
     name: 'Gaps',
-    frames: s(25),
+    frames: s(15),
     scene: (
       <Planned
-        title="Where the data runs out"
-        shows="The data-quality dashboard: counties with no figures, indicators years out of date, no time to treatment per patient or per county, the education gap only in reports. Goal 3 cannot be measured with what exists."
+        title="Where open data stops"
+        shows="The data-quality dashboard: counties with no figures, indicators years old, no time per pathway step anywhere in Finland."
       />
     ),
   },
-
-  // 3. Cases fill the gap.
   {
-    name: 'Cases',
-    frames: s(30),
+    name: 'Cases as data',
+    frames: s(23.5),
     scene: (
       <Planned
-        title="Cases fill the gap"
-        shows="Pathways › Cases: a clinician records a cancer case in a form generated from the case type; its steps (referral, diagnosis, treatment start) land on a timeline."
+        title="The cases are data too"
+        shows="The cases become a source: share within target per county and step, median days, the bottleneck step, and an alert when a step slips."
       />
     ),
   },
 
-  // 4. What a case gives back: the patient's timeline and the trials it fits.
-  {
-    name: 'Timeline and trials',
-    frames: s(31),
-    scene: (
-      <Planned
-        title="A timeline for every patient, and the trials that fit"
-        shows="The case page: the patient's pathway against the target times, delays flagged. The trial matcher runs on the case and its result sheet lists the recruiting trials that fit, from ClinicalTrials.gov."
-      />
-    ),
-  },
-
-  // 5. Why it lasts: the loop.
+  // 4. The loop: why it lasts.
   { name: 'Loop', frames: LOOP_FRAMES, scene: <FeedbackLoop /> },
 
-  // 6. What it is built with: the side challenges.
+  // 5. What it is built with: the side challenges.
   { name: 'Side challenges', frames: SIDE_CHALLENGE_FRAMES, scene: <SideChallenges /> },
 
   { name: 'Credits', frames: s(13.5), scene: <Credits /> },

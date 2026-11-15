@@ -5,10 +5,10 @@ import { LowerThird } from '../LowerThird'
 
 /** The loop, clockwise from the top: what each side puts in and gets back. */
 const STEPS = [
-  { title: 'Clinicians enter cases', line: 'referral, diagnosis, treatment' },
-  { title: 'They get answers back', line: 'the patient’s timeline, matching trials' },
-  { title: 'Cases become data', line: 'live waiting times per county' },
-  { title: 'The gaps close', line: 'equal care, measured, for everyone' },
+  { title: 'Cases with models', line: 'the clock and the trials, for clinicians' },
+  { title: 'Models need data', line: 'registries, trials and evidence, through ADA' },
+  { title: 'Cases become data', line: 'pathway times per county, live' },
+  { title: 'Better data, better models', line: 'the gaps close, care gets more equal' },
 ]
 
 const CENTER = { x: 960, y: 440 }
@@ -60,9 +60,9 @@ export function FeedbackLoop() {
             key={step.title}
             style={{
               position: 'absolute',
-              left: left ? x - 520 : right ? x + 36 : x - 260,
+              left: left ? x - 676 : right ? x + 36 : x - 320,
               top: index === 0 ? y - 150 : index === 2 ? y + 40 : y - 48,
-              width: 500,
+              width: 640,
               textAlign: left ? 'right' : right ? 'left' : 'center',
               opacity: pop,
               transform: `scale(${0.9 + pop * 0.1})`,
@@ -93,7 +93,7 @@ export function FeedbackLoop() {
         )
       })}
       {frame >= s(0.3) + EACH * STEPS.length && (
-        <LowerThird title="Data is entered because entering it pays off" line="Clinicians, patients and analysts all win" accent="#22c55e" />
+        <LowerThird title="A win-win: entering a case pays off at once" line="Clinicians get answers, and the data gaps close" accent="#22c55e" />
       )}
     </AbsoluteFill>
   )
