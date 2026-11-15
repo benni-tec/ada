@@ -41,6 +41,7 @@ from ada.adapters.memory.repositories import (
 )
 from ada.adapters.memory.web import MemoryWebBudget
 from ada.adapters.secrets.fernet import FernetSecretBox
+from ada.adapters.sources.cases import CaseSourceReader, CaseSourceReaders
 from ada.adapters.sources.examples import (
     EXAMPLES,
     NORDCAN_LUNG_SURVIVAL,
@@ -597,8 +598,11 @@ async def test_the_container_shares_the_readers_and_closes_them(
         async with container() as request:
             service = await request.get(SourceService)
             assert isinstance(service, DataSources)
-            # The readers, and with them the HTTP client, are shared by every request.
-            assert service.readers is readers
+            # The readers, and with them the HTTP client, are shared by every request; the
+            # cases reader beside them reads the request's repositories.
+            assert isinstance(service.readers, CaseSourceReaders)
+            assert service.readers.readers is readers
+            assert isinstance(service.readers.for_kind(AccessKind.CASES), CaseSourceReader)
     finally:
         await container.close()
     assert readers.readers.readers[AccessKind.URL].client.is_closed

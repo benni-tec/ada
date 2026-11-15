@@ -66,7 +66,7 @@ export function fetchWidget({ widgetId }: WidgetContext): Promise<Widget> {
 export const MAIN_INPUT = 'main'
 
 /** The output of one of the widget's inputs (by default its own operator, "main"), with
- * what its columns mean (`output`) and the scenario and stale flags. */
+ * what its columns mean (`output`), whether it is stale and whether the run binds inputs. */
 export function fetchData({ widgetId, runId }: WidgetContext, limit = 1000, input = MAIN_INPUT): Promise<WidgetData> {
   const query = new URLSearchParams({ limit: String(limit) })
   if (runId) query.set('run_id', runId)

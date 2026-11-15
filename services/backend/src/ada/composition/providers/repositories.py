@@ -3,12 +3,14 @@ from dishka import Provider, Scope, provide
 from ada.adapters.db.agent_repositories import SqlAgentTurnRepository, SqlTurnProgress
 from ada.adapters.db.alert_repositories import SqlAlertRepository, SqlAlertRuleRepository
 from ada.adapters.db.attachment_repositories import SqlAttachmentRepository
+from ada.adapters.db.case_repositories import SqlCaseRepository
 from ada.adapters.db.llm_repositories import (
     SqlAgentSettingsRepository,
     SqlJudgeSettingsRepository,
     SqlLlmModelRepository,
     SqlLlmProviderRepository,
 )
+from ada.adapters.db.model_repositories import SqlStatisticalModelRepository
 from ada.adapters.db.pipeline_repositories import (
     SqlOperatorRepository,
     SqlRunRepository,
@@ -35,6 +37,7 @@ from ada.core.ports.repositories import (
     AlertRepository,
     AlertRuleRepository,
     AttachmentRepository,
+    CaseRepository,
     DashboardRepository,
     DataSourceRepository,
     JudgeSettingsRepository,
@@ -46,6 +49,7 @@ from ada.core.ports.repositories import (
     RunRepository,
     SessionRepository,
     SnapshotRepository,
+    StatisticalModelRepository,
     TemplateRepository,
     WidgetRepository,
 )
@@ -77,6 +81,8 @@ class RepositoryProvider(Provider):
     llm_models = provide(SqlLlmModelRepository, provides=LlmModelRepository)
     agent_settings = provide(SqlAgentSettingsRepository, provides=AgentSettingsRepository)
     judge_settings = provide(SqlJudgeSettingsRepository, provides=JudgeSettingsRepository)
+    statistical_models = provide(SqlStatisticalModelRepository, provides=StatisticalModelRepository)
+    cases = provide(SqlCaseRepository, provides=CaseRepository)
 
     source_locks = provide(SqlSourceLocks, provides=SourceLocks)
     # Its own connection per record, from the engine, not the request's session.

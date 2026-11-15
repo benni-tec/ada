@@ -20,7 +20,7 @@ router = APIRouter(route_class=DishkaRoute, tags=["runs"])
 
 class NewRun(Request):
     time_range: TimeRange | None = None
-    # Input slot name to the operator bound to it; any binding makes the run a scenario.
+    # Input slot name to the operator bound to it, composing pipelines into a DAG.
     bindings: dict[str, OperatorId] | None = None
 
 

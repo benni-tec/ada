@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent), `0010` named widget inputs and render errors, `0011` session attachments, widget verdicts and the sidebar's order (`dashboards.position`, `reports.position`), `0012` the judges (`judge_defaults`, seeded, and `project_judges`) |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent), `0010` named widget inputs and render errors, `0011` session attachments, widget verdicts and the sidebar's order (`dashboards.position`, `reports.position`), `0012` the judges (`judge_defaults`, seeded, and `project_judges`), `0013` agent turn recovery, `0014` the freshness policy a source had before it was watched, `0015` alert deliveries (`alert_deliveries`), `0016` a source's check interval, `0017` statistical models (`statistical_models`, `statistical_model_versions`), `0018` cases (`case_types`, `cases`, `case_events`, `case_results`; `statistical_models.case_type_id`, `auto_run`) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -158,6 +158,14 @@ sources"):
 | `core/services/ports/web.py` | `WebExplorationService.read(..., query=None, pdf_pages=None, ocr=False)`; `MAX_FOCUS_CHARS` (2,000) |
 | `adapters/web/scopes.py` | The scopes' domain lists (`DATA_DOMAINS`, `NEWS_DOMAINS`, `RESEARCH_DOMAINS`, `DOMAINS`), moved out of `exa.py` and shared by both engines |
 
+What cases as a data source added to them (see "Cases sources"; no port, table or
+migration changed):
+
+| Where | Change |
+| --- | --- |
+| `core/models/sources.py` | `AccessKind.CASES` (`"cases"`) |
+| `core/models/cases.py` | `CaseTable` (`cases`, `events`, `results`), `case_table(options)`, `case_type_address(address)`; the column rules shared by the registration and the reader: `CASE_TABLE_COLUMNS`, `CASE_TIME_COLUMN`, `field_columns(fields)`, `field_cells(fields, values)`, `result_column(kind, name)` |
+
 ## Adding a feature without touching shared files
 
 Four packages are scanned at startup. A feature adds a module; no list is edited.
@@ -183,7 +191,7 @@ stand-in.
 | `system.py` | `Database`, `TaskQueue`, `SystemStatusService`, `WebConfigured` (from `Settings`) |
 | `repositories.py` | All sixteen repositories (SQLAlchemy, on the request's session); `SourceLocks` (advisory locks on the request's session); `SourceCheckLog`, `TurnProgress` and `ResearchCalls` (`SqlResearchCalls`) (own connection, a short transaction per write) |
 | `analysis.py` | `AnalysisStore` (Parquet and DuckDB), `PipelineService`, `RunService`, `ExplorationService` (`Exploration`), `BatchService` (`Batches`) |
-| `sources.py` | `SourceReaders` (HTTP: URL, request, document and web sources), `SourceService` (with the `WebExplorer` for monitors, the `SecretBox` for their secrets and `ADA_PUBLIC_URL`), `RefreshService` (`WaitingRefreshes`) |
+| `sources.py` | `SourceReaders` (HTTP: URL, request, document and web sources), `SourceService` (its readers with the cases reader beside them, on the request's repositories, and the `WebExplorer` for monitors, the `SecretBox` for their secrets and `ADA_PUBLIC_URL`), `RefreshService` (`WaitingRefreshes`) |
 | `web.py` | `WebSearch` (`ExaSearch` on ADA's Exa key when it is set, else `ContextDevSearch` on its Context.dev key, else an unconfigured `ExaSearch`), `WebExplorer` (`ContextDevWeb`, REST, ADA's Context.dev key), all on one HTTP client of their own; `WebBudget` (`SqlWebBudget`: own connection, a short transaction per write), `WebExplorationService` (`WebExploration`) |
 | `workspace.py` | `ProjectService`, `SessionService`, `WidgetService` |
 | `background.py` | `EventBroadcaster` (Valkey pub/sub), `EventPublisher` (transactional, per request), `EventStream` (Valkey), `TaskDispatcher` (taskiq on Valkey) |
@@ -445,6 +453,40 @@ the page changes instead of on a schedule. Freshness is either: a long ttl or a 
   snapshot.
 - Alerts need nothing new: a rule whose source got a newer snapshot is due (`due()`).
 - The secret never appears on `DataSource`, in a response, an event or a log.
+
+### Cases sources
+
+A cases source (`access_kind: "cases"`) makes one table of a case type an ordinary
+source: snapshots, lineage and freshness as for any other, so pipelines, widgets and
+dashboards read it. Its address is the case type's id (stored in one spelling), which must
+belong to the source's project; `options.table` (`CaseTable`) is `"cases"` (default),
+`"events"` or `"results"`, anything else is `Invalid`. It is read inside the platform, with
+no network, by `CaseSourceReader` (`adapters/sources/cases.py`) through `CaseRepository`,
+as Parquet in typed columns; `register` sets the format to `parquet` whatever was passed.
+
+| `options.table` | Rows | Columns | Time role |
+| --- | --- | --- | --- |
+| `cases` | One per case | `key, revision, created_at, updated_at`, then every field of the case type: an `enum_list` as its values joined with commas, a `day_map` one integer column per level named `<field>_<level>` (null where the step has not started) | `updated_at` |
+| `events` | One per step event | `key, field, step, days, recorded_at` | `recorded_at` |
+| `results` | One per result | `key, model_id, model, version, case_revision, trigger, created_at, summary, status` (`model` is its name), then each `Section.columns` entry prefixed by the model kind (`patient_pathway_days_behind`), the union over the rows, null where a result has none | `created_at` |
+
+- **Declared for you.** `register` derives the declared schema (`case_schema`,
+  `core/services/sources/cases.py`): the table's columns from the case type, and for
+  results from each model on it (`CaseModel.columns(version)`). Roles the caller declares
+  (a geo role on a county field, say) are kept, with the time role above unless they name
+  another; columns the caller declares are ignored. The reader writes the case type's
+  columns as they are now plus every declared column the data lacks (empty), so a field
+  added later appears as a column and the declared schema always fits.
+- **One table of one case type for good.** `update` refuses a new case type or table:
+  register another source.
+- **Push.** Without a freshness policy a cases source gets `push`. `CaseService.put_case`
+  and every stored result (an automatic run or `evaluate`) mark each `push` cases source
+  on the type stale: `refresh_source(id, force=True)` is queued after the commit, once per
+  source and unit of work, as the webhook of a watched page queues it. A `manual` or `ttl`
+  cases source is left to its policy. A cases source cannot be watched (no http address).
+- `DataSources` takes the `CaseRepository` and the `StatisticalModelRepository` (optional;
+  without them a cases source is `Invalid` to register), and the source provider puts the
+  cases reader beside the installed readers (`CaseSourceReaders`) per unit of work.
 
 ### The daily web budget
 
@@ -1003,6 +1045,93 @@ the web and adds it as sources, in a **research session**: a child session
   composer's "Research" button sends the draft as a brief (its first line, cut at 80
   characters, as the title), enabled when a research or session agent is set.
 
+## Statistical models
+
+A versioned model built from published figures, each with its citation, the passage it was
+checked against and an evidence grade, evaluated on one profile at a time
+(`core/models/statistical_models.py`; the first is the patient pathway model,
+`core/services/statistical_models/pathway.py`). `StatisticalModel{id, project_id, name,
+description, kind, latest_version}` and `ModelVersion{id, model_id, version, spec,
+compiled}`: a version is immutable, a change makes a new one, and `compiled` is what the
+build derived from the spec (the median target per step, converted parameters, the
+population view with the residual per site and sex). `StatisticalModelRepository`
+(`get`, `list`, `add`, `add_version`, `version`); `StatisticalModelService` (`create`,
+`create_pathway_model`, `add_version`, `list`, `get`, `version`, `evaluate`, `population`).
+`create_pathway_model` takes an optional parameter operator (columns `name, estimate,
+ci_low, ci_high, source_id, passage, found`): every parameter cited to a registered source
+is then read from it through `ExplorationService`, refused unless its passage was found in
+the source, and cited by that operator and run. Building a model may thus start a run;
+evaluating one never does.
+
+**An evaluation is computed and returned, never stored**: no run, snapshot, operator or
+widget, and no DuckDB. A model run on a case is the exception: its result is stored on the
+case (see Cases). The platform is not for patient data (synthetic profiles only), so
+evaluations are ordinary tool calls, recorded in the session like any other. REST: `GET /projects/{id}/models`, `POST
+/projects/{id}/models` (a spec) and `/models/pathway` (the shipped one; body `{parameters?}`), `GET
+/models/{id}`, `/versions/latest`, `/versions/{n}`, `/population`, `POST
+/models/{id}/versions`, `POST /models/{id}/evaluate`. MCP: `create_pathway_model`,
+`list_models`, `get_model`, `evaluate_model`. Migration `0017`: `statistical_models`,
+`statistical_model_versions`.
+
+## Cases
+
+A **case type** (`core/models/cases.py`) is a schema of fields (`text`, `number`, `integer`,
+`date`, `boolean`, `enum`, `enum_list`, `day_map`). A **case** is one instance under a `key`
+its caller sets, unique within the type, 1–128 characters of `[A-Za-z0-9._:-]`, and never
+a Finnish personal identity code; saving is an upsert by key. A case keeps its latest
+`values`, a `revision` per save, and append-only **events**: every field whose value changed
+at a save (`field`, `level` for a day map's step, `old`, `new`). A statistical model names one case type
+(`StatisticalModel.case_type_id`; created without one, it gets its kind's default case
+type, `ModelKind.default_case_type`), which must cover what its latest version reads (same
+name and type, required where the model requires, enum levels a subset of the model's);
+creating a model or a version, and changing a case type, are refused otherwise. While a
+case type has cases, its fields may only grow (new optional fields, new levels).
+
+Saving a case runs every model on its type with `auto_run`; any model on the type runs on
+request (`evaluate`). Each run stores a **result** on the case (`CaseResult`: model,
+version, the case revision it read, the section, auto or request, who, when). Results are
+history, never overwritten, and never backfilled: a model added later has no result for
+old cases until it is evaluated or the case is saved again. `CaseRepository`;
+`CaseService` (`create_type`, `update_type`, `get_type`, `list_types`, `put_case`,
+`get_case`, `list_cases`, `models`, `evaluate`, `open_cases`, `model_cases`). The open-case
+list orders by deadline status, never by survival.
+
+A case type's cases, step events and results are also a data source (`register_source`,
+`access_kind: "cases"`, the case type's id as the address, `options.table`; see "Cases
+sources"), kept fresh by push: every save and every stored result queues a forced refresh
+of the type's push cases sources after the commit (`Cases` through `DataSourceRepository`,
+`TaskDispatcher` and `AfterCommit`). REST: `GET/POST
+/projects/{id}/case-types`, `GET/PATCH /case-types/{id}`, `GET /case-types/{id}/cases`,
+`GET /case-types/{id}/open-cases`, `GET/PUT /case-types/{id}/cases/{key}`, `GET
+/case-types/{id}/cases/{key}/models`, `POST /case-types/{id}/cases/{key}/evaluate`, `GET
+/models/{id}/cases`, `PUT /models/{id}/case-type`. MCP: `list_case_types`,
+`create_case_type`, `set_case`, `get_case`, `evaluate_case`, `list_open_cases`.
+
+**The trial matcher** (`trial_matcher`, `statistical_models/trials_kind.py`) is the second kind.
+A version pins the recruiting trials of its cancer groups from a `case_trials` data step
+(docs/trials.md), read in a new run with one row per trial and its nearest recruiting Nordic
+site from Helsinki, Kuopio and Oulu (`TrialMatcherSpec`, `TrialCompiled`). On a case it
+matches site against cancer group, sex, and the age group against the trial's limits (a
+group only partly inside is marked uncertain), puts trials with a Finnish site first, then
+the nearest from the city of the case's county; eligibility text is shown, never judged,
+and its results never ask for attention. Created with `POST
+/projects/{id}/models/trials` (`{operator_id, case_type_id?, auto_run?}`) or the MCP tool
+`create_trial_matcher`; `POST /models/{id}/refresh` or `refresh_trial_matcher` makes a new
+version with the trials read again. It lands on the cancer pathway case type when the
+project has one (a type that covers it), and runs on request by default.
+
+Nothing in cases assumes a use case. A model **kind**
+(`core/services/statistical_models/kinds.py`, `KINDS`) says which fields it reads, runs on a
+case's values, declares its result columns and brings a default case type; the patient
+pathway model is the first kind (`pathway_kind.py`). Each result's `Section.attention`
+(`open`, `overdue_by`, `due_in`) is filled by its kind; the open-case list is "the cases
+needing attention" across every model on the type, by status, then the most overdue, then
+the soonest due. `ModelOnCase.reads` names the fields a model reads; `GET
+/case-types/{id}/cases` returns each case with the latest result of every model on it. A
+model's spec and build carry its `kind`: `ModelVersion.spec` and `compiled` are unions
+tagged by it. A profile's evaluation and the population view
+belong to the survival kind and refuse others.
+
 ## REST
 
 All routes are under `/api`. Bodies are the domain models' JSON forms; request bodies
@@ -1088,7 +1217,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 
 Tool names are snake case and start with a verb (`list create register update refresh
 add get preview system pin edit set show generate check build query search read extract
-map watch unwatch delegate report`; `tests/test_api.py`). Tools
+map watch unwatch delegate report review attach detach evaluate`; `tests/test_api.py`). Tools
 that create something take a `note`: one line on why the agent is doing this, shown in
 the session. The acting `Actor` is
 `external_agent` with the client name the MCP host reported when it connected; a client
@@ -1323,7 +1452,8 @@ receives data from an agent; it asks the server for the output of its operator.
   how to draw, never the data. `create_widget`'s description is the agent's manual: the
   module (`export default function render(root, data, ada)`, an optional cleanup), `data`
   (`main` and `inputs[name]`: columns, rows as objects, roles, truncated; `run_id`,
-  `is_scenario`, `is_stale`), `ada` (theme, colours, size and `onResize`, the platform's
+  `is_scenario` (the run binds an input slot; a historical name, kept for code that reads
+  it), `is_stale`), `ada` (theme, colours, size and `onResize`, the platform's
   number and date formats, the listed libraries, `error`), and the CSS variables.
   - **Checks** (`core/services/widgets/specs.py`, every problem at once, with lines): the
     keys; `export default`; at most 64 KB of code and CSS; libraries `d3` (7.9.0) and
@@ -1348,7 +1478,7 @@ receives data from an agent; it asks the server for the output of its operator.
     `render_error` and `verdict`, the briefing names the session's widgets that need
     fixing, and an update of spec, type or inputs clears `render_error`.
   - **The card** says "custom", shows `render_error` as one line under the frame and a
-    warn or fail verdict as a yellow icon with the findings; the pipeline dialog has a
+    warn or fail verdict as a yellow icon with the findings; the pipeline sheet has a
     "Code" tab with the inputs by name, the libraries, the code and the CSS.
 - **Reports keep what they showed.** Adding a report version copies every widget it shows
   (all types: operator, inputs, type, spec, title, note, verdict; `copied_from` the
@@ -1374,8 +1504,8 @@ receives data from an agent; it asks the server for the output of its operator.
   actions menu. A single view (`mark` or `layer`) fills the frame (`width`/`height:
   "container"`, autosize `fit`) unless the spec sizes itself; composed views size their
   parts. Its Vega config follows the page theme (the colours of `styles.css`, re-read when
-  `data-theme` or the system scheme changes); the spec's own `config` still wins. Scenario
-  and stale flags come from the runtime, as for every type. A spec that does not compile
+  `data-theme` or the system scheme changes); the spec's own `config` still wins. The
+  stale flag comes from the runtime, as for every type. A spec that does not compile
   shows Vega-Lite's message in the card.
 
 - **Where the built files are.** `WIDGETS_DIR` (default: `services/widgets/dist` of the
@@ -1418,7 +1548,7 @@ receives data from an agent; it asks the server for the output of its operator.
   unmounted, so its scroll position is kept. A direct link to `?open=` has no run in its
   state: the modal starts a run of its own, like the widget page, and closing replaces the
   address without `open`.
-- **The pipeline view** is a modal dialog (`components/pipeline/`): the operator tree as a
+- **The pipeline view** is a sheet from the right (`components/pipeline/`, `components/side-sheet.tsx`): the operator tree as a
   graph laid out by depth (sources at the left, the widget's operator at the right, a
   shared input drawn once; materializing nodes solid and tinted, pass-through dashed;
   nodes are buttons, the arrow keys follow the edges), the selected operator's details
@@ -1433,8 +1563,10 @@ receives data from an agent; it asks the server for the output of its operator.
   protocol over postMessage: `ui/initialize`, then `ui/notifications/initialized`; it
   takes the widget from the `ui/notifications/tool-result` of `create_widget` and calls
   `get_widget_data` with `tools/call` through the host. No REST is used there.
-- **What it must show.** A marker when `is_scenario` is true, and one when `is_stale`
-  is true. A simulated or outdated number must never look like a measured, current one.
+- **What it must show.** A marker when `is_stale` is true: an outdated number must never
+  look like a current one. `is_scenario` (the run binds at least one input slot; the name
+  is historical) is passed but not shown. Binding an input composes pipelines into a DAG,
+  which says nothing about whether the numbers are measured, so it gets no marker.
 - **The map.** Each region at its latest period, in five equal classes on a sequential
   blue ramp (more is darker; flipped in dark mode); suppressed regions hatched, regions
   without a value grey, neither a colour of the scale. One focus stop; the arrow keys step
@@ -1661,14 +1793,21 @@ project's verdict lists.
 - **Attachments beside a session** (`components/attachments/*`) split the page half and
   half (`lg` and up; stacked below): the conversation, and the attachments as tabs under a
   bar that is black with white text in light mode and white with black text in dark mode.
+  The pane is open while something is attached and closed while nothing is (a strip of
+  the bar's colour with "Open the attachments"): it closes when the last attachment goes
+  and opens when one arrives; the person can close it ("Close the attachments") or open
+  it, empty too. Its left edge is a window splitter ("Resize the attachments", `lg` and
+  up): dragged, or focused and moved with the arrow keys (left widens, by 5%), Home and
+  End, between 25% and 75% of the width, remembered per browser (`localStorage`
+  `ada-attachments-width`).
   A tab has the kind's icon, the title (full in its tooltip, with who attached it) and an
   × "Detach <title>"; arrows, Home and End move between tabs. "Attach" opens a searchable
   chooser of the project's dashboards, reports (with a version), alert rules, sources,
   pipelines, other sessions and widgets (attached ones marked; picking one opens its
   tab), and a URL field for a web page. The open tab is remembered per session
   (`localStorage` `ada-session-tab:<id>`), else the newest opens; one an agent attaches
-  opens (`session.attachment_added`). With nothing attached the half says so, with
-  Attach. Views: a dashboard's grid read only, its empty slots offering "Add widget" into
+  opens (`session.attachment_added`). Opened with nothing attached, the half says so,
+  with Attach. Views: a dashboard's grid read only, its empty slots offering "Add widget" into
   the composer; a report version frozen at its run; an alert rule with its alerts; a
   source's provenance, freshness and rows; a pipeline's graph and rows; another session's
   record read only; a widget card at the session's run; a web page's title and an "Open"

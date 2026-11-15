@@ -1,0 +1,405 @@
+<title>Patient pathway model</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* The ADA app shell (sidebar + content) with three screens routed on the hash: #case, #models, #model.
+   Model results open in a side sheet over the page; nothing navigates away from the case. */
+:root { --bg: #ffffff; --panel: #fafaf9; --fg: #18181b; --muted: #71717a; --line: #e4e4e7; --soft: #f4f4f5;
+  --accent: #2563eb; --accent-soft: #eff6ff; --warn: #c2410c; --warn-soft: #fff7ed; --ok: #15803d; --ok-soft: #f0fdf4;
+  --banner: #b91c1c; --scrim: rgba(24, 24, 27, .32); --shadow: 0 10px 30px rgba(0, 0, 0, .12);
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0c0c0e; --panel: #131316; --fg: #f4f4f5; --muted: #a1a1aa; --line: #27272a; --soft: #1c1c20;
+  --accent: #60a5fa; --accent-soft: #172036; --warn: #fb923c; --warn-soft: #2a1a10; --ok: #4ade80; --ok-soft: #10241a; --banner: #991b1b; --scrim: rgba(0, 0, 0, .6); --shadow: 0 10px 30px rgba(0, 0, 0, .5); color-scheme: dark } }
+:root[data-theme="dark"] { --bg: #0c0c0e; --panel: #131316; --fg: #f4f4f5; --muted: #a1a1aa; --line: #27272a; --soft: #1c1c20;
+  --accent: #60a5fa; --accent-soft: #172036; --warn: #fb923c; --warn-soft: #2a1a10; --ok: #4ade80; --ok-soft: #10241a; --banner: #991b1b; --scrim: rgba(0, 0, 0, .6); --shadow: 0 10px 30px rgba(0, 0, 0, .5); color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); margin: 0 }
+.banner { background: var(--banner); color: #fff; font-weight: 600; font-size: 13px; text-align: center; padding: 6px max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px)) }
+.shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: calc(100vh - 32px) }
+aside { background: var(--panel); border-right: 1px solid var(--line); padding: 16px 12px 16px max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 2px; font-size: 13px }
+aside .project { font-weight: 600; padding: 4px 8px 12px }
+aside a { color: var(--muted); text-decoration: none; padding: 6px 8px; border-radius: 6px; display: flex; gap: 8px; align-items: center }
+aside a:hover { background: var(--soft); color: var(--fg) }
+aside a.on { background: var(--soft); color: var(--fg); font-weight: 500 }
+aside .group { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 14px 8px 4px }
+main { min-width: 0; padding-block: 24px 64px; padding-left: 32px; padding-right: max(32px, env(safe-area-inset-right, 0px)) }
+.screen { max-width: 1040px; display: flex; flex-direction: column; gap: 20px }
+.crumbs { font-size: 13px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap } .crumbs a { color: var(--muted); text-decoration: none } .crumbs a:hover { color: var(--fg) }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; text-wrap: balance } h1.key { font-family: var(--mono); font-size: 22px }
+h2 { font-size: 15px; margin: 0; text-wrap: balance }
+.sub { color: var(--muted); font-size: 13px; display: flex; gap: 6px 14px; flex-wrap: wrap }
+.panel { border: 1px solid var(--line); border-radius: 10px; background: var(--bg); min-width: 0 }
+.panel > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line) }
+.panel > .body { padding: 16px }
+.icon-btn { width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer }
+.icon-btn:hover { background: var(--soft) }
+.icon-btn svg { width: 15px; height: 15px }
+.btn { font: inherit; font-size: 13px; font-weight: 500; border-radius: 6px; padding: 6px 12px; cursor: pointer; border: 1px solid var(--fg); background: var(--fg); color: var(--bg); white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; gap: 6px }
+.btn.outline { background: var(--bg); color: var(--fg); border-color: var(--line) } .btn.outline:hover { background: var(--soft) }
+.btn.link { background: none; border: none; color: var(--accent); padding: 0 } .btn.link:hover { text-decoration: underline }
+.btn[disabled] { opacity: .6; cursor: progress }
+.badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 500; white-space: nowrap; border: 1px solid var(--line); color: var(--muted) }
+.badge.auto { background: var(--accent-soft); color: var(--accent); border-color: transparent }
+.badge.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent }
+.badge.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent }
+.badge.solid-warn { background: var(--warn); color: #fff; border-color: transparent }
+.toast { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); border-radius: 8px; padding: 10px 14px; font-size: 13px; box-shadow: var(--shadow); z-index: 30; transition: opacity .3s }
+.toast.gone { opacity: 0; pointer-events: none }
+/* The data card */
+.data { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0 }
+.data > div { padding: 16px; min-width: 0 } .data > div + div { border-left: 1px solid var(--line) }
+.fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px 20px; margin: 0 }
+.fields dt { font-size: 12px; color: var(--muted) } .fields dd { margin: 2px 0 0; font-weight: 500; overflow-wrap: anywhere }
+.fields .own dt::after { content: " · case type field"; color: var(--accent) }
+.fields input, .fields select { font: inherit; font-size: 13px; width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; background: var(--bg); color: var(--fg) }
+.fields .edit { display: none } .editing .fields .view { display: none } .editing .fields .edit { display: block }
+.edit-bar { display: none; gap: 8px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--line) } .editing .edit-bar { display: flex }
+.label { font-size: 12px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px }
+.timeline { list-style: none; padding: 0; margin: 0; font-size: 13px }
+.timeline li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; padding: 0 0 10px 14px; border-left: 2px solid var(--line); margin-left: 5px; position: relative }
+.timeline li:last-child { padding-bottom: 0 }
+.timeline li::before { content: ""; position: absolute; left: -6px; top: 5px; width: 10px; height: 10px; border-radius: 999px; background: var(--bg); border: 2px solid var(--fg) }
+.timeline li.clock::before { background: var(--fg) } .timeline li.open::before { border: 2px dashed var(--warn) }
+.timeline .d { color: var(--muted); font-variant-numeric: tabular-nums }
+/* Tables */
+.table-wrap { overflow-x: auto }
+table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px }
+th { text-align: left; font-weight: 500; color: var(--muted); padding: 10px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; font-size: 12px }
+td { padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: middle }
+tr:last-child td { border-bottom: none }
+tbody tr:hover { background: var(--panel) }
+td .mono, .mono { font-family: var(--mono); font-size: 12px }
+td .muted, .muted { color: var(--muted); font-size: 12px }
+td.actions { text-align: right; white-space: nowrap }
+td a.row-link { color: var(--fg); font-weight: 500; text-decoration: none } td a.row-link:hover { text-decoration: underline }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px }
+.stat { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px } .stat .n { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums } .stat .l { font-size: 12px; color: var(--muted) }
+.filters { display: flex; gap: 6px; flex-wrap: wrap } .filters button { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); border-radius: 999px; padding: 3px 10px; cursor: pointer } .filters button.on { color: var(--fg); border-color: var(--fg); font-weight: 500 }
+/* The sheet */
+.scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 20 }
+.sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(680px, 100vw); background: var(--bg); border-left: 1px solid var(--line); box-shadow: var(--shadow); z-index: 21; display: flex; flex-direction: column }
+.sheet > header { padding: 16px 20px; padding-top: max(16px, env(safe-area-inset-top, 0px)); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; align-items: flex-start }
+.sheet .scroll { overflow-y: auto; padding: 20px; padding-right: max(20px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; flex: 1 }
+.sheet > footer { padding: 12px 20px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap }
+.sheet select { font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; background: var(--bg); color: var(--fg); max-width: 100% }
+.callout { border-radius: 8px; padding: 12px 14px; background: var(--fg); color: var(--bg); font-size: 14px }
+.drow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px }
+.drow:last-child { border-bottom: none } .drow small { display: block; color: var(--muted); font-size: 12px }
+.step { display: grid; grid-template-columns: minmax(110px, 190px) minmax(0, 1fr) 84px; gap: 10px; align-items: center; font-size: 12px; padding: 4px 0 }
+.bar { position: relative; height: 12px; background: var(--soft); border-radius: 3px }
+.bar i { position: absolute; top: 0; bottom: 0; left: 0; background: var(--fg); border-radius: 3px 0 0 3px; opacity: .7 } .bar i.pt { opacity: .25 }
+.bar b { position: absolute; top: 0; bottom: 0; background: var(--warn); border-radius: 0 3px 3px 0 } .bar s { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--accent) }
+.days { text-align: right; font-variant-numeric: tabular-nums } .days .late { color: var(--warn); font-weight: 600 }
+.surv { display: flex; gap: 20px; flex-wrap: wrap; align-items: center }
+.surv .n { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums }
+.dots { display: grid; grid-template-columns: repeat(20, 8px); gap: 3px } .dots i { width: 8px; height: 8px; border-radius: 999px; background: var(--line) } .dots i.a { background: var(--fg); opacity: .75 }
+.note { font-size: 12px; color: var(--muted); margin: 0 }
+@media (max-width: 860px) { .data { grid-template-columns: minmax(0, 1fr) } .data > div + div { border-left: none; border-top: 1px solid var(--line) } }
+@media (max-width: 720px) {
+  .shell { grid-template-columns: minmax(0, 1fr) }
+  aside { flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--line); padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); gap: 4px }
+  aside .project, aside .group { display: none }
+  main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+  .step { grid-template-columns: minmax(0, 1fr) 80px } .step .bar { grid-column: 1 / -1 }
+}
+</style>
+
+<div class="banner">Educational use only. Do not enter patient data.</div>
+<div class="shell">
+  <aside>
+    <div class="project">Nordic cancer care</div>
+    <a href="#">Sessions</a>
+    <a href="#">Dashboards</a>
+    <a href="#">Sources</a>
+    <div class="group">Pathways</div>
+    <a href="#case" data-nav="case">Cases</a>
+    <a href="#models" data-nav="models">Models</a>
+  </aside>
+
+  <main>
+    <!-- Screen: a case, right after saving it -->
+    <section class="screen" id="screen-case">
+      <div class="crumbs"><a href="#case">Cases</a><span>/</span><span>Suspected cancer pathway</span></div>
+      <div class="head">
+        <div>
+          <h1 class="key">SYN-0042</h1>
+          <div class="sub"><span>Key from your system</span><span>Revision 3 · saved 15 Nov 2026, 10:42</span><span>Synthetic</span></div>
+        </div>
+        <span class="badge solid-warn">Treatment start overdue by 3 days</span>
+      </div>
+
+      <div class="panel" id="data-card">
+        <header>
+          <h2>Case data</h2>
+          <button class="icon-btn" type="button" id="edit" aria-label="Edit the case data" title="Edit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+        </header>
+        <div class="data">
+          <div>
+            <dl class="fields">
+              <div><dt>Site</dt><dd><span class="view">Lung</span><select class="edit"><option>Lung</option><option>Colorectal</option><option>Pancreas</option></select></dd></div>
+              <div><dt>Sex · age group</dt><dd><span class="view">Female · 60–69</span><input class="edit" value="Female · 60–69"></dd></div>
+              <div><dt>Route</dt><dd><span class="view">Public health centre</span><input class="edit" value="Public health centre"></dd></div>
+              <div><dt>Presentation</dt><dd><span class="view">Cough 6+ weeks, smoker over 40 · imaging finding</span><input class="edit" value="Cough 6+ weeks, smoker over 40 · imaging finding"></dd></div>
+              <div><dt>Intent · modality</dt><dd><span class="view">Curative · surgery</span><input class="edit" value="Curative · surgery"></dd></div>
+              <div><dt>Stage</dt><dd><span class="view">Not known yet</span><select class="edit"><option>Not known yet</option><option>Localised</option><option>Regional</option><option>Distant</option></select></dd></div>
+              <div><dt>Education</dt><dd><span class="view">Basic</span><input class="edit" value="Basic"></dd></div>
+              <div class="own"><dt>County</dt><dd><span class="view">Pirkanmaa</span><input class="edit" value="Pirkanmaa"></dd></div>
+              <div class="own"><dt>Referred by</dt><dd><span class="view">Health centre, Hervanta</span><input class="edit" value="Health centre, Hervanta"></dd></div>
+            </dl>
+          </div>
+          <div>
+            <div class="label">Steps</div>
+            <ul class="timeline">
+              <li><span class="d">day 0</span><span>First contact, health centre <span class="muted">· 51 days of symptoms before</span></span></li>
+              <li><span class="d">day 14</span><span>Physician; imaging ordered</span></li>
+              <li class="clock"><span class="d">day 27</span><span>X-ray shows a lesion: <strong>clock starts</strong></span></li>
+              <li><span class="d">day 28</span><span>Pathway referral</span></li>
+              <li><span class="d">day 36</span><span>First specialist visit</span></li>
+              <li><span class="d">day 62</span><span>Work-up complete</span></li>
+              <li class="open"><span class="d">day 74</span><span>Today · no treatment start yet</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="edit-bar"><span class="muted" style="margin-right:auto;align-self:center">Saving makes revision 4 and runs the automatic models again.</span><button class="btn outline" type="button" data-cancel>Cancel</button><button class="btn" type="button" data-save>Save</button></div>
+      </div>
+
+      <div class="panel">
+        <header><h2>Models</h2><span class="muted">2 models on Suspected cancer pathway</span></header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Model</th><th>Runs</th><th>Latest result</th><th>When</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><a class="row-link" href="#model">Patient pathway model</a><div class="muted">v1</div></td>
+                <td><span class="badge auto">Automatically</span></td>
+                <td><span class="badge warn">Treatment start overdue by 3 days</span> <span class="muted">· 20 days behind · 35 of 100 at 5 years</span></td>
+                <td><span class="muted">15 Nov, 10:42 · rev. 3</span></td>
+                <td class="actions"><button class="btn outline" type="button" data-sheet="pathway">View result</button></td>
+              </tr>
+              <tr id="trial-row">
+                <td><a class="row-link" href="#models">Clinical trial matcher</a><div class="muted">v1 · example, added after this case</div></td>
+                <td><span class="badge">On request</span></td>
+                <td data-slot="trial-result"><span class="muted">Not evaluated for this case</span></td>
+                <td data-slot="trial-when"><span class="muted">—</span></td>
+                <td class="actions" data-slot="trial-action"><button class="btn" type="button" data-evaluate="trial">Evaluate</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="note">Results are kept on the case as history. A model added later is not run on old cases until someone evaluates it here.</p>
+    </section>
+
+    <!-- Screen: all models -->
+    <section class="screen" id="screen-models" hidden>
+      <div class="head">
+        <div><h1>Models</h1><div class="sub"><span>Each model runs on one case type</span></div></div>
+        <button class="btn" type="button">New model</button>
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Model</th><th>Case type</th><th>Runs</th><th>Version</th><th>Eligible cases</th><th>With a result</th><th>Updated</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><a class="row-link" href="#model">Patient pathway model</a><div class="muted">Fast-track trigger, deadlines, survival second</div></td>
+                <td>Suspected cancer pathway</td>
+                <td><span class="badge auto">Automatically</span></td>
+                <td>v1</td>
+                <td>312</td>
+                <td>312 <span class="muted">· 100 %</span></td>
+                <td><span class="muted">14 Nov</span></td>
+              </tr>
+              <tr>
+                <td><a class="row-link" href="#models">Clinical trial matcher</a><div class="muted">Example: recruiting trials by site, age and sex</div></td>
+                <td>Suspected cancer pathway</td>
+                <td><span class="badge">On request</span></td>
+                <td>v1</td>
+                <td>312</td>
+                <td>4 <span class="muted">· 1 %</span></td>
+                <td><span class="muted">15 Nov</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen: one model and its cases -->
+    <section class="screen" id="screen-model" hidden>
+      <div class="crumbs"><a href="#models">Models</a><span>/</span><span>Patient pathway model</span></div>
+      <div class="head">
+        <div>
+          <h1>Patient pathway model</h1>
+          <div class="sub"><span>v1</span><span>Case type: Suspected cancer pathway</span><span class="badge auto">Runs automatically</span></div>
+        </div>
+        <div style="display:flex;gap:8px"><button class="btn outline" type="button">Model card</button><button class="btn outline" type="button">Population</button></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="n">312</div><div class="l">eligible cases</div></div>
+        <div class="stat"><div class="n">312</div><div class="l">with a result</div></div>
+        <div class="stat"><div class="n" style="color:var(--warn)">27</div><div class="l">open, a deadline overdue</div></div>
+        <div class="stat"><div class="n">61 %</div><div class="l">treatment started on target</div></div>
+      </div>
+      <div class="panel">
+        <header>
+          <h2>Cases</h2>
+          <div class="filters" role="group" aria-label="Filter cases"><button class="on" type="button">All 312</button><button type="button">Overdue 27</button><button type="button">Open 84</button><button type="button">Not run 0</button></div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Key</th><th>County</th><th>Site</th><th>Latest result</th><th>Ran</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><a class="row-link mono" href="#case">SYN-0042</a></td><td>Pirkanmaa</td><td>Lung</td><td><span class="badge warn">Treatment start overdue by 3 days</span></td><td><span class="muted">Automatically · 15 Nov, 10:42</span></td><td class="actions"><button class="btn outline" type="button" data-sheet="pathway">View</button></td></tr>
+              <tr><td><a class="row-link mono" href="#case">SYN-0117</a></td><td>Pohjois-Pohjanmaa</td><td>Colorectal</td><td><span class="badge warn">Work-up overdue by 6 days</span></td><td><span class="muted">Automatically · 15 Nov, 09:58</span></td><td class="actions"><button class="btn outline" type="button" data-sheet="pathway">View</button></td></tr>
+              <tr><td><a class="row-link mono" href="#case">SYN-0203</a></td><td>Varsinais-Suomi</td><td>Lung</td><td><span class="badge">First visit due in 2 days</span></td><td><span class="muted">Automatically · 14 Nov, 16:20</span></td><td class="actions"><button class="btn outline" type="button" data-sheet="pathway">View</button></td></tr>
+              <tr><td><a class="row-link mono" href="#case">SYN-0019</a></td><td>Helsinki</td><td>Pancreas</td><td><span class="badge ok">Treatment started on target</span></td><td><span class="muted">On request · 13 Nov, 11:05</span></td><td class="actions"><button class="btn outline" type="button" data-sheet="pathway">View</button></td></tr>
+              <tr><td><a class="row-link mono" href="#case">SYN-0288</a></td><td>Lappi</td><td>Lung</td><td><span class="badge">No pathway criterion met</span></td><td><span class="muted">Automatically · 12 Nov, 08:41</span></td><td class="actions"><button class="btn outline" type="button" data-sheet="pathway">View</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="note">Eligible cases are all cases of the model's case type. Cases saved before the model existed show "Not run" until someone evaluates them.</p>
+    </section>
+  </main>
+</div>
+
+<!-- The result sheet -->
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+  <header>
+    <div>
+      <div class="muted" id="sheet-case">SYN-0042 · Suspected cancer pathway</div>
+      <h2 id="sheet-title" style="font-size:17px">Patient pathway model</h2>
+      <div class="sub" id="sheet-meta"><span>v1</span><span>Ran automatically</span><span>15 Nov, 10:42</span><span>read revision 3</span></div>
+    </div>
+    <button class="icon-btn" type="button" data-close aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </header>
+
+  <div class="scroll" id="sheet-pathway">
+    <div class="callout"><strong>Treatment start is overdue by 3 days.</strong> The pathway would have started in Denmark, Norway and Sweden with the X-ray on day 27; treatment was due on day 71.</div>
+    <div>
+      <div class="label">Deadlines</div>
+      <div class="drow"><span>Imaging after suspicion<small>6 days after the physician's decision · Sweden</small></span><span class="muted">day 20</span><span class="badge">7 days late</span></div>
+      <div class="drow"><span>First specialist visit<small>10 days after the trigger · Denmark, Norway</small></span><span class="muted">day 37</span><span class="badge ok">met, 1 day early</span></div>
+      <div class="drow"><span>Work-up complete<small>32 days after the trigger · Denmark, Norway</small></span><span class="muted">day 59</span><span class="badge">3 days late</span></div>
+      <div class="drow"><span>Treatment start<small>44 days after the trigger · Denmark, Norway, Sweden</small></span><span class="muted">day 71</span><span class="badge solid-warn">overdue by 3 days</span></div>
+    </div>
+    <div>
+      <div class="label">Where the days go · 20 days behind target</div>
+      <div class="step"><span>First contact → physician</span><div class="bar"><i style="width:11.7%"></i><b style="left:11.7%;width:11.7%"></b><s style="left:11.7%"></s></div><span class="days"><span class="late">14 d +7</span></span></div>
+      <div class="step"><span>Physician → imaging</span><div class="bar"><i style="width:10%"></i><b style="left:10%;width:11.7%"></b><s style="left:10%"></s></div><span class="days"><span class="late">13 d +7</span></span></div>
+      <div class="step"><span>Imaging → referral</span><div class="bar"><i style="width:1.7%"></i><s style="left:6.7%"></s></div><span class="days">1 d</span></div>
+      <div class="step"><span>Referral → first visit</span><div class="bar"><i style="width:10%"></i><b style="left:10%;width:3.3%"></b><s style="left:10%"></s></div><span class="days"><span class="late">8 d +2</span></span></div>
+      <div class="step"><span>First visit → work-up</span><div class="bar"><i style="width:36.7%"></i><b style="left:36.7%;width:6.7%"></b><s style="left:36.7%"></s></div><span class="days"><span class="late">26 d +4</span></span></div>
+      <div class="step"><span>Work-up → treatment</span><div class="bar"><i style="width:20%"></i><s style="left:23.3%"></s></div><span class="days">12 d so far</span></div>
+      <p class="note" style="margin-top:6px">Blue line: the target, the median of the Danish, Norwegian and Swedish standards.</p>
+    </div>
+    <div>
+      <div class="label">Alive at 5 years, of 100 with this profile</div>
+      <div class="surv"><span class="n">35</span><div class="dots" data-alive="35"></div><span class="muted">32–39 across the settings · the same if the rest is on target</span></div>
+      <p class="note" style="margin-top:6px">Weaker evidence than the deadlines. The 14 days lost before the X-ray cost about 3 of 100 under an assumption.</p>
+    </div>
+    <div>
+      <div class="label">Support to offer</div>
+      <ul style="margin:0;padding-left:18px;font-size:13px"><li>A patient navigator to keep the next steps on time.</li><li>A check that every treatment option was discussed.</li></ul>
+    </div>
+  </div>
+
+  <div class="scroll" id="sheet-trial" hidden>
+    <div class="callout">2 recruiting trials match on site, age and sex. Eligibility is shown, not judged.</div>
+    <div>
+      <div class="drow"><span>Example trial A · phase 2<small>Lung · 18–80 · Helsinki, Tampere</small></span><span class="muted">Finland</span><span class="badge ok">recruiting</span></div>
+      <div class="drow"><span>Example trial B · phase 3<small>Lung · 40–85 · Uppsala</small></span><span class="muted">Sweden</span><span class="badge ok">recruiting</span></div>
+    </div>
+    <p class="note">Placeholder rows: trial matching is a later model.</p>
+  </div>
+
+  <footer>
+    <select aria-label="Earlier results" id="sheet-history"><option>15 Nov, 10:42 · rev. 3 (latest)</option><option>12 Nov, 09:10 · rev. 2</option><option>4 Nov, 14:55 · rev. 1</option></select>
+    <button class="btn" type="button" data-reevaluate>Evaluate again</button>
+  </footer>
+</div>
+
+<div class="toast" id="toast" role="status">Case SYN-0042 saved. The pathway model ran automatically.</div>
+
+<script>
+document.querySelectorAll('.dots[data-alive]').forEach((el) => {
+  const alive = Number(el.dataset.alive)
+  el.innerHTML = Array.from({ length: 100 }, (_, i) => `<i${i < alive ? ' class="a"' : ''}></i>`).join('')
+})
+
+// Screens, routed on the hash; #case is the start.
+const screens = ['case', 'models', 'model']
+function show() {
+  const name = screens.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'case'
+  screens.forEach((s) => { document.getElementById(`screen-${s}`).hidden = s !== name })
+  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('on', a.dataset.nav === (name === 'model' ? 'models' : name)))
+  closeSheet()
+  window.scrollTo(0, 0)
+}
+window.addEventListener('hashchange', show)
+
+// The toast after saving fades on its own.
+const toast = document.getElementById('toast')
+setTimeout(() => toast.classList.add('gone'), 3500)
+
+// Edit in place: the pencil turns the fields into inputs.
+const card = document.getElementById('data-card')
+document.getElementById('edit').addEventListener('click', () => card.classList.toggle('editing'))
+card.querySelector('[data-cancel]').addEventListener('click', () => card.classList.remove('editing'))
+card.querySelector('[data-save]').addEventListener('click', () => {
+  card.classList.remove('editing')
+  toast.textContent = 'Saved as revision 4. The pathway model ran again.'
+  toast.classList.remove('gone')
+  setTimeout(() => toast.classList.add('gone'), 3500)
+})
+
+// The result sheet.
+const sheet = document.getElementById('sheet'), scrim = document.getElementById('scrim')
+function openSheet(kind) {
+  const trial = kind === 'trial'
+  document.getElementById('sheet-pathway').hidden = trial
+  document.getElementById('sheet-trial').hidden = !trial
+  document.getElementById('sheet-title').textContent = trial ? 'Clinical trial matcher' : 'Patient pathway model'
+  document.getElementById('sheet-meta').innerHTML = trial
+    ? '<span>v1</span><span>Evaluated on request</span><span>just now</span><span>read revision 3</span>'
+    : '<span>v1</span><span>Ran automatically</span><span>15 Nov, 10:42</span><span>read revision 3</span>'
+  document.getElementById('sheet-history').innerHTML = trial
+    ? '<option>Just now · rev. 3 (only result)</option>'
+    : '<option>15 Nov, 10:42 · rev. 3 (latest)</option><option>12 Nov, 09:10 · rev. 2</option><option>4 Nov, 14:55 · rev. 1</option>'
+  sheet.hidden = scrim.hidden = false
+  sheet.querySelector('[data-close]').focus()
+}
+function closeSheet() { sheet.hidden = scrim.hidden = true }
+document.addEventListener('click', (e) => {
+  const open = e.target.closest('[data-sheet]')
+  if (open) openSheet(open.dataset.sheet)
+  if (e.target.closest('[data-close]') || e.target === scrim) closeSheet()
+})
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet() })
+sheet.querySelector('[data-reevaluate]').addEventListener('click', (e) => {
+  const b = e.currentTarget
+  b.disabled = true; b.textContent = 'Evaluating…'
+  setTimeout(() => { b.disabled = false; b.textContent = 'Evaluate again'; document.getElementById('sheet-history').insertAdjacentHTML('afterbegin', '<option selected>Just now · rev. 3 (latest)</option>') }, 700)
+})
+
+// Evaluate a model that does not run automatically: the result is stored and opens in the sheet.
+document.querySelector('[data-evaluate="trial"]').addEventListener('click', (e) => {
+  const b = e.currentTarget
+  b.disabled = true; b.textContent = 'Evaluating…'
+  setTimeout(() => {
+    document.querySelector('[data-slot="trial-result"]').innerHTML = '<span class="badge ok">2 recruiting trials</span> <span class="muted">· Finland 1 · Sweden 1</span>'
+    document.querySelector('[data-slot="trial-when"]').innerHTML = '<span class="muted">just now · rev. 3</span>'
+    document.querySelector('[data-slot="trial-action"]').innerHTML = '<button class="btn outline" type="button" data-sheet="trial">View result</button>'
+    openSheet('trial')
+  }, 700)
+})
+
+show()
+</script>

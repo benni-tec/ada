@@ -2,8 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { SquareArrowOutUpRight } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 
-import { Modal } from '@/components/modal'
 import { ErrorNotice, Loading } from '@/components/notices'
+import { SideSheet } from '@/components/side-sheet'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -56,7 +56,7 @@ function inputOperator(widget: Widget, input: string): { operatorId: OperatorId;
 
 /**
  * "Pipeline" at the left of the card's footer: one button that opens the widget's
- * pipeline as a graph. Every card has one: whoever doubts a number can follow it back to
+ * pipeline as a graph, in a sheet from the right. Every card has one: whoever doubts a number can follow it back to
  * its source and fetch time, in the card's own run. The pipeline is read only when the
  * dialog opens, so a page of cards asks for none.
  *
@@ -115,7 +115,7 @@ function RunLine({ run }: { run: CardRun }) {
   )
 }
 
-/** The pipeline dialog, on one of the widget's inputs. The pipeline is read when it opens.
+/** The pipeline sheet, on one of the widget's inputs. The pipeline is read when it opens.
  * A custom widget's dialog has a second tab with its code. */
 function PipelineDialog({
   widget,
@@ -144,7 +144,7 @@ function PipelineDialog({
     <PipelineView target={operatorId} run={run} operators={lineage.data} sourceOf={sourceOf} />
   )
   return (
-    <Modal title={title} description={<RunLine run={run} />} onClose={onClose}>
+    <SideSheet title={title} description={<RunLine run={run} />} onClose={onClose}>
       {widget.type === 'custom' ? (
         <Tabs defaultValue="pipeline" className="h-full min-h-0 gap-0">
           <TabsList variant="line" className="mx-3 my-1">
@@ -161,7 +161,7 @@ function PipelineDialog({
       ) : (
         pipeline
       )}
-    </Modal>
+    </SideSheet>
   )
 }
 

@@ -13,6 +13,8 @@ export * from './attachments'
 export * from './agent'
 export * from './settings'
 export * from './judges'
+export * from './statistical-models'
+export * from './cases'
 
 export type Health = Schemas['Health']
 

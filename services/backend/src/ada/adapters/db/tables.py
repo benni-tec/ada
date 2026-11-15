@@ -552,6 +552,111 @@ class WebUsageRow(Base):
     credits: Mapped[int] = mapped_column(Integer)
 
 
+class StatisticalModelRow(Base):
+    __tablename__ = "statistical_models"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    project_id: Mapped[UUID] = _project()
+    name: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(String(32))
+    # The number of the newest version; the versions point back at the model.
+    latest_version: Mapped[int] = mapped_column(Integer)
+    case_type_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("case_types.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    auto_run: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    created_by: Mapped[Json] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+    updated_at: Mapped[datetime | None] = mapped_column(_timestamp, nullable=True)
+
+
+class StatisticalModelVersionRow(Base):
+    """Immutable: what a version was built from (the spec) and what the build derived."""
+
+    __tablename__ = "statistical_model_versions"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    model_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("statistical_models.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    spec: Mapped[Json] = mapped_column(JSONB)
+    compiled: Mapped[Json] = mapped_column(JSONB)
+    created_by: Mapped[Json] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+
+    __table_args__ = (UniqueConstraint("model_id", "version"),)
+
+
+class CaseTypeRow(Base):
+    __tablename__ = "case_types"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    project_id: Mapped[UUID] = _project()
+    name: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    fields: Mapped[list[Json]] = mapped_column(JSONB)
+    revision: Mapped[int] = mapped_column(Integer)
+    created_by: Mapped[Json] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+
+
+class CaseRow(Base):
+    """A case under the key its caller set; `values` is the latest state."""
+
+    __tablename__ = "cases"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    case_type_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("case_types.id", ondelete="CASCADE"), index=True
+    )
+    key: Mapped[str] = mapped_column(String(128))
+    values: Mapped[Json] = mapped_column(JSONB)
+    schema_revision: Mapped[int] = mapped_column(Integer)
+    revision: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+    updated_at: Mapped[datetime] = mapped_column(_timestamp)
+
+    __table_args__ = (UniqueConstraint("case_type_id", "key"),)
+
+
+class CaseEventRow(Base):
+    """Append-only: a field's value changed at a save (a day map per level)."""
+
+    __tablename__ = "case_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    case_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("cases.id", ondelete="CASCADE"), index=True
+    )
+    field: Mapped[str] = mapped_column(String(64))
+    level: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    old: Mapped[Any] = mapped_column(JSONB, nullable=True)
+    new: Mapped[Any] = mapped_column(JSONB, nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(_timestamp)
+
+
+class CaseResultRow(Base):
+    """Append-only: one model's result for one case, as it was."""
+
+    __tablename__ = "case_results"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("cases.id", ondelete="CASCADE"), index=True
+    )
+    model_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("statistical_models.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    case_revision: Mapped[int] = mapped_column(Integer)
+    section: Mapped[Json] = mapped_column(JSONB)
+    trigger: Mapped[str] = mapped_column(String(16))
+    created_by: Mapped[Json] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)
+
+
 class AlertDeliveryRow(Base):
     __tablename__ = "alert_deliveries"
 

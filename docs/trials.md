@@ -122,3 +122,6 @@ records the rebuilt step again). Every step note starts with its contract name. 
 
 The checked-in seven CT.gov recording records all pass the condition filter; their
 counts are unchanged (including two recruiting Finnish trials).
+
+The trial matcher model (`trial_matcher`, docs/contracts.md "Cases") reads `case_trials`:
+`create_trial_matcher` with that operator puts a matcher on the project's cancer case type.

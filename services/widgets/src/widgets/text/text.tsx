@@ -127,7 +127,6 @@ function describe(placeholder: Placeholder, resolved: Resolved, result: InputRes
   ]
   if (result?.status === 'loaded') {
     lines.push(`Run: ${result.data.run_id}`, `Fetched: ${time(result.fetchedAt)}`)
-    if (result.data.is_scenario) lines.push('Scenario: simulated numbers')
     if (result.data.is_stale) lines.push('Stale: last good data, a refresh failed')
   }
   if (canOpenPipeline()) lines.push('Click to open its pipeline')
@@ -319,7 +318,7 @@ export function Text({ widget, data, fetchedAt }: Loaded) {
 
   return (
     <>
-      {staleElsewhere && <Flags data={{ is_scenario: false, is_stale: true }} />}
+      {staleElsewhere && <Flags data={{ is_stale: true }} />}
       <div className="ada-text">
         <Streamdown
           mode="static"
