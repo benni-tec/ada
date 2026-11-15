@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { latestPerKey } from '@/lib/columns'
 import type { Loaded } from '@/lib/runtime'
@@ -7,7 +7,7 @@ import type { Roles, WidgetData } from '@/lib/types'
 import { loaded, widget } from '@/test/samples'
 
 import { RegionMap } from './map'
-import { buildMap, classes, parseGeometry, type MapModel } from './model'
+import { anchorOf, buildMap, classes, parseGeometry, placeLabels, shortNames, type MapModel, type Region } from './model'
 
 /** A square in planar metres, as Statistics Finland's boundaries come (EPSG:3067). */
 function square(x: number, y: number, size = 100_000) {
@@ -174,4 +174,85 @@ test('names what is missing to draw a map', () => {
   expect(screen.getByRole('alert')).toHaveTextContent('A map needs a geography role')
   rerender(<RegionMap {...sample({ widget: widget({ type: 'map', spec: { geometry: 'shape' } }) })} />)
   expect(screen.getByRole('alert')).toHaveTextContent('No column "shape" with the region outlines')
+})
+
+test('on paper every region is named on the map, by its name and value where it fits, else by a number in a key', async () => {
+  // On screen the tooltips name the regions: no labels.
+  const { container } = render(<RegionMap {...sample()} />)
+  expect(container.querySelector('.ada-map-labels')).toBeNull()
+  expect(container.querySelector('[data-region="19"]')).toHaveAttribute('stroke', 'var(--surface)')
+
+  // Laid out for a report's PDF, it labels them.
+  document.documentElement.dataset.snapshot = ''
+  const labels = await vi.waitFor(() => {
+    const found = container.querySelector('.ada-map-labels')
+    if (!found) throw new Error('no labels yet')
+    return found
+  })
+  expect(labels).toHaveAttribute('aria-hidden', 'true')
+  // Five regions, each named once: as a label or in the key.
+  const named = [...labels.querySelectorAll(':scope > text')].map((text) => text.textContent)
+  const key = [...container.querySelectorAll('.ada-map-key li')].map((item) => item.textContent)
+  expect(named.length + key.length).toBe(5)
+  expect([...named, ...key].join(' ')).toContain('North Ostrobothnia85.6'.slice(0, 18))
+  delete document.documentElement.dataset.snapshot
+  await vi.waitFor(() => expect(container.querySelector('.ada-map-labels')).toBeNull())
+})
+
+test('a label goes inside its region: the centroid, or for a crescent the middle of its widest stretch', () => {
+  const same = (x: number, y: number) => [x, y]
+  const box = { type: 'Polygon' as const, coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] }
+  expect(anchorOf(box, same)).toEqual({ anchor: [5, 5], area: 100 })
+  // A C open to the east: its centroid falls in the opening.
+  const c = { type: 'Polygon' as const, coordinates: [[[0, 0], [10, 0], [10, 2], [2, 2], [2, 8], [10, 8], [10, 10], [0, 10], [0, 0]]] }
+  const { anchor } = anchorOf(c, same)
+  expect(anchor![0]).toBeLessThan(2)
+  // The largest part of a multipolygon is the one labelled.
+  // A square with a hole in its middle: the label goes on the region, not in the hole.
+  const framed = {
+    type: 'Polygon' as const,
+    coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]], [[4, 4], [6, 4], [6, 6], [4, 6], [4, 4]]],
+  }
+  const ring = anchorOf(framed, same).anchor!
+  expect(ring[0] < 4 || ring[0] > 6).toBe(true)
+  const islands = { type: 'MultiPolygon' as const, coordinates: [[[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]], [[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]]]] }
+  expect(anchorOf(islands, same)).toEqual({ anchor: [25, 25], area: 100 })
+})
+
+test('names lose the words most of them end with', () => {
+  expect(shortNames(['Lapland wellbeing services county', 'Kainuu wellbeing services county', 'City of Helsinki'])).toEqual([
+    'Lapland',
+    'Kainuu',
+    'City of Helsinki',
+  ])
+  expect(shortNames(['Helsinki', 'Espoo'])).toEqual(['Helsinki', 'Espoo'])
+})
+
+test('labels never overlap or cover another region: crowded regions are numbered, and a number in the way moves out with a line', () => {
+  const region = (code: string, x: number, y: number, area: number): Region => ({
+    code, name: code, path: 'M0 0Z', value: 1, lower: null, upper: null, state: 'value', bin: 0, period: null, anchor: [x, y], area,
+  })
+  const texts = new Map([['big', ['A long region name']], ['near', ['Another long name']], ['alone', ['Lapland', '83.8']]])
+  const labels = placeLabels([region('near', 104, 100, 50), region('big', 100, 100, 500), region('alone', 300, 300, 900)], texts, 10, [0, 0, 1000, 1000])
+  expect(labels.find((l) => l.code === 'alone')).toMatchObject({ x: 300, y: 300, lines: ['Lapland', '83.8'] })
+  // Either label would cover the other's region: both numbered, north to south then west
+  // to east, and the second moved off the first, a line back to its own region.
+  expect(labels.find((l) => l.code === 'big')).toMatchObject({ number: 1, x: 100, y: 100 })
+  const near = labels.find((l) => l.code === 'near')!
+  expect(near).toMatchObject({ number: 2, from: [104, 100] })
+  expect(Math.hypot(near.x - 100, near.y - 100)).toBeGreaterThan(10)
+})
+
+test('a label that would leave the map is numbered, and crowded numbers all find room of their own', () => {
+  const region = (code: string, x: number, y: number, area: number): Region => ({
+    code, name: code, path: 'M0 0Z', value: 1, lower: null, upper: null, state: 'value', bin: 0, period: null, anchor: [x, y], area,
+  })
+  // At the edge, a long name would be cut off: a number, inside the map.
+  const [edge] = placeLabels([region('edge', 5, 50, 100)], new Map([['edge', ['A very long region name indeed']]]), 10, [0, 0, 200, 200])
+  expect(edge).toMatchObject({ number: 1 })
+  // Twenty-six regions within half a unit: every number clear of every other.
+  const crowd = Array.from({ length: 26 }, (_, i) => region(`r${i}`, 100 + (i % 5) / 10, 100 + Math.floor(i / 5) / 10, 1))
+  const numbers = placeLabels(crowd, new Map(crowd.map((r) => [r.code, ['A long name for a tiny region']])), 10, [0, 0, 1000, 1000])
+  for (const [i, a] of numbers.entries())
+    for (const b of numbers.slice(i + 1)) expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(10 * 0.62 * 2)
 })

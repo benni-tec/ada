@@ -312,6 +312,19 @@ body,
   max-height: 480px;
 }
 
+/* A picture for a report's PDF (host.ts answerSnapshots): everything shown, nothing
+   scrolls, and no sources line, which the PDF lists under the picture itself. */
+:root[data-snapshot] .ada-body,
+:root[data-snapshot] .ada-table-scroll,
+:root[data-snapshot] .ada-text {
+  max-height: none;
+  overflow: visible;
+}
+
+:root[data-snapshot] .ada-sources {
+  display: none;
+}
+
 .ada-table-scroll:focus-visible {
   outline: 2px solid var(--series-1);
 }
@@ -457,6 +470,11 @@ body,
   height: 400px;
 }
 
+/* On paper the labels are the only way to read the map: more room for them. */
+:root[data-snapshot] .ada-map {
+  height: 680px;
+}
+
 .ada-map svg {
   position: absolute;
   inset: 0;
@@ -469,18 +487,38 @@ body,
 }
 
 /* A thin gap in the surface colour between neighbours, whatever the map's scale. */
-.ada-region {
-  stroke: var(--surface);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
 .ada-region-outline {
   fill: none;
   stroke: var(--text-primary);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
+}
+
+/* Region labels: their colours are attributes in map.tsx, which a picture keeps. */
+.ada-map-labels {
+  pointer-events: none;
+}
+
+.ada-map-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ada-map-key-number {
+  display: inline-block;
+  min-width: 14px;
+  border: 1px solid var(--text-secondary);
+  border-radius: 999px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 13px;
 }
 
 .ada-map-tooltip {

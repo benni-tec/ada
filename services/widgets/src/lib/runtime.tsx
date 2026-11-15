@@ -82,6 +82,19 @@ async function withInputs(loaded: Loaded, ctx: WidgetContext | null): Promise<Lo
   }
 }
 
+function onPaperChange(listener: () => void): () => void {
+  const observer = new MutationObserver(listener)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-snapshot'] })
+  return () => observer.disconnect()
+}
+
+/** Whether the widget is being laid out for paper: a picture of it is being taken for a
+ * report's PDF (host.ts answerSnapshots). What only paper needs, e.g. a map's labels in
+ * place of its tooltips, is drawn only then. */
+export function usePaper(): boolean {
+  return useSyncExternalStore(onPaperChange, () => 'snapshot' in document.documentElement.dataset)
+}
+
 /** Loads the widget named in the URL fragment and its data, shows loading and error
  * states, and marks stale data. Widget types render only the loaded case. */
 export function WidgetRuntime({ children }: { children: (loaded: Loaded) => ReactNode }) {
