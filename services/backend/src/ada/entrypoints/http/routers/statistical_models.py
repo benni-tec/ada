@@ -17,6 +17,7 @@ from ada.core.models.statistical_models import (
     ModelVersion,
     PopulationFigure,
     StatisticalModel,
+    StepTime,
 )
 from ada.core.services.ports.statistical_models import StatisticalModelService
 from ada.entrypoints.http.actor import WEB
@@ -131,6 +132,16 @@ async def evaluate_model(
     """Evaluate one synthetic profile. Nothing is stored: no run, no snapshot, no
     operator."""
     return await service.evaluate(model_id, body.inputs, body.version)
+
+
+@router.get("/models/{model_id}/step-times")
+async def step_times(
+    model_id: Id, service: FromDishka[StatisticalModelService]
+) -> Sequence[StepTime]:
+    """Per site and step: the Nordic standard, the days expected in Finland without a
+    standardised pathway, Finland's published typical days, and the median of the model's
+    cases."""
+    return await service.step_times(model_id)
 
 
 @router.get("/models/{model_id}/population")

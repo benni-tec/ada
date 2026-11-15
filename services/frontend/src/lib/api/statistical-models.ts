@@ -35,6 +35,7 @@ export type Deadline = Schemas['Deadline']
 export type PathwayRow = Schemas['PathwayRow']
 export type Lever = Schemas['Lever']
 export type PopulationFigure = Schemas['PopulationFigure']
+export type StepTime = Schemas['StepTime']
 
 type Answer<T> = { data?: T; error?: unknown; response: Response }
 
@@ -52,6 +53,7 @@ export const statisticalModelKeys = {
   model: (id: Id) => ['models', id] as const,
   latest: (id: Id) => ['models', id, 'latest'] as const,
   population: (id: Id) => ['models', id, 'population'] as const,
+  stepTimes: (id: Id) => ['models', id, 'step-times'] as const,
 }
 
 export const listStatisticalModels = (projectId: Id) =>
@@ -81,6 +83,15 @@ export const statisticalModelQuery = (id: Id) =>
 
 export const latestVersionQuery = (id: Id) =>
   queryOptions({ queryKey: statisticalModelKeys.latest(id), queryFn: () => latestVersion(id) })
+
+/** Per site and step: the Nordic standard, the days expected in Finland without a
+ * standardised pathway, Finland's published typical days, and the median of the model's cases. */
+export async function getStepTimes(id: Id): Promise<StepTime[]> {
+  return unwrap(api.GET('/api/models/{model_id}/step-times', { params: { path: { model_id: id } } }))
+}
+
+export const stepTimesQuery = (id: Id) =>
+  queryOptions({ queryKey: statisticalModelKeys.stepTimes(id), queryFn: () => getStepTimes(id) })
 
 export const populationQuery = (id: Id) =>
   queryOptions({ queryKey: statisticalModelKeys.population(id), queryFn: () => getPopulation(id) })

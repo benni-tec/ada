@@ -1069,19 +1069,29 @@ compiled}`: a version is immutable, a change makes a new one, and `compiled` is 
 build derived from the spec (the median target per step, converted parameters, the
 population view with the residual per site and sex). `StatisticalModelRepository`
 (`get`, `list`, `add`, `add_version`, `version`); `StatisticalModelService` (`create`,
-`create_pathway_model`, `add_version`, `list`, `get`, `version`, `evaluate`, `population`).
+`create_pathway_model`, `add_version`, `list`, `get`, `version`, `evaluate`, `population`,
+`step_times`).
 `create_pathway_model` takes an optional parameter operator (columns `name, estimate,
 ci_low, ci_high, source_id, passage, found`): every parameter cited to a registered source
 is then read from it through `ExplorationService`, refused unless its passage was found in
 the source, and cited by that operator and run. Building a model may thus start a run;
 evaluating one never does.
 
+**Expected Finland.** Finland has no standardised cancer pathway. The parameter
+`no_pathway_ratio` (1.531, 1.441 to 1.633: 49 over 32 days, Jensen et al. 2015, Denmark's
+diagnostic interval before and after its pathways) turns the Nordic standard of each
+diagnostic step (first contact to work-up complete) into the days expected in Finland
+(`PathwayRow.expected`); the treatment step keeps the standard. `step_times` gives per site
+and step the standard, the expected days, Finland's published days and the median of the
+model's cases; the Population tab shows it, and a case's result marks the expected days in
+amber beside the blue target.
+
 **An evaluation is computed and returned, never stored**: no run, snapshot, operator or
 widget, and no DuckDB. A model run on a case is the exception: its result is stored on the
 case (see Cases). The platform is not for patient data (synthetic profiles only), so
 evaluations are ordinary tool calls, recorded in the session like any other. REST: `GET /projects/{id}/models`, `POST
 /projects/{id}/models` (a spec) and `/models/pathway` (the shipped one; body `{parameters?}`), `GET
-/models/{id}`, `/versions/latest`, `/versions/{n}`, `/population`, `POST
+/models/{id}`, `/versions/latest`, `/versions/{n}`, `/population`, `/step-times`, `POST
 /models/{id}/versions`, `POST /models/{id}/evaluate`. MCP: `create_pathway_model`,
 `list_models`, `get_model`, `evaluate_model`. Migration `0017`: `statistical_models`,
 `statistical_model_versions`.

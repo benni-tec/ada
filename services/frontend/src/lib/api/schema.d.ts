@@ -573,6 +573,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{model_id}/step-times": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Step Times
+         * @description Per site and step: the Nordic standard, the days expected in Finland without a
+         *     standardised pathway, Finland's published typical days, and the median of the model's
+         *     cases.
+         */
+        get: operations["step_times_api_models__model_id__step_times_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{model_id}/versions": {
         parameters: {
             query?: never;
@@ -3562,6 +3584,8 @@ export interface components {
             current: boolean;
             /** Days */
             days: number | null;
+            /** Expected */
+            expected?: number | null;
             /** Gap */
             gap: number;
             /** Label */
@@ -3936,7 +3960,7 @@ export interface components {
          *     the excess scale at build (Compiled.parameters), the others are used as they are.
          * @enum {string}
          */
-        Scale: "excess" | "cause_specific" | "overall" | "odds_ratio" | "per_day" | "days" | "survival";
+        Scale: "excess" | "cause_specific" | "overall" | "odds_ratio" | "per_day" | "days" | "survival" | "ratio";
         /**
          * Schema
          * @description What an operator produces. Every operator states it; `derived` says whether the
@@ -4216,6 +4240,29 @@ export interface components {
             project_id: components["schemas"]["Id"];
             /** Updated At */
             updated_at?: string | null;
+        };
+        /**
+         * StepTime
+         * @description One step of one site's pathway, four ways: the Nordic standard, the days expected in
+         *     Finland without a standardised pathway, Finland's published typical days, and the
+         *     median of the model's cases. Each is None where there is none.
+         */
+        StepTime: {
+            /** Cases */
+            cases: number;
+            /** Expected */
+            expected: number | null;
+            /** Label */
+            label: string;
+            /** Measured */
+            measured: number | null;
+            /** Nordic */
+            nordic: number | null;
+            /** Published */
+            published: number | null;
+            /** Site */
+            site: string;
+            step: components["schemas"]["PathwayStep"];
         };
         /**
          * StoredFile
@@ -5794,6 +5841,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PopulationFigure"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_times_api_models__model_id__step_times_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepTime"][];
                 };
             };
             /** @description Validation Error */

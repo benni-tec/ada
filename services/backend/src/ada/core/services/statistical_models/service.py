@@ -12,12 +12,14 @@ from ada.core.models.operators import OperatorId
 from ada.core.models.statistical_models import (
     AnyCompiled,
     AnySpec,
+    Compiled,
     Evaluation,
     EvaluationInputs,
     ModelSpec,
     ModelVersion,
     PopulationFigure,
     StatisticalModel,
+    StepTime,
     TrialCompiled,
     TrialMatcherSpec,
 )
@@ -36,7 +38,7 @@ from ada.core.services.statistical_models.build import (
     compile_spec,
     read_parameters,
 )
-from ada.core.services.statistical_models.evaluate import evaluate
+from ada.core.services.statistical_models.evaluate import evaluate, step_times
 from ada.core.services.statistical_models.kinds import kind_of
 
 
@@ -241,6 +243,14 @@ class StatisticalModels(StatisticalModelService):
     ) -> Sequence[PopulationFigure]:
         await self._survival(model_id)
         return (await self.version(model_id, number)).compiled.population
+
+    async def step_times(self, model_id: Id, number: int | None = None) -> Sequence[StepTime]:
+        version = await self.version(model_id, number)
+        if not isinstance(version.spec, ModelSpec) or not isinstance(version.compiled, Compiled):
+            raise Invalid("Only the patient pathway model has days per step")
+        model = await self.models.get(model_id)
+        cases = await self.cases.list(model.case_type_id) if model.case_type_id else []
+        return step_times(version.spec, version.compiled, [c.values for c in cases])
 
     async def _survival(self, model_id: Id) -> None:
         """Invalid unless the model is of the survival kind: a profile's evaluation and the

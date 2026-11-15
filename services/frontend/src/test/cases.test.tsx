@@ -59,7 +59,7 @@ const evaluation = {
     note: 'This presentation would start a pathway in Norway and Sweden.',
   },
   deadlines: [{ label: 'Treatment start', rule: '43 days after the trigger', countries: ['Norway', 'Sweden'], due_day: 70, status: 'overdue', by: 3 }],
-  pathway: [{ step: 'contact_to_physician', label: 'First contact → physician', days: 14, target: 7, gap: 7, countries: [], patient_interval: false, current: false }],
+  pathway: [{ step: 'contact_to_physician', label: 'First contact → physician', days: 14, target: 7, expected: 10.7, gap: 7, countries: [], patient_interval: false, current: false }],
   days_behind: 20,
   survival: { now: 35, on_target: 35, by_setting: {}, range_now: { low: 32, high: 39 }, range_on_target: { low: 32, high: 39 }, setting: {} },
   levers: [],
@@ -249,6 +249,10 @@ test('the pathway result in the sheet leads with the deadlines', async () => {
   expect(within(sheet).getByText(/would start a pathway in Norway and Sweden/)).toBeInTheDocument()
   expect(within(sheet).getByText('overdue by 3 days')).toBeInTheDocument()
   expect(within(sheet).getByText('Offer a patient navigator to keep the next steps on time.')).toBeInTheDocument()
+  // Each step: the Nordic target (blue) and the days expected in Finland without a pathway (amber).
+  const days = sheet.querySelector('[data-section="days"]') as HTMLElement
+  expect(days.querySelector('[data-expected="10.7"]')).not.toBeNull()
+  expect(days).toHaveTextContent('Amber line: the days expected in Finland')
   // Survival is relative survival per 100, said so, never "alive".
   const survival = sheet.querySelector('[data-section="survival"]') as HTMLElement
   expect(within(survival).getByRole('heading', { name: '5-year relative survival, per 100' })).toBeInTheDocument()

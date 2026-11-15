@@ -12,6 +12,7 @@ from ada.core.models.statistical_models import (
     ModelVersion,
     PopulationFigure,
     StatisticalModel,
+    StepTime,
 )
 
 
@@ -93,6 +94,12 @@ class StatisticalModelService(Protocol):
     ) -> Evaluation:
         """Evaluate one profile on a version. Invalid when an input is not among the
         terms' levels, or names a site the version has no baseline for."""
+        ...
+
+    async def step_times(self, model_id: Id, number: int | None = None) -> Sequence[StepTime]:
+        """Per site and step: the Nordic standard, the days expected in Finland without a
+        standardised pathway, Finland's published typical days, and the median of the
+        model's cases. Invalid for a model that is not the patient pathway model."""
         ...
 
     async def population(
