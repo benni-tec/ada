@@ -4,13 +4,17 @@ _UNION = " UNION ALL ".join(f"SELECT * FROM input_{i}" for i in range(4))
 _NORDIC = "('Finland', 'Sweden', 'Norway', 'Denmark')"
 
 CANCER_REGEX = (
-    "cancer|neoplas|tumou?r|carcinoma|lymphoma|leuka?emia|myeloma|sarcoma|melanoma|"
-    "glioma|blastoma|mesothelioma|malignan|metasta|oncolog"
+    r"cancer|neoplas|tumou?r|carcinom|lymphoma|leuka?emia|myeloma|sarcoma|melanoma|glioma|"
+    r"blastoma|mesothelioma|malignan|metasta|oncolog|myelodysplas|\bmds\b|myeloprolif|"
+    r"myelofibrosis|polycythemia|thrombocythemia|mastocytosis|macroglobulin|lymphoprolif|"
+    r"hodgkin|neuroendocrine|\bgist\b|thymoma|seminoma|germ cell|meningioma|chordoma|"
+    r"craniopharyngioma|pseudomyxoma|\bpdac\b|nsclc|\bsclc\b|hnscc|\bhcc\b|\bcrc\b|"
+    r"\bn?mibc\b|\bcll\b|\baml\b|\bcml\b"
 )
 
 CANCER_PATTERNS = {
     "lung": "lung|nsclc|sclc|bronch",
-    "pancreas": "pancrea",
+    "pancreas": "pancrea|\\bpdac\\b",
     "liver": "hepatocellular|\\bliver\\b|\\bhcc\\b|hepatic|cholangio|biliary",
     "breast": "breast",
     "colorectal": "colorectal|colon|rectal",
