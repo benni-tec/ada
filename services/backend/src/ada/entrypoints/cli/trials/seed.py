@@ -151,7 +151,11 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
             async with container() as request:
                 sources = await request.get(SourceService)
                 source = await sources.get(registered[name])
-                if name in study_names and source.last_checked_at is not None:
+                if (
+                    name in study_names
+                    and source.last_error is None
+                    and source.last_checked_at is not None
+                ):
                     if datetime.now(UTC) - source.last_checked_at < timedelta(days=7):
                         continue
                 await sources.refresh(source.id, force=True)

@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -16,7 +17,9 @@ from ada.config import Settings
 from ada.core.models.alerts import AlertState
 from ada.core.models.base import Id
 from ada.core.models.sessions import EntryKind
-from ada.core.ports.sources import SourceReaders
+from ada.core.models.sources import CheckEvery
+from ada.core.ports.repositories import DataSourceRepository
+from ada.core.ports.sources import SourceCheckLog, SourceReaders
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
@@ -456,8 +459,12 @@ async def test_register_page_wires_unions_and_watches_all_pages(
         monkeypatch.setattr(settings, "ada_public_url", "https://ada.example")
         source_service = await request.get(SourceService)
 
-        async def watch(service, id):  # noqa: ANN001, ANN202
-            watched.append(id)
+        async def watch(service, id, check_every=None):  # noqa: ANN001, ANN202
+            watched.append((id, check_every))
+            source = await service.get(id)
+            await service.sources.set_monitor(
+                id, f"monitor-{id}", "test-secret", source.freshness, check_every
+            )
             return await service.get(id)
 
         monkeypatch.setattr(type(source_service), "watch", watch)
@@ -483,7 +490,14 @@ async def test_register_page_wires_unions_and_watches_all_pages(
         )
         assert page_options(study)["interval"] == "daily"
         all_sources = await source_service.list(project_id)
-        assert set(watched) == {s.id for s in all_sources if page_options(s)}
+        assert sorted(watched) == sorted(
+            (s.id, page_options(s)["interval"]) for s in all_sources if page_options(s)
+        )
+        hus = next(s for s in all_sources if page_options(s).get("hospital") == "HUS")
+        await (await request.get(DataSourceRepository)).set_monitor(
+            hus.id, "old-monitor", "test-secret", hus.freshness, CheckEvery.DAILY
+        )
+        watched.clear()
         dashboard = next(
             d
             for d in await (await request.get(DashboardService)).list(project_id)
@@ -492,6 +506,8 @@ async def test_register_page_wires_unions_and_watches_all_pages(
         rules = await (await request.get(AlertService)).list_rules(dashboard.id)
         assert len([r for r in rules if r.name == HOSPITAL_RULE and r.enabled]) == 1
         assert any(not r.enabled and r.name.startswith(HOSPITAL_RULE) for r in rules)
+    await seed_trials(container)
+    assert watched == [(hus.id, CheckEvery.TEN_MINUTES)]
     async with container() as request:
         sources = await request.get(SourceService)
         await sources.refresh(page.id)
@@ -504,3 +520,37 @@ async def test_register_page_wires_unions_and_watches_all_pages(
         listed = await runs.read(run.id, built.hospital_trials.id)
         assert any(r[0] == "New hospital" for r in listed.rows)
         assert len((await runs.read(run.id, built.sponsor_sites.id)).rows) == 1
+
+
+async def test_refresh_retries_failed_recent_sponsor_check(
+    container: AsyncContainer, finland_fixture: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    finland_fixture["studies"][0]["protocolSection"]["sponsorCollaboratorsModule"]["leadSponsor"][
+        "name"
+    ] = "Pfizer"
+    project_id = await seed_trials(container, refresh=True)
+    async with container() as request:
+        sources = await request.get(SourceService)
+        study = next(
+            s
+            for s in await sources.list(project_id)
+            if page_options(s).get("kind") == "sponsor_study_page"
+        )
+        await (await request.get(SourceCheckLog)).record_failure(
+            study.id, datetime.now(UTC), study.last_probe_token, "temporary failure"
+        )
+        refresh = type(sources).refresh
+        refreshed = []
+
+        async def track_refresh(service, id, **kwargs):  # noqa: ANN001, ANN003, ANN202
+            refreshed.append(id)
+            return await refresh(service, id, **kwargs)
+
+        monkeypatch.setattr(type(sources), "refresh", track_refresh)
+    await seed_trials(container, refresh=True)
+    assert study.id in refreshed
+    async with container() as request:
+        assert (await (await request.get(SourceService)).get(study.id)).last_error is None
+    refreshed.clear()
+    await seed_trials(container, refresh=True)
+    assert study.id not in refreshed

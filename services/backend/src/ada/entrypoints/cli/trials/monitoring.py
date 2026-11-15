@@ -11,6 +11,7 @@ from ada.core.models.alerts import Severity
 from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.dashboards import Dashboard, Slot
+from ada.core.models.sources import CheckEvery
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
@@ -163,10 +164,10 @@ async def create_monitoring(
         if not metadata:
             continue
         if (await request.get(Settings)).ada_public_url:
-            if source.monitor_id is None:
+            interval = CheckEvery(metadata["interval"])
+            if source.monitor_id is None or source.check_every != interval:
                 try:
-                    # TODO: pass interval=metadata["interval"] when SourceService.watch accepts it.
-                    await source_service.watch(source.id)
+                    await source_service.watch(source.id, check_every=interval)
                 except Exception as error:
                     print(f"  {source.name}: watch failed ({type(error).__name__}); TTL refresh")
                 else:
