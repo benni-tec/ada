@@ -63,29 +63,21 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         session_id: SessionId,
         operator_id: OperatorId,
         service: FromDishka[StatisticalModelService],
+        county_operator_id: OperatorId | None = None,
         case_type_id: Id | None = None,
         auto_run: bool = False,
     ) -> ModelVersion:
-        """Create a trial matcher: recruiting Nordic cancer trials a case could be discussed
-        for, matched on cancer group, sex and age group; trials with a Finnish site first,
-        then the nearest site from the case's county. Eligibility text is shown, never
-        judged. `operator_id` is a `case_trials` data step (docs/trials.md; in the "Nordic
-        cancer trials" project its note starts `case_trials:`). The first version pins the
-        trials as read now; `refresh_trial_matcher` reads them again. It runs on
-        `case_type_id`, else on a case type that covers it (the cancer pathway one when the
+        """Create a trial matcher: the recruiting Nordic cancer trials of a case's cancer
+        group, nearest first. It filters on the cancer group only; sex and age limits are
+        shown, never applied, and eligibility text is shown, never judged. It reads its data
+        steps whenever it runs, so its results are as current as they are: `operator_id` is
+        a `case_trials` step and `county_operator_id` a `county_cities` step (docs/trials.md;
+        in the "Nordic cancer trials" project their notes start with those names). It runs
+        on `case_type_id`, else on a case type that covers it (the cancer pathway one when the
         project has it); `auto_run` runs it on every save of a case."""
         return await service.create_trial_matcher(
-            project_id, operator_id, calling_agent(), case_type_id, auto_run
+            project_id, operator_id, calling_agent(), county_operator_id, case_type_id, auto_run
         )
-
-    @mcp.tool
-    @inject
-    async def refresh_trial_matcher(
-        model_id: Id, session_id: SessionId, service: FromDishka[StatisticalModelService]
-    ) -> ModelVersion:
-        """Make a new version of a trial matcher with the trials read again from its data
-        step. Earlier versions, and the results made with them, stay as they were."""
-        return await service.refresh_trial_matcher(model_id, calling_agent())
 
     @mcp.tool
     @inject

@@ -17,6 +17,7 @@ from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.alerts import AlertState, Severity
 from ada.core.models.base import Id
+from ada.core.models.errors import Invalid
 from ada.core.models.sessions import EntryKind
 from ada.core.models.sources import CheckEvery
 from ada.core.ports.repositories import DataSourceRepository
@@ -29,6 +30,7 @@ from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
+from ada.core.services.ports.statistical_models import StatisticalModelService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.cli.trials import seed
 from ada.entrypoints.cli.trials.dashboards import DOORS, NEAR_YOU
@@ -73,6 +75,9 @@ async def container(
         if request.url.path == "/v1/web/scrape":
             body = json.loads(request.content)
             url = body["url"]
+            fixture = recorded_pages.get(url)
+            if fixture == "REQUEST_TIMEOUT":
+                raise Invalid("REQUEST_TIMEOUT")
             if "jsonParams" in body:
                 return httpx.Response(
                     200,
@@ -94,7 +99,6 @@ async def container(
                         }
                     },
                 )
-            fixture = recorded_pages.get(url)
             markdown = (RECORDINGS / "pages" / fixture).read_text() if fixture else "No trial IDs"
             return httpx.Response(
                 200,
@@ -178,6 +182,12 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
         assert project.agent_instructions == seed.AGENT_INSTRUCTIONS
         assert len(project.agent_instructions) < 900
         await projects.update(project_id, project.revision, agent_instructions="Old instructions")
+        # Someone took the matcher off its case type: the reseed puts it back on one, running
+        # on every save, as the instructions promise a result on every save.
+        models = await request.get(StatisticalModelService)
+        [matcher] = [m for m in await models.list(project_id) if m.kind == "trial_matcher"]
+        case_type_id = matcher.case_type_id
+        await models.set_case_type(matcher.id, None, False)
     assert await seed_trials(container) == project_id
     async with container() as request:
         assert (await (await request.get(ProjectService)).get(project_id)).agent_instructions == (
@@ -197,12 +207,18 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             "ctis_finland_pending",
             "trial_rates",
             "case_trials",
+            "county_cities",
             "trial_site_changes",
             "hospital_trials",
             "hospital_trial_gaps",
             "hospital_trial_changes",
             "sponsor_sites",
         }
+        # The trial matcher runs on its own case type, once, reading the current steps.
+        models = await (await request.get(StatisticalModelService)).list(project_id)
+        [matcher] = [m for m in models if m.kind == "trial_matcher"]
+        assert matcher.auto_run and matcher.latest_version == 1
+        assert matcher.case_type_id == case_type_id
         pipelines = await request.get(PipelineService)
         after = {
             o.id
@@ -211,6 +227,47 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
         }
     assert before == after
     assert len(after) > 15
+
+
+async def test_refresh_survives_failed_hospital_page(
+    container: AsyncContainer,
+    recorded_pages: dict[str, str],
+    finland_fixture: dict,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    page = PAGES[0]
+    recorded_pages[page.address] = "REQUEST_TIMEOUT"
+    finland_fixture["studies"][0]["protocolSection"]["sponsorCollaboratorsModule"]["leadSponsor"][
+        "name"
+    ] = "Pfizer"
+    finland_fixture["studies"][0]["protocolSection"]["statusModule"]["lastUpdatePostDateStruct"] = {
+        "date": "2026-11-15"
+    }
+    study = study_page("NCT05634889", "Pfizer")
+    assert study is not None
+    recorded_pages[study.address] = "REQUEST_TIMEOUT"
+    project_id = await seed_trials(container, refresh=True)
+    async with container() as request:
+        assert (await (await request.get(ProjectService)).get(project_id)).id == project_id
+        sources = await (await request.get(SourceService)).list(project_id)
+        built = await _build(request, project_id, {s.name: s.id for s in sources})
+        runs = await request.get(RunService)
+        [run] = await runs.list(project_id)
+        assert not (await runs.read(run.id, built.sponsor_sites.id)).rows
+        dashboards = await (await request.get(DashboardService)).list(project_id)
+        assert {DOORS, NEAR_YOU, DASHBOARD} <= {d.name for d in dashboards}
+        assert len(await (await request.get(SessionService)).list(project_id)) == 1
+        source = next(
+            s
+            for s in await (await request.get(SourceService)).list(project_id)
+            if s.name == page.name
+        )
+        assert source.last_error == "REQUEST_TIMEOUT"
+    output = capsys.readouterr().out
+    assert f"  {page.name}: refresh failed (REQUEST_TIMEOUT)" in output
+    assert (
+        f"  2 web pages failed; rerun the seed to retry them: {page.name}, {study.name}" in output
+    )
 
 
 async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
@@ -268,7 +325,7 @@ async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
             dashboard_id = first[name]
             version = await dashboards.current(dashboard_id)
             assert version is not None
-            assert len(version.slots) == (6 if name == DOORS else 2)
+            assert len(version.slots) == (7 if name == DOORS else 2)
             for slot in version.slots:
                 data = await widgets.data(slot.widget_id)
                 assert data.rows

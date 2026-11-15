@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useRouter, useSearch } from '@tanstack/react-
 import { widgetQuery, type Id } from '@/lib/api'
 import { useProjectRun, type CardRun } from '@/lib/view-run'
 
-import { GoToSession } from './dashboards/pin-to-dashboard'
+import { GoToSession, TalkAboutWidget } from './dashboards/pin-to-dashboard'
 import { Modal } from './modal'
 import { ErrorNotice, Loading } from './notices'
 import { WidgetCard } from './widget-card'
@@ -41,7 +41,14 @@ function OpenWidget({ projectId, widgetId }: { projectId: Id; widgetId: Id }) {
   return (
     <Modal
       title={widget.data ? widget.data.title || 'Untitled widget' : 'Widget'}
-      actions={widget.data && <GoToSession widget={widget.data} />}
+      actions={
+        widget.data && (
+          <>
+            <TalkAboutWidget widget={widget.data} />
+            <GoToSession widget={widget.data} />
+          </>
+        )
+      }
       onClose={close}
     >
       <div className="flex h-full min-h-0 flex-col p-3">

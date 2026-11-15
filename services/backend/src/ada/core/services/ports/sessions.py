@@ -18,6 +18,13 @@ class SessionService(Protocol):
 
     async def rename(self, id: Id, title: str, expected_revision: int) -> Session: ...
 
+    async def delete(self, id: Id, actor: Actor) -> None:
+        """Delete a session: its messages, attachments, agent turns and the reports it owns
+        go, and other sessions stop showing it attached. Its widgets and research sessions
+        stay in the project, unlinked. Invalid while one of its agent turns is queued or
+        running."""
+        ...
+
     async def dashboard_agent_session(self, dashboard_id: Id) -> tuple[Session, bool]:
         """The session of a dashboard's agent panel: the newest session that started from
         the dashboard and has it attached, else a new one titled "<dashboard name>

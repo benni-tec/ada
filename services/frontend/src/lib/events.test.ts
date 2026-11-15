@@ -11,6 +11,10 @@ function event(type: EventType, payload: Record<string, unknown>) {
 test('each event makes stale the queries of what it names', () => {
   const invalidated = (type: EventType, payload: Record<string, unknown>) => event(type, payload).invalidate
   expect(invalidated('session.created', { session_id: 's1' })).toEqual([['projects', 'p1', 'sessions']])
+  expect(invalidated('session.deleted', { session_id: 's1' })).toEqual([
+    ['projects', 'p1', 'sessions'],
+    ['projects', 'p1', 'reports'],
+  ])
   expect(invalidated('session.entry_added', { session_id: 's1', entry_id: 'e1' })).toEqual([['sessions', 's1', 'entries']])
   for (const type of ['session.attachment_added', 'session.attachment_removed'] as const) {
     expect(invalidated(type, { session_id: 's1', attachment: { id: 'att1' } })).toEqual([['sessions', 's1', 'attachments']])

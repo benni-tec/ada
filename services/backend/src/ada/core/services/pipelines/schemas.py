@@ -5,16 +5,12 @@ from collections.abc import Iterable
 
 from ada.core.models.errors import Invalid
 from ada.core.models.operators import Operator, OperatorKind, SourceParams
-from ada.core.models.runs import Snapshot
+from ada.core.models.runs import SOURCE_KEY, Snapshot
 from ada.core.models.schema import Column, ColumnType, Schema
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.repositories import OperatorRepository, SnapshotRepository
 from ada.core.services.pipelines.fusion import Node, SnapshotNode, StandInNode, compose
 from ada.core.services.ports.sources import SourceService
-
-# The key of a source's whole-source snapshot. A source that fetches by period also has
-# one snapshot per period (ada.core.services.schema.time.period_key).
-SOURCE_KEY = ""
 
 
 class Columns:

@@ -3,6 +3,7 @@ from typing import Any
 from uuid import uuid7
 
 from ada.core.models.actors import PLATFORM, Actor
+from ada.core.models.agents import FINISHED
 from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import Id
 from ada.core.models.errors import Invalid
@@ -21,6 +22,7 @@ from ada.core.models.sessions import (
 )
 from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import (
+    AgentTurnRepository,
     AttachmentRepository,
     DashboardRepository,
     OperatorRepository,
@@ -45,8 +47,10 @@ class Sessions(SessionService):
         attachments: AttachmentService,
         events: EventPublisher,
         clock: Clock,
+        turns: AgentTurnRepository,
     ) -> None:
         self.sessions = sessions
+        self.turns = turns
         self.projects = projects
         self.dashboards = dashboards
         self.operators = operators
@@ -123,6 +127,27 @@ class Sessions(SessionService):
         session = await self.sessions.get(id)
         return await self.sessions.update(
             session.model_copy(update={"title": _title(title)}), expected_revision
+        )
+
+    async def delete(self, id: Id, actor: Actor) -> None:
+        session = await self.sessions.get(id)
+        if any(turn.status not in FINISHED for turn in await self.turns.list(id)):
+            raise Invalid("The session's agent is still working: stop it or wait, then delete")
+        # Other sessions stop showing it; each detach is announced to their pages.
+        for other in await self.attached.sessions_with(AttachmentKind.SESSION, str(id)):
+            if other == id:
+                continue
+            for attachment in await self.attached.list(other):
+                if attachment.kind is AttachmentKind.SESSION and attachment.ref == str(id):
+                    await self.attachments.detach(other, attachment.id, actor)
+        await self.sessions.delete(id)
+        await self.events.publish(
+            Event(
+                type=EventType.SESSION_DELETED,
+                project_id=session.project_id,
+                payload={"session_id": str(id)},
+                at=self.clock.now(),
+            )
         )
 
     async def add_message(

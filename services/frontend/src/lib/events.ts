@@ -30,6 +30,7 @@ export type Effects = {
  * do not reach `onmessage`. */
 export const EVENT_TYPES: readonly EventType[] = [
   'session.created',
+  'session.deleted',
   'session.entry_added',
   'session.attachment_added',
   'session.attachment_removed',
@@ -68,6 +69,10 @@ export function effectsOf(event: LiveEvent): Effects {
     case 'session.created':
       // E.g. an agent over MCP started one: the project page lists it.
       invalidate.push(keys.sessions(projectId))
+      break
+    case 'session.deleted':
+      // Gone from the lists, with the reports it owned.
+      invalidate.push(keys.sessions(projectId), ['projects', projectId, 'reports'])
       break
     case 'session.entry_added': {
       const session = id(payload, 'session_id')

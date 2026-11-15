@@ -85,7 +85,10 @@ tasks:
       runInCI: false
 
   test:
-    command: "uv run pytest"
+    # One worker per core, each with a database of its own (conftest's `_migrated`); idle
+    # workers take tests from busy ones, as a few tests take far longer than the rest. At
+    # most 16: each worker holds two PostgreSQL connections, of the default 100.
+    command: "uv run pytest -n auto --maxprocesses 16 --dist worksteal"
     inputs:
       - "@group(sources)"
       - "@group(tests)"

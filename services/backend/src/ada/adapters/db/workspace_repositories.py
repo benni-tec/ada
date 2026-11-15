@@ -279,6 +279,14 @@ class SqlSessionRepository(SessionRepository):
         )
         return _session(row)
 
+    async def delete(self, id: Id) -> None:
+        row = await fetch(self.session, SessionRow, id, "session")
+        # Entries, attachments, agent turns and the reports it owns go with the row (ON
+        # DELETE CASCADE: a report has exactly one owner); widgets and research sessions
+        # stay with the link cleared (ON DELETE SET NULL).
+        await self.session.delete(row)
+        await self.session.flush()
+
     async def add_entry(self, entry: SessionEntry) -> None:
         await require(self.session, SessionRow, entry.session_id, "session")
         row = SessionEntryRow(

@@ -4,6 +4,7 @@ cancer pathway"."""
 
 import re
 
+from ada.core.models.analysis import Rows
 from ada.core.models.base import JsonObject
 from ada.core.models.cases import Attention, DefaultCaseType, Field, FieldType, Section
 from ada.core.models.schema import Column, ColumnType
@@ -16,6 +17,7 @@ from ada.core.models.statistical_models import (
     ModelVersion,
     PathwayStep,
 )
+from ada.core.services.ports.exploration import Clauses
 from ada.core.services.statistical_models import pathway
 from ada.core.services.statistical_models.evaluate import evaluate
 
@@ -102,7 +104,11 @@ class PathwayKind:
             Field(name="treatment_started", type=FieldType.BOOLEAN, label="Treatment started"),
         )
 
-    def run(self, version: ModelVersion, values: JsonObject) -> Section:
+    def queries(self, version: ModelVersion, values: JsonObject) -> dict[str, tuple[str, Clauses]]:
+        """None: the model's figures are in its version."""
+        return {}
+
+    def run(self, version: ModelVersion, values: JsonObject, data: dict[str, Rows]) -> Section:
         inputs = EvaluationInputs.model_validate(values)
         result = evaluate(version, inputs)
         summary, status = _headline(result.deadlines, result.trigger.well_founded.fired)

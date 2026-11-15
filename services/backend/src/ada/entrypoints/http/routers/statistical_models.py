@@ -10,6 +10,7 @@ from fastapi import APIRouter
 from ada.core.models.base import Id
 from ada.core.models.operators import OperatorId
 from ada.core.models.statistical_models import (
+    AnySpec,
     Evaluation,
     EvaluationInputs,
     ModelSpec,
@@ -38,12 +39,15 @@ class NewPathwayModel(Request):
 class NewTrialMatcher(Request):
     # The trials data step to read (a `case_trials` step, docs/trials.md).
     operator_id: OperatorId
+    # The step naming each county's distance city (a `county_cities` step).
+    county_operator_id: OperatorId | None = None
     case_type_id: Id | None = None
     auto_run: bool = False
 
 
 class NewVersion(Request):
-    spec: ModelSpec
+    # A spec of the model's own kind.
+    spec: AnySpec
 
 
 class Evaluate(Request):
@@ -82,19 +86,16 @@ async def create_pathway_model(
 async def create_trial_matcher(
     project_id: Id, body: NewTrialMatcher, service: FromDishka[StatisticalModelService]
 ) -> ModelVersion:
-    """A trial matcher whose first version pins the recruiting trials read from
-    `operator_id`, on a case type that covers it."""
+    """A trial matcher reading `operator_id` (and `county_operator_id`) whenever it runs,
+    on a case type that covers it."""
     return await service.create_trial_matcher(
-        project_id, body.operator_id, WEB, body.case_type_id, body.auto_run
+        project_id,
+        body.operator_id,
+        WEB,
+        body.county_operator_id,
+        body.case_type_id,
+        body.auto_run,
     )
-
-
-@router.post("/models/{model_id}/refresh", status_code=201)
-async def refresh_trial_matcher(
-    model_id: Id, service: FromDishka[StatisticalModelService]
-) -> ModelVersion:
-    """A new version of a trial matcher with the trials read again."""
-    return await service.refresh_trial_matcher(model_id, WEB)
 
 
 @router.get("/models/{model_id}")

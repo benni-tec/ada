@@ -255,6 +255,32 @@ class MemorySessionRepository(SessionRepository):
     async def update(self, session: Session, expected_revision: int) -> Session:
         return _update(self.store.sessions, "session", session, expected_revision)
 
+    async def delete(self, id: Id) -> None:
+        _get(self.store.sessions, "session", id)
+        del self.store.sessions[id]
+        self.store.session_entries = [e for e in self.store.session_entries if e.session_id != id]
+        for key, attachment in list(self.store.attachments.items()):
+            if attachment.session_id == id:
+                del self.store.attachments[key]
+        for key, turn in list(self.store.agent_turns.items()):
+            if turn.session_id == id:
+                del self.store.agent_turns[key]
+        # The reports it owns go with it (a report has one owner), with their versions.
+        for key, report in list(self.store.reports.items()):
+            if report.session_id == id:
+                del self.store.reports[key]
+                for v, version in list(self.store.report_versions.items()):
+                    if version.report_id == key:
+                        del self.store.report_versions[v]
+        # Its widgets and research sessions stay, unlinked, as ON DELETE SET NULL has it.
+        for records, field in (
+            (self.store.widgets, "session_id"),
+            (self.store.sessions, "parent_session_id"),
+        ):
+            for key, record in list(records.items()):
+                if getattr(record, field) == id:
+                    records[key] = record.model_copy(update={field: None})
+
     async def add_entry(self, entry: SessionEntry) -> None:
         await self.get(entry.session_id)
         self.store.session_entries.append(entry)

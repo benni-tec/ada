@@ -95,6 +95,7 @@ function result(overrides: Partial<CaseResult> = {}): CaseResult {
       status: 'urgent',
       columns: { trigger: 'well_founded', treatment_start_status: 'overdue', treatment_start_by: 3 },
       attention: { open: true, overdue_by: 3, due_in: null },
+      reads: {},
       body: evaluation as unknown as Record<string, unknown>,
     },
     trigger: 'auto',
@@ -109,7 +110,7 @@ const trialResult = result({
   model_id: 'm2',
   trigger: 'request',
   created_at: '2026-11-15T11:00:00Z',
-  section: { kind: 'trial_matcher', title: 'Clinical trial matcher', summary: '2 recruiting trials', status: 'ok', columns: { trials: 2 }, attention: { open: false }, body: {} },
+  section: { kind: 'trial_matcher', title: 'Clinical trial matcher', summary: '2 recruiting trials', status: 'ok', columns: { trials: 2 }, attention: { open: false }, body: {}, reads: {} },
 })
 
 /** The fake API around one case; `state` changes as the case is saved and evaluated. */

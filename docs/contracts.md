@@ -1107,18 +1107,25 @@ of the type's push cases sources after the commit (`Cases` through `DataSourceRe
 /models/{id}/cases`, `PUT /models/{id}/case-type`. MCP: `list_case_types`,
 `create_case_type`, `set_case`, `get_case`, `evaluate_case`, `list_open_cases`.
 
-**The trial matcher** (`trial_matcher`, `statistical_models/trials_kind.py`) is the second kind.
-A version pins the recruiting trials of its cancer groups from a `case_trials` data step
-(docs/trials.md), read in a new run with one row per trial and its nearest recruiting Nordic
-site from Helsinki, Kuopio and Oulu (`TrialMatcherSpec`, `TrialCompiled`). On a case it
-matches site against cancer group, sex, and the age group against the trial's limits (a
-group only partly inside is marked uncertain), puts trials with a Finnish site first, then
-the nearest from the city of the case's county; eligibility text is shown, never judged,
-and its results never ask for attention. Created with `POST
-/projects/{id}/models/trials` (`{operator_id, case_type_id?, auto_run?}`) or the MCP tool
-`create_trial_matcher`; `POST /models/{id}/refresh` or `refresh_trial_matcher` makes a new
-version with the trials read again. It lands on the cancer pathway case type when the
-project has one (a type that covers it), and runs on request by default.
+**The trial matcher** (`trial_matcher`, `statistical_models/trials_kind.py`) is the second kind:
+the patient-level view of the trials, beside the national one on the trials dashboards. It
+filters on the case's cancer group only (a topic match, not eligibility); sex and age limits
+are shown beside each trial and never leave one out; trials are sorted by distance from the
+city the `county_cities` step names for the case's county (Helsinki without it); eligibility
+text is shown, never judged; its results never ask for attention. It keeps nothing in its
+version (`TrialMatcherSpec`: the `case_trials` and `county_cities` operators and the site to
+cancer group map) and reads those steps whenever it runs: a kind names its data queries
+(`ModelKind.queries`), the case service runs them in a new run each and passes the rows to
+`run`, and the result records the runs it read (`Section.reads`). A query cut off at the
+row limit gives a "Could not run" result instead of an answer about part of the data. A
+limit the registry does not give (sex, ages) stays missing and is shown as not reported. Created with `POST
+/projects/{id}/models/trials` (`{operator_id, county_operator_id?, case_type_id?, auto_run?}`)
+or `create_trial_matcher`; a new spec of the same kind is a new version (`add_version`).
+`ada seed-trials` puts one in the "Nordic cancer trials" project, running on every save of a
+case of its type ("Cancer trial candidate" unless the project already had a type that covers
+it; the agent instructions name the type it is on), and its agent answers patient questions
+through it. A reseed puts a matcher taken off its case type back on one
+(`attach_default_case_type`) and turns its runs on save back on.
 
 Nothing in cases assumes a use case. A model **kind**
 (`core/services/statistical_models/kinds.py`, `KINDS`) says which fields it reads, runs on a
@@ -1150,6 +1157,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /projects/{id}/sessions`, `POST /projects/{id}/sessions {title, origin_dashboard_id?}` | List (research sessions too, with `agent` and `parent_session_id`); create |
 | `POST /sessions/{id}/research {brief, title}` | Delegate research as the person: 201 with the research session (see The research agent) |
 | `GET /sessions/{id}`, `PATCH /sessions/{id} {expected_revision, title}` | Read; rename |
+| `DELETE /sessions/{id}` | 204. Deletes the session with its messages, attachments, agent turns and the reports it owns (a report has exactly one owner); other sessions stop showing it attached. Its widgets and research sessions stay, unlinked. 422 while one of its agent turns is queued or running. Announced with `session.deleted` |
 | `GET /sessions/{id}/attachments`, `POST /sessions/{id}/attachments {kind, ref, title?}`, `DELETE /sessions/{id}/attachments/{attachment_id}` | What is shown beside the session, oldest first; attach (201, also when already attached: the existing one, no event); detach (204). See "Session attachments" |
 | `POST /widgets/{id}/render {error}` | The frame's report of how it drew (`error` null when it drew); 204. Stored only when it changed |
 | `GET /sessions/{id}/entries` | The session's record, oldest first. Entry kinds: `message` (with `context`), `operator` and `widget` (`ref` the id, `text` the note), `agent_turn` (`ref` the turn), `tool_call` (an external agent's MCP call, in `tool_call`; see MCP tools), `delegation` and `report` (`ref` the research session) |
@@ -1425,6 +1433,7 @@ connection open. Events are broadcast after the unit of work that caused them co
 | Event | Payload |
 | --- | --- |
 | `session.created` | `session_id` |
+| `session.deleted` | `session_id` |
 | `session.entry_added` | `session_id`, `entry_id`. Also for each recorded tool call, after the commit of its own unit of work (also when the call failed) |
 | `widget.created` | `widget_id`, `session_id` if any |
 | `widget.updated` | `widget_id`, `session_id` if any; the frontend reloads its widget frames, which read the spec when they load. `render_only: true` when only a frame's report of how it drew changed: the cards refetch, the frames do not reload (a reload would draw and report again) |
@@ -1870,12 +1879,13 @@ not describe it.
   `test_worker_events` (on PostgreSQL: a failed call recorded while its own writes roll
   back) and `test_agent` (the in-platform agent's calls not recorded). A feature is tested through its service, then one transport for
   what the routes add (REST or MCP, not both), then PostgreSQL for what only it does.
-  `CI=1 moon run backend:test` takes well under a minute.
+  `CI=1 moon run backend:test` runs them on every core (pytest-xdist, `-n auto --maxprocesses
+  16 --dist worksteal`) in about a minute; `uv run pytest` alone runs them in one process.
 - Backend tests run without services, except those that take the `database_url` or
   `migrated_database_url` fixture (PostgreSQL) or the `valkey` fixture of
   `tests/test_worker_events.py`. They need `moon run root:infra` and are skipped locally
   when it is not running; with `CI` set they fail instead. CI starts both.
-- **Shared setup, for speed.** One database is migrated per run and emptied (`TRUNCATE`)
+- **Shared setup, for speed.** One database is migrated per run (per worker) and emptied (`TRUNCATE`)
   before each test that takes `migrated_database_url`; only the migration tests get a new
   database (`database_url`). Building an app or an MCP server takes a while, so a module
   builds one (`scope="module"`) and its tests share it: each works in a project of its

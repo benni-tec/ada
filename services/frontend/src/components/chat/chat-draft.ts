@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 
-import type { Context, Id, Pipeline } from '@/lib/api'
+import type { Context, Id, Pipeline, Widget } from '@/lib/api'
 
 /**
  * A chip on the message being written: what the message is about. One chip may carry
@@ -61,5 +61,14 @@ export function pipelineChip(pipeline: Pick<Pipeline, 'operator_id' | 'name'>, d
     key: 'pipeline:' + pipeline.operator_id + '@' + dashboard.id + ':' + (dashboard.slot ?? ''),
     label: 'Pipeline: ' + pipeline.name + ' → ' + where,
     context,
+  }
+}
+
+/** The chip "Talk about this widget" puts on the message: the widget itself. */
+export function widgetChip(widget: Pick<Widget, 'id' | 'title'>): Chip {
+  return {
+    key: 'widget:' + widget.id,
+    label: 'Widget: ' + (widget.title || 'Untitled widget'),
+    context: [{ kind: 'widget', widget_id: widget.id }],
   }
 }

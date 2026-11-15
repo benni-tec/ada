@@ -18,9 +18,99 @@ upstream frontend {
     keepalive 16;
 }
 
+map "${DEMO_TOKEN}:$cookie_ada_team" $demo_visitor {
+    default 1;
+    ~^: 0;
+    ~^${DEMO_TOKEN}:${DEMO_TOKEN}$ 0;
+}
+map $request_method $demo_team_cookie {
+    default "";
+    GET "ada_team=${DEMO_TOKEN}; Path=/; Max-Age=604800; HttpOnly; Secure; SameSite=Lax";
+}
+map $cookie_ada_visitor $demo_browser {
+    default $cookie_ada_visitor;
+    "" $binary_remote_addr;
+}
+map $cookie_ada_visitor $demo_cookie {
+    default "";
+    "" "ada_visitor=$request_id; Path=/; Max-Age=86400; HttpOnly; Secure; SameSite=Lax";
+}
+map "$request_method:$uri" $demo_route {
+    default other;
+    ~^[^:]+:/api/hooks/ hook;
+    ~^POST:/api/sessions/[^/]+/(messages|research|analysis)/?$ turn;
+}
+map "$demo_visitor:$request_method:$demo_route" $demo_turn_key {
+    default "";
+    "1:POST:turn" $demo_browser;
+}
+map "$demo_visitor:$request_method:$demo_route" $demo_ip_key {
+    default "";
+    "1:POST:turn" $binary_remote_addr;
+}
+map "$demo_visitor:$request_method:$demo_route" $demo_post_key {
+    default "";
+    "1:POST:other" $demo_browser;
+}
+map $demo_route $demo_limit_detail {
+    default "Too many changes at once. Wait a minute and try again.";
+    turn "Demo limit reached: one agent turn per minute. Ask the team for more.";
+}
+map "$request_method:$uri" $demo_mutation {
+    default 0;
+    ~^POST:/api/alert-rules/[^/]+/(test|check)/?$ 1;
+}
+map $demo_visitor $demo_visitor_header {
+    default "";
+    1 1;
+}
+map "$demo_visitor:$uri" $demo_private {
+    default "";
+    ~^1:/api/settings(/|$) "Settings are locked on the public demo.";
+    ~^1:/mcp(/|$) "The MCP endpoint is not public on the demo.";
+}
+map "$demo_visitor:$demo_mutation" $demo_locked {
+    default 0;
+    "1:1" 1;
+}
+limit_req_zone $demo_turn_key zone=demo_turn:10m rate=1r/m;
+limit_req_zone $demo_ip_key zone=demo_ip:10m rate=3r/m;
+limit_req_zone $demo_post_key zone=demo_post:10m rate=10r/m;
+
 server {
     listen 80;
     server_name _;
+
+    set_real_ip_from 10.0.0.0/8;
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+    add_header Set-Cookie $demo_cookie always;
+    limit_req zone=demo_turn burst=5 nodelay;
+    limit_req zone=demo_ip burst=20 nodelay;
+    limit_req zone=demo_post burst=30 nodelay;
+    limit_req_status 429;
+    error_page 429 = @demo_limit;
+    error_page 403 = @demo_forbidden;
+    if ($demo_private) { return 403; }
+    if ($demo_locked) { return 403; }
+
+    location @demo_forbidden {
+        default_type application/json;
+        if ($demo_private) { return 403 '{"detail":"$demo_private"}'; }
+        return 403 '{"detail":"Alert tests are off on the public demo."}';
+    }
+    location @demo_limit {
+        default_type application/json;
+        return 429 '{"detail":"$demo_limit_detail"}';
+    }
+    location = /team/${DEMO_TOKEN} {
+        access_log off;
+        add_header Set-Cookie $demo_team_cookie;
+        if ($request_method = GET) { return 302 /; }
+        proxy_pass http://frontend;
+    }
 
     proxy_http_version 1.1;
     proxy_set_header Connection "";
@@ -28,6 +118,8 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    # The backend refuses visitor changes to the team demo projects; empty for the team, so not sent.
+    proxy_set_header X-Ada-Visitor $demo_visitor_header;
 
     # Live updates for the frontend: a project's server-sent event stream, which stays open.
     # The backend sends a comment every 15 seconds, so the read timeout only ends streams
