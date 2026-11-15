@@ -84,6 +84,7 @@ services:
     image: ghcr.io/benni-tec/ada/gateway:${VERSION:-latest}
     restart: unless-stopped
     environment:
+      DEMO_TOKEN: ${DEMO_TOKEN:-}
       BACKEND_HOST: backend
       BACKEND_PORT: ${BACKEND_PORT:-8000}
       FRONTEND_HOST: frontend

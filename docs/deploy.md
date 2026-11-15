@@ -16,9 +16,12 @@ ada runs on one Verda VM that it shares with another project, "Tell me when". Pu
   `https://ada.95-133-254-42.sslip.io` to `ada-gateway:80` over the external Docker network
   `edge`. ada publishes no host ports: the override removes the PostgreSQL, Valkey and gateway
   ones, because Docker bypasses the host firewall.
-  For the Junction event this route has no authentication: anyone with the URL can use the API
-  and the MCP endpoint, and with them the paid web and model keys. After the event, remove the
-  route or put it behind access control.
+  The public demo guard locks settings, MCP and edits, and rate-limits visitor POSTs.
+  Before the first deploy including the guard, generate a token with `openssl rand -hex 24`
+  and save it as `DEMO_TOKEN=<token>` in `/opt/ada/.env` (required for deployment).
+  Tokens must contain only `[A-Za-z0-9]`. Keep the token private.
+  Team members visit `https://ada.95-133-254-42.sslip.io/team/<token>` for a seven-day
+  cookie that bypasses the guard. An empty token disables the guard locally.
 
 `edge` belongs to the front door: its Caddy must be up (so the network exists) before ada
 starts, or `up` fails with "network edge not found".
