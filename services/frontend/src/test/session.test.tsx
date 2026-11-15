@@ -416,11 +416,13 @@ test('rename: Escape cancels; on a conflict the session is read again and the pe
 test('delete: the confirmation names the reports that go with the session; a refusal says why; then the project', async () => {
   const deleted: string[] = []
   let working = true
+  let count = () => {}
   const report = (id: string, session_id: string | null) => ({
     id, project_id: 'p1', name: id, session_id, dashboard_id: session_id ? null : 'd1', latest_version_id: null, created_at: '2026-11-03T09:00:00Z', revision: 1,
   })
   serveSession({
-    'GET /api/projects/p1/reports': [report('rep1', 's1'), report('rep2', 's1'), report('rep3', null)],
+    // Held back, so the confirmation is seen before the reports are counted.
+    'GET /api/projects/p1/reports': () => new Promise<Response>((resolve) => (count = () => resolve(json([report('rep1', 's1'), report('rep2', 's1'), report('rep3', null)])))),
     'GET /api/projects/p1/sessions': [session()],
     'GET /api/projects/p1/dashboards': [],
     'GET /api/projects/p1/alerts': [],
@@ -433,11 +435,15 @@ test('delete: the confirmation names the reports that go with the session; a ref
   const { router } = renderAt('/projects/p1/sessions/s1')
   await screen.findByRole('heading', { name: 'Why did coverage drop?', level: 1 })
 
-  // Cancel leaves it as it was.
+  // Cancel leaves it as it was. Delete waits until the reports going with it are counted.
   fireEvent.click(screen.getByRole('button', { name: 'Delete the session' }))
   const confirm = screen.getByRole('group', { name: 'Delete Why did coverage drop??' })
+  expect(confirm).toHaveTextContent('counting…')
+  expect(within(confirm).getByRole('button', { name: 'Delete' })).toBeDisabled()
+  act(() => count())
   expect(await within(confirm).findByText(/and the 2 reports it made/)).toBeInTheDocument()
   expect(confirm).toHaveTextContent('Its widgets stay in the project.')
+  expect(within(confirm).getByRole('button', { name: 'Delete' })).toBeEnabled()
   fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }))
   expect(screen.queryByRole('group', { name: /^Delete / })).not.toBeInTheDocument()
 

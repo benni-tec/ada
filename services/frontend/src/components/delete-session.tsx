@@ -15,16 +15,23 @@ export function DeleteSession({ projectId, sessionId, title }: { projectId: Id; 
   const [confirming, setConfirming] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { data: reports } = useQuery({ ...reportsQuery(projectId), enabled: confirming })
-  const owned = (reports ?? []).filter((report) => report.session_id === sessionId).length
+  const reports = useQuery({ ...reportsQuery(projectId), enabled: confirming })
+  const owned = (reports.data ?? []).filter((report) => report.session_id === sessionId).length
+  // Until the reports are counted the confirmation cannot say what goes, so Delete waits;
+  // when they cannot be counted it says so rather than counting none.
+  const counting = reports.isPending
+  const made = reports.isError
+    ? ', and any reports it made (they could not be counted)'
+    : owned > 0
+      ? `, and the ${owned === 1 ? 'report' : `${owned} reports`} it made`
+      : ''
   const remove = useMutation({
     mutationFn: () => deleteSession(sessionId),
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: keys.session(sessionId) })
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: keys.sessions(projectId) }),
-        queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'reports'] }),
-      ])
+      // The lists refetch in the background: a slow one must not keep the page open.
+      void queryClient.invalidateQueries({ queryKey: keys.sessions(projectId) })
+      void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'reports'] })
       await navigate({ to: '/projects/$projectId', params: { projectId } })
     },
   })
@@ -39,10 +46,10 @@ export function DeleteSession({ projectId, sessionId, title }: { projectId: Id; 
     <div role="group" aria-label={`Delete ${title}?`} className="flex basis-full flex-col gap-2 rounded-md border border-destructive/40 p-3 text-sm">
       <p>
         Delete <strong>{title}</strong> with its messages and agent turns
-        {owned > 0 ? `, and the ${owned === 1 ? 'report' : `${owned} reports`} it made` : ''}? Its widgets stay in the project.
+        {counting ? ', and the reports it made (counting…)' : made}? Its widgets stay in the project.
       </p>
       <div className="flex gap-2">
-        <Button variant="destructive" size="sm" disabled={remove.isPending} onClick={() => remove.mutate()}>
+        <Button variant="destructive" size="sm" disabled={counting || remove.isPending} onClick={() => remove.mutate()}>
           Delete
         </Button>
         <Button variant="outline" size="sm" disabled={remove.isPending} onClick={() => setConfirming(false)}>
