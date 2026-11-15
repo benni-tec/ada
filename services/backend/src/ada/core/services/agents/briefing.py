@@ -249,7 +249,6 @@ out). When a tool refuses a call, read its message and correct the call.
 """
 
 
-# Who the agent is and its rules, by the kind of session it works in.
 # The analyst's order when the deployment asks for quick analyses (AGENT_ANALYSIS_DEPTH).
 QUICK_ORDER = """\
 Rules:
@@ -279,6 +278,7 @@ def quick_rules(rules: str) -> str:
     return QUICK_ORDER + rules[end:] if start < end else rules
 
 
+# Who the agent is and its rules, by the kind of session it works in.
 BRIEFS = {
     SessionAgent.SESSION: (ABOUT_ADA, RULES),
     SessionAgent.RESEARCH: (ABOUT_RESEARCH, RESEARCH_RULES),
