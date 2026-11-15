@@ -1465,7 +1465,7 @@ receives data from an agent; it asks the server for the output of its operator.
     `render_error` and `verdict`, the briefing names the session's widgets that need
     fixing, and an update of spec, type or inputs clears `render_error`.
   - **The card** says "custom", shows `render_error` as one line under the frame and a
-    warn or fail verdict as a yellow icon with the findings; the pipeline dialog has a
+    warn or fail verdict as a yellow icon with the findings; the pipeline sheet has a
     "Code" tab with the inputs by name, the libraries, the code and the CSS.
 - **Reports keep what they showed.** Adding a report version copies every widget it shows
   (all types: operator, inputs, type, spec, title, note, verdict; `copied_from` the
@@ -1535,7 +1535,7 @@ receives data from an agent; it asks the server for the output of its operator.
   unmounted, so its scroll position is kept. A direct link to `?open=` has no run in its
   state: the modal starts a run of its own, like the widget page, and closing replaces the
   address without `open`.
-- **The pipeline view** is a modal dialog (`components/pipeline/`): the operator tree as a
+- **The pipeline view** is a sheet from the right (`components/pipeline/`, `components/side-sheet.tsx`): the operator tree as a
   graph laid out by depth (sources at the left, the widget's operator at the right, a
   shared input drawn once; materializing nodes solid and tinted, pass-through dashed;
   nodes are buttons, the arrow keys follow the edges), the selected operator's details
