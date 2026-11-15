@@ -6,9 +6,10 @@ from fastapi import APIRouter, status
 
 from ada.core.models.agents import PostedMessage
 from ada.core.models.base import Id
+from ada.core.models.operators import OperatorId
 from ada.core.models.sessions import Context, Session, SessionEntry
 from ada.core.models.widgets import Widget
-from ada.core.services.ports.agents import AgentTurnService, ResearchService
+from ada.core.services.ports.agents import AgentTurnService, AnalysisService, ResearchService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.widgets import WidgetService
@@ -44,6 +45,15 @@ class NewResearch(Request):
     brief: str
     # The research session's title.
     title: str
+
+
+class NewAnalysis(Request):
+    # The question for the analyst.
+    brief: str
+    # The analysis session's title.
+    title: str
+    # The operators to analyse; the analyst can find others itself.
+    operator_ids: tuple[OperatorId, ...] = ()
 
 
 @router.get("/projects/{project_id}/sessions")
@@ -97,6 +107,16 @@ async def delegate_research(
     this one, with the brief as its first message and its turn queued. Its report is added
     to this session's record; it does not start a turn here."""
     return await service.delegate(session_id, body.brief, body.title, WEB)
+
+
+@router.post("/sessions/{session_id}/analysis", status_code=status.HTTP_201_CREATED)
+async def delegate_analysis(
+    session_id: Id, body: NewAnalysis, service: FromDishka[AnalysisService]
+) -> Session:
+    """Delegate an analysis to the analyst, as the person: an analysis session under this
+    one, with the brief as its first message and its turn queued. Its findings are added
+    to this session's record, each with the operator that shows it."""
+    return await service.delegate(session_id, body.brief, body.title, body.operator_ids, WEB)
 
 
 @router.get("/sessions/{session_id}/widgets")

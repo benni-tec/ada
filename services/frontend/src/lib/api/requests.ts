@@ -102,6 +102,15 @@ export const delegateResearch = (sessionId: Id, title: string, brief: string) =>
     }),
   )
 
+/** Hands a question to the analyst in a new child session, which reports findings back here. */
+export const delegateAnalysis = (sessionId: Id, title: string, brief: string, operatorIds: string[]) =>
+  unwrap(
+    api.POST('/api/sessions/{session_id}/analysis', {
+      params: { path: { session_id: sessionId } },
+      body: { title, brief, operator_ids: operatorIds },
+    }),
+  )
+
 // Messages are posted with their context and model by `postMessage` (agent.ts).
 
 export const listSessionWidgets = (sessionId: Id) =>

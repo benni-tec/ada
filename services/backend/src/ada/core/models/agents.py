@@ -118,6 +118,14 @@ class AgentSettingsView(DomainModel):
     revision: int
 
 
+class Finding(DomainModel):
+    """One finding of an analysis: a plain sentence, each figure in it as the cited
+    operator's output has it, and that operator."""
+
+    claim: str
+    operator_id: str
+
+
 class ResearchLimits(DomainModel):
     # Paid web tool calls a research session may make, over all its turns.
     web_calls: int = 40

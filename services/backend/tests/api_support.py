@@ -28,7 +28,7 @@ from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.actors import Actor
 from ada.core.models.analysis import Rows
-from ada.core.models.base import Id
+from ada.core.models.base import Id, JsonObject
 from ada.core.models.errors import Invalid
 from ada.core.models.events import Event
 from ada.core.models.judges import Finding, JudgeContext, JudgeKind, Outcome, Verdict
@@ -63,6 +63,7 @@ from ada.core.ports.system import Clock
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.ports.web import WebExplorer, WebSearch
 from ada.core.services.pipelines import listing
+from ada.core.services.pipelines.statistics import compile_statistic
 from ada.core.services.ports.judges import JudgeService
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.runs import RunService
@@ -142,6 +143,21 @@ class FakePipelines(PipelineService):
         return await self._add(
             project_id, OperatorKind.TRANSFORM, {"sql": sql}, inputs, schema, actor
         )
+
+    async def add_statistic(
+        self,
+        project_id: Id,
+        tool: str,
+        arguments: JsonObject,
+        input: OperatorId,
+        actor: Actor,
+        materialize: bool = False,
+    ) -> Operator:
+        upstream = await self.operators.get(input)
+        normalised, compiled = compile_statistic(tool, arguments, COLUMNS, upstream.output.roles)
+        params = {"tool": tool, "arguments": normalised, "sql": compiled.sql}
+        schema = Schema(columns=COLUMNS, roles=compiled.roles)
+        return await self._add(project_id, OperatorKind.STATISTIC, params, (input,), schema, actor)
 
     async def add_input(
         self, project_id: Id, name: str, output: Schema, default: OperatorId, actor: Actor

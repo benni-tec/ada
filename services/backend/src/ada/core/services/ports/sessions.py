@@ -4,7 +4,7 @@ from typing import Protocol
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.operators import OperatorId
-from ada.core.models.sessions import Context, Session, SessionEntry, ToolCall
+from ada.core.models.sessions import Context, Session, SessionAgent, SessionEntry, ToolCall
 
 
 class SessionService(Protocol):
@@ -54,9 +54,12 @@ class SessionService(Protocol):
         call names a project (Invalid otherwise)."""
         ...
 
-    async def create_research(self, parent_session_id: Id, title: str, actor: Actor) -> Session:
-        """A research session under the parent, in its project, and a delegation entry in
-        the parent that names it. A research session does not delegate further."""
+    async def create_child(
+        self, parent_session_id: Id, title: str, agent: SessionAgent, actor: Actor
+    ) -> Session:
+        """A research or analysis session under the parent, in its project, and a
+        delegation entry in the parent that names it. A delegated session does not delegate
+        further."""
         ...
 
     async def record_report(self, child_session_id: Id, text: str, actor: Actor) -> SessionEntry:
