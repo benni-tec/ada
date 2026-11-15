@@ -117,8 +117,8 @@ test('writes a value in each format', async () => {
   expect(screen.getByText('2024')).toBeInTheDocument()
 })
 
-test('marks the values of a stale or simulated input, as the runtime marks the widget', async () => {
-  serve({ gap: gaps({ is_stale: true }) })
+test('marks the values of a stale input, as the runtime marks the widget', async () => {
+  serve({ gap: gaps({ is_stale: true, is_scenario: true }) })
   show('Fresh {{main.coverage[region=North]}}, stale {{gap.gap[county=Lappi]}}.')
 
   const stale = await screen.findByTitle((title) => title.includes('Input: gap'))
@@ -127,6 +127,9 @@ test('marks the values of a stale or simulated input, as the runtime marks the w
   expect(within(placeholder('Input: main')).queryByText('stale')).not.toBeInTheDocument()
   // Main is not stale, so the runtime says nothing: the widget says it once at the top.
   expect(screen.getByRole('list', { name: 'Data warnings' })).toHaveTextContent('Stale')
+  // Bound inputs compose pipelines; they are not marked.
+  expect(stale.title).not.toMatch(/scenario|simulated/i)
+  expect(screen.queryByText(/scenario/i)).not.toBeInTheDocument()
 })
 
 test('shows "no value" with the reason, never a blank', async () => {

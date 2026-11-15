@@ -1439,7 +1439,8 @@ receives data from an agent; it asks the server for the output of its operator.
   how to draw, never the data. `create_widget`'s description is the agent's manual: the
   module (`export default function render(root, data, ada)`, an optional cleanup), `data`
   (`main` and `inputs[name]`: columns, rows as objects, roles, truncated; `run_id`,
-  `is_scenario`, `is_stale`), `ada` (theme, colours, size and `onResize`, the platform's
+  `is_scenario` (the run binds an input slot; a historical name, kept for code that reads
+  it), `is_stale`), `ada` (theme, colours, size and `onResize`, the platform's
   number and date formats, the listed libraries, `error`), and the CSS variables.
   - **Checks** (`core/services/widgets/specs.py`, every problem at once, with lines): the
     keys; `export default`; at most 64 KB of code and CSS; libraries `d3` (7.9.0) and
@@ -1490,8 +1491,8 @@ receives data from an agent; it asks the server for the output of its operator.
   actions menu. A single view (`mark` or `layer`) fills the frame (`width`/`height:
   "container"`, autosize `fit`) unless the spec sizes itself; composed views size their
   parts. Its Vega config follows the page theme (the colours of `styles.css`, re-read when
-  `data-theme` or the system scheme changes); the spec's own `config` still wins. Scenario
-  and stale flags come from the runtime, as for every type. A spec that does not compile
+  `data-theme` or the system scheme changes); the spec's own `config` still wins. The
+  stale flag comes from the runtime, as for every type. A spec that does not compile
   shows Vega-Lite's message in the card.
 
 - **Where the built files are.** `WIDGETS_DIR` (default: `services/widgets/dist` of the
@@ -1549,8 +1550,10 @@ receives data from an agent; it asks the server for the output of its operator.
   protocol over postMessage: `ui/initialize`, then `ui/notifications/initialized`; it
   takes the widget from the `ui/notifications/tool-result` of `create_widget` and calls
   `get_widget_data` with `tools/call` through the host. No REST is used there.
-- **What it must show.** A marker when `is_scenario` is true, and one when `is_stale`
-  is true. A simulated or outdated number must never look like a measured, current one.
+- **What it must show.** A marker when `is_stale` is true: an outdated number must never
+  look like a current one. `is_scenario` (the run binds at least one input slot; the name
+  is historical) is passed but not shown. Binding an input composes pipelines into a DAG,
+  which says nothing about whether the numbers are measured, so it gets no marker.
 - **The map.** Each region at its latest period, in five equal classes on a sequential
   blue ramp (more is darker; flipped in dark mode); suppressed regions hatched, regions
   without a value grey, neither a colour of the scale. One focus stop; the arrow keys step
