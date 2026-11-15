@@ -882,6 +882,12 @@ def test_csv_is_rewritten_as_utf8_with_commas() -> None:
     assert shape(plain, {}) == plain
 
 
+@pytest.mark.parametrize("options", [{}, {"csv": {}}])
+def test_csv_falls_back_to_windows_1252(options: dict[str, Any]) -> None:
+    text = "name,description\nKäse,“limited”\n"
+    assert shape(fetched(text.encode("cp1252"), DataFormat.CSV), options).content == text.encode()
+
+
 @pytest.mark.parametrize(
     ("content", "format", "options"),
     [
