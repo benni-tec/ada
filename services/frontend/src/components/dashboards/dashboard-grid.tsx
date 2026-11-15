@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import type { CardRun } from '@/lib/view-run'
 
 import { columnWidth, GAP, keepsAspect, moved, pixels, place, resized, ROW_HEIGHT, type Box } from './layout'
-import { GoToSession } from './pin-to-dashboard'
+import { GoToSession, TalkAboutWidget } from './pin-to-dashboard'
 
 type Widgets = Map<Id, Widget>
 
@@ -54,9 +54,21 @@ function SlotContent({
   )
 }
 
-/** A widget on a dashboard is on one already: its action leads back to where it was made. */
+/** A widget on a dashboard is on one already: its actions talk about it in a session and
+ * lead back to where it was made. */
 function OnDashboard({ children }: { children: ReactNode }) {
-  return <WidgetCardActions value={(widget) => <GoToSession widget={widget} />}>{children}</WidgetCardActions>
+  return (
+    <WidgetCardActions
+      value={(widget) => (
+        <>
+          <TalkAboutWidget widget={widget} />
+          <GoToSession widget={widget} />
+        </>
+      )}
+    >
+      {children}
+    </WidgetCardActions>
+  )
 }
 
 type Drag = {

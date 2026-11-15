@@ -1,24 +1,29 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 import { AttachmentPanel } from '@/components/attachments/attachment-panel'
-import { ChatDraftContext, useChatDraftState } from '@/components/chat/chat-draft'
+import { ChatDraftContext, useChatDraftState, widgetChip } from '@/components/chat/chat-draft'
 import { SessionChat } from '@/components/chat/session-chat'
 import { DeleteSession } from '@/components/delete-session'
 import { EditableTitle } from '@/components/editable-title'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { PageType } from '@/components/page-header'
-import { getSession, keys, renameSession, sessionQuery } from '@/lib/api'
+import { getSession, keys, renameSession, sessionQuery, widgetQuery } from '@/lib/api'
 import { useRevisedUpdate } from '@/lib/revisions'
 
 type Search = {
   /** A widget to scroll to and highlight; the MCP tools link to it this way. */
   widget?: string
+  /** A widget to put on the message being written ("Talk about this widget"). */
+  about?: string
 }
 
 export const Route = createFileRoute('/projects/$projectId/sessions/$sessionId')({
-  validateSearch: (search: Record<string, unknown>): Search =>
-    typeof search.widget === 'string' && search.widget !== '' ? { widget: search.widget } : {},
+  validateSearch: (search: Record<string, unknown>): Search => ({
+    ...(typeof search.widget === 'string' && search.widget !== '' ? { widget: search.widget } : {}),
+    ...(typeof search.about === 'string' && search.about !== '' ? { about: search.about } : {}),
+  }),
   component: SessionPage,
 })
 
@@ -28,10 +33,20 @@ export const Route = createFileRoute('/projects/$projectId/sessions/$sessionId')
  */
 function SessionPage() {
   const { projectId, sessionId } = Route.useParams()
-  const { widget: highlighted } = Route.useSearch()
+  const { widget: highlighted, about } = Route.useSearch()
+  const navigate = Route.useNavigate()
   const session = useQuery(sessionQuery(sessionId))
   // The page holds the draft, so a dashboard tab's "Add widget" can put its chip on it.
   const draft = useChatDraftState()
+  // "Talk about this widget" from a dashboard: the widget goes on the message once, then
+  // leaves the address, so a reload does not put it back.
+  const aboutWidget = useQuery({ ...widgetQuery(about ?? ''), enabled: about !== undefined })
+  const { addChip } = draft
+  useEffect(() => {
+    if (!about || !aboutWidget.data) return
+    addChip(widgetChip(aboutWidget.data))
+    void navigate({ search: (previous) => ({ ...previous, about: undefined }), replace: true })
+  }, [about, aboutWidget.data, addChip, navigate])
   const rename = useRevisedUpdate({
     queryKey: keys.session(sessionId),
     read: () => getSession(sessionId),

@@ -424,6 +424,33 @@ test('a widget opens full size over the page at its card’s run; Escape, back a
   expect(router.state.location.search).toEqual({})
 })
 
+test('“Talk about this widget” starts a session with the dashboard attached and the widget on its message; history leads back', async () => {
+  const calls: unknown[] = []
+  const stored = session({ id: 's9', origin_dashboard_id: 'd1', title: 'About Coverage by region' })
+  serveDashboard({
+    'POST /api/projects/p1/sessions': (body: unknown) => (calls.push(['create', body]), json(stored, 201)),
+    'POST /api/sessions/s9/attachments': (body: unknown) => (calls.push(['attach', body]), json(attachment({ session_id: 's9' }), 201)),
+    'GET /api/sessions/s9/attachments': [],
+    'GET /api/sessions/s9': stored,
+    'GET /api/sessions/s9/entries': [],
+    'GET /api/sessions/s9/widgets': [],
+  })
+  const { router } = renderAt('/projects/p1/dashboards/d1')
+
+  const map = await screen.findByRole('article', { name: 'Coverage by region' })
+  // The way back to where it was made is the history icon now.
+  expect(await within(map).findByRole('link', { name: 'Go to the session it came from' })).toHaveAttribute('href', '/projects/p1/sessions/s4?widget=w0')
+  fireEvent.click(within(map).getByRole('button', { name: 'Talk about this widget in a new session' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/projects/p1/sessions/s9'))
+  expect(calls[0]).toEqual(['create', expect.objectContaining({ title: 'About Coverage by region' })])
+  expect(calls[1]).toEqual(['attach', expect.objectContaining({ kind: 'dashboard', ref: 'd1' })])
+
+  // The widget is on the message, once: the address no longer names it.
+  const composer = await screen.findByRole('form', { name: 'Write a message' })
+  expect(await within(composer).findByRole('list', { name: 'Context' })).toHaveTextContent('Widget: Coverage by region')
+  await waitFor(() => expect(router.state.location.search).toEqual({}))
+})
+
 test('a session started from the dashboard has it attached beside the conversation, which follows it and can detach it', async () => {
   const calls: unknown[] = []
   const stored = session({ id: 's9', origin_dashboard_id: 'd1', title: 'Questions about Screening overview' })
@@ -471,6 +498,9 @@ test('a session started from the dashboard has it attached beside the conversati
   const composer = screen.getByRole('form', { name: 'Write a message' })
   expect(await within(composer).findByRole('list', { name: 'Context' })).toHaveTextContent('Pipeline: Screening by county → Screening overview, slot “notes”')
   expect(within(composer).getByLabelText('Message')).toHaveFocus()
+  // In a session, “Talk about this widget” puts the widget on this session's message.
+  fireEvent.click(within(within(panel).getByRole('article', { name: 'Coverage by region' })).getByRole('button', { name: 'Talk about this widget' }))
+  expect(within(composer).getByRole('list', { name: 'Context' })).toHaveTextContent('Widget: Coverage by region')
 
   // An agent pins a fourth widget; the stream announces the new version.
   current = view({ dashboard: dashboard({ revision: 4, current_version_id: 'v3' }), version: { ...v2, id: 'v3', number: 3, slots: [...v2.slots, slot('extra', 'w1', 6, 4)] } })

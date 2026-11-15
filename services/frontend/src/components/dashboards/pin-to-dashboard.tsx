@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
-import { MessagesSquare, Pin } from 'lucide-react'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { History, MessagesSquare, Pin } from 'lucide-react'
 import { useId, useState, type FormEvent } from 'react'
 
+import { useChatDraft, widgetChip } from '@/components/chat/chat-draft'
 import { Hint, IconButton } from '@/components/icon-action'
 import { ErrorNotice } from '@/components/notices'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import {
   getDashboard,
   keys,
   pinWidget,
+  startSessionFromDashboard,
   widgetQuery,
   type Dashboard,
   type Widget,
@@ -160,6 +162,47 @@ export function PinToDashboard({ widget }: { widget: Widget }) {
 }
 
 /**
+ * Talk about a widget. On a dashboard (its grid, or the widget opened over it): a new
+ * session with the dashboard attached, the widget on its first message. In a session (a
+ * dashboard tab beside it): the widget on this session's message. Elsewhere there is no
+ * dashboard to attach, so no icon.
+ */
+export function TalkAboutWidget({ widget }: { widget: Widget }) {
+  const { dashboardId, sessionId } = useParams({ strict: false })
+  const draft = useChatDraft()
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const start = useMutation({
+    mutationFn: () => startSessionFromDashboard(widget.project_id, dashboardId!, `About ${widget.title || 'a widget'}`),
+    onSuccess: async (session) => {
+      void queryClient.invalidateQueries({ queryKey: keys.sessions(widget.project_id) })
+      await navigate({
+        to: '/projects/$projectId/sessions/$sessionId',
+        params: { projectId: widget.project_id, sessionId: session.id },
+        search: { about: widget.id },
+      })
+    },
+  })
+  const label = 'Talk about this widget'
+  if (sessionId && draft)
+    return (
+      <IconButton label={label} onClick={() => draft.addChip(widgetChip(widget))}>
+        <MessagesSquare />
+      </IconButton>
+    )
+  if (!dashboardId) return null
+  return (
+    <IconButton
+      label={start.error ? `No session started: ${start.error.message}` : 'Talk about this widget in a new session'}
+      unavailable={start.isPending ? 'Starting a session…' : undefined}
+      onClick={() => start.mutate()}
+    >
+      <MessagesSquare />
+    </IconButton>
+  )
+}
+
+/**
  * On a dashboard: back to the session the widget was made in, scrolled to it. A widget on
  * a dashboard is usually a copy made by pinning, which has no session of its own: the way
  * back then follows `copied_from` to the original and opens its session at it.
@@ -176,7 +219,7 @@ export function GoToSession({ widget }: { widget: Widget }) {
   if (!source) {
     return (
       <IconButton label="Go to the session it came from" unavailable={original.isLoading ? 'Looking for the session…' : 'Not made in a session'}>
-        <MessagesSquare />
+        <History />
       </IconButton>
     )
   }
@@ -189,7 +232,7 @@ export function GoToSession({ widget }: { widget: Widget }) {
           search={{ widget: source.id }}
           aria-label="Go to the session it came from"
         >
-          <MessagesSquare />
+          <History />
         </Link>
       </Button>
     </Hint>
