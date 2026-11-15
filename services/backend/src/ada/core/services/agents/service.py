@@ -62,6 +62,8 @@ logger = logging.getLogger(__name__)
 MAX_STEPS = 24
 # A research turn searches, reads pages and checks each source it adds.
 MAX_RESEARCH_STEPS = 60
+# An analysis turn profiles, computes and checks before it reports.
+MAX_ANALYSIS_STEPS = 40
 
 # How long a turn may run. One that takes longer is going in circles or waiting on
 # something that does not answer; it fails, and the session's next turn can start.
@@ -76,6 +78,10 @@ TURN_MARGIN = timedelta(minutes=1)
 ABANDONED = "The turn did not end in time; the worker running it has probably stopped"
 
 INCOMPLETE = "(incomplete: ended without a report)"
+UNCHECKED = (
+    "The analysis ended without a checked report, so none of its figures are passed on. "
+    "Its session has its work."
+)
 
 
 class AgentTurns(AgentTurnService):
@@ -315,7 +321,7 @@ class AgentTurns(AgentTurnService):
                     session,
                     await self.sessions.entries(session.id),
                     await self.turn_records.list(session.id),
-                    MAX_RESEARCH_STEPS if research else MAX_STEPS,
+                    _steps(session.agent),
                     (await self.agent_settings.get()).instructions,
                 )
                 agent = _agent(turn.model)
@@ -350,13 +356,13 @@ class AgentTurns(AgentTurnService):
         return finished
 
     async def _report_end(self, session: Session, turn: AgentTurn) -> None:
-        """The research turn on the brief, when it did not report back, reports how it
+        """The delegated turn on the brief, when it did not report back, reports how it
         ended: its final text, marked incomplete, or its failure. Only whoever settles the
         turn calls this, in the same unit of work, so it happens once. A person's follow-ups
         in the research session are a conversation of their own: they report only by
         calling report_back."""
         parent_id = session.parent_session_id
-        if session.agent is not SessionAgent.RESEARCH or parent_id is None:
+        if session.agent is SessionAgent.SESSION or parent_id is None:
             return
         entries = await self.sessions.entries(session.id)
         brief = next((entry for entry in entries if entry.kind is EntryKind.MESSAGE), None)
@@ -369,10 +375,14 @@ class AgentTurns(AgentTurnService):
             for entry in await self.sessions.entries(parent_id)
         ):
             return
-        if turn.status is TurnStatus.DONE:
+        if turn.status is TurnStatus.DONE and session.agent is SessionAgent.ANALYSIS:
+            # Its final text was never checked against the data, so it is not passed on.
+            text = UNCHECKED
+        elif turn.status is TurnStatus.DONE:
             text = f"{_final_text(turn) or 'It gave no answer.'}\n\n{INCOMPLETE}"
         elif turn.status is TurnStatus.FAILED:
-            text = f"Research failed: {turn.error}"
+            what = "Research" if session.agent is SessionAgent.RESEARCH else "Analysis"
+            text = f"{what} failed: {turn.error}"
         else:
             # Cancelled by a person, who knows.
             return
@@ -490,3 +500,13 @@ def _operators(output: Any) -> list[dict[str, Any]]:
         for item in candidates
         if isinstance(item, dict) and "kind" in item and "params" in item
     ]
+
+
+def _steps(agent: SessionAgent) -> int:
+    match agent:
+        case SessionAgent.RESEARCH:
+            return MAX_RESEARCH_STEPS
+        case SessionAgent.ANALYSIS:
+            return MAX_ANALYSIS_STEPS
+        case _:
+            return MAX_STEPS

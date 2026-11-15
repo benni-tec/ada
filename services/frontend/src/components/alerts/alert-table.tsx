@@ -47,7 +47,10 @@ function AlertRow({ view }: { view: AlertView }) {
   return (
     <>
       <TableRow data-state={open ? 'selected' : undefined}>
-        <TableCell className="font-medium">{keyText(alert.key)}</TableCell>
+        <TableCell className="font-medium whitespace-normal">
+          {keyText(alert.key)}
+          <Deliveries projectId={alert.project_id} alertId={alert.id} />
+        </TableCell>
         <TableCell className={active ? severityTextClasses[view.rule.severity] : 'text-muted-foreground'}>
           {stateText(view)}
         </TableCell>
@@ -67,7 +70,6 @@ function AlertRow({ view }: { view: AlertView }) {
           </IconButton>
         </TableCell>
       </TableRow>
-      <TableRow><TableCell colSpan={4}><Deliveries projectId={alert.project_id} alertId={alert.id} /></TableCell></TableRow>
       {open && (
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={4} id={rowsId} className="bg-muted/30 whitespace-normal">

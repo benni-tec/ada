@@ -44,6 +44,8 @@ def name(operator: Operator, source_names: Mapping[Id, str]) -> str:
             return sql_name(str(operator.params.get("sql", ""))) or operator.id
         case OperatorKind.INPUT:
             return str(operator.params.get("name", "")) or operator.id
+        case OperatorKind.STATISTIC:
+            return sql_name(str(operator.params.get("sql", ""))) or operator.id
         case _:
             return f"{operator.kind.value} {operator.id}"
 

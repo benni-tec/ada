@@ -6,12 +6,14 @@ from ada.config import Settings
 from ada.core.models.agents import ResearchLimits
 from ada.core.ports.agents import AgentRuntime, LanguageModels
 from ada.core.ports.secrets import SecretBox
+from ada.core.services.agents.analysis import Analysis
 from ada.core.services.agents.research import Research
 from ada.core.services.agents.service import AgentTurns
 from ada.core.services.agents.settings import AgentConfiguration
 from ada.core.services.ports.agents import (
     AgentSettingsService,
     AgentTurnService,
+    AnalysisService,
     ResearchService,
 )
 
@@ -44,6 +46,7 @@ class AgentProvider(Provider):
         return ResearchLimits(web_calls=settings.research_web_calls)
 
     research = provide(Research, provides=ResearchService, scope=Scope.REQUEST)
+    analysis = provide(Analysis, provides=AnalysisService, scope=Scope.REQUEST)
 
 
 provider = AgentProvider()

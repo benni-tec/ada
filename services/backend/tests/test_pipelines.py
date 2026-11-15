@@ -324,6 +324,34 @@ async def test_an_input_checks_its_default_against_its_schema(world: World) -> N
         await world.pipelines.add_input(world.project_id, "codes", wrong, source.id, AGENT)
 
 
+async def test_a_statistic_runs_the_sql_it_stored_and_declares_its_interval(
+    world: World,
+) -> None:
+    years = await world.transform(
+        "SELECT * FROM (VALUES ('FI', 2020, 10.0), ('FI', 2021, 12.0), ('FI', 2022, 13.5), "
+        "('FI', 2023, 15.0), ('SE', 2022, 20.0)) v(country, year, share)"
+    )
+    arguments = {"value": "share", "time": "year", "by": ["country"]}
+    trend = await world.pipelines.add_statistic(
+        world.project_id, "trend", arguments, years.id, AGENT
+    )
+
+    assert trend.kind is OperatorKind.STATISTIC
+    assert "regr_slope" in trend.params["sql"]
+    assert trend.output.roles.measures == (
+        MeasureRole(value="slope", lower="slope_lower", upper="slope_upper"),
+    )
+    fi, se = sorted(await world.read(trend))
+    # country, n, first, last, slope, lower, upper, confidence, r2, direction
+    assert (fi[0], fi[1], fi[4], fi[7], fi[9]) == ("FI", 4, 1.65, 95, "rising")
+    assert round(fi[5], 2) == 1.28 and round(fi[6], 2) == 2.02
+    assert (se[0], se[1], se[9]) == ("SE", 1, "too few points")
+    with pytest.raises(Invalid, match="'nope' is not a column"):
+        await world.pipelines.add_statistic(
+            world.project_id, "trend", {**arguments, "value": "nope"}, years.id, AGENT
+        )
+
+
 async def test_a_chain_of_pass_through_transforms_is_one_query(world: World) -> None:
     source = await world.source()
     big = await world.transform("SELECT * FROM input_0 WHERE value > 10", source)

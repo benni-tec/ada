@@ -49,7 +49,7 @@ export function OperatorDetails({
             <ol className="flex flex-col">
               {operator.inputs.map((input, index) => (
                 <li key={`${input}-${index}`}>
-                  {operator.kind === 'transform' && <code className="mr-1 font-mono text-xs">input_{index}</code>}
+                  {(operator.kind === 'transform' || operator.kind === 'statistic') && <code className="mr-1 font-mono text-xs">input_{index}</code>}
                   {nameOf(input)}
                 </li>
               ))}
@@ -114,6 +114,18 @@ function Parameters({ operator, source }: { operator: Operator; source: SourceIn
     case 'transform':
       return (
         <Part title="SQL">
+          <pre className="max-h-64 overflow-auto rounded-md bg-neutral-100 p-2 font-mono text-xs whitespace-pre-wrap dark:bg-neutral-950">
+            {String(params.sql ?? '')}
+          </pre>
+        </Part>
+      )
+    case 'statistic':
+      return (
+        <Part title={`Statistic: ${String(params.tool ?? '')}`}>
+          <pre className="max-h-32 overflow-auto rounded-md bg-neutral-100 p-2 font-mono text-xs whitespace-pre-wrap dark:bg-neutral-950">
+            {JSON.stringify(params.arguments ?? {}, null, 2)}
+          </pre>
+          <p className="text-xs text-neutral-500">Compiled to this SQL when it was added, and run as written:</p>
           <pre className="max-h-64 overflow-auto rounded-md bg-neutral-100 p-2 font-mono text-xs whitespace-pre-wrap dark:bg-neutral-950">
             {String(params.sql ?? '')}
           </pre>

@@ -4,6 +4,7 @@ import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import duckdb
 import httpx
 import pytest
 from dishka import AsyncContainer, Provider, Scope
@@ -12,8 +13,11 @@ from ada.adapters.clock import SystemClock
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.composition import create_container
 from ada.config import Settings
+from ada.core.models.alerts import AlertState
+from ada.core.models.base import Id
 from ada.core.models.sessions import EntryKind
 from ada.core.ports.sources import SourceReaders
+from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.pipelines import PipelineService
@@ -24,20 +28,31 @@ from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.cli.trials import seed
 from ada.entrypoints.cli.trials.dashboards import DOORS, NEAR_YOU
-from ada.entrypoints.cli.trials.seed import _build, seed_trials
+from ada.entrypoints.cli.trials.monitoring import DASHBOARD, FINNISH_RULE, site_changes_sql
+from ada.entrypoints.cli.trials.seed import SEED, _build, seed_trials
 from ada.entrypoints.cli.trials.sources import COUNTRIES
-from memory import MemoryBackground
+from ada.entrypoints.cli.trials.steps import TRIAL_SITES
+from memory import MemoryBackground, memory_adapters
 
 pytestmark = pytest.mark.anyio
 RECORDINGS = Path(__file__).parent / "recordings" / "trials"
 
 
 @pytest.fixture
-async def container(migrated_database_url: str, tmp_path: Path) -> AsyncIterator[AsyncContainer]:
+def finland_fixture() -> dict:
+    return json.loads((RECORDINGS / "ctgov-Finland.json").read_text())
+
+
+@pytest.fixture(params=["memory", "postgres"])
+async def container(
+    request: pytest.FixtureRequest, tmp_path: Path, finland_fixture: dict
+) -> AsyncIterator[AsyncContainer]:
     def registry(request: httpx.Request) -> httpx.Response:
         if request.url.host == "clinicaltrials.gov":
             country = request.url.params["query.locn"]
             name = f"ctgov-{country}.json"
+            if country == "Finland":
+                return httpx.Response(200, json=finland_fixture)
         else:
             assert request.method == "POST"
             body = json.loads(request.content)
@@ -60,16 +75,23 @@ async def container(migrated_database_url: str, tmp_path: Path) -> AsyncIterator
                 )
         return httpx.Response(200, json=data)
 
-    readers = HttpSourceReaders(create_client(httpx.MockTransport(registry)), SystemClock())
+    readers = HttpSourceReaders(
+        create_client(httpx.MockTransport(registry)), SystemClock(), allow_private=True
+    )
     outside = Provider(scope=Scope.APP)
     outside.provide(lambda: readers, provides=SourceReaders)
+    database_url = (
+        request.getfixturevalue("migrated_database_url")
+        if request.param == "postgres"
+        else "postgresql+psycopg://test@127.0.0.1:1/test"
+    )
     result = create_container(
         Settings(
-            database_url=migrated_database_url,
+            database_url=database_url,
             valkey_url="redis://127.0.0.1:1/0",
             data_dir=tmp_path,
         ),
-        MemoryBackground(),
+        *(memory_adapters() if request.param == "memory" else (MemoryBackground(),)),
         outside,
     )
     try:
@@ -99,7 +121,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             seed.AGENT_INSTRUCTIONS
         )
         sources = await (await request.get(SourceService)).list(project_id)
-        assert len(sources) == 8
+        assert len(sources) == 10
         assert all(s.last_checked_at is None for s in sources)
         sessions = await request.get(SessionService)
         [session] = await sessions.list(project_id)
@@ -112,6 +134,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             "ctis_finland_pending",
             "trial_rates",
             "case_trials",
+            "trial_site_changes",
         }
         pipelines = await request.get(PipelineService)
         after = {
@@ -120,7 +143,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             for o in await pipelines.lineage(p.operator_id)
         }
     assert before == after
-    assert len(after) == 19
+    assert len(after) > 15
 
 
 async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
@@ -169,12 +192,13 @@ async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
         dashboards = await request.get(DashboardService)
         widgets = await request.get(WidgetService)
         first = {d.name: d.id for d in await dashboards.list(project_id)}
-        assert set(first) == {DOORS, NEAR_YOU}
+        assert set(first) == {DOORS, NEAR_YOU, DASHBOARD}
         before = {w.id for w in await widgets.list(project_id)}
         [session] = await (await request.get(SessionService)).list(project_id)
         attachments = await (await request.get(AttachmentService)).list(session.id)
         assert {a.ref for a in attachments} == {str(d) for d in first.values()}
-        for name, dashboard_id in first.items():
+        for name in (DOORS, NEAR_YOU):
+            dashboard_id = first[name]
             version = await dashboards.current(dashboard_id)
             assert version is not None
             assert len(version.slots) == (6 if name == DOORS else 2)
@@ -211,3 +235,207 @@ async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
             d.name: d.id for d in await (await request.get(DashboardService)).list(project_id)
         } == first
         assert {w.id for w in await (await request.get(WidgetService)).list(project_id)} == before
+
+
+async def simulate_site_change(container: AsyncContainer, finland_fixture: dict) -> Id:
+    """Seed recordings, then refresh Finland after changing the transport's mutable fixture."""
+    # Copy the door trial from Sweden into Finland's next country listing.
+    sweden = json.loads((RECORDINGS / "ctgov-Sweden.json").read_text())
+    trial = next(
+        t
+        for t in sweden["studies"]
+        if t["protocolSection"]["identificationModule"]["nctId"] == "NCT07195695"
+    )
+    if not any(
+        t["protocolSection"]["identificationModule"]["nctId"] == "NCT07195695"
+        for t in finland_fixture["studies"]
+    ):
+        finland_fixture["studies"].append(json.loads(json.dumps(trial)))
+    previous = next(
+        t
+        for t in finland_fixture["studies"]
+        if t["protocolSection"]["identificationModule"]["nctId"] == "NCT07195695"
+    )
+    previous["protocolSection"]["contactsLocationsModule"]["locations"].append(
+        {
+            "facility": "HUS",
+            "city": "Helsinki",
+            "country": "Finland",
+            "status": "NOT_YET_RECRUITING",
+        }
+    )
+    project_id = await seed_trials(container, refresh=True)
+    section = trial["protocolSection"]
+    locations = section["contactsLocationsModule"]["locations"]
+    closing = next(
+        s for s in locations if s["country"] in COUNTRIES and s.get("status") == "RECRUITING"
+    )
+    closing["status"] = "COMPLETED"
+    locations.append(
+        {"facility": "HUS", "city": "Helsinki", "country": "Finland", "status": "RECRUITING"}
+    )
+    finland_fixture["studies"] = [
+        t
+        for t in finland_fixture["studies"]
+        if t["protocolSection"]["identificationModule"]["nctId"] != "NCT07195695"
+    ] + [trial]
+    async with container() as request:
+        sources = await (await request.get(SourceService)).list(project_id)
+        source = next(s for s in sources if s.name == "ClinicalTrials.gov: Finland")
+        await (await request.get(SourceService)).refresh(source.id, force=True)
+    return project_id
+
+
+async def test_monitoring_changes_and_finnish_alert(
+    container: AsyncContainer, finland_fixture: dict
+) -> None:
+    # The Finland recording also carries the door trial as an old observation.
+    sweden = json.loads((RECORDINGS / "ctgov-Sweden.json").read_text())
+    trial = next(
+        t
+        for t in sweden["studies"]
+        if t["protocolSection"]["identificationModule"]["nctId"] == "NCT07195695"
+    )
+    finland_fixture["studies"].append(trial)
+    project_id = await seed_trials(container, refresh=True)
+    async with container() as request:
+        widget = next(
+            w
+            for w in await (await request.get(WidgetService)).list(project_id)
+            if w.title == "trial_site_changes" and w.copied_from is None
+        )
+        run = await (await request.get(RunService)).start(project_id, SEED)
+        assert not (await (await request.get(RunService)).read(run.id, widget.operator_id)).rows
+    project_id = await simulate_site_change(container, finland_fixture)
+    async with container() as request:
+        runs = await request.get(RunService)
+        run = await runs.start(project_id, SEED)
+        data = await runs.read(run.id, widget.operator_id)
+        rows = [dict(zip([c.name for c in data.columns], row, strict=True)) for row in data.rows]
+        assert {r["change_kind"] for r in rows if r["nct_id"] == "NCT07195695"} >= {
+            "finnish_site_recruiting",
+            "nordic_site_closed",
+        }
+        dashboard = next(
+            d
+            for d in await (await request.get(DashboardService)).list(project_id)
+            if d.name == DASHBOARD
+        )
+        alerts = await request.get(AlertService)
+        rules = await alerts.list_rules(dashboard.id)
+        bulletin = next(r for r in rules if r.name == "Weekly trial-gap bulletin")
+        assert bulletin.key_columns == ("registry", "cancer_group", "week")
+        assert bulletin.check_interval_seconds == 7 * 86400
+        rule = next(r for r in rules if r.name == FINNISH_RULE)
+        await alerts.check(rule.id)
+        firing = [
+            a for a in await alerts.alerts(project_id, AlertState.FIRING) if a.rule_id == rule.id
+        ]
+        assert len(firing) == 1
+        assert "NCT07195695" in str((await alerts.rows(firing[0].id)).rows)
+
+
+def test_site_changes_reconcile_sources_and_unnamed_sites() -> None:
+    with duckdb.connect() as db:
+        for i in range(4):
+            db.execute(f"""
+                CREATE TABLE input_{i} (
+                    nct_id VARCHAR, title VARCHAR, last_update VARCHAR, locations JSON,
+                    snapshot_at TIMESTAMP, snapshot_rank INTEGER
+                )
+            """)
+
+        def observation(source: int, rank: int, statuses: list[str], trial: str = "NCT1") -> None:
+            sites = [
+                {"city": "Helsinki", "country": "Finland", "status": status} for status in statuses
+            ]
+            db.execute(
+                f"INSERT INTO input_{source} VALUES (?, 'Trial', '2026-01-01', ?, ?, ?)",
+                [trial, json.dumps(sites), f"2026-01-{4 - rank + source:02d}", rank],
+            )
+
+        observation(0, 2, ["recruiting", "COMPLETED"])
+        observation(1, 1, ["RECRUITING", "COMPLETED", "RECRUITING"])
+        sql = site_changes_sql(TRIAL_SITES)
+        # Moving between country pulls, duplicate unnamed sites and casing are not changes.
+        assert db.execute(sql).fetchall() == []
+
+        observation(0, 1, ["RECRUITING"])
+        observation(3, 1, ["COMPLETED"])
+        db.execute("UPDATE input_0 SET last_update = '2026-02-01' WHERE snapshot_rank = 1")
+        assert db.execute(sql).fetchall() == []
+        # With matching registry revisions, the later fetch breaks the tie.
+        db.execute("UPDATE input_3 SET last_update = '2026-02-01'")
+        assert [row[0] for row in db.execute(sql).fetchall()] == ["nordic_site_closed"]
+        db.execute("DELETE FROM input_3")
+        db.execute("DELETE FROM input_0")
+        observation(0, 2, ["not_yet_recruiting", "COMPLETED"])
+        result = db.execute(sql)
+        rows = [
+            dict(zip([c[0] for c in result.description], row, strict=True))
+            for row in result.fetchall()
+        ]
+        assert {r["change_kind"] for r in rows} == {"finnish_site_recruiting", "nordic_site_opened"}
+        assert len(rows) == 2
+
+        observation(2, 1, ["RECRUITING"], trial="NCT2")
+        observation(3, 1, ["recruiting"], trial="NCT2")
+        result = db.execute(sql)
+        rows = [
+            dict(zip([c[0] for c in result.description], row, strict=True))
+            for row in result.fetchall()
+        ]
+        assert sum(r["change_kind"] == "new_trial" for r in rows) == 1
+
+        observation(2, 1, ["not_yet_recruiting"], trial="NCT3")
+        result = db.execute(sql)
+        rows = [
+            dict(zip([c[0] for c in result.description], row, strict=True))
+            for row in result.fetchall()
+        ]
+        assert {r["change_kind"] for r in rows if r["nct_id"] == "NCT3"} == {
+            "new_trial",
+            "finnish_site_added",
+        }
+
+
+def test_site_changes_guard_truncated_sources() -> None:
+    with duckdb.connect() as db:
+        for source in range(4):
+            db.execute(f"""
+                CREATE TABLE input_{source} AS
+                SELECT 'NCT' || i AS nct_id, 'Trial' AS title,
+                    '2026-01-01' AS last_update,
+                    '[{{"country":"Sweden","status":"RECRUITING"}}]'::JSON AS locations,
+                    TIMESTAMP '2026-01-01' AS snapshot_at, 2 AS snapshot_rank
+                FROM range({source * 10}, {source * 10 + 4}) t(i)
+            """)
+        sql = site_changes_sql(TRIAL_SITES)
+        # Empty and truncated sources suppress removals; exactly half is valid.
+        for source, count in ((1, 1), (2, 2), (3, 3)):
+            db.execute(f"""
+                INSERT INTO input_{source}
+                SELECT nct_id, title, last_update, locations,
+                    TIMESTAMP '2026-01-02', 1
+                FROM input_{source} LIMIT {count}
+            """)
+        db.execute("""
+            INSERT INTO input_1 VALUES ('NEW', 'New trial', '2026-01-02',
+                '[{"country":"Sweden","status":"RECRUITING"}]', '2026-01-02', 1)
+        """)
+        # Keep this source below half even with the addition.
+        db.execute("""
+            INSERT INTO input_1 SELECT 'OLD', title, last_update, locations, snapshot_at, 2
+            FROM input_1 LIMIT 1
+        """)
+        rows = db.execute(sql).fetchall()
+        assert {(r[0], r[1]) for r in rows} == {
+            ("trial_left_list", "NCT22"),
+            ("nordic_site_closed", "NCT22"),
+            ("trial_left_list", "NCT23"),
+            ("nordic_site_closed", "NCT23"),
+            ("trial_left_list", "NCT33"),
+            ("nordic_site_closed", "NCT33"),
+            ("new_trial", "NEW"),
+            ("nordic_site_opened", "NEW"),
+        }

@@ -23,8 +23,9 @@ export function Deliveries({ projectId, alertId, ruleId, browserAlertId }: {
   const deliveries = query.data?.filter((delivery) =>
     alertId ? delivery.alert_id === alertId : delivery.test && delivery.rule_id === ruleId,
   )
+  if (!query.error && !deliveries?.length && !receipt) return null
   return (
-    <div className="space-y-1 text-xs text-muted-foreground">
+    <div className="mt-1 space-y-1 text-xs font-normal text-muted-foreground">
       {query.error && <ErrorNotice error={query.error} prefix="Deliveries cannot be loaded:" />}
       {deliveries?.map((delivery) => (
         <div key={delivery.id}>
