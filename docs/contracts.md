@@ -707,8 +707,9 @@ Reports and their versions (`core/services/reports/`).
   widget lays itself out for paper (`data-snapshot`: nothing scrolls, no sources line) and
   answers `{type: 'ada:snapshot', id, image, width, height}` (a PNG data URL, drawn with
   `html-to-image`) or `{…, error}`. The widget footers cite the sources by number in a
-  bibliography at the end, ordered by first use. One callout at the top links to the
-  version in ADA on the host the PDF was made on. A custom widget draws in a frame of
+  bibliography at the end, ordered by first use: two columns, each name the link to its
+  address. A bordered box at the very end links to the version in ADA on the host the PDF
+  was made on. A custom widget draws in a frame of
   its own, which the picture cannot see.
 - **Concurrency.** Adding a version moves `latest_version_id` with the report's revision,
   so two versions added at once conflict; REST and MCP also take an optional

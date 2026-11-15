@@ -45,6 +45,7 @@ const ink = '#171717'
 const muted = '#525252'
 const rule = '#d4d4d4'
 const linkBlue = '#1d4ed8'
+const tonesNote = '#0284c7'
 
 const styles = StyleSheet.create({
   page: { paddingTop: 48, paddingBottom: 56, paddingHorizontal: 48, fontFamily: 'Inter', fontSize: 10.5, color: ink, lineHeight: 1.45 },
@@ -58,6 +59,7 @@ const styles = StyleSheet.create({
   h3: { fontSize: 11.5, lineHeight: 1.25, fontFamily: 'Inter', fontWeight: 700, marginTop: 6, marginBottom: 4 },
   paragraph: { marginBottom: 6 },
   callout: { borderLeftWidth: 3, paddingLeft: 10, paddingVertical: 6, marginBottom: 10 },
+  inAda: { borderWidth: 1, borderColor: tonesNote, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 8, marginTop: 16 },
   calloutLabel: { fontSize: 8.5, fontFamily: 'Inter', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: muted },
   figure: { marginVertical: 8, borderWidth: 1, borderColor: rule, borderRadius: 4 },
   picture: { width: '100%', objectFit: 'contain' },
@@ -65,13 +67,15 @@ const styles = StyleSheet.create({
   widgetFooter: { borderTopWidth: 1, borderTopColor: rule, paddingHorizontal: 8, paddingVertical: 5, fontSize: 8.5, color: muted },
   caption: { fontSize: 9.5, color: muted, marginTop: -4, marginBottom: 8 },
   sourcesTitle: { fontSize: 13.5, lineHeight: 1.25, fontFamily: 'Inter', fontWeight: 700, marginTop: 16, marginBottom: 6 },
-  source: { fontSize: 9, marginBottom: 5 },
+  sourceList: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  source: { width: '48.5%', fontSize: 9, marginBottom: 5 },
+  sourceName: { color: ink, textDecoration: 'none' },
   // From the top: placed by `bottom`, it lands at the top of some pages.
   pageFooter: { position: 'absolute', top: A4_HEIGHT - 36, left: 48, right: 48, fontSize: 8, color: muted, flexDirection: 'row', justifyContent: 'space-between' },
 })
 
 const tones: Record<CalloutBlock['tone'], { label: string; color: string }> = {
-  note: { label: 'Note', color: '#0284c7' },
+  note: { label: 'Note', color: tonesNote },
   finding: { label: 'Finding', color: '#059669' },
   warning: { label: 'Warning', color: '#d97706' },
 }
@@ -98,19 +102,19 @@ export function ReportDocument({ report, version, sources: unordered, origin, dr
           </Text>
           <Text style={styles.facts}>Frozen at run {version.run_id}: every figure below comes from it.</Text>
         </View>
-        {/* The one way back into ADA: on the version's page every widget opens at this run,
-            with its pipeline and sources. */}
-        <View style={[styles.callout, { borderLeftColor: tones.note.color }]} wrap={false}>
+        {blocks.map((block, index) => (
+          <BlockPdf key={index} block={block} depth={0} drawn={drawn} sources={sources} />
+        ))}
+        {sources.length > 0 && <Sources sources={sources} />}
+        {/* Last, the one way back into ADA: on the version's page every widget opens at this
+            run, with its pipeline and sources. */}
+        <View style={styles.inAda} wrap={false}>
           <Text style={styles.calloutLabel}>In ADA</Text>
           <Text>This version, with every widget's pipeline and sources, is at</Text>
           <Link src={reportUrl(origin, report, version)} style={styles.link}>
             {reportUrl(origin, report, version)}
           </Link>
         </View>
-        {blocks.map((block, index) => (
-          <BlockPdf key={index} block={block} depth={0} drawn={drawn} sources={sources} />
-        ))}
-        {sources.length > 0 && <Sources sources={sources} />}
       </Page>
     </Document>
   )
@@ -211,26 +215,29 @@ function WidgetPdf({ id, caption, drawn, sources }: { id: Id; caption: string } 
   )
 }
 
+/** The bibliography, in two columns: each source's number, its name (the link to where the
+ * data came from) and when it was fetched; the addresses are behind the names. */
 function Sources({ sources }: { sources: ReportSource[] }) {
   return (
     <View>
       <Text style={styles.sourcesTitle}>Sources</Text>
-      {sources.map((source, index) => (
-        // One entry is never split: a long address broken over a page cannot be laid out.
-        <View key={source.operator_id} style={styles.source} wrap={false}>
-          <Text>
-            [{index + 1}] {source.name}
-            {source.fetched_at ? `, fetched ${new Date(source.fetched_at).toLocaleString()}` : ''}
-          </Text>
-          {/^https?:\/\//i.test(source.address) ? (
-            <Link src={source.address} style={styles.link}>
-              {source.address}
-            </Link>
-          ) : (
-            <Text>{source.address}</Text>
-          )}
-        </View>
-      ))}
+      <View style={styles.sourceList}>
+        {sources.map((source, index) => (
+          <View key={source.operator_id} style={styles.source} wrap={false}>
+            <Text>
+              [{index + 1}]{' '}
+              {/^https?:\/\//i.test(source.address) ? (
+                <Link src={source.address} style={styles.sourceName}>
+                  {source.name}
+                </Link>
+              ) : (
+                source.name
+              )}
+            </Text>
+            {source.fetched_at && <Text style={{ color: muted }}>fetched {new Date(source.fetched_at).toLocaleString()}</Text>}
+          </View>
+        ))}
+      </View>
     </View>
   )
 }
