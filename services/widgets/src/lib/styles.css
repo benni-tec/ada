@@ -666,9 +666,14 @@ body,
   text-align: inherit;
 }
 
-/* A figure stays on one line; a text value (a target, a name) wraps like the text around it. */
+/* A figure stays on one line; a text value (a target, a name) wraps like the text around it,
+   its first line on the line it starts (a list's bullet beside it). */
 .ada-placeholder[data-numeric] {
   white-space: nowrap;
+}
+
+button.ada-placeholder:not([data-numeric]) {
+  vertical-align: top;
 }
 
 button.ada-placeholder {
