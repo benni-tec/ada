@@ -25,6 +25,7 @@ for name in (
     "EXA_API_KEY",
     "ADA_PUBLIC_URL",
     "ALERT_NTFY_URL",
+    "ALERT_EMAIL_TO",
     "ALERT_WEBHOOK_URL",
     "CONTEXT_MONITOR_MINUTES",
 ):

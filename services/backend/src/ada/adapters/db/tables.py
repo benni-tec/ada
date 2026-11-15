@@ -549,3 +549,19 @@ class WebUsageRow(Base):
     )
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     credits: Mapped[int] = mapped_column(Integer)
+
+
+class AlertDeliveryRow(Base):
+    __tablename__ = "alert_deliveries"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    alert_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("alerts.id", ondelete="CASCADE"))
+    project_id: Mapped[UUID] = _project()
+    rule_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("alert_rules.id", ondelete="CASCADE"))
+    test: Mapped[bool] = mapped_column(Boolean)
+    channel: Mapped[str] = mapped_column(Text)
+    target: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text)
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    detail: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(_timestamp)

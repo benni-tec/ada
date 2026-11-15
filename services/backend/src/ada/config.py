@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     # Where Context.dev can reach this platform, for page monitor webhooks. Unset:
     # watching refuses, naming it.
     ada_public_url: str | None = None
+    alert_email_to: str | None = None
     alert_ntfy_url: str | None = None
     alert_webhook_url: str | None = None
     # Paid web tool calls (Exa and Context.dev) a research session may make.
