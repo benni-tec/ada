@@ -4,25 +4,42 @@ import { Cursor } from '../Cursor'
 import { s } from '../frame'
 import { LowerThird } from '../LowerThird'
 
-/** Screenshots of the "The strategy's four goals" dashboard in ADA, light mode: as it is,
- * and with its bell opened on the active alerts. */
-const DASHBOARD = 'goals-dashboard.png'
+/** Screenshots of the "National Cancer Strategy 2026–2035" dashboard in ADA, light mode: the
+ * whole page (a tall viewport), and its top with the bell opened on the active alerts. Both
+ * are 1400 CSS px wide, shown 1920 wide. */
+const PAGE = 'goals-full.png'
 const ALERTS = 'goals-alerts.png'
 
-const CLICK = s(7)
+// One goal band per row of the dashboard, 1.15 times larger, its cards centred.
+const ZOOM = 1.15
+const X = -346
+const band = (top: number) => -(top * ZOOM - 98)
+const GOAL1 = band(398)
+const GOAL2 = band(1188)
+const GOAL3 = band(1978)
+const GOAL3_MORE = band(2768)
+const GOAL4 = band(3557)
+
+const CLICK = s(9.8)
 
 const CAMERA = [
   { at: 0, scale: 1, x: 0, y: 0 },
-  { at: s(3.2), scale: 1.03, x: -14, y: -8 },
-  // The four goal tiles.
-  { at: s(3.9), scale: 1.2, x: -443, y: -335 },
-  { at: s(6), scale: 1.22, x: -456, y: -342 },
-  // Back out, to the bell.
-  { at: s(6.6), scale: 1, x: 0, y: 0 },
-  { at: CLICK + s(0.6), scale: 1, x: 0, y: 0 },
-  // The alert list, the critical one first.
-  { at: CLICK + s(1.2), scale: 1.5, x: -1200, y: -128 },
-  { at: s(11), scale: 1.52, x: -1222, y: -136 },
+  { at: s(1.1), scale: 1, x: 0, y: 0 },
+  { at: s(1.7), scale: ZOOM, x: X, y: GOAL1 },
+  { at: s(3.1), scale: ZOOM, x: X, y: GOAL1 },
+  { at: s(3.7), scale: ZOOM, x: X, y: GOAL2 },
+  { at: s(5.1), scale: ZOOM, x: X, y: GOAL2 },
+  { at: s(5.7), scale: ZOOM, x: X, y: GOAL3 },
+  { at: s(6.7), scale: ZOOM, x: X, y: GOAL3 },
+  { at: s(7.2), scale: ZOOM, x: X, y: GOAL3_MORE },
+  { at: s(7.9), scale: ZOOM, x: X, y: GOAL3_MORE },
+  { at: s(8.4), scale: ZOOM, x: X, y: GOAL4 },
+  { at: s(9.1), scale: ZOOM, x: X, y: GOAL4 },
+  // Back to the top for the bell, then into the alert list.
+  { at: s(9.4), scale: 1, x: 0, y: 0 },
+  { at: CLICK + s(0.4), scale: 1, x: 0, y: 0 },
+  { at: CLICK + s(1), scale: 1.6, x: -878, y: -300 },
+  { at: s(12), scale: 1.62, x: -890, y: -306 },
 ]
 
 function camera(frame: number) {
@@ -35,9 +52,16 @@ function camera(frame: number) {
   }
 }
 
-export const GOALS_FRAMES = s(11)
+const BANNERS = [
+  { from: s(1.7), to: s(3.5), title: 'Goal 1 · Human-centred services', line: "Each goal opens with the strategy's own targets" },
+  { from: s(3.7), to: s(5.5), title: 'Goal 2 · Prevention and early detection', line: 'No county reaches 80 % in all three screenings', accent: '#f97316' },
+  { from: s(5.7), to: s(8.2), title: 'Goal 3 · Equal and effective care', line: '1,346 deaths a year above the target; pathway times from the cases', accent: '#dc2626' },
+  { from: s(8.4), to: s(9.6), title: 'Goal 4 · Staying at the forefront', line: '6.3 trials per million against the Nordic 8.6', accent: '#2563eb' },
+]
 
-/** The four goals of the National Cancer Strategy on one dashboard, and its alerts. */
+export const GOALS_FRAMES = s(12)
+
+/** The four goals of the National Cancer Strategy, top to bottom, and the dashboard's alerts. */
 export function GoalsScene() {
   const frame = useCurrentFrame()
   const { scale, x, y } = camera(frame)
@@ -45,22 +69,30 @@ export function GoalsScene() {
   const opened = interpolate(frame, [CLICK + 3, CLICK + 8], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
   return (
     <AbsoluteFill className="overflow-hidden bg-background">
-      <Img src={staticFile(DASHBOARD)} style={{ position: 'absolute', width: 1920, transformOrigin: '0 0', transform }} />
+      <Img src={staticFile(PAGE)} style={{ position: 'absolute', width: 1920, transformOrigin: '0 0', transform }} />
       <Img src={staticFile(ALERTS)} style={{ position: 'absolute', width: 1920, transformOrigin: '0 0', transform, opacity: opened }} />
       <Cursor
         path={[
-          { at: s(0.8), x: 1500, y: 1000 },
-          { at: s(5), x: 1077, y: 440 },
-          { at: CLICK - 5, x: 1838, y: 117 },
-          { at: CLICK, x: 1838, y: 117, click: true },
-          { at: s(9), x: 1248, y: 222 },
+          { at: s(0.6), x: 1500, y: 1000 },
+          { at: s(2.6), x: 789, y: 524 },
+          { at: s(4.6), x: 758, y: 546 },
+          { at: s(6.4), x: 789, y: 537 },
+          { at: s(8.9), x: 1373, y: 534 },
+          { at: CLICK - 5, x: 1322, y: 239 },
+          { at: CLICK, x: 1322, y: 239, click: true },
+          { at: s(11.4), x: 960, y: 358 },
         ]}
       />
-      <Sequence durationInFrames={CLICK - s(0.4)}>
-        <LowerThird title="The strategy's four goals, on one dashboard" line="Each goal against its target, from open data" exitAt={CLICK - s(0.8)} />
+      <Sequence durationInFrames={s(1.6)}>
+        <LowerThird title="National Cancer Strategy 2026–2035" line="Its four goals on one dashboard, top to bottom" exitAt={s(1.3)} />
       </Sequence>
+      {BANNERS.map((banner) => (
+        <Sequence key={banner.title} from={banner.from} durationInFrames={banner.to - banner.from}>
+          <LowerThird title={banner.title} line={banner.line} accent={banner.accent} exitAt={banner.to - banner.from - s(0.3)} />
+        </Sequence>
+      ))}
       <Sequence from={CLICK + s(0.4)}>
-        <LowerThird title="Alerts when a goal slips" line="Critical: cancer deaths 1,346 above the 2035 target" accent="#dc2626" />
+        <LowerThird title="Alerts when a goal slips" line="Critical: cancer deaths above the 2035 target" accent="#dc2626" />
       </Sequence>
     </AbsoluteFill>
   )

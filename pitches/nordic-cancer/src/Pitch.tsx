@@ -69,7 +69,7 @@ const SECTIONS: Section[] = [
   { name: 'Ask', frames: CHAT_FRAMES, scene: <ChatScene /> },
   {
     name: 'Sources',
-    frames: s(6),
+    frames: s(5),
     scene: (
       <Planned
         title="Open data, integrated in minutes"
