@@ -237,7 +237,7 @@ async def test_refresh_survives_failed_hospital_page(
         assert source.last_error == "REQUEST_TIMEOUT"
     output = capsys.readouterr().out
     assert f"  {page.name}: refresh failed (REQUEST_TIMEOUT)" in output
-    assert f"  1 web pages failed; their monitors retry them: {page.name}" in output
+    assert f"  1 web pages failed; rerun the seed to retry them: {page.name}" in output
 
 
 async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(

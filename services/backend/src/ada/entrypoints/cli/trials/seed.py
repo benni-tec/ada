@@ -185,9 +185,17 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
         async with container() as request:
             built = await _build(request, project_id, registered)
             for field in fields(built):
-                data = await (await request.get(RunService)).query(
-                    run.id, getattr(built, field.name).id, "SELECT count(*) AS rows FROM input_0", 1
-                )
+                try:
+                    data = await (await request.get(RunService)).query(
+                        run.id,
+                        getattr(built, field.name).id,
+                        "SELECT count(*) AS rows FROM input_0",
+                        1,
+                    )
+                except Exception as error:
+                    # A page that never had a snapshot fails every step that reads it.
+                    print(f"  {field.name}: unavailable ({error})")
+                    continue
                 print(f"  {field.name}: {data.rows[0][0]} rows")
     async with container() as request:
         dashboards = await _publish(request, project_id, registered, built)
@@ -201,7 +209,8 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
         print(f"  dashboard {dashboard.id}  {dashboard.name}")
     if failures:
         print(
-            f"  {len(failures)} web pages failed; their monitors retry them: {', '.join(failures)}"
+            f"  {len(failures)} web pages failed; rerun the seed to retry them: "
+            f"{', '.join(failures)}"
         )
     return project_id
 
