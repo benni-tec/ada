@@ -575,6 +575,26 @@
         "title": "AlertView",
         "type": "object"
       },
+      "AnyCompiled": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Compiled"
+          },
+          {
+            "$ref": "#/components/schemas/TrialCompiled"
+          }
+        ]
+      },
+      "AnySpec": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ModelSpec"
+          },
+          {
+            "$ref": "#/components/schemas/TrialMatcherSpec"
+          }
+        ]
+      },
       "Attachment": {
         "description": "Something shown beside a session, as a tab, and listed to its agent. A session has\neach thing attached at most once. An attachment is added or removed, never changed.",
         "properties": {
@@ -1252,6 +1272,12 @@
       "Compiled": {
         "description": "What the build derived from the spec.",
         "properties": {
+          "kind": {
+            "const": "patient_pathway",
+            "default": "patient_pathway",
+            "title": "Kind",
+            "type": "string"
+          },
           "parameters": {
             "additionalProperties": {
               "$ref": "#/components/schemas/Parameter"
@@ -3087,7 +3113,7 @@
         "description": "Immutable; a change makes a new version.",
         "properties": {
           "compiled": {
-            "$ref": "#/components/schemas/Compiled"
+            "$ref": "#/components/schemas/AnyCompiled"
           },
           "created_at": {
             "format": "date-time",
@@ -3104,7 +3130,7 @@
             "$ref": "#/components/schemas/Id"
           },
           "spec": {
-            "$ref": "#/components/schemas/ModelSpec"
+            "$ref": "#/components/schemas/AnySpec"
           },
           "version": {
             "title": "Version",
@@ -3856,6 +3882,34 @@
         "title": "NewTransform",
         "type": "object"
       },
+      "NewTrialMatcher": {
+        "additionalProperties": false,
+        "properties": {
+          "auto_run": {
+            "default": false,
+            "title": "Auto Run",
+            "type": "boolean"
+          },
+          "case_type_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operator_id": {
+            "$ref": "#/components/schemas/OperatorId"
+          }
+        },
+        "required": [
+          "operator_id"
+        ],
+        "title": "NewTrialMatcher",
+        "type": "object"
+      },
       "NewVersion": {
         "additionalProperties": false,
         "properties": {
@@ -4200,6 +4254,107 @@
           "expected_revision"
         ],
         "title": "Pin",
+        "type": "object"
+      },
+      "PinnedTrial": {
+        "description": "A recruiting trial as the trial matcher's version read it from the trials data\n(`case_trials`, docs/trials.md): what it matches on, and its nearest recruiting sites.\nThe eligibility text is the registry's, as written.",
+        "properties": {
+          "cancer_groups": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Cancer Groups",
+            "type": "array"
+          },
+          "conditions": {
+            "default": "",
+            "title": "Conditions",
+            "type": "string"
+          },
+          "eligibility": {
+            "default": "",
+            "title": "Eligibility",
+            "type": "string"
+          },
+          "finnish_site": {
+            "default": false,
+            "title": "Finnish Site",
+            "type": "boolean"
+          },
+          "max_age_years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age Years"
+          },
+          "min_age_years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Age Years"
+          },
+          "nct_id": {
+            "title": "Nct Id",
+            "type": "string"
+          },
+          "nearest": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrialSite"
+            },
+            "default": {},
+            "title": "Nearest",
+            "type": "object"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "recruiting_countries": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Recruiting Countries",
+            "type": "array"
+          },
+          "sex": {
+            "default": "ALL",
+            "title": "Sex",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nct_id",
+          "title",
+          "url"
+        ],
+        "title": "PinnedTrial",
         "type": "object"
       },
       "Pipeline": {
@@ -6179,6 +6334,153 @@
         ],
         "title": "ToolState",
         "type": "string"
+      },
+      "TrialCompiled": {
+        "description": "What a trial matcher version read: the trials, as they were, from one run.",
+        "properties": {
+          "kind": {
+            "const": "trial_matcher",
+            "default": "trial_matcher",
+            "title": "Kind",
+            "type": "string"
+          },
+          "read_at": {
+            "format": "date-time",
+            "title": "Read At",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "trials": {
+            "items": {
+              "$ref": "#/components/schemas/PinnedTrial"
+            },
+            "title": "Trials",
+            "type": "array"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "trials",
+          "read_at"
+        ],
+        "title": "TrialCompiled",
+        "type": "object"
+      },
+      "TrialMatcherSpec": {
+        "description": "The trial matcher: which recruiting trials a case could be discussed for, matched\non structured fields only (cancer group, sex, age), never on the eligibility text.",
+        "properties": {
+          "cautions": {
+            "default": [
+              "Matched on cancer group, sex and age only; the eligibility text is not judged.",
+              "Recruiting means the registry's site status, which lags.",
+              "An age group that only partly fits a trial's age limits is marked uncertain."
+            ],
+            "items": {
+              "type": "string"
+            },
+            "title": "Cautions",
+            "type": "array"
+          },
+          "groups": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {
+              "colorectal": "colorectal",
+              "lung": "lung",
+              "pancreas": "pancreas"
+            },
+            "title": "Groups",
+            "type": "object"
+          },
+          "intended_use": {
+            "default": "Educational: lists recruiting Nordic trials a synthetic case could be discussed for with an oncologist. Not an eligibility decision; never patient data.",
+            "title": "Intended Use",
+            "type": "string"
+          },
+          "kind": {
+            "const": "trial_matcher",
+            "default": "trial_matcher",
+            "title": "Kind",
+            "type": "string"
+          },
+          "operator_id": {
+            "title": "Operator Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator_id"
+        ],
+        "title": "TrialMatcherSpec",
+        "type": "object"
+      },
+      "TrialSite": {
+        "description": "A trial's recruiting Nordic site nearest to one of the cities the trials data\nmeasures from, and the great-circle distance to it.",
+        "properties": {
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "facility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facility"
+          },
+          "km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Km"
+          }
+        },
+        "required": [
+          "facility",
+          "city",
+          "country",
+          "km"
+        ],
+        "title": "TrialSite",
+        "type": "object"
       },
       "Trigger": {
         "properties": {
@@ -8396,6 +8698,50 @@
         ]
       }
     },
+    "/api/models/{model_id}/refresh": {
+      "post": {
+        "description": "A new version of a trial matcher with the trials read again.",
+        "operationId": "refresh_trial_matcher_api_models__model_id__refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Trial Matcher",
+        "tags": [
+          "models"
+        ]
+      }
+    },
     "/api/models/{model_id}/versions": {
       "post": {
         "operationId": "add_version_api_models__model_id__versions_post",
@@ -9581,6 +9927,60 @@
           }
         },
         "summary": "Create Pathway Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/models/trials": {
+      "post": {
+        "description": "A trial matcher whose first version pins the recruiting trials read from\n`operator_id`, on a case type that covers it.",
+        "operationId": "create_trial_matcher_api_projects__project_id__models_trials_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTrialMatcher"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Trial Matcher",
         "tags": [
           "models"
         ]

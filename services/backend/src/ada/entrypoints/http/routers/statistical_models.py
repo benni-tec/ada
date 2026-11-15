@@ -35,6 +35,13 @@ class NewPathwayModel(Request):
     parameters: OperatorId | None = None
 
 
+class NewTrialMatcher(Request):
+    # The trials data step to read (a `case_trials` step, docs/trials.md).
+    operator_id: OperatorId
+    case_type_id: Id | None = None
+    auto_run: bool = False
+
+
 class NewVersion(Request):
     spec: ModelSpec
 
@@ -69,6 +76,25 @@ async def create_pathway_model(
     platform, or with its effect sizes read from the operator in `parameters`."""
     parameters = body.parameters if body else None
     return await service.create_pathway_model(project_id, WEB, parameters)
+
+
+@router.post("/projects/{project_id}/models/trials", status_code=201)
+async def create_trial_matcher(
+    project_id: Id, body: NewTrialMatcher, service: FromDishka[StatisticalModelService]
+) -> ModelVersion:
+    """A trial matcher whose first version pins the recruiting trials read from
+    `operator_id`, on a case type that covers it."""
+    return await service.create_trial_matcher(
+        project_id, body.operator_id, WEB, body.case_type_id, body.auto_run
+    )
+
+
+@router.post("/models/{model_id}/refresh", status_code=201)
+async def refresh_trial_matcher(
+    model_id: Id, service: FromDishka[StatisticalModelService]
+) -> ModelVersion:
+    """A new version of a trial matcher with the trials read again."""
+    return await service.refresh_trial_matcher(model_id, WEB)
 
 
 @router.get("/models/{model_id}")

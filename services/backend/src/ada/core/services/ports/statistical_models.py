@@ -54,6 +54,25 @@ class StatisticalModelService(Protocol):
         source, or a parameter cited to a registered source has no row."""
         ...
 
+    async def create_trial_matcher(
+        self,
+        project_id: Id,
+        operator_id: OperatorId,
+        actor: Actor,
+        case_type_id: Id | None = None,
+        auto_run: bool = False,
+    ) -> ModelVersion:
+        """Create a trial matcher: a version pins the recruiting trials of its cancer groups
+        from `operator_id` (a `case_trials` data step, docs/trials.md), read in a new run.
+        On `case_type_id`, else on a case type that covers it (the cancer pathway one when
+        the project has it), else on a new "Cancer trial candidate" type."""
+        ...
+
+    async def refresh_trial_matcher(self, model_id: Id, actor: Actor) -> ModelVersion:
+        """A new version of a trial matcher with the trials read again; the old versions,
+        and the results made with them, stay as they were."""
+        ...
+
     async def add_version(self, model_id: Id, spec: ModelSpec, actor: Actor) -> ModelVersion:
         """Build a new version; the old ones stay as they are. Invalid when the model's
         case type does not cover the new version."""

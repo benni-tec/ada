@@ -573,6 +573,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{model_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Trial Matcher
+         * @description A new version of a trial matcher with the trials read again.
+         */
+        post: operations["refresh_trial_matcher_api_models__model_id__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{model_id}/versions": {
         parameters: {
             query?: never;
@@ -930,6 +950,27 @@ export interface paths {
          *     platform, or with its effect sizes read from the operator in `parameters`.
          */
         post: operations["create_pathway_model_api_projects__project_id__models_pathway_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/models/trials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Trial Matcher
+         * @description A trial matcher whose first version pins the recruiting trials read from
+         *     `operator_id`, on a case type that covers it.
+         */
+        post: operations["create_trial_matcher_api_projects__project_id__models_trials_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2066,6 +2107,8 @@ export interface components {
             alert: components["schemas"]["Alert"];
             rule: components["schemas"]["AlertRule"];
         };
+        AnyCompiled: components["schemas"]["Compiled"] | components["schemas"]["TrialCompiled"];
+        AnySpec: components["schemas"]["ModelSpec"] | components["schemas"]["TrialMatcherSpec"];
         /**
          * Attachment
          * @description Something shown beside a session, as a tab, and listed to its agent. A session has
@@ -2344,6 +2387,12 @@ export interface components {
          * @description What the build derived from the spec.
          */
         Compiled: {
+            /**
+             * Kind
+             * @default patient_pathway
+             * @constant
+             */
+            kind: "patient_pathway";
             /** Parameters */
             parameters: {
                 [key: string]: components["schemas"]["Parameter"];
@@ -3123,7 +3172,7 @@ export interface components {
          * @description Immutable; a change makes a new version.
          */
         ModelVersion: {
-            compiled: components["schemas"]["Compiled"];
+            compiled: components["schemas"]["AnyCompiled"];
             /**
              * Created At
              * Format: date-time
@@ -3132,7 +3181,7 @@ export interface components {
             created_by: components["schemas"]["Actor"];
             id: components["schemas"]["Id"];
             model_id: components["schemas"]["Id"];
-            spec: components["schemas"]["ModelSpec"];
+            spec: components["schemas"]["AnySpec"];
             /** Version */
             version: number;
         };
@@ -3363,6 +3412,16 @@ export interface components {
             /** Sql */
             sql: string;
         };
+        /** NewTrialMatcher */
+        NewTrialMatcher: {
+            /**
+             * Auto Run
+             * @default false
+             */
+            auto_run: boolean;
+            case_type_id?: components["schemas"]["Id"] | null;
+            operator_id: components["schemas"]["OperatorId"];
+        };
         /** NewVersion */
         NewVersion: {
             spec: components["schemas"]["ModelSpec"];
@@ -3485,6 +3544,63 @@ export interface components {
             /** Slot */
             slot: string;
             widget_id: components["schemas"]["Id"];
+        };
+        /**
+         * PinnedTrial
+         * @description A recruiting trial as the trial matcher's version read it from the trials data
+         *     (`case_trials`, docs/trials.md): what it matches on, and its nearest recruiting sites.
+         *     The eligibility text is the registry's, as written.
+         */
+        PinnedTrial: {
+            /**
+             * Cancer Groups
+             * @default []
+             */
+            cancer_groups: string[];
+            /**
+             * Conditions
+             * @default
+             */
+            conditions: string;
+            /**
+             * Eligibility
+             * @default
+             */
+            eligibility: string;
+            /**
+             * Finnish Site
+             * @default false
+             */
+            finnish_site: boolean;
+            /** Max Age Years */
+            max_age_years?: number | null;
+            /** Min Age Years */
+            min_age_years?: number | null;
+            /** Nct Id */
+            nct_id: string;
+            /**
+             * Nearest
+             * @default {}
+             */
+            nearest: {
+                [key: string]: components["schemas"]["TrialSite"];
+            };
+            /** Phase */
+            phase?: string | null;
+            /**
+             * Recruiting Countries
+             * @default []
+             */
+            recruiting_countries: string[];
+            /**
+             * Sex
+             * @default ALL
+             */
+            sex: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
         };
         /**
          * Pipeline
@@ -4291,6 +4407,87 @@ export interface components {
          * @enum {string}
          */
         ToolState: "input-available" | "output-available" | "output-error";
+        /**
+         * TrialCompiled
+         * @description What a trial matcher version read: the trials, as they were, from one run.
+         */
+        TrialCompiled: {
+            /**
+             * Kind
+             * @default trial_matcher
+             * @constant
+             */
+            kind: "trial_matcher";
+            /**
+             * Read At
+             * Format: date-time
+             */
+            read_at: string;
+            /** Run Id */
+            run_id?: string | null;
+            /** Trials */
+            trials: components["schemas"]["PinnedTrial"][];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /**
+         * TrialMatcherSpec
+         * @description The trial matcher: which recruiting trials a case could be discussed for, matched
+         *     on structured fields only (cancer group, sex, age), never on the eligibility text.
+         */
+        TrialMatcherSpec: {
+            /**
+             * Cautions
+             * @default [
+             *       "Matched on cancer group, sex and age only; the eligibility text is not judged.",
+             *       "Recruiting means the registry's site status, which lags.",
+             *       "An age group that only partly fits a trial's age limits is marked uncertain."
+             *     ]
+             */
+            cautions: string[];
+            /**
+             * Groups
+             * @default {
+             *       "colorectal": "colorectal",
+             *       "lung": "lung",
+             *       "pancreas": "pancreas"
+             *     }
+             */
+            groups: {
+                [key: string]: string;
+            };
+            /**
+             * Intended Use
+             * @default Educational: lists recruiting Nordic trials a synthetic case could be discussed for with an oncologist. Not an eligibility decision; never patient data.
+             */
+            intended_use: string;
+            /**
+             * Kind
+             * @default trial_matcher
+             * @constant
+             */
+            kind: "trial_matcher";
+            /** Operator Id */
+            operator_id: string;
+        };
+        /**
+         * TrialSite
+         * @description A trial's recruiting Nordic site nearest to one of the cities the trials data
+         *     measures from, and the great-circle distance to it.
+         */
+        TrialSite: {
+            /** City */
+            city: string | null;
+            /** Country */
+            country: string;
+            /** Facility */
+            facility: string | null;
+            /** Km */
+            km: number | null;
+        };
         /** Trigger */
         Trigger: {
             /** Clock Start */
@@ -5610,6 +5807,37 @@ export interface operations {
             };
         };
     };
+    refresh_trial_matcher_api_models__model_id__refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_version_api_models__model_id__versions_post: {
         parameters: {
             query?: never;
@@ -6360,6 +6588,41 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": components["schemas"]["NewPathwayModel"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_trial_matcher_api_projects__project_id__models_trials_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTrialMatcher"];
             };
         };
         responses: {

@@ -1,7 +1,7 @@
 """The kinds of statistical model, and what each needs to run on cases. A kind says which
 fields of a case it reads, runs on a case's values, declares the columns its results can
-have, and brings a default case type. The patient pathway model is the first kind; a new
-kind (a trial matcher, say) is one more entry in KINDS."""
+have, and brings a default case type. The patient pathway model and the trial matcher are
+the kinds; a new kind is one more entry in KINDS."""
 
 from typing import Protocol
 
@@ -10,7 +10,7 @@ from ada.core.models.cases import DefaultCaseType, Field, Section
 from ada.core.models.errors import Invalid
 from ada.core.models.schema import Column
 from ada.core.models.statistical_models import ModelVersion
-from ada.core.services.statistical_models import pathway
+from ada.core.services.statistical_models import pathway, trials_kind
 from ada.core.services.statistical_models.pathway_kind import PathwayKind
 
 
@@ -35,7 +35,10 @@ class ModelKind(Protocol):
         ...
 
 
-KINDS: dict[str, ModelKind] = {pathway.KIND: PathwayKind()}
+KINDS: dict[str, ModelKind] = {
+    pathway.KIND: PathwayKind(),
+    trials_kind.KIND: trials_kind.TrialKind(),
+}
 
 
 def kind_of(name: str) -> ModelKind:

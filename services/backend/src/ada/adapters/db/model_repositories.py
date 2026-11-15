@@ -10,7 +10,7 @@ from ada.adapters.db.tables import ProjectRow, StatisticalModelRow, StatisticalM
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.errors import Conflict, NotFound
-from ada.core.models.statistical_models import Compiled, ModelSpec, ModelVersion, StatisticalModel
+from ada.core.models.statistical_models import ModelVersion, StatisticalModel
 from ada.core.ports.repositories import StatisticalModelRepository
 
 
@@ -91,14 +91,17 @@ class SqlStatisticalModelRepository(StatisticalModelRepository):
         row = (await self.session.execute(statement)).scalar_one_or_none()
         if row is None:
             raise NotFound("model version", f"{model_id}/{number}")
-        return ModelVersion(
-            id=row.id,
-            model_id=row.model_id,
-            version=row.version,
-            spec=ModelSpec.model_validate(row.spec),
-            compiled=Compiled.model_validate(row.compiled),
-            created_by=Actor.model_validate(row.created_by),
-            created_at=row.created_at,
+        # Validated as a whole, so the spec and the build take the model kind's shape.
+        return ModelVersion.model_validate(
+            {
+                "id": row.id,
+                "model_id": row.model_id,
+                "version": row.version,
+                "spec": row.spec,
+                "compiled": row.compiled,
+                "created_by": row.created_by,
+                "created_at": row.created_at,
+            }
         )
 
 

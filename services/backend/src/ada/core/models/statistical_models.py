@@ -9,7 +9,9 @@ and graded, the 5-year survival associated with the difference.
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
+
+from pydantic import Discriminator, Tag
 
 from ada.core.models.actors import Actor
 from ada.core.models.base import DomainModel, Id
@@ -213,8 +215,8 @@ class ModelSpec(DomainModel):
     """Everything a version is built from. Validated when a version is created
     (StatisticalModelService.create)."""
 
-    # The model kind this spec is for (ada.core.services.statistical_models.kinds). The
-    # first kind with a spec of its own makes ModelVersion.spec a union tagged by `kind`.
+    # The model kind this spec is for (ada.core.services.statistical_models.kinds);
+    # ModelVersion.spec is a union tagged by it.
     kind: Literal["patient_pathway"] = "patient_pathway"
     outcome: str
     structure: Literal["relative_survival_dag"] = "relative_survival_dag"
@@ -265,6 +267,7 @@ class ValidationCheck(DomainModel):
 class Compiled(DomainModel):
     """What the build derived from the spec."""
 
+    kind: Literal["patient_pathway"] = "patient_pathway"
     # site -> step (or "pathway") -> modality (or "any") -> median days.
     targets: dict[str, dict[str, dict[str, int]]]
     # The parameters as built. Overall-mortality HRs are converted to the excess scale per
@@ -292,14 +295,101 @@ class StatisticalModel(DomainModel):
     updated_at: datetime | None = None
 
 
+class TrialSite(DomainModel):
+    """A trial's recruiting Nordic site nearest to one of the cities the trials data
+    measures from, and the great-circle distance to it."""
+
+    facility: str | None
+    city: str | None
+    country: str
+    km: float | None
+
+
+class PinnedTrial(DomainModel):
+    """A recruiting trial as the trial matcher's version read it from the trials data
+    (`case_trials`, docs/trials.md): what it matches on, and its nearest recruiting sites.
+    The eligibility text is the registry's, as written."""
+
+    nct_id: str
+    title: str
+    phase: str | None = None
+    conditions: str = ""
+    # The trials data's cancer groups (lung, pancreas, colorectal, ...).
+    cancer_groups: tuple[str, ...] = ()
+    # ALL, FEMALE or MALE, as the registry says.
+    sex: str = "ALL"
+    min_age_years: float | None = None
+    max_age_years: float | None = None
+    eligibility: str = ""
+    recruiting_countries: tuple[str, ...] = ()
+    finnish_site: bool = False
+    # helsinki | kuopio | oulu -> the nearest recruiting Nordic site.
+    nearest: dict[str, TrialSite] = {}
+    url: str
+
+
+class TrialMatcherSpec(DomainModel):
+    """The trial matcher: which recruiting trials a case could be discussed for, matched
+    on structured fields only (cancer group, sex, age), never on the eligibility text."""
+
+    kind: Literal["trial_matcher"] = "trial_matcher"
+    # The trials data step to read (Felix's `case_trials`).
+    operator_id: str
+    # A case's site -> the trials data's cancer group.
+    groups: dict[str, str] = {
+        "lung": "lung",
+        "colorectal": "colorectal",
+        "pancreas": "pancreas",
+    }
+    intended_use: str = (
+        "Educational: lists recruiting Nordic trials a synthetic case could be discussed for "
+        "with an oncologist. Not an eligibility decision; never patient data."
+    )
+    cautions: tuple[str, ...] = (
+        "Matched on cancer group, sex and age only; the eligibility text is not judged.",
+        "Recruiting means the registry's site status, which lags.",
+        "An age group that only partly fits a trial's age limits is marked uncertain.",
+    )
+
+
+class TrialCompiled(DomainModel):
+    """What a trial matcher version read: the trials, as they were, from one run."""
+
+    kind: Literal["trial_matcher"] = "trial_matcher"
+    trials: tuple[PinnedTrial, ...]
+    run_id: str | None = None
+    read_at: datetime
+    warnings: tuple[str, ...] = ()
+
+
+def _kind(value: Any) -> str:
+    """The kind a spec or a build is for; versions stored before kinds had none."""
+    if isinstance(value, dict):
+        return value.get("kind", "patient_pathway")
+    return getattr(value, "kind", "patient_pathway")
+
+
+# Each kind's spec and build: the survival DAG for the patient pathway model, the pinned
+# trials for the trial matcher.
+type AnySpec = Annotated[
+    Annotated[ModelSpec, Tag("patient_pathway")]
+    | Annotated[TrialMatcherSpec, Tag("trial_matcher")],
+    Discriminator(_kind),
+]
+type AnyCompiled = Annotated[
+    Annotated[Compiled, Tag("patient_pathway")] | Annotated[TrialCompiled, Tag("trial_matcher")],
+    Discriminator(_kind),
+]
+
+
 class ModelVersion(DomainModel):
     """Immutable; a change makes a new version."""
 
     id: Id
     model_id: Id
     version: int
-    spec: ModelSpec
-    compiled: Compiled
+    spec: AnySpec
+    compiled: AnyCompiled
     created_by: Actor
     created_at: datetime
 
