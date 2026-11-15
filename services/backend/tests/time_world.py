@@ -13,6 +13,7 @@ import factories
 from ada.adapters.duckdb.store import DuckDbAnalysisStore
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import (
+    MemoryAgentTurnRepository,
     MemoryAlertRuleRepository,
     MemoryAttachmentRepository,
     MemoryDashboardRepository,
@@ -162,6 +163,7 @@ class World:
                 ),
                 self.events,
                 self.clock,
+                MemoryAgentTurnRepository(memory),
             ),
             self.runs,
             UncheckedJudges(self.clock),

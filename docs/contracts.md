@@ -1150,6 +1150,7 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `GET /projects/{id}/sessions`, `POST /projects/{id}/sessions {title, origin_dashboard_id?}` | List (research sessions too, with `agent` and `parent_session_id`); create |
 | `POST /sessions/{id}/research {brief, title}` | Delegate research as the person: 201 with the research session (see The research agent) |
 | `GET /sessions/{id}`, `PATCH /sessions/{id} {expected_revision, title}` | Read; rename |
+| `DELETE /sessions/{id}` | 204. Deletes the session with its messages, attachments, agent turns and the reports it owns (a report has exactly one owner); other sessions stop showing it attached. Its widgets and research sessions stay, unlinked. 422 while one of its agent turns is queued or running. Announced with `session.deleted` |
 | `GET /sessions/{id}/attachments`, `POST /sessions/{id}/attachments {kind, ref, title?}`, `DELETE /sessions/{id}/attachments/{attachment_id}` | What is shown beside the session, oldest first; attach (201, also when already attached: the existing one, no event); detach (204). See "Session attachments" |
 | `POST /widgets/{id}/render {error}` | The frame's report of how it drew (`error` null when it drew); 204. Stored only when it changed |
 | `GET /sessions/{id}/entries` | The session's record, oldest first. Entry kinds: `message` (with `context`), `operator` and `widget` (`ref` the id, `text` the note), `agent_turn` (`ref` the turn), `tool_call` (an external agent's MCP call, in `tool_call`; see MCP tools), `delegation` and `report` (`ref` the research session) |
@@ -1424,6 +1425,7 @@ connection open. Events are broadcast after the unit of work that caused them co
 | Event | Payload |
 | --- | --- |
 | `session.created` | `session_id` |
+| `session.deleted` | `session_id` |
 | `session.entry_added` | `session_id`, `entry_id`. Also for each recorded tool call, after the commit of its own unit of work (also when the call failed) |
 | `widget.created` | `widget_id`, `session_id` if any |
 | `widget.updated` | `widget_id`, `session_id` if any; the frontend reloads its widget frames, which read the spec when they load. `render_only: true` when only a frame's report of how it drew changed: the cards refetch, the frames do not reload (a reload would draw and report again) |
