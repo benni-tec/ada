@@ -319,6 +319,8 @@ def test_context_is_checked_stored_with_the_message_and_reaches_the_prompt(
     assert f'"Regions", id {widget["id"]}' in instructions
     assert f'Session "Screening", id {session["id"]}' in instructions
     assert "Never state a number you did not read from a tool" in instructions
+    assert "Current UTC time:" in instructions
+    assert "local timezone" in instructions
 
 
 def test_the_prompt_lists_what_the_session_shows_beside_the_conversation(
