@@ -5,6 +5,7 @@ export type SourceInfo = { name: string; address: string }
 
 export const kindLabels: Record<OperatorKind, string> = {
   source: 'Source',
+  history: 'History',
   extract: 'Extraction',
   input: 'Input',
   transform: 'SQL',
@@ -45,6 +46,10 @@ export function shortName(operator: Operator, source?: SourceInfo): string {
   switch (operator.kind) {
     case 'source':
       return source?.name ?? 'A data source'
+    case 'history': {
+      const last = params.last
+      return typeof last === 'number' ? `Last ${last} snapshots` : 'Snapshot history'
+    }
     case 'transform':
       return sqlHeadline(text(params, 'sql'))
     case 'input':

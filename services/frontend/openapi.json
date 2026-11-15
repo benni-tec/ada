@@ -1922,6 +1922,46 @@
         "title": "NewDashboardRun",
         "type": "object"
       },
+      "NewHistory": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "history",
+            "title": "Kind",
+            "type": "string"
+          },
+          "last": {
+            "default": 10,
+            "minimum": 1.0,
+            "title": "Last",
+            "type": "integer"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "kind",
+          "source_id"
+        ],
+        "title": "NewHistory",
+        "type": "object"
+      },
       "NewInput": {
         "additionalProperties": false,
         "properties": {
@@ -2583,6 +2623,7 @@
       "OperatorKind": {
         "enum": [
           "source",
+          "history",
           "extract",
           "input",
           "transform",
@@ -6438,6 +6479,7 @@
               "schema": {
                 "discriminator": {
                   "mapping": {
+                    "history": "#/components/schemas/NewHistory",
                     "input": "#/components/schemas/NewInput",
                     "source": "#/components/schemas/NewSourceOperator",
                     "transform": "#/components/schemas/NewTransform"
@@ -6447,6 +6489,9 @@
                 "oneOf": [
                   {
                     "$ref": "#/components/schemas/NewSourceOperator"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NewHistory"
                   },
                   {
                     "$ref": "#/components/schemas/NewTransform"

@@ -2330,6 +2330,26 @@ export interface components {
         NewDashboardRun: {
             time_range?: components["schemas"]["TimeRange"] | null;
         };
+        /** NewHistory */
+        NewHistory: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "history";
+            /**
+             * Last
+             * @default 10
+             */
+            last: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            session_id?: components["schemas"]["Id"] | null;
+            source_id: components["schemas"]["Id"];
+        };
         /** NewInput */
         NewInput: {
             default: components["schemas"]["OperatorId"];
@@ -2543,7 +2563,7 @@ export interface components {
          * OperatorKind
          * @enum {string}
          */
-        OperatorKind: "source" | "extract" | "input" | "transform" | "statistic" | "agent";
+        OperatorKind: "source" | "history" | "extract" | "input" | "transform" | "statistic" | "agent";
         /**
          * Order
          * @description A new order of a project's dashboards or reports: every id of them, once.
@@ -4560,7 +4580,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewSourceOperator"] | components["schemas"]["NewTransform"] | components["schemas"]["NewInput"];
+                "application/json": components["schemas"]["NewSourceOperator"] | components["schemas"]["NewHistory"] | components["schemas"]["NewTransform"] | components["schemas"]["NewInput"];
             };
         };
         responses: {
