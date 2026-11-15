@@ -1966,6 +1966,17 @@ older seed registered differently is registered anew, the old one kept under a d
 requests), generates the report "Screening participation report" once, checks the rule,
 and queues the remaining sources for the worker.
 
+It then replays the curated dashboards (`entrypoints/cli/curated.py`) from the fixture
+`entrypoints/cli/demo.json`: "National Cancer Strategy 2026–2035" (the four goals with
+their alert rules), "Pathway times by county (synthetic)" and "Data quality: county
+indicators", with every widget, operator (in dependency order) and data source behind them;
+the first two are pinned. Before them come the patient pathway model, its "Suspected
+cancer pathway" case type and 300 synthetic cases (`entrypoints/cli/synthetic.py`, seed 1),
+which the cases sources read. Dashboards that exist are skipped and sources of the same
+name and address reused, so seeding again adds nothing; with `--refresh` the new sources
+are queued for the worker. `scripts/export_demo.py --project <id>` writes the fixture from
+a running instance after the dashboards change there.
+
 ## Known issues, for the next wave
 
 - **Widget frames share the API's origin.** The frontend frames widgets with

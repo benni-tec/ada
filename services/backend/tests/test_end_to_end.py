@@ -52,6 +52,7 @@ from ada.core.ports.sources import SourceReaders
 from ada.core.ports.tasks import TaskDispatcher
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.attachments import AttachmentService
+from ada.core.services.ports.cases import CaseService
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.reports import ReportService
@@ -59,7 +60,16 @@ from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
-from ada.entrypoints.cli.seed import DEMO_DASHBOARD, DEMO_PROJECT, DEMO_RANGE, seed_demo
+from ada.entrypoints.cli.curated import PINNED, SYNTHETIC_CASES
+from ada.entrypoints.cli.seed import (
+    CHART_TITLE,
+    DEMO_DASHBOARD,
+    DEMO_PROJECT,
+    DEMO_RANGE,
+    MAP_TITLE,
+    TABLE_TITLE,
+    seed_demo,
+)
 from ada.entrypoints.mcp.server import create_mcp
 from ada.entrypoints.mcp.sessions import SESSIONLESS
 from ada.entrypoints.worker import create_broker
@@ -578,23 +588,34 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
             sessions = await (await request.get(SessionService)).list(project_id)
             reports = await (await request.get(ReportService)).list(project_id)
             alerts = await request.get(AlertService)
-            rules = await alerts.list_rules(dashboards[0].id)
+            demo = next(d for d in dashboards if d.name == DEMO_DASHBOARD)
+            rules = await alerts.list_rules(demo.id)
             firing = await alerts.alerts(project_id, AlertState.FIRING)
-            current = await (await request.get(DashboardService)).current(dashboards[0].id)
+            current = await (await request.get(DashboardService)).current(demo.id)
+            case_types = await (await request.get(CaseService)).list_types(project_id)
+            cases = await (await request.get(CaseService)).list_cases(case_types[0].id)
             versions = await (await request.get(ReportService)).versions(reports[0].id)
             shown = await (await request.get(AttachmentService)).list(sessions[0].id)
         assert [project.name for project in projects] == [DEMO_PROJECT]
-        assert [source.name for source in sources] == [example.name for example in EXAMPLES]
-        assert [(d.name, d.default_time_range) for d in dashboards] == [
-            (DEMO_DASHBOARD, DEMO_RANGE)
+        names = [source.name for source in sources]
+        assert names[: len(EXAMPLES)] == [example.name for example in EXAMPLES]
+        # The curated dashboards (curated.py), the first two pinned, and the cases they read.
+        assert [d.name for d in dashboards] == [
+            *PINNED,
+            DEMO_DASHBOARD,
+            "Data quality: county indicators",
         ]
+        assert demo.default_time_range == DEMO_RANGE
+        assert "National Cancer Strategy 2026–2035 (PDF)" in names
+        assert len(cases) == SYNTHETIC_CASES
         assert current is not None and [slot.name for slot in current.slots] == [
             "Map",
             "By county",
         ]
         # The session's three, and the dashboard's and the report's copies of the map and
         # the table.
-        assert sorted(widget.type for widget in widgets) == [
+        shown_widgets = [w for w in widgets if w.title in {MAP_TITLE, TABLE_TITLE, CHART_TITLE}]
+        assert sorted(widget.type for widget in shown_widgets) == [
             "chart",
             "map",
             "map",
@@ -603,10 +624,10 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
             "table",
             "table",
         ]
-        assert sum(widget.copied_from is not None for widget in widgets) == 4
+        assert sum(widget.copied_from is not None for widget in shown_widgets) == 4
         assert len(sessions) == 1
         # Seeding again attached nothing new.
-        assert [(a.kind, a.ref) for a in shown] == [("dashboard", str(dashboards[0].id))]
+        assert [(a.kind, a.ref) for a in shown] == [("dashboard", str(demo.id))]
         assert len(rules) == 1
         # East Uusimaa, West Uusimaa, Vantaa and Kerava, and Helsinki are below 80 % in 2024.
         assert sorted(alert.key["county_code"] for alert in firing) == ["01", "03", "04", "90"]
@@ -616,6 +637,10 @@ async def test_seeding_builds_the_demo_once_and_fetches_its_data(
         dispatcher = await container.get(TaskDispatcher)
         assert isinstance(dispatcher, RecordingTaskDispatcher)
         statfin = next(s for s in sources if s.name == STATFIN_CANCER_DEATHS.name)
-        assert dispatcher.refreshes == [(statfin.id, True), (statfin.id, True)]
+        # Every curated source is queued too.
+        examples = {s.id for s in sources if s.name in {e.name for e in EXAMPLES}}
+        curated = {id for id, _ in dispatcher.refreshes if id not in examples}
+        assert [id for id, _ in dispatcher.refreshes if id == statfin.id] == [statfin.id] * 2
+        assert curated == {s.id for s in sources} - examples
     finally:
         await container.close()
