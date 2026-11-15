@@ -140,9 +140,16 @@ function BlockPdf({ block, depth, ...context }: { block: Block; depth: number } 
     case 'callout': {
       const tone = tones[block.tone] ?? tones.note
       return (
-        <View style={[styles.callout, { borderLeftColor: tone.color }]} wrap={false}>
-          <Text style={styles.calloutLabel}>{tone.label}</Text>
-          {block.title && <Text style={{ fontWeight: 700 }}>{block.title}</Text>}
+        // A callout may continue on the next page; its label and title stay with its first lines.
+        <View style={[styles.callout, { borderLeftColor: tone.color }]}>
+          <Text style={styles.calloutLabel} minPresenceAhead={40}>
+            {tone.label}
+          </Text>
+          {block.title && (
+            <Text style={{ fontWeight: 700 }} minPresenceAhead={30}>
+              {block.title}
+            </Text>
+          )}
           <Paragraphs text={block.text} />
         </View>
       )
@@ -222,7 +229,7 @@ function Sources({ sources }: { sources: ReportSource[] }) {
       <Text style={styles.sourcesTitle}>Sources</Text>
       <View style={styles.sourceList}>
         {sources.map((source, index) => (
-          <View key={source.operator_id} style={styles.source} wrap={false}>
+          <View key={source.operator_id} style={styles.source}>
             <Text>
               [{index + 1}]{' '}
               {/^https?:\/\//i.test(source.address) ? (

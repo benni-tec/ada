@@ -324,3 +324,20 @@ test('asked by its page, a widget sends a picture of itself once it is drawn, or
   expect(capture).toHaveBeenCalledTimes(2)
   stop()
 })
+
+test('a widget still loading when the wait is over sends no picture of “Loading…”, but why', async () => {
+  vi.useFakeTimers()
+  const parent = { postMessage: vi.fn() }
+  Object.defineProperty(window, 'parent', { value: parent, configurable: true })
+  window.location.hash = '#widget=w1'
+  const element = document.createElement('div')
+  element.innerHTML = '<div role="status" aria-busy="true">Loading…</div>'
+  const capture = vi.fn(async () => 'data:image/png;base64,AAA')
+  const stop = answerSnapshots(element, capture)
+  window.dispatchEvent(new MessageEvent('message', { data: { type: 'ada:snapshot', id: 's9' }, source: parent as unknown as Window }))
+  await vi.advanceTimersByTimeAsync(21_000)
+  expect(capture).not.toHaveBeenCalled()
+  expect(parent.postMessage).toHaveBeenCalledWith({ type: 'ada:snapshot', id: 's9', error: 'The widget did not finish loading' }, '*')
+  stop()
+  vi.useRealTimers()
+})

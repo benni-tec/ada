@@ -219,7 +219,7 @@ const captureAsPng: Capture = async (element) => {
   return toPng(element, { pixelRatio: 2, backgroundColor: background === 'rgba(0, 0, 0, 0)' ? '#fff' : background })
 }
 
-// How long a picture waits for the widget to finish loading before it is taken anyway.
+// How long a picture waits for the widget to finish loading; past it there is none.
 const SNAPSHOT_WAIT_MS = 20_000
 
 /**
@@ -231,10 +231,12 @@ const SNAPSHOT_WAIT_MS = 20_000
  */
 export function answerSnapshots(element: HTMLElement, capture: Capture = captureAsPng): () => void {
   if (!framedByPage()) return () => {}
+  const loading = () => !element.firstElementChild || element.querySelector('[aria-busy="true"]') !== null
   const drawn = async () => {
     const until = Date.now() + SNAPSHOT_WAIT_MS
-    while (Date.now() < until && (!element.firstElementChild || element.querySelector('[aria-busy="true"]')))
-      await new Promise((resolve) => setTimeout(resolve, 100))
+    while (Date.now() < until && loading()) await new Promise((resolve) => setTimeout(resolve, 100))
+    // A picture of "Loading…" is no picture of the widget.
+    if (loading()) throw new Error('The widget did not finish loading')
     // A moment more, for the layout of what just arrived. Not an animation frame: a frame
     // the browser does not show gets none.
     await new Promise((resolve) => setTimeout(resolve, 100))

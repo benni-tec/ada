@@ -71,7 +71,10 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
   const size = Math.max(model.box[2], model.box[3]) / 46
   const short = shortNames(drawn.map((r) => r.name))
   const texts = new Map(drawn.map((r, index) => [r.code, [short[index], ...(r.value === null ? [] : [formatNumber(r.value)])]]))
-  const labels = paper ? placeLabels(drawn, texts, size) : []
+  // On paper a margin round the outlines, for labels and moved numbers at the edge.
+  const margin = size * 2
+  const view: MapModel['box'] = paper ? [model.box[0] - margin, model.box[1] - margin, model.box[2] + 2 * margin, model.box[3] + 2 * margin] : model.box
+  const labels = paper ? placeLabels(drawn, texts, size, [view[0], view[1], view[0] + view[2], view[1] + view[3]]) : []
   const keyed = labels.filter((label): label is Extract<Label, { number: number }> => 'number' in label)
   const description = `Map of ${model.value} by region, ${drawn.length} regions${
     model.period ? `, ${model.period}` : ''
@@ -81,8 +84,7 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
     <>
       <div className="ada-map">
         <svg
-          // On paper a margin round the outlines, for labels and moved numbers at the edge.
-          viewBox={(paper ? [model.box[0] - size * 2, model.box[1] - size * 2, model.box[2] + size * 4, model.box[3] + size * 4] : model.box).join(' ')}
+          viewBox={view.join(' ')}
           preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label={title ? `${title}: ${description}` : description}
