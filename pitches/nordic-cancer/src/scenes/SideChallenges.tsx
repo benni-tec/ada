@@ -25,7 +25,7 @@ const CHALLENGES = [
   },
 ]
 
-export const SIDE_CHALLENGE_FRAMES = s(10)
+export const SIDE_CHALLENGE_FRAMES = s(7)
 
 export function SideChallenges() {
   const frame = useCurrentFrame()
@@ -34,7 +34,7 @@ export function SideChallenges() {
     <AbsoluteFill className="bg-background text-foreground" style={{ fontFamily: "'Geist Variable', sans-serif", padding: '140px 120px 0' }}>
       <div style={{ display: 'flex', gap: 40 }}>
         {CHALLENGES.map((item, index) => {
-          const pop = spring({ frame: frame - s(0.3) - index * s(0.6), fps, config: { damping: 16, stiffness: 200 }, durationInFrames: 12 })
+          const pop = spring({ frame: frame - s(0.2) - index * s(0.4), fps, config: { damping: 16, stiffness: 200 }, durationInFrames: 12 })
           return (
             <div
               key={item.name}

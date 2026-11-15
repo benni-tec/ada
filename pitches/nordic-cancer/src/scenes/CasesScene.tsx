@@ -24,31 +24,31 @@ const pathway = models[0]
 /** The steps the case has, in pathway order, revealed one at a time. */
 const DAYS = Object.entries((full.case.values.days ?? {}) as Record<string, number>)
 
-/** The case as the clinician has entered it by `frame`: one more step every half second. */
+/** The case as the clinician has entered it by `frame`: one more step every 0.4 seconds. */
 function caseAt(frame: number): CaseState {
-  const shown = Math.min(DAYS.length, Math.floor(frame / s(0.5)) + 1)
+  const shown = Math.min(DAYS.length, Math.floor(frame / s(0.4)) + 1)
   return { ...full, case: { ...full.case, values: { ...full.case.values, days: Object.fromEntries(DAYS.slice(0, shown)) } } }
 }
 
-const SAVED = s(0.5) * DAYS.length + s(0.4)
-const SHEET = s(7)
+const SAVED = s(0.4) * DAYS.length + s(0.3)
+const SHEET = s(5)
 
 /** The pointer: along the steps as they are entered, to the result, a click on View result,
  * then the overdue deadline, the late step and the survival in the sheet. */
 const POINTER: Point[] = [
   { at: 0, x: 1500, y: 980 },
-  { at: 12, x: 1110, y: 330 },
-  { at: 27, x: 1110, y: 372 },
-  { at: 42, x: 1110, y: 414 },
-  { at: SAVED + 20, x: 1120, y: 892 },
-  { at: SHEET - 12, x: 1560, y: 892 },
-  { at: SHEET - 6, x: 1560, y: 892, click: true },
-  { at: s(9.5), x: 1800, y: 300 },
-  { at: s(15), x: 1222, y: 682 },
-  { at: s(24), x: 1150, y: 952 },
+  { at: 10, x: 1110, y: 330 },
+  { at: 22, x: 1110, y: 372 },
+  { at: 34, x: 1110, y: 414 },
+  { at: SAVED + 16, x: 1120, y: 892 },
+  { at: SHEET - 10, x: 1560, y: 892 },
+  { at: SHEET - 5, x: 1560, y: 892, click: true },
+  { at: s(6.5), x: 1800, y: 300 },
+  { at: s(11.5), x: 1222, y: 682 },
+  { at: s(17.5), x: 1150, y: 952 },
 ]
 
-export const CASES_FRAMES = s(34)
+export const CASES_FRAMES = s(26)
 
 const FOCUS_CSS = `
 [data-focus] [data-section]:not([data-section="pathway-result"]) { opacity: 0.22; }
@@ -66,7 +66,7 @@ export function CasesScene() {
   const ran = frame >= SAVED
   const sheet = spring({ frame: frame - SHEET, fps, config: { damping: 200 }, durationInFrames: 14 })
   // The part of the result the banner talks about; the rest dims.
-  const focus = frame < s(8.5) ? null : frame < s(14) ? 'deadlines' : frame < s(23) ? 'days' : 'survival'
+  const focus = frame < s(6) ? null : frame < s(11) ? 'deadlines' : frame < s(17) ? 'days' : 'survival'
   return (
     <AbsoluteFill className="bg-background text-foreground">
       <style>{FOCUS_CSS}</style>
@@ -139,19 +139,19 @@ export function CasesScene() {
         )}
       </TooltipProvider>
       <Cursor path={POINTER} />
-      <Sequence durationInFrames={s(4)}>
-        <LowerThird title="A case: one patient's pathway" line="Entered step by step by the clinician (synthetic data)" exitAt={s(3.6)} />
+      <Sequence durationInFrames={s(3)}>
+        <LowerThird title="A case: one patient's pathway" line="Entered step by step by the clinician (synthetic data)" exitAt={s(2.6)} />
       </Sequence>
-      <Sequence from={s(4)} durationInFrames={s(3)}>
-        <LowerThird title="Models run on every save" line="The patient pathway model, from the Nordic standards" exitAt={s(2.6)} />
+      <Sequence from={s(3)} durationInFrames={s(2.4)}>
+        <LowerThird title="Models run on every save" line="The patient pathway model, from the Nordic standards" exitAt={s(2)} />
       </Sequence>
-      <Sequence from={s(7.5)} durationInFrames={s(5.5)}>
-        <LowerThird title="The clock Finland is missing" line="Imaging after suspicion: overdue by 2 days" accent="#f97316" exitAt={s(5.1)} />
+      <Sequence from={s(5.6)} durationInFrames={s(5.2)}>
+        <LowerThird title="The clock Finland is missing" line="Imaging after suspicion: overdue by 2 days" accent="#f97316" exitAt={s(4.8)} />
       </Sequence>
-      <Sequence from={s(14)} durationInFrames={s(8)}>
-        <LowerThird title="Where the days go" line="Each step against the Danish, Norwegian and Swedish targets" exitAt={s(7.6)} />
+      <Sequence from={s(11)} durationInFrames={s(5.8)}>
+        <LowerThird title="Where the days go" line="Each step against the Danish, Norwegian and Swedish targets" exitAt={s(5.4)} />
       </Sequence>
-      <Sequence from={s(23)}>
+      <Sequence from={s(17)}>
         <LowerThird title="Evidence a clinician can act on" line="Survival and delay effects, each with its published source" accent="#22c55e" />
       </Sequence>
     </AbsoluteFill>

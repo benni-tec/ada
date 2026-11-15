@@ -30,7 +30,7 @@ function Punch({ children, sub }: { children: string; sub?: string }) {
 /** A screen of the app, drifting in. */
 function Screen({ src, title, line }: { src: string; title: string; line: string }) {
   const frame = useCurrentFrame()
-  const scale = interpolate(frame, [0, s(6)], [1.02, 1.2])
+  const scale = interpolate(frame, [0, s(4)], [1.02, 1.16])
   return (
     <AbsoluteFill className="bg-background">
       <Img src={staticFile(src)} style={{ width: '100%', transform: `scale(${scale})`, transformOrigin: '70% 45%' }} />
@@ -52,17 +52,17 @@ function Planned({ title, shows }: { title: string; shows: string }) {
 
 type Section = { name: string; frames: number; scene: ReactNode }
 
-/** The pitch, three minutes, in the order of the story: the case and its models first,
+/** The pitch, two minutes, in the order of the story: the case and its models first,
  * then where their data comes from, then the cases as data, which closes the loop. */
 const SECTIONS: Section[] = [
-  { name: 'Title', frames: s(4), scene: <TitleCard subtitle="Promoting better and equal cancer care" /> },
-  { name: 'No clock', frames: s(5), scene: <Punch sub="Finland has no trigger, no clock and no measurement">No clock</Punch> },
+  { name: 'Title', frames: s(3.5), scene: <TitleCard subtitle="Promoting better and equal cancer care" /> },
+  { name: 'No clock', frames: s(3.5), scene: <Punch sub="Finland has no trigger, no clock and no measurement">No clock</Punch> },
 
   // 1. The central tool: cases with models.
   { name: 'Cases', frames: CASES_FRAMES, scene: <CasesScene /> },
   {
     name: 'Trials',
-    frames: s(8),
+    frames: s(6),
     scene: (
       <Planned
         title="And the trials worth discussing"
@@ -72,11 +72,11 @@ const SECTIONS: Section[] = [
   },
 
   // 2. Where the models' data comes from: ADA's analysis.
-  { name: 'Data', frames: s(2.5), scene: <Punch sub="where the models' data comes from">The data</Punch> },
+  { name: 'Data', frames: s(2), scene: <Punch sub="where the models' data comes from">The data</Punch> },
   { name: 'Ask', frames: CHAT_FRAMES, scene: <ChatScene /> },
   {
     name: 'Sources',
-    frames: s(12),
+    frames: s(8),
     scene: (
       <Planned
         title="Open data, integrated in minutes"
@@ -86,7 +86,7 @@ const SECTIONS: Section[] = [
   },
   {
     name: 'Trace',
-    frames: s(12),
+    frames: s(8),
     scene: (
       <Planned
         title="Every number traced to its source"
@@ -96,12 +96,12 @@ const SECTIONS: Section[] = [
   },
   {
     name: 'Dashboard',
-    frames: s(6),
+    frames: s(4),
     scene: <Screen src="dashboard-light.png" title="Goal 3 on one dashboard" line="Survival gap, mortality against target, screening by county" />,
   },
   {
     name: 'Evidence',
-    frames: s(10),
+    frames: s(6),
     scene: (
       <Planned
         title="The model's figures cite their papers"
@@ -113,7 +113,7 @@ const SECTIONS: Section[] = [
   // 3. The gaps, and the cases that fill them.
   {
     name: 'Gaps',
-    frames: s(15),
+    frames: s(8),
     scene: (
       <Planned
         title="Where open data stops"
@@ -123,7 +123,7 @@ const SECTIONS: Section[] = [
   },
   {
     name: 'Cases as data',
-    frames: s(23.5),
+    frames: s(12),
     scene: (
       <Planned
         title="The cases are data too"
@@ -138,7 +138,7 @@ const SECTIONS: Section[] = [
   // 5. What it is built with: the side challenges.
   { name: 'Side challenges', frames: SIDE_CHALLENGE_FRAMES, scene: <SideChallenges /> },
 
-  { name: 'Credits', frames: s(13.5), scene: <Credits /> },
+  { name: 'Credits', frames: s(7.5), scene: <Credits /> },
 ]
 
 export const PITCH_FRAMES = SECTIONS.reduce((total, section) => total + section.frames, 0)
