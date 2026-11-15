@@ -3,11 +3,11 @@ import { ChevronRight, Pencil, Plus, RefreshCw } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import { IconButton } from '@/components/icon-action'
+import { LiveTime } from '@/components/live-time'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { ErrorNotice } from '@/components/notices'
-import { Time } from '@/components/provenance'
 import {
   alertKeys,
   checkAlertRule,
@@ -144,7 +144,7 @@ function RuleRow({ projectId, rule, alerts }: { projectId: Id; rule: AlertRule; 
         {rule.last_checked_at ? (
           <>
             {' · last '}
-            <Time value={rule.last_checked_at} />
+            <LiveTime value={rule.last_checked_at} />
           </>
         ) : (
           ' · not checked yet'

@@ -88,6 +88,29 @@ def register(mcp: FastMCP, inject: Inject) -> None:
 
     @mcp.tool
     @inject
+    async def add_history(
+        project_id: Id,
+        session_id: SessionId,
+        source_id: Id,
+        projects: FromDishka[ProjectService],
+        pipelines: FromDishka[PipelineService],
+        sessions: FromDishka[SessionService],
+        last: Annotated[int, Field(ge=1)] = 10,
+        note: str = "",
+    ) -> Operator:
+        """All stored snapshots of a source, newest first, with snapshot_at and
+        snapshot_rank, for comparing over time. `last` limits snapshots (default 10).
+        Missing columns are NULL; period (pushdown) sources are unsupported.
+        Use the returned operator id as an input of add_transform.
+        """
+        await projects.get(project_id)
+        actor = calling_agent()
+        operator = await pipelines.add_history(project_id, source_id, actor, last=last)
+        await sessions.record_operator(session_id, operator.id, note, actor)
+        return operator
+
+    @mcp.tool
+    @inject
     async def add_transform(
         project_id: Id,
         session_id: SessionId,

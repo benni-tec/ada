@@ -3,8 +3,8 @@ import { ChevronDown } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import { IconButton } from '@/components/icon-action'
+import { LiveTime } from '@/components/live-time'
 import { ErrorNotice, Loading } from '@/components/notices'
-import { Time } from '@/components/provenance'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { alertRowsQuery, type AlertView } from '@/lib/api'
 import { cell, cellText, isLong } from '@/lib/cells'
@@ -52,11 +52,11 @@ function AlertRow({ view }: { view: AlertView }) {
         </TableCell>
         <TableCell className="text-muted-foreground">
           {active ? 'Since ' : 'From '}
-          <Time value={alert.started_at} />
+          <LiveTime value={alert.started_at} relative={!alert.resolved_at} />
           {alert.resolved_at && (
             <>
               {' to '}
-              <Time value={alert.resolved_at} />
+              <LiveTime value={alert.resolved_at} />
             </>
           )}
         </TableCell>

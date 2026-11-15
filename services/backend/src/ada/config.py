@@ -43,12 +43,15 @@ class Settings(BaseSettings):
     # Exa's API key, for search_web, which uses Exa when it is set and Context.dev
     # otherwise. Neither set: the tool refuses, naming both.
     exa_api_key: SecretStr | None = None
+    context_monitor_minutes: int = Field(1440, ge=10)
     # Web credits each project may spend per day (UTC): the web tools (Exa searches
     # at a fixed weight, see WEB_SEARCH_CREDITS) and web sources together.
     web_daily_credit_limit: int = Field(300, ge=0)
     # Where Context.dev can reach this platform, for page monitor webhooks. Unset:
     # watching refuses, naming it.
     ada_public_url: str | None = None
+    alert_ntfy_url: str | None = None
+    alert_webhook_url: str | None = None
     # Paid web tool calls (Exa and Context.dev) a research session may make.
     research_web_calls: int = 40
 
