@@ -167,6 +167,11 @@ out). When a tool refuses a call, read its message and correct the call.
 
 RESEARCH_RULES = """\
 Rules:
+- For page monitoring, spend the budget finding and choosing pages. Read only when
+unsure a page is relevant; hand the list to watch_sources in one or two calls, choosing
+check_every per page. This registers and watches plain text without reading it. The
+load/preview checks below apply to datasets, not this batch. Report batch failures;
+do not claim unread pages have been verified.
 - When watching pages with watch_source, choose check_every by page type: "10min" only \
 for updates the user needs within minutes (e.g. shortage lists), "hourly" for news and \
 lists changing during the day, "daily" for slow pages.

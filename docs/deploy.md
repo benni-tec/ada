@@ -45,6 +45,7 @@ CI never writes these two in `/opt/ada`:
 
 Optional backend settings in `.env.local`:
 
+- `RESEARCH_WEB_CALLS`: paid web-call budget per research session, default 80.
 - `CONTEXT_MONITOR_MINUTES`: page monitor interval, default 1440; minimum 10 minutes. Applies to newly created monitors.
 - `ALERT_NTFY_URL`: full ntfy topic URL; unset disables push notifications.
 - `ALERT_EMAIL_TO`: optional comma-separated addresses. Records simulated emails (subject and body) in the delivery log; never sends email.

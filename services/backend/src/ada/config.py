@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     alert_ntfy_url: str | None = None
     alert_webhook_url: str | None = None
     # Paid web tool calls (Exa and Context.dev) a research session may make.
-    research_web_calls: int = 40
+    research_web_calls: int = 80
 
     # URL, request and downloaded document sources read public addresses only; true lets
     # them read loopback and private ones too, for local development and tests. Never in
