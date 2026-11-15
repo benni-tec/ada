@@ -4,6 +4,7 @@ the run's events turned into the parts of the turn as they happen."""
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic_ai import Agent, ModelRetry, Tool
 from pydantic_ai.exceptions import (
@@ -126,11 +127,14 @@ def provider_model(target: ModelTarget) -> Model:
     key = target.api_key.get_secret_value() if target.api_key is not None else None
     match target.kind:
         case ProviderKind.OPENAI_COMPATIBLE:
-            from pydantic_ai.models.openai import OpenAIChatModel
+            from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
             from pydantic_ai.providers.openai import OpenAIProvider
 
             # The client insists on a key; an endpoint without one ignores whatever it gets.
             provider = OpenAIProvider(base_url=target.base_url, api_key=key or "none")
+            if _is_openai(target.base_url):
+                # OpenAI's reasoning models (gpt-6.1-sol) refuse tools on Chat Completions.
+                return OpenAIResponsesModel(target.model, provider=provider)
             return OpenAIChatModel(target.model, provider=provider)
         case ProviderKind.GEMINI:
             from pydantic_ai.models.google import GoogleModel
@@ -139,6 +143,12 @@ def provider_model(target: ModelTarget) -> Model:
             return GoogleModel(
                 target.model, provider=GoogleProvider(api_key=key, base_url=target.base_url)
             )
+
+
+def _is_openai(base_url: str | None) -> bool:
+    """OpenAI itself (no base URL, or api.openai.com), which speaks the Responses API;
+    other OpenAI-compatible servers mostly speak only Chat Completions."""
+    return not base_url or urlsplit(base_url).hostname == "api.openai.com"
 
 
 def _tool(spec: ToolSpec, tools: AgentTools) -> Tool[Any]:

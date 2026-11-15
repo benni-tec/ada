@@ -23,18 +23,26 @@ from openai import AsyncOpenAI
 from pydantic_ai.exceptions import ModelAuthenticationError, ModelHTTPError
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from taskiq import InMemoryBroker
 
 import factories
+from ada.adapters.llm.runtime import provider_model
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import MemoryStore
 from ada.adapters.sources.web import WebPageReader
 from ada.composition import create_container
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
-from ada.core.models.agents import AgentTurn, ProviderKind, ResearchLimits, ToolPart, TurnStatus
+from ada.core.models.agents import (
+    AgentTurn,
+    ModelTarget,
+    ProviderKind,
+    ResearchLimits,
+    ToolPart,
+    TurnStatus,
+)
 from ada.core.models.agents import TextPart as AnswerText
 from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.analysis import Rows
@@ -1554,6 +1562,18 @@ def test_provider_auth_failure_does_not_echo_credentials(
     assert finished.status == "failed"
     assert "Update this provider's API key in Settings" in (finished.error or "")
     assert "synthetic-test-secret" not in (finished.error or "")
+
+
+def test_openai_itself_is_called_through_the_responses_api() -> None:
+    def built(base_url: str | None) -> type:
+        target = ModelTarget(
+            model_id="m", kind=ProviderKind.OPENAI_COMPATIBLE, base_url=base_url, model="m"
+        )
+        return type(provider_model(target))
+
+    # gpt-6.1-sol refuses tools on Chat Completions; a local server knows only those.
+    assert built(None) is built("https://api.openai.com/v1") is OpenAIResponsesModel
+    assert built("http://localhost:8001/v1") is OpenAIChatModel
 
 
 # The analyst, in child sessions
