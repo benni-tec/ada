@@ -85,7 +85,7 @@ async def create_dashboards(
     rates = await widget(
         steps.trial_rates,
         "chart",
-        "Recruiting cancer trials per million",
+        "Recruiting trials per million",
         {
             "transform": [{"filter": "datum.cancer_group === 'all'"}],
             "facet": {"column": {"field": "registry", "type": "nominal", "title": "Registry"}},
@@ -126,7 +126,7 @@ async def create_dashboards(
     cancer_table = await widget(
         cancers,
         "table",
-        "Lung, pancreas and liver trial rates",
+        "Per million: lung, pancreas, liver",
         _table(["registry", "cancer_group", "country", "trials", "per_million", "rate_ratio_fi"]),
     )
     doors = await view(
@@ -135,7 +135,7 @@ async def create_dashboards(
     doors_table = await widget(
         doors,
         "table",
-        "Recruiting abroad, no Finnish site",
+        "Abroad, no Finnish site",
         _table(
             [
                 "title",
@@ -161,7 +161,7 @@ async def create_dashboards(
     site_map = await widget(
         sites,
         "chart",
-        "Recruiting Nordic sites with registry coordinates",
+        "Recruiting Nordic sites",
         {
             "projection": {"type": "mercator"},
             "mark": {"type": "point", "size": 70, "opacity": 0.7},
@@ -186,7 +186,7 @@ async def create_dashboards(
     pending = await widget(
         steps.ctis_finland_pending,
         "table",
-        "Listed for Finland, not recruiting yet",
+        "Finland: recruitment pending",
         _table(["title", "url", "sponsor", "phase", "status_fi", "recruiting_in", "decision_date"]),
     )
     definitions = await widget(
@@ -204,26 +204,16 @@ async def create_dashboards(
             )
         },
     )
-    patient_table = await widget(
+    nearby = await view(
+        "SELECT city, km_helsinki, km_kuopio, km_oulu, title, eligibility, url FROM input_0 "
+        "ORDER BY least(km_helsinki, km_kuopio, km_oulu) NULLS LAST",
         steps.case_trials,
+    )
+    patient_table = await widget(
+        nearby,
         "table",
         "Recruiting cancer trials and sites",
-        _table(
-            [
-                "title",
-                "url",
-                "cancer_groups",
-                "phase",
-                "facility",
-                "city",
-                "country",
-                *DISTANCES,
-                "sex",
-                "min_age_years",
-                "max_age_years",
-                "eligibility",
-            ]
-        ),
+        _table(["city", *DISTANCES, "title", "eligibility", "url"]),
     )
     advice = await widget(
         steps.case_trials,
@@ -239,20 +229,26 @@ async def create_dashboards(
         found = next((d for d in await dashboards.list(project_id) if d.name == name), None)
         if found is None:
             found = await dashboards.create(project_id, name, actor)
-        if await dashboards.current(found.id) is None:
-            await dashboards.edit(
-                found.id,
-                [
-                    Slot(
-                        name=w.title,
-                        widget_id=w.id,
-                        layout={"x": x, "y": y, "w": width, "h": height},
-                    )
-                    for w, x, y, width, height in content
-                ],
-                found.revision,
-                actor,
+        slots = [
+            Slot(
+                name=w.title,
+                widget_id=w.id,
+                layout={"x": x, "y": y, "w": width, "h": height},
             )
+            for w, x, y, width, height in content
+        ]
+        current = await dashboards.current(found.id)
+        current_slots = []
+        if current is not None:
+            for slot in current.slots:
+                placed = await widgets.get(slot.widget_id) if slot.widget_id else None
+                current_slots.append(
+                    slot.model_copy(update={"widget_id": placed.copied_from or placed.id})
+                    if placed
+                    else slot
+                )
+        if current is None or current_slots != slots:
+            await dashboards.edit(found.id, slots, found.revision, actor)
             found = await dashboards.get(found.id)
         await attachments.attach(session_id, AttachmentKind.DASHBOARD, str(found.id), actor)
         return found

@@ -3,6 +3,11 @@
 _UNION = " UNION ALL ".join(f"SELECT * FROM input_{i}" for i in range(4))
 _NORDIC = "('Finland', 'Sweden', 'Norway', 'Denmark')"
 
+CANCER_REGEX = (
+    "cancer|neoplas|tumou?r|carcinoma|lymphoma|leuka?emia|myeloma|sarcoma|melanoma|"
+    "glioma|blastoma|mesothelioma|malignan|metasta|oncolog"
+)
+
 CANCER_PATTERNS = {
     "lung": "lung|nsclc|sclc|bronch",
     "pancreas": "pancrea",
@@ -75,6 +80,7 @@ SELECT nct_id, title, overall_status,
     try_cast(last_update AS DATE) AS last_update,
     'https://clinicaltrials.gov/study/' || nct_id AS url
 FROM grouped
+WHERE regexp_matches(lower(conditions), '{CANCER_REGEX}')
 """
 """One CT.gov trial with eligibility preserved and cancer groups derived from conditions."""
 

@@ -17,6 +17,7 @@ from ada.core.ports.sources import SourceReaders
 from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.pipelines import PipelineService
+from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
@@ -44,7 +45,20 @@ async def container(migrated_database_url: str, tmp_path: Path) -> AsyncIterator
                 c for c, code in COUNTRIES.items() if body["searchCriteria"]["msc"] == [code]
             )
             name = f"ctis-{country}-p{body['pagination']['page']}.json"
-        return httpx.Response(200, json=json.loads((RECORDINGS / name).read_text()))
+        data = json.loads((RECORDINGS / name).read_text())
+        if "studies" in data:
+            # CT.gov synonym expansion can return non-cancer conditions.
+            extra = json.loads(json.dumps(data["studies"][0]))
+            protocol = extra["protocolSection"]
+            protocol["identificationModule"]["nctId"] = "NCT_NON_CANCER"
+            protocol["conditionsModule"]["conditions"] = ["Myasthenia Gravis"]
+            data["studies"].append(extra)
+            for study in data["studies"]:
+                locations = study["protocolSection"]["contactsLocationsModule"]["locations"]
+                locations.append(
+                    dict(locations[0], status="NOT_YET_RECRUITING", city="Closed test site")
+                )
+        return httpx.Response(200, json=data)
 
     readers = HttpSourceReaders(create_client(httpx.MockTransport(registry)), SystemClock())
     outside = Provider(scope=Scope.APP)
@@ -73,8 +87,17 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             for p in await pipelines.pipelines(project_id)
             for o in await pipelines.lineage(p.operator_id)
         }
+    async with container() as request:
+        projects = await request.get(ProjectService)
+        project = await projects.get(project_id)
+        assert project.agent_instructions == seed.AGENT_INSTRUCTIONS
+        assert len(project.agent_instructions) < 900
+        await projects.update(project_id, project.revision, agent_instructions="Old instructions")
     assert await seed_trials(container) == project_id
     async with container() as request:
+        assert (await (await request.get(ProjectService)).get(project_id)).agent_instructions == (
+            seed.AGENT_INSTRUCTIONS
+        )
         sources = await (await request.get(SourceService)).list(project_id)
         assert len(sources) == 8
         assert all(s.last_checked_at is None for s in sources)
@@ -97,7 +120,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             for o in await pipelines.lineage(p.operator_id)
         }
     assert before == after
-    assert len(after) == 18
+    assert len(after) == 19
 
 
 async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
@@ -129,6 +152,8 @@ async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
     assert page2 in {r["ct_number"] for r in rows(ctis)}
     assert all(r["eligibility"] and r["url"].endswith(r["nct_id"]) for r in rows(cases))
     assert any(r["country"] == "Finland" for r in rows(cases))
+    assert all(r["nct_id"] != "NCT_NON_CANCER" for r in rows(cases))
+    assert all(r["city"] != "Closed test site" for r in rows(cases))
 
     fi_rate = next(
         r
@@ -158,10 +183,25 @@ async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
                 assert data.rows
                 widget = await widgets.get(slot.widget_id)
                 columns = [c.name for c in data.columns]
-                if widget.title == "Recruiting abroad, no Finnish site":
+                if name == NEAR_YOU and widget.type == "table":
+                    assert widget.spec["columns"] == [
+                        "city",
+                        "km_helsinki",
+                        "km_kuopio",
+                        "km_oulu",
+                        "title",
+                        "eligibility",
+                        "url",
+                    ]
+                    distances = [
+                        min((d for d in row[1:4] if d is not None), default=None)
+                        for row in data.rows
+                    ]
+                    assert distances == sorted(distances, key=lambda d: (d is None, d or 0))
+                if widget.title == "Abroad, no Finnish site":
                     distances = [row[columns.index("km_helsinki")] for row in data.rows]
                     assert distances == sorted(distances, key=lambda d: (d is None, d or 0))
-                if widget.title == "Recruiting cancer trials per million":
+                if widget.title == "Recruiting trials per million":
                     assert widget.spec["transform"] == [{"filter": "datum.cancer_group === 'all'"}]
                     assert any(row[columns.index("cancer_group")] == "all" for row in data.rows)
 

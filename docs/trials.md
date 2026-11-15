@@ -87,7 +87,8 @@ Recruiting means the registry's site status, not confirmed availability. Site
 statuses lag. A pending CTIS listing is not a Finnish recruiting site. The two
 registries overlap and their counts must not be added. CTIS code meanings are
 inferred from samples, not an authoritative codebook. Broad CT.gov search can
-include non-cancer conditions. Basket trials can belong to several cancer groups;
+include non-cancer conditions; the trials step keeps only conditions matching the
+cancer regex in `steps.py`. Basket trials can belong to several cancer groups;
 groups are not additive or evidence of suitability for a particular patient.
 
 Populations in millions: FI 5.64, SE 10.59, NO 5.59, DK 5.99, from Eurostat
@@ -95,7 +96,8 @@ demo_pjan, 1 January 2025 (https://ec.europa.eu/eurostat/databrowser/view/demo_p
 National 1 January 2026 figures are up to 0.7% higher. Per million residents is not per patient.
 These tables make no eligibility judgement or treatment recommendation.
 
-Local full-recording check (2026-11-15): CT.gov FI 98 (17.38/M), pooled SE+NO+DK
+Earlier full-recording check (2026-11-15, before the condition filter; these counts
+have not been revalidated with that filter): CT.gov FI 98 (17.38/M), pooled SE+NO+DK
 32.25/M, RR 0.539; CTIS FI 71 (12.59/M), pooled 18.63/M, RR 0.676;
 39 Finnish CTIS oncology trials pending. Doors: 501 all cancers, 80 matching
 lung/pancreas/liver conditions. The older analysis reported 87 for that subset;
@@ -114,3 +116,6 @@ Find the project and its **Nordic cancer trials** session, then the recorded
 operator whose note starts `case_trials:`. All seven notes start with their contract
 name. In the seed integration, `TrialSteps` exposes every operator by that same name;
 `seed.py` attaches dashboards and leaves a hand-over for monitoring.
+
+The checked-in seven CT.gov recording records all pass the condition filter; their
+counts are unchanged (including two recruiting Finnish trials).
