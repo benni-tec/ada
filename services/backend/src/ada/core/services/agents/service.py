@@ -58,8 +58,8 @@ from ada.core.services.ports.sessions import SessionService
 logger = logging.getLogger(__name__)
 
 # Model requests per turn. Enough to look around, build a pipeline and a widget, and pin
-# it; a turn that needs more is going in circles.
-MAX_STEPS = 24
+# it, including joins and alerts after a research report. Still bounded against loops.
+MAX_STEPS = 40
 # A research turn searches, reads pages and checks each source it adds.
 MAX_RESEARCH_STEPS = 60
 # An analysis turn profiles, computes and checks before it reports.
@@ -134,7 +134,7 @@ class AgentTurns(AgentTurnService):
         self.units = units
         self.clock = clock
         self.briefing = Briefing(
-            operators, dashboards, widgets, data_sources, attachments, alerts, reports
+            operators, dashboards, widgets, data_sources, attachments, alerts, reports, clock
         )
 
     async def models(self) -> ModelList:

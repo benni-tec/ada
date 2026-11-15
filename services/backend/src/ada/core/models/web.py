@@ -141,3 +141,16 @@ def reading_not_configured() -> WebNotConfigured:
 
 def watching_not_configured() -> WebNotConfigured:
     return WebNotConfigured("watching", "ADA_PUBLIC_URL is not set")
+
+
+def render_wait(value: object) -> int | str | None:
+    """A bounded render delay in milliseconds or a CSS selector to await."""
+    if value is None:
+        return None
+    if type(value) is int and 0 <= value <= 30_000:
+        return value
+    if isinstance(value, str) and value.strip() and len(value) <= 500:
+        return value.strip()
+    raise Invalid(
+        "wait_for must be milliseconds from 0 to 30000 or a CSS selector (1 to 500 characters)"
+    )

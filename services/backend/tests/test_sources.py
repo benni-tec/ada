@@ -1484,6 +1484,53 @@ async def test_a_policy_edit_waits_for_unwatch_in_postgres(migrated_database_url
     assert unwatched.freshness == weekly
 
 
+def test_row_provenance_comes_from_the_fetch_after_field_mapping() -> None:
+    from datetime import UTC, datetime
+
+    fetched = FetchedData(
+        content=(
+            b'{"rows":[{"name":"example","source_url":"invented","SOURCE_URL":"also invented"}]}'
+        ),
+        format=DataFormat.JSON,
+        origin="https://example.test/data",
+        fetched_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    result = shape(
+        fetched, {"rows": "rows", "fields": {"name": "name"}, "include_provenance": True}
+    )
+    assert json.loads(result.content) == [
+        {
+            "name": "example",
+            "source_url": fetched.origin,
+            "fetched_at": fetched.fetched_at.isoformat(),
+        }
+    ]
+
+    spoofed = fetched.model_copy(
+        update={"format": DataFormat.CSV, "content": b"name, SOURCE_URL \nexample,invented\n"}
+    )
+    with pytest.raises(Invalid, match="provenance columns.*reserved"):
+        shape(spoofed, {"include_provenance": True})
+
+
+async def test_uploaded_csv_loads_through_the_installed_url_reader(tmp_path: Path) -> None:
+    files = LocalFileStore(tmp_path)
+    project_id = factories.project().id
+    stored = await files.put(project_id, b"name,quantity\nExample,4\n", ".csv")
+    source = factories.data_source(project_id, address=stored.address)
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _: pytest.fail("No HTTP for uploads"))
+    ) as client:
+        reader = HttpSourceReaders(client, FixedClock(), files).for_kind(AccessKind.URL)
+        fetched = await reader.fetch(source, TimeRange())
+        assert fetched.content == b"name,quantity\nExample,4\n"
+        assert fetched.origin == stored.address
+        assert await reader.probe(source) == stored.address
+        other_project = source.model_copy(update={"project_id": factories.project().id})
+        with pytest.raises(Invalid, match="must belong"):
+            await reader.fetch(other_project, TimeRange())
+
+
 async def test_token_pagination_keeps_params_and_joins_before_shaping() -> None:
     def answer(request: httpx.Request) -> httpx.Response:
         page = int(request.url.params.get("pageToken", "1"))

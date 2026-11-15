@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from fastmcp import Client
 from mcp.types import Implementation
 from openai import AsyncOpenAI
-from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.exceptions import ModelAuthenticationError, ModelHTTPError
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -329,6 +329,8 @@ def test_context_is_checked_stored_with_the_message_and_reaches_the_prompt(
     assert f'"Regions", id {widget["id"]}' in instructions
     assert f'Session "Screening", id {session["id"]}' in instructions
     assert "Never state a number you did not read from a tool" in instructions
+    assert "Current UTC time:" in instructions
+    assert "local timezone" in instructions
 
 
 def test_the_prompt_lists_what_the_session_shows_beside_the_conversation(
@@ -1531,6 +1533,27 @@ async def test_a_turn_failed_while_its_worker_stalled_stays_failed(
     # its own end was not stored.
     assert resumed == stored == failed
     assert sources == []
+
+
+def test_provider_auth_failure_does_not_echo_credentials(
+    client: TestClient,
+    session: dict[str, Any],
+    script: Script,
+) -> None:
+    script.then(
+        fail(
+            ModelAuthenticationError(
+                "scripted",
+                "key synthetic-test-secret rejected",
+                body={"key": "synthetic-test-secret"},
+            )
+        )
+    )
+    posted = send(client, "POST", f"/sessions/{session['id']}/messages", {"text": "Hello"}, 201)
+    finished = run(client, posted["turn"]["id"])
+    assert finished.status == "failed"
+    assert "Update this provider's API key in Settings" in (finished.error or "")
+    assert "synthetic-test-secret" not in (finished.error or "")
 
 
 # The analyst, in child sessions

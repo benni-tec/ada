@@ -99,8 +99,11 @@ class PydanticAiRuntime(AgentRuntime):
             raise AgentFailed(
                 f"The agent did not finish within {request.max_steps} steps"
             ) from error
-        except ModelAuthenticationError as error:
-            raise AgentFailed(f"The model provider refused the key: {error}") from error
+        except ModelAuthenticationError:
+            # Authentication bodies can echo credentials (even masked fragments).
+            raise AgentFailed(
+                "The model provider refused the key. Update this provider's API key in Settings."
+            ) from None
         except ModelConnectionError as error:
             raise AgentFailed(f"The model provider could not be reached: {error}") from error
         except ModelAPIError as error:
