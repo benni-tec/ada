@@ -33,6 +33,7 @@ from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.schema import Column, ColumnType, Schema
+from ada.core.models.sessions import SessionAgent
 from ada.core.models.sources import (
     AccessKind,
     CheckEvery,
@@ -378,8 +379,8 @@ async def test_failed_web_calls_count_against_the_research_cap(
             project = await (await request.get(ProjectService)).create("P")
             sessions = await request.get(SessionService)
             parent = await sessions.create(project.id, "S")
-            child = await sessions.create_research(
-                parent.id, "Survival", Actor(kind=ActorKind.USER, name="web")
+            child = await sessions.create_child(
+                parent.id, "Survival", SessionAgent.RESEARCH, Actor(kind=ActorKind.USER, name="web")
             )
         arguments = {
             "query": "survival",

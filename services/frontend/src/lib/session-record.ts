@@ -9,7 +9,13 @@ export type RecordItem =
   | { kind: 'tool-calls'; key: string; actor: Actor; calls: ToolCallEntry[] }
 
 /** Tools that put what they made into the record themselves, as an operator or widget. */
-const RECORDING_TOOLS = new Set(['add_source_operator', 'add_transform', 'create_widget', 'build_pipeline'])
+const RECORDING_TOOLS = new Set([
+  'add_source_operator',
+  'add_transform',
+  'add_statistic',
+  'create_widget',
+  'build_pipeline',
+])
 
 /** Calls whose answers are for the agent alone: it may not show them to the person. */
 const EXPLORATION_TOOLS = new Set(['query_operator', 'search_web', 'read_page', 'extract_table', 'map_site'])

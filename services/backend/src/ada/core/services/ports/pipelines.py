@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from ada.core.models.actors import Actor
-from ada.core.models.base import Id
+from ada.core.models.base import Id, JsonObject
 from ada.core.models.operators import Operator, OperatorId
 from ada.core.models.pipelines import Pipeline
 from ada.core.models.schema import Column, Roles, Schema
@@ -40,6 +40,20 @@ class PipelineService(Protocol):
         """SQL over earlier operators, which it names input_0, input_1, ... Its columns are
         derived by describing the query; `roles` declares what they mean and must name
         only columns the query returns. Raises Invalid otherwise."""
+        ...
+
+    async def add_statistic(
+        self,
+        project_id: Id,
+        tool: str,
+        arguments: JsonObject,
+        input: OperatorId,
+        actor: Actor,
+        materialize: bool = False,
+    ) -> Operator:
+        """A named statistic over one earlier operator (statistics.py): its arguments are
+        checked against the input's columns and it is compiled to SQL, stored with it.
+        Raises Invalid for an unknown statistic or arguments that do not fit."""
         ...
 
     async def describe(

@@ -375,8 +375,9 @@ class DataSources(SourceService):
             sealed = self.secrets.encrypt(monitor.secret.get_secret_value())
             await self.sources.set_monitor(id, monitor.id, sealed, before, check_every)
             watched = await self._set_freshness(source, FreshnessPolicy(kind=FreshnessKind.PUSH))
-        except Exception:
+        except BaseException:
             # Without this the monitor would keep firing at a source that does not know it.
+            # BaseException: a caller's timeout cancels here too, after the monitor exists.
             await self.explorer.unwatch(monitor.id)
             raise
         if old is not None:

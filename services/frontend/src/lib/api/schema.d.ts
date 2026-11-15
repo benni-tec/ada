@@ -941,6 +941,28 @@ export interface paths {
         patch: operations["change_session_api_sessions__session_id__patch"];
         trace?: never;
     };
+    "/api/sessions/{session_id}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delegate Analysis
+         * @description Delegate an analysis to the analyst, as the person: an analysis session under this
+         *     one, with the brief as its first message and its turn queued. Its findings are added
+         *     to this session's record, each with the operator that shows it.
+         */
+        post: operations["delegate_analysis_api_sessions__session_id__analysis_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions/{session_id}/attachments": {
         parameters: {
             query?: never;
@@ -2279,6 +2301,18 @@ export interface components {
             /** @default warning */
             severity: components["schemas"]["Severity"];
         };
+        /** NewAnalysis */
+        NewAnalysis: {
+            /** Brief */
+            brief: string;
+            /**
+             * Operator Ids
+             * @default []
+             */
+            operator_ids: components["schemas"]["OperatorId"][];
+            /** Title */
+            title: string;
+        };
         /** NewAttachment */
         NewAttachment: {
             kind: components["schemas"]["AttachmentKind"];
@@ -2295,6 +2329,26 @@ export interface components {
         /** NewDashboardRun */
         NewDashboardRun: {
             time_range?: components["schemas"]["TimeRange"] | null;
+        };
+        /** NewHistory */
+        NewHistory: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "history";
+            /**
+             * Last
+             * @default 10
+             */
+            last: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            session_id?: components["schemas"]["Id"] | null;
+            source_id: components["schemas"]["Id"];
         };
         /** NewInput */
         NewInput: {
@@ -2509,7 +2563,7 @@ export interface components {
          * OperatorKind
          * @enum {string}
          */
-        OperatorKind: "source" | "extract" | "input" | "transform" | "statistic" | "agent";
+        OperatorKind: "source" | "history" | "extract" | "input" | "transform" | "statistic" | "agent";
         /**
          * Order
          * @description A new order of a project's dashboards or reports: every id of them, once.
@@ -2889,7 +2943,7 @@ export interface components {
          * SessionAgent
          * @enum {string}
          */
-        SessionAgent: "session" | "research";
+        SessionAgent: "session" | "research" | "analysis";
         /** SessionAgentChoice */
         SessionAgentChoice: {
             /** Expected Revision */
@@ -4526,7 +4580,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewSourceOperator"] | components["schemas"]["NewTransform"] | components["schemas"]["NewInput"];
+                "application/json": components["schemas"]["NewSourceOperator"] | components["schemas"]["NewHistory"] | components["schemas"]["NewTransform"] | components["schemas"]["NewInput"];
             };
         };
         responses: {
@@ -5290,6 +5344,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delegate_analysis_api_sessions__session_id__analysis_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewAnalysis"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
