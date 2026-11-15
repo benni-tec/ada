@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 
+import duckdb
 import httpx
 import pytest
 from dishka import AsyncContainer, Provider, Scope
@@ -30,10 +31,16 @@ from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.cli.trials import seed
 from ada.entrypoints.cli.trials.dashboards import DOORS, NEAR_YOU
-from ada.entrypoints.cli.trials.monitoring import DASHBOARD, FINNISH_RULE, HOSPITAL_RULE
+from ada.entrypoints.cli.trials.monitoring import (
+    DASHBOARD,
+    FINNISH_RULE,
+    HOSPITAL_RULE,
+    site_changes_sql,
+)
 from ada.entrypoints.cli.trials.pages import PAGES, page_options, study_page
 from ada.entrypoints.cli.trials.seed import SEED, _build, register_trial_page, seed_trials
 from ada.entrypoints.cli.trials.sources import COUNTRIES
+from ada.entrypoints.cli.trials.steps import TRIAL_SITES
 from memory import MemoryBackground, memory_adapters
 
 pytestmark = pytest.mark.anyio
@@ -271,6 +278,19 @@ async def simulate_site_change(container: AsyncContainer, finland_fixture: dict)
         for t in finland_fixture["studies"]
     ):
         finland_fixture["studies"].append(json.loads(json.dumps(trial)))
+    previous = next(
+        t
+        for t in finland_fixture["studies"]
+        if t["protocolSection"]["identificationModule"]["nctId"] == "NCT07195695"
+    )
+    previous["protocolSection"]["contactsLocationsModule"]["locations"].append(
+        {
+            "facility": "HUS",
+            "city": "Helsinki",
+            "country": "Finland",
+            "status": "NOT_YET_RECRUITING",
+        }
+    )
     project_id = await seed_trials(container, refresh=True)
     section = trial["protocolSection"]
     locations = section["contactsLocationsModule"]["locations"]
@@ -320,7 +340,7 @@ async def test_monitoring_changes_and_finnish_alert(
         data = await runs.read(run.id, widget.operator_id)
         rows = [dict(zip([c.name for c in data.columns], row, strict=True)) for row in data.rows]
         assert {r["change_kind"] for r in rows if r["nct_id"] == "NCT07195695"} >= {
-            "finnish_site_added",
+            "finnish_site_recruiting",
             "nordic_site_closed",
         }
         dashboard = next(
@@ -330,6 +350,9 @@ async def test_monitoring_changes_and_finnish_alert(
         )
         alerts = await request.get(AlertService)
         rules = await alerts.list_rules(dashboard.id)
+        bulletin = next(r for r in rules if r.name == "Weekly trial-gap bulletin")
+        assert bulletin.key_columns == ("registry", "cancer_group", "week")
+        assert bulletin.check_interval_seconds == 7 * 86400
         rule = next(r for r in rules if r.name == FINNISH_RULE)
         await alerts.check(rule.id)
         firing = [
@@ -549,8 +572,109 @@ async def test_refresh_retries_failed_recent_sponsor_check(
         monkeypatch.setattr(type(sources), "refresh", track_refresh)
     await seed_trials(container, refresh=True)
     assert study.id in refreshed
-    async with container() as request:
-        assert (await (await request.get(SourceService)).get(study.id)).last_error is None
-    refreshed.clear()
-    await seed_trials(container, refresh=True)
-    assert study.id not in refreshed
+
+
+def test_site_changes_reconcile_sources_and_unnamed_sites() -> None:
+    with duckdb.connect() as db:
+        for i in range(4):
+            db.execute(f"""
+                CREATE TABLE input_{i} (
+                    nct_id VARCHAR, title VARCHAR, last_update VARCHAR, locations JSON,
+                    snapshot_at TIMESTAMP, snapshot_rank INTEGER
+                )
+            """)
+
+        def observation(source: int, rank: int, statuses: list[str], trial: str = "NCT1") -> None:
+            sites = [
+                {"city": "Helsinki", "country": "Finland", "status": status} for status in statuses
+            ]
+            db.execute(
+                f"INSERT INTO input_{source} VALUES (?, 'Trial', '2026-01-01', ?, ?, ?)",
+                [trial, json.dumps(sites), f"2026-01-{4 - rank + source:02d}", rank],
+            )
+
+        observation(0, 2, ["recruiting", "COMPLETED"])
+        observation(1, 1, ["RECRUITING", "COMPLETED", "RECRUITING"])
+        sql = site_changes_sql(TRIAL_SITES)
+        # Moving between country pulls, duplicate unnamed sites and casing are not changes.
+        assert db.execute(sql).fetchall() == []
+
+        observation(0, 1, ["RECRUITING"])
+        observation(3, 1, ["COMPLETED"])
+        db.execute("UPDATE input_0 SET last_update = '2026-02-01' WHERE snapshot_rank = 1")
+        assert db.execute(sql).fetchall() == []
+        # With matching registry revisions, the later fetch breaks the tie.
+        db.execute("UPDATE input_3 SET last_update = '2026-02-01'")
+        assert [row[0] for row in db.execute(sql).fetchall()] == ["nordic_site_closed"]
+        db.execute("DELETE FROM input_3")
+        db.execute("DELETE FROM input_0")
+        observation(0, 2, ["not_yet_recruiting", "COMPLETED"])
+        result = db.execute(sql)
+        rows = [
+            dict(zip([c[0] for c in result.description], row, strict=True))
+            for row in result.fetchall()
+        ]
+        assert {r["change_kind"] for r in rows} == {"finnish_site_recruiting", "nordic_site_opened"}
+        assert len(rows) == 2
+
+        observation(2, 1, ["RECRUITING"], trial="NCT2")
+        observation(3, 1, ["recruiting"], trial="NCT2")
+        result = db.execute(sql)
+        rows = [
+            dict(zip([c[0] for c in result.description], row, strict=True))
+            for row in result.fetchall()
+        ]
+        assert sum(r["change_kind"] == "new_trial" for r in rows) == 1
+
+        observation(2, 1, ["not_yet_recruiting"], trial="NCT3")
+        result = db.execute(sql)
+        rows = [
+            dict(zip([c[0] for c in result.description], row, strict=True))
+            for row in result.fetchall()
+        ]
+        assert {r["change_kind"] for r in rows if r["nct_id"] == "NCT3"} == {
+            "new_trial",
+            "finnish_site_added",
+        }
+
+
+def test_site_changes_guard_truncated_sources() -> None:
+    with duckdb.connect() as db:
+        for source in range(4):
+            db.execute(f"""
+                CREATE TABLE input_{source} AS
+                SELECT 'NCT' || i AS nct_id, 'Trial' AS title,
+                    '2026-01-01' AS last_update,
+                    '[{{"country":"Sweden","status":"RECRUITING"}}]'::JSON AS locations,
+                    TIMESTAMP '2026-01-01' AS snapshot_at, 2 AS snapshot_rank
+                FROM range({source * 10}, {source * 10 + 4}) t(i)
+            """)
+        sql = site_changes_sql(TRIAL_SITES)
+        # Empty and truncated sources suppress removals; exactly half is valid.
+        for source, count in ((1, 1), (2, 2), (3, 3)):
+            db.execute(f"""
+                INSERT INTO input_{source}
+                SELECT nct_id, title, last_update, locations,
+                    TIMESTAMP '2026-01-02', 1
+                FROM input_{source} LIMIT {count}
+            """)
+        db.execute("""
+            INSERT INTO input_1 VALUES ('NEW', 'New trial', '2026-01-02',
+                '[{"country":"Sweden","status":"RECRUITING"}]', '2026-01-02', 1)
+        """)
+        # Keep this source below half even with the addition.
+        db.execute("""
+            INSERT INTO input_1 SELECT 'OLD', title, last_update, locations, snapshot_at, 2
+            FROM input_1 LIMIT 1
+        """)
+        rows = db.execute(sql).fetchall()
+        assert {(r[0], r[1]) for r in rows} == {
+            ("trial_left_list", "NCT22"),
+            ("nordic_site_closed", "NCT22"),
+            ("trial_left_list", "NCT23"),
+            ("nordic_site_closed", "NCT23"),
+            ("trial_left_list", "NCT33"),
+            ("nordic_site_closed", "NCT33"),
+            ("new_trial", "NEW"),
+            ("nordic_site_opened", "NEW"),
+        }

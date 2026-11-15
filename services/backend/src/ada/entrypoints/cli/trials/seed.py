@@ -158,7 +158,13 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                 ):
                     if datetime.now(UTC) - source.last_checked_at < timedelta(days=7):
                         continue
-                await sources.refresh(source.id, force=True)
+                try:
+                    await sources.refresh(source.id, force=True)
+                except Invalid:
+                    # Extract pages keep a 7-day minimum between fetches; a recent
+                    # snapshot exists, so the next seed retries the failed check.
+                    if name not in study_names:
+                        raise
         async with container() as request:
             built = await _build(request, project_id, registered)
             for field in fields(built):

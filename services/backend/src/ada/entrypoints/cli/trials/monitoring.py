@@ -25,29 +25,54 @@ if TYPE_CHECKING:
     from ada.entrypoints.cli.trials.seed import TrialSteps
 
 DASHBOARD = "Trial site monitoring"
+MIN_SNAPSHOT_TRIAL_RATIO = 0.5
 FINNISH_RULE = "A Finnish site opened on a Nordic cancer trial"
 HOSPITAL_RULE = "A Finnish hospital page listed a new cancer trial"
 
 
 def site_changes_sql(site_sql: str) -> str:
-    """Reuse the seed's site parser for each snapshot of one country source."""
+    """Compare reconciled Nordic snapshots using the seed's site parser.
+
+    Empty history snapshots emit no rows, so an empty rank 2 cannot be distinguished
+    from missing history and cannot establish a comparison baseline.
+    """
 
     def sites(rank: int) -> str:
         sql = site_sql
         for i in range(4):
             sql = sql.replace(
                 f"input_{i}",
-                f"(SELECT * FROM history WHERE snapshot_rank = {rank}"
+                f"(SELECT * FROM observations WHERE snapshot_rank = {rank}"
                 + (" AND false" if i else "")
                 + ")",
             )
         return sql
 
     return f"""
-WITH history AS (SELECT * FROM input_0),
-new_sites AS ({sites(1)}), old_sites AS ({sites(2)}),
-new_trials AS (SELECT DISTINCT nct_id, title FROM history WHERE snapshot_rank = 1),
-old_trials AS (SELECT DISTINCT nct_id, title FROM history WHERE snapshot_rank = 2),
+WITH history AS (
+    {" UNION ALL ".join(f"SELECT *, {i} AS source_index FROM input_{i}" for i in range(4))}
+), guarded_sources AS (
+    SELECT source_index FROM history GROUP BY source_index
+    HAVING count(DISTINCT nct_id) FILTER (WHERE snapshot_rank = 1)
+        < {MIN_SNAPSHOT_TRIAL_RATIO} * count(DISTINCT nct_id) FILTER (WHERE snapshot_rank = 2)
+), observations AS (
+    SELECT * FROM history
+    QUALIFY row_number() OVER (PARTITION BY snapshot_rank, nct_id
+        ORDER BY last_update DESC NULLS LAST, snapshot_at DESC, locations::VARCHAR DESC) = 1
+), parsed_sites AS (
+    SELECT *, 1 AS snapshot_rank FROM ({sites(1)})
+    UNION ALL
+    SELECT *, 2 AS snapshot_rank FROM ({sites(2)})
+), sites AS (
+    SELECT DISTINCT nct_id, coalesce(facility, '') AS facility, city, country, snapshot_rank,
+        CASE WHEN bool_or(upper(site_status) = 'RECRUITING') THEN 'RECRUITING'
+            ELSE max(upper(site_status)) END AS site_status
+    FROM parsed_sites
+    GROUP BY nct_id, coalesce(facility, ''), city, country, snapshot_rank
+), new_sites AS (SELECT * FROM sites WHERE snapshot_rank = 1),
+old_sites AS (SELECT * FROM sites WHERE snapshot_rank = 2),
+new_trials AS (SELECT nct_id, title FROM observations WHERE snapshot_rank = 1),
+old_trials AS (SELECT nct_id, title FROM observations WHERE snapshot_rank = 2),
 site_pairs AS (
     SELECT coalesce(n.nct_id, o.nct_id) AS nct_id,
         coalesce(n.facility, o.facility) AS facility, coalesce(n.city, o.city) AS city,
@@ -70,9 +95,12 @@ site_pairs AS (
         previous_status, status
     FROM site_pairs p LEFT JOIN new_trials n USING (nct_id)
     LEFT JOIN old_trials o USING (nct_id)
-    CROSS JOIN (VALUES ('finnish_site_added'), ('nordic_site_opened'),
+    CROSS JOIN (VALUES ('finnish_site_added'), ('finnish_site_recruiting'), ('nordic_site_opened'),
         ('nordic_site_closed')) kinds(kind)
-    WHERE (kind = 'finnish_site_added' AND country = 'Finland' AND added)
+    WHERE (kind = 'finnish_site_added' AND country = 'Finland' AND added
+            AND status IS DISTINCT FROM 'RECRUITING')
+        OR (kind = 'finnish_site_recruiting' AND country = 'Finland'
+            AND status = 'RECRUITING' AND previous_status IS DISTINCT FROM 'RECRUITING')
         OR (country IN ('Finland', 'Sweden', 'Norway', 'Denmark') AND (
             (kind = 'nordic_site_opened' AND status = 'RECRUITING'
                 AND previous_status IS DISTINCT FROM 'RECRUITING')
@@ -85,6 +113,10 @@ SELECT DISTINCT e.*, (SELECT max(snapshot_at) FROM history WHERE snapshot_rank =
         AS has_fi_site
 FROM events e
 WHERE EXISTS (SELECT 1 FROM history WHERE snapshot_rank = 2)
+    AND (e.change_kind NOT IN ('trial_left_list', 'nordic_site_closed') OR NOT EXISTS (
+        SELECT 1 FROM history h JOIN guarded_sources g USING (source_index)
+        WHERE h.snapshot_rank = 2 AND h.nct_id = e.nct_id
+    ))
 """
 
 
@@ -119,20 +151,17 @@ async def create_monitoring(
     existing = {
         (w.operator_id, w.title): w for w in await widgets.list(project_id) if w.copied_from is None
     }
-    changes = []
-    for source in CTGOV:
-        history = await pipelines.add_history(project_id, sources[source.name], actor, last=2)
-        changes.append(
-            await pipelines.add_transform(
-                project_id, site_changes_sql(TRIAL_SITES), [history.id], actor
-            )
-        )
+    histories = [
+        await pipelines.add_history(project_id, sources[source.name], actor, last=2)
+        for source in CTGOV
+    ]
     trial_site_changes = await pipelines.add_transform(
+        project_id, site_changes_sql(TRIAL_SITES), [h.id for h in histories], actor
+    )
+    weekly_rates = await pipelines.add_transform(
         project_id,
-        "SELECT DISTINCT * FROM ("
-        + " UNION ALL ".join(f"SELECT * FROM input_{i}" for i in range(len(changes)))
-        + ")",
-        [c.id for c in changes],
+        "SELECT *, strftime(current_date, '%G-W%V') AS week FROM input_0",
+        [steps.trial_rates.id],
         actor,
     )
     sessions = await request.get(SessionService)
@@ -207,7 +236,7 @@ async def create_monitoring(
         (
             FINNISH_RULE,
             trial_site_changes,
-            _compare("change_kind", "finnish_site_added", "fi"),
+            _compare("change_kind", "finnish_site_recruiting", "fi"),
             ["nct_id", "facility"],
             Severity.WARNING,
             None,
@@ -244,7 +273,7 @@ async def create_monitoring(
         ),
         (
             "Weekly trial-gap bulletin",
-            steps.trial_rates,
+            weekly_rates,
             {
                 "id": "gap",
                 "kind": "and",
@@ -253,7 +282,7 @@ async def create_monitoring(
                     _compare("rate_ratio_fi", 1, "ratio", "<"),
                 ],
             },
-            ["registry", "cancer_group"],
+            ["registry", "cancer_group", "week"],
             Severity.INFO,
             7 * DAY,
         ),
