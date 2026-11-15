@@ -112,10 +112,9 @@ async function evaluateProfile() {
   await waitFor(() => expect(screen.getByText(/would start a pathway in Norway and Sweden/)).toBeInTheDocument())
 }
 
-test('every page carries the data rule, and the list links to the model', async () => {
+test('the list links to the model', async () => {
   serve()
   renderAt('/projects/p1/models')
-  expect(await screen.findByRole('note')).toHaveTextContent('Educational use only. Do not enter patient data.')
   const link = await screen.findByRole('link', { name: 'Patient pathway model' })
   expect(link).toHaveAttribute('href', '/projects/p1/models/m1')
 })

@@ -1065,9 +1065,8 @@ evaluating one never does.
 
 **An evaluation is computed and returned, never stored**: no run, snapshot, operator or
 widget, and no DuckDB. A model run on a case is the exception: its result is stored on the
-case (see Cases). The platform is not for patient data: the frontend carries a banner
-on every page saying so, and evaluations are therefore ordinary tool calls, recorded in the
-session like any other. REST: `GET /projects/{id}/models`, `POST
+case (see Cases). The platform is not for patient data (synthetic profiles only), so
+evaluations are ordinary tool calls, recorded in the session like any other. REST: `GET /projects/{id}/models`, `POST
 /projects/{id}/models` (a spec) and `/models/pathway` (the shipped one; body `{parameters?}`), `GET
 /models/{id}`, `/versions/latest`, `/versions/{n}`, `/population`, `POST
 /models/{id}/versions`, `POST /models/{id}/evaluate`. MCP: `create_pathway_model`,
