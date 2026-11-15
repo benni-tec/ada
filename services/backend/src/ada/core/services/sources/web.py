@@ -13,6 +13,7 @@ from ada.core.models.sources import (
     WEB_CRAWL_MAX_PAGES,
     WEB_MINIMUM_TTL,
     WEB_PDF_OPERATIONS,
+    WEB_PROVENANCE_COLUMNS,
     WEB_SOURCES_COLUMN,
     AccessKind,
     DataFormat,
@@ -23,12 +24,22 @@ from ada.core.models.sources import (
     web_operation,
     web_pdf,
 )
+from ada.core.models.web import render_wait
 
 # The columns an extraction may fill.
 MAX_EXTRACT_COLUMNS = 30
 
 
 def web_schema(options: dict[str, object], declared: Schema | None) -> Schema:
+    schema = _web_schema(options, declared)
+    if options.get("include_provenance") is True:
+        names = {column.name for column in WEB_PROVENANCE_COLUMNS}
+        columns = tuple(column for column in schema.columns if column.name.casefold() not in names)
+        return schema.model_copy(update={"columns": (*columns, *WEB_PROVENANCE_COLUMNS)})
+    return schema
+
+
+def _web_schema(options: dict[str, object], declared: Schema | None) -> Schema:
     """A web source's declared schema at registration: the document columns of its
     extract mode for scrape and crawl; for answers and extract the declared columns, which
     it must have, for answers with `sources` added at the end."""
@@ -62,6 +73,24 @@ def check_web(source: DataSource) -> None:
     operation = web_operation(source.options)
     _check_freshness(source, operation)
     options = source.options
+    if "original_html" in options and type(options["original_html"]) is not bool:
+        raise Invalid("options.original_html must be true or false")
+    if options.get("original_html") and (
+        operation is not WebOperation.SCRAPE
+        or document_extract(options).value != "tables"
+        or options.get("pdf") is not None
+        or options.get("wait_for") is not None
+    ):
+        raise Invalid(
+            "options.original_html requires scrape with extract=tables, without pdf or wait_for"
+        )
+    render_wait(options.get("wait_for"))
+    if "include_provenance" in options and type(options["include_provenance"]) is not bool:
+        raise Invalid("options.include_provenance must be true or false")
+    if options.get("include_provenance") and operation not in WEB_PDF_OPERATIONS:
+        raise Invalid("options.include_provenance is supported by scrape and extract only")
+    if "wait_for" in options and operation not in WEB_PDF_OPERATIONS:
+        raise Invalid("options.wait_for is supported by scrape and extract only")
     if web_pdf(options) is not None and operation not in WEB_PDF_OPERATIONS:
         raise Invalid(
             f'options.pdf is for the operations "scrape" and "extract", not "{operation.value}"'
@@ -74,6 +103,8 @@ def check_web(source: DataSource) -> None:
         return
     extract = document_extract(options)
     expected = [column.name for column in DOCUMENT_COLUMNS[extract]]
+    if options.get("include_provenance"):
+        expected.extend(column.name for column in WEB_PROVENANCE_COLUMNS)
     declared = source.declared_schema
     if declared is None or [column.name for column in declared.columns] != expected:
         raise Invalid(
@@ -174,7 +205,17 @@ def _check_extract(source: DataSource) -> None:
             "page, 1 to 2000 characters"
         )
     declared = source.declared_schema
-    if declared is None or not 1 <= len(declared.columns) <= MAX_EXTRACT_COLUMNS:
+    reserved = (
+        {column.name for column in WEB_PROVENANCE_COLUMNS}
+        if source.options.get("include_provenance")
+        else set()
+    )
+    columns = (
+        [column for column in declared.columns if column.name.casefold() not in reserved]
+        if declared
+        else []
+    )
+    if not 1 <= len(columns) <= MAX_EXTRACT_COLUMNS:
         raise Invalid(
             f'A web source with operation "extract" declares 1 to {MAX_EXTRACT_COLUMNS} '
             "columns, which the extraction fills"

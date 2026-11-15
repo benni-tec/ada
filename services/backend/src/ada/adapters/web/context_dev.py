@@ -5,11 +5,16 @@ monitors (ContextDevWeb), and web and news search (ContextDevSearch).
 Called over REST (https://api.context.dev/v1, `Authorization: Bearer <key>`). Exactly
 the parameters of the WebExplorer and WebSearch ports are sent, and every request that
 reads carries the caller's `tags`; nothing else of the API (screenshots, browser actions,
-profiles, policies, ZDR) is reachable from here. A read that fails keeps HTTP 200 with
+profiles, policies, ZDR) is reachable from here. Reads bypass the upstream cache;
+optional waits allow late JS data, rendered HTML exposes script/download links, and
+original HTML reads the response bytes before client-side pagination removes table rows.
+A read that fails keeps HTTP 200 with
 `success: false` in its format; only a malformed request is an HTTP error. Such a failure
 quotes only its checked error code: the rest of the answer may carry the page's own text.
 """
 
+import base64
+import binascii
 import html
 from collections.abc import Sequence
 from typing import Any
@@ -127,6 +132,9 @@ class ContextDevWeb(_ContextDev, WebExplorer):
         main_content_only: bool = False,
         focus: str | None = None,
         pdf: PdfOptions | None = None,
+        wait_for: int | str | None = None,
+        raw_html: bool = False,
+        original_html: bool = False,
     ) -> WebPage:
         body: JsonObject = (
             {
@@ -137,15 +145,34 @@ class ContextDevWeb(_ContextDev, WebExplorer):
             if focus
             else {"url": url, "formats": {"markdown": True}}
         )
+        if original_html:
+            body = {"url": url, "formats": {"bytes": True}}
+        elif raw_html:
+            body = {"url": url, "formats": {"html": True}}
+        body["maxAgeMs"] = 0
         shared = _pdf_params(pdf)
+        if wait_for is not None:
+            shared["waitFor"] = wait_for
         if main_content_only:
             shared["mainContentOnly"] = True
-            if not focus:
-                body["markdownParams"] = {"includeLinks": False}
+            if not focus and not raw_html and not original_html:
+                body["markdownParams"] = {"includeLinks": True}
         if shared:
             body["sharedParams"] = shared
         answer = await self._send("POST", "/web/scrape", f"read {url}", tags, json=body)
-        if focus:
+        if original_html:
+            data = self._format(answer, "bytes", url)
+            if not isinstance(data, dict) or "html" not in str(data.get("contentType", "")):
+                raise Invalid("original_html requires a page whose original response is HTML")
+            try:
+                markdown = base64.b64decode(data["base64"], validate=True).decode(
+                    "utf-8", errors="replace"
+                )
+            except KeyError, ValueError, binascii.Error:
+                raise Invalid("Context.dev did not return valid original HTML bytes") from None
+        elif raw_html:
+            markdown = str(self._format(answer, "html", url) or "")
+        elif focus:
             passages = self._format(answer, "highlights", url)
             markdown = "\n\n".join(str(passage) for passage in passages or [])
         else:
@@ -166,6 +193,7 @@ class ContextDevWeb(_ContextDev, WebExplorer):
         *,
         tags: Sequence[str],
         pdf: PdfOptions | None = None,
+        wait_for: int | str | None = None,
     ) -> Extraction:
         # The schema must be a top-level object, so the rows sit in a property. Nullable
         # columns keep the model from guessing a value the page does not state.
@@ -188,7 +216,11 @@ class ContextDevWeb(_ContextDev, WebExplorer):
             "formats": {"json": True},
             "jsonParams": {"schema": schema, "instructions": instruction},
         }
-        if shared := _pdf_params(pdf):
+        body["maxAgeMs"] = 0
+        shared = _pdf_params(pdf)
+        if wait_for is not None:
+            shared["waitFor"] = wait_for
+        if shared:
             body["sharedParams"] = shared
         answer = await self._send("POST", "/web/scrape", f"extract from {url}", tags, json=body)
         data = self._format(answer, "json", url)

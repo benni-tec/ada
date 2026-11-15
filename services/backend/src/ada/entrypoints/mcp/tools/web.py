@@ -75,7 +75,18 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         of the whole page: use it to check a figure on a long page or PDF cheaply. For a
         PDF, `pdf_pages` ("25" or "25-26") reads only those pages, each starting with a
         `<!-- page N -->` line, and `ocr` reads them with OCR, for tables that are images
-        (empty or garbled without it). One credit, a page of a PDF with OCR one each."""
+        (empty or garbled without it). For JS-loaded data, wait_for is a delay in
+        milliseconds (0–30000) or a CSS
+        selector. With raw_html=true, the markdown field contains rendered HTML, including
+        scripts and hidden links, to discover a JS page's public data endpoint. Then query
+        is a literal substring to find in that HTML (a bounded excerpt around its first
+        occurrence). For JavaScript/source-code URLs, use raw_html=true with a literal
+        query: semantic
+        highlights are not exact code search. Reading HTML never clicks or submits anything.
+        original_html=true reads the original HTTP HTML before JS removes paginated rows
+        (same literal-query behavior).
+        Reads bypass the upstream cache. One credit, a page of a PDF with OCR
+        one each."""
         )
     )
     @inject
@@ -89,6 +100,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         query: Annotated[str | None, Field(max_length=MAX_FOCUS_CHARS)] = None,
         pdf_pages: str | None = None,
         ocr: bool = False,
+        wait_for: int | str | None = None,
+        raw_html: bool = False,
+        original_html: bool = False,
     ) -> WebReadAnswer:
         await research.use_web_call(session_id)
         return await web.read(
@@ -99,6 +113,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             query=query,
             pdf_pages=pdf_pages,
             ocr=ocr,
+            wait_for=wait_for,
+            raw_html=raw_html,
+            original_html=original_html,
         )
 
     @mcp.tool(
@@ -107,7 +124,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         (Context.dev): to see whether a page holds a table worth registering. The rows are
         model-extracted, not parsed: a value the page does not state comes back null, and
         every figure needs checking against the page. To keep such rows, register the page
-        as a web source with operation "extract". About five credits."""
+        as a web source with operation "extract". For JS-loaded data, wait_for is
+        milliseconds (0–30000) or a CSS selector.
+        About five credits."""
         )
     )
     @inject
@@ -119,9 +138,12 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         columns: Annotated[list[Column], Field(min_length=1, max_length=MAX_EXTRACT_COLUMNS)],
         web: FromDishka[WebExplorationService],
         research: FromDishka[ResearchService],
+        wait_for: int | str | None = None,
     ) -> WebExtractAnswer:
         await research.use_web_call(session_id)
-        return await web.extract(project_id, session_id, url, instruction, columns)
+        return await web.extract(
+            project_id, session_id, url, instruction, columns, wait_for=wait_for
+        )
 
     @mcp.tool(
         description=_described(

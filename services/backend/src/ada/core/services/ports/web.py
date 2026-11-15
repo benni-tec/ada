@@ -84,6 +84,9 @@ class WebExplorationService(Protocol):
         query: str | None = None,
         pdf_pages: str | None = None,
         ocr: bool = False,
+        wait_for: int | str | None = None,
+        raw_html: bool = False,
+        original_html: bool = False,
     ) -> WebReadAnswer:
         """The page's main content as Markdown, or with `query` only the passages relevant
         to it; `pdf_pages` ("25" or "25-26") reads only those pages of a PDF, `ocr` reads
@@ -91,7 +94,13 @@ class WebExplorationService(Protocol):
         ...
 
     async def extract(
-        self, project_id: Id, session_id: Id, url: str, instruction: str, columns: Sequence[str]
+        self,
+        project_id: Id,
+        session_id: Id,
+        url: str,
+        instruction: str,
+        columns: Sequence[str],
+        wait_for: int | str | None = None,
     ) -> WebExtractAnswer: ...
 
     async def map(

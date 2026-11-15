@@ -24,6 +24,10 @@
     long to extract whole is refused rather than stored with rows missing. `options.pdf`
     as for scrape.
 
+With `options.include_provenance: true`, scrape/extract add the platform-owned source_url
+and fetched_at to every row. The timestamp makes each successful fetch a new snapshot,
+even when the publisher rows are unchanged; alert keys should use stable business fields.
+
 Each fetch spends the project's daily web credits first (WebBudget): its price, or for a
 crawl `max_pages`, corrected afterwards to what Context.dev says it charged (a PDF read
 with OCR costs a credit per page). A
@@ -35,13 +39,13 @@ monitor that refreshes them when the page changed (push).
 import asyncio
 import json
 import tempfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 import duckdb
 
-from ada.adapters.sources.context_dev import markdown_pages, markdown_tables
+from ada.adapters.sources.context_dev import html_tables, markdown_pages, markdown_tables
 from ada.adapters.sources.document import document_parquet
 from ada.core.models.analysis import FetchedData
 from ada.core.models.errors import Invalid
@@ -50,6 +54,7 @@ from ada.core.models.sources import (
     WEB_ANSWERS_CREDITS,
     WEB_CRAWL_MAX_PAGES,
     WEB_EXTRACT_CREDITS,
+    WEB_PROVENANCE_COLUMNS,
     WEB_SCRAPE_CREDITS,
     WEB_SOURCES_COLUMN,
     DataFormat,
@@ -61,6 +66,7 @@ from ada.core.models.sources import (
     web_pdf,
 )
 from ada.core.models.time import TimeRange
+from ada.core.models.web import render_wait
 from ada.core.ports.sources import SourceReader
 from ada.core.ports.system import Clock
 from ada.core.ports.web import WebBudget, WebExplorer
@@ -98,7 +104,11 @@ class WebPageReader(SourceReader):
             case WebOperation.SCRAPE:
                 await self._spend(source, WEB_SCRAPE_CREDITS)
                 page = await self.explorer.read(
-                    source.address, tags=tags, pdf=web_pdf(source.options)
+                    source.address,
+                    tags=tags,
+                    pdf=web_pdf(source.options),
+                    wait_for=render_wait(source.options.get("wait_for")),
+                    original_html=bool(source.options.get("original_html")),
                 )
                 if page.credits is not None and page.credits != WEB_SCRAPE_CREDITS:
                     await self.budget.adjust(
@@ -143,9 +153,10 @@ class WebPageReader(SourceReader):
                 extraction = await self.explorer.extract(
                     source.address,
                     str(source.options["instruction"]),
-                    [column.name for column in source.declared_schema.columns],
+                    [column.name for column in _extracted_columns(source)],
                     tags=tags,
                     pdf=web_pdf(source.options),
+                    wait_for=render_wait(source.options.get("wait_for")),
                 )
                 if extraction.credits != WEB_EXTRACT_CREDITS:
                     await self.budget.adjust(
@@ -159,10 +170,13 @@ class WebPageReader(SourceReader):
                     )
                 content = await asyncio.to_thread(_records_parquet, source, extraction.rows, None)
                 origin = source.address
+        fetched_at = self.clock.now()
+        if source.options.get("include_provenance"):
+            content = await asyncio.to_thread(_with_provenance, content, origin, fetched_at)
         return FetchedData(
             content=content,
             format=DataFormat.PARQUET,
-            fetched_at=self.clock.now(),
+            fetched_at=fetched_at,
             origin=origin,
         )
 
@@ -184,6 +198,8 @@ class WebPageReader(SourceReader):
         rows: list[tuple[Any, ...]] = list(
             markdown_pages(markdown)
             if extract is DocumentExtract.PAGES
+            else html_tables(markdown)
+            if source.options.get("original_html")
             else markdown_tables(markdown)
         )
         return await asyncio.to_thread(document_parquet, extract, rows)
@@ -220,7 +236,7 @@ def _records_parquet(
     assert source.declared_schema is not None
     columns: list[Column] = [
         column
-        for column in source.declared_schema.columns
+        for column in _extracted_columns(source)
         if sources is None or column.name != WEB_SOURCES_COLUMN.name
     ]
     sources_column = _quote(WEB_SOURCES_COLUMN.name)
@@ -265,3 +281,33 @@ def _text(value: Any) -> str | None:
 
 def _quote(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
+
+
+def _extracted_columns(source: DataSource) -> list[Column]:
+    assert source.declared_schema is not None
+    reserved = (
+        {column.name for column in WEB_PROVENANCE_COLUMNS}
+        if source.options.get("include_provenance")
+        else set()
+    )
+    return [
+        column
+        for column in source.declared_schema.columns
+        if column.name.casefold() not in reserved
+    ]
+
+
+def _with_provenance(content: bytes, url: str, fetched_at: datetime) -> bytes:
+    """Attach platform-owned provenance, never values inferred by the extractor."""
+    with tempfile.TemporaryDirectory() as directory:
+        source = Path(directory) / "source.parquet"
+        target = Path(directory) / "traced.parquet"
+        source.write_bytes(content)
+        with duckdb.connect() as connection:
+            connection.execute(
+                "CREATE TABLE traced AS SELECT *, ?::VARCHAR AS source_url, "
+                "?::TIMESTAMPTZ AS fetched_at FROM read_parquet(?)",
+                [url, fetched_at, str(source)],
+            )
+            connection.execute("COPY traced TO ? (FORMAT parquet)", [str(target)])
+        return target.read_bytes()

@@ -8,6 +8,7 @@ from ada.core.models.web import (
     SearchScope,
     pdf_page_range,
     reading_not_configured,
+    render_wait,
     search_not_configured,
 )
 from ada.core.ports.system import Clock
@@ -82,7 +83,12 @@ class WebExploration(WebExplorationService):
         query: str | None = None,
         pdf_pages: str | None = None,
         ocr: bool = False,
+        wait_for: int | str | None = None,
+        raw_html: bool = False,
+        original_html: bool = False,
     ) -> WebReadAnswer:
+        wait_for = render_wait(wait_for)
+        raw_html = raw_html or original_html
         url = _url(url, "read_page")
         if not 1 <= max_chars <= MAX_READ_CHARS:
             raise Invalid(f"max_chars is between 1 and {MAX_READ_CHARS}")
@@ -97,19 +103,42 @@ class WebExploration(WebExplorationService):
             pdf = PdfOptions(ocr=True)
         tags = await self._context_dev(project_id, session_id, WEB_READ_CREDITS)
         page = await self.explorer.read(
-            url, tags=tags, main_content_only=True, focus=focus, pdf=pdf
+            url,
+            tags=tags,
+            main_content_only=not raw_html,
+            focus=None if raw_html else focus,
+            pdf=pdf,
+            wait_for=wait_for,
+            raw_html=raw_html,
+            original_html=original_html,
         )
         await self._correct(project_id, WEB_READ_CREDITS, page.credits)
+        content = page.markdown
+        offset = 0
+        if raw_html and focus:
+            found = content.casefold().find(focus.casefold())
+            if found < 0:
+                raise Invalid(
+                    "The query was not found in the rendered HTML; try a literal substring"
+                )
+            offset = max(0, found - min(1000, max_chars // 4))
         return WebReadAnswer(
             url=page.url,
             title=page.title,
-            markdown=page.markdown[:max_chars],
-            truncated=len(page.markdown) > max_chars,
+            markdown=content[offset : offset + max_chars],
+            truncated=offset > 0 or len(content) > offset + max_chars,
         )
 
     async def extract(
-        self, project_id: Id, session_id: Id, url: str, instruction: str, columns: Sequence[str]
+        self,
+        project_id: Id,
+        session_id: Id,
+        url: str,
+        instruction: str,
+        columns: Sequence[str],
+        wait_for: int | str | None = None,
     ) -> WebExtractAnswer:
+        wait_for = render_wait(wait_for)
         url = _url(url, "extract_table")
         if not instruction.strip() or len(instruction) > MAX_INSTRUCTION_CHARS:
             raise Invalid(f"The instruction is 1 to {MAX_INSTRUCTION_CHARS} characters")
@@ -119,7 +148,9 @@ class WebExploration(WebExplorationService):
         if len(set(names)) != len(names):
             raise Invalid("The columns' names are unique")
         tags = await self._context_dev(project_id, session_id, WEB_EXTRACT_CREDITS)
-        extraction = await self.explorer.extract(url, instruction.strip(), names, tags=tags)
+        extraction = await self.explorer.extract(
+            url, instruction.strip(), names, tags=tags, wait_for=wait_for
+        )
         await self._correct(project_id, WEB_EXTRACT_CREDITS, extraction.credits)
         return WebExtractAnswer(url=url, rows=extraction.rows, truncated=extraction.truncated)
 

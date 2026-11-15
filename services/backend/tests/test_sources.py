@@ -1467,6 +1467,29 @@ async def test_a_policy_edit_waits_for_unwatch_in_postgres(migrated_database_url
     assert unwatched.freshness == weekly
 
 
+def test_json_row_provenance_comes_from_the_fetch_after_field_mapping() -> None:
+    from datetime import UTC, datetime
+
+    fetched = FetchedData(
+        content=(
+            b'{"rows":[{"name":"example","source_url":"invented","SOURCE_URL":"also invented"}]}'
+        ),
+        format=DataFormat.JSON,
+        origin="https://example.test/data",
+        fetched_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    result = shape(
+        fetched, {"rows": "rows", "fields": {"name": "name"}, "include_provenance": True}
+    )
+    assert json.loads(result.content) == [
+        {
+            "name": "example",
+            "source_url": fetched.origin,
+            "fetched_at": fetched.fetched_at.isoformat(),
+        }
+    ]
+
+
 async def test_uploaded_csv_loads_through_the_installed_url_reader(tmp_path: Path) -> None:
     files = LocalFileStore(tmp_path)
     project_id = factories.project().id

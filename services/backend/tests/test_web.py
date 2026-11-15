@@ -810,6 +810,7 @@ async def test_context_dev_reads_pdf_pages_with_ocr_and_the_passages_on_a_questi
     assert sent[0] == {
         "url": LUNG_REPORT,
         "formats": {"highlights": True},
+        "maxAgeMs": 0,
         "highlightsParams": {"query": question, "maxCharacters": 8000},
         "sharedParams": {
             "mainContentOnly": True,
@@ -873,6 +874,7 @@ async def test_context_dev_gets_only_the_forwarded_parameters_and_its_refusals_r
     assert json.loads(sent[0].content) == {
         "url": "https://example.test",
         "formats": {"markdown": True},
+        "maxAgeMs": 0,
         "tags": ["ada", "project:p"],
     }
     assert sent[0].headers["authorization"] == "Bearer key"
@@ -935,3 +937,95 @@ async def test_the_web_budget_counts_in_its_own_transaction(migrated_database_ur
         await budget.adjust(project.id, day, -2)
         assert await budget.spend(project.id, day, 2, limit=4)
         assert not await budget.spend(project.id, day + timedelta(days=1), 5, limit=4)
+
+
+async def test_render_wait_reaches_fresh_scrapes_and_extractions() -> None:
+    sent = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "markdown": {"success": True, "data": "loaded"},
+                "html": {"success": True, "data": "<script>public endpoint</script>"},
+                "json": {"success": True, "data": {"rows": [{"name": "loaded"}]}},
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+        web = ContextDevWeb(client, "test-key")
+        await web.read("https://example.test", tags=[], wait_for=1200, main_content_only=True)
+        await web.extract("https://example.test", "rows", ["name"], tags=[], wait_for="tbody tr")
+    assert [body["sharedParams"]["waitFor"] for body in sent] == [1200, "tbody tr"]
+    assert all(body["maxAgeMs"] == 0 for body in sent)
+    assert sent[0]["markdownParams"]["includeLinks"] is True
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+        page = await ContextDevWeb(client, "test-key").read(
+            "https://example.test", tags=[], raw_html=True
+        )
+    assert page.markdown == "<script>public endpoint</script>"
+    assert sent[-1]["formats"] == {"html": True}
+    explorer = FakeExplorer()
+    await _reader(explorer)[0].fetch(_web_source(options={"wait_for": 1200}), TimeRange())
+    assert explorer.calls[0][1]["wait_for"] == 1200
+    from ada.core.models.web import render_wait
+
+    with pytest.raises(Invalid, match="wait_for"):
+        render_wait(30001)
+
+
+async def test_web_provenance_survives_typed_extraction_as_platform_values() -> None:
+    from ada.core.services.sources.web import web_schema
+
+    source = _web_source(
+        options={"operation": "extract", "instruction": "rows", "include_provenance": True},
+        declared_schema=Schema(columns=(Column(name="rate", type=ColumnType.NUMBER),)),
+    )
+    source = source.model_copy(
+        update={"declared_schema": web_schema(source.options, source.declared_schema)}
+    )
+    explorer = FakeExplorer(
+        rows=[{"rate": "4.2", "source_url": "invented", "fetched_at": "invented"}]
+    )
+    fetched = await _reader(explorer)[0].fetch(source, TimeRange())
+    assert _rows(fetched.content) == [
+        {"rate": 4.2, "source_url": source.address, "fetched_at": fetched.fetched_at}
+    ]
+    assert explorer.calls[0][1]["columns"] == ["rate"]
+
+
+async def test_original_html_tables_keep_rows_hidden_by_client_pagination() -> None:
+    import base64
+
+    markup = (
+        "<table><tr><th>Name</th><th>Free</th></tr>"
+        "<tr><td>A &amp; B</td><td>4</td></tr><tr><td>C</td><td>0</td></tr></table>"
+    )
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["formats"] == {"bytes": True}
+        return httpx.Response(
+            200,
+            json={
+                "bytes": {
+                    "success": True,
+                    "data": {
+                        "contentType": "text/html",
+                        "base64": base64.b64encode(markup.encode()).decode(),
+                    },
+                }
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+        reader = WebPageReader(
+            ContextDevWeb(client, "test-key"), MemoryWebBudget(), FixedClock(), 300
+        )
+        source = _web_source(options={"extract": "tables", "original_html": True})
+        data = await reader.fetch(source, TimeRange())
+    assert [row["cells"] for row in _rows(data.content)] == [
+        ["Name", "Free"],
+        ["A & B", "4"],
+        ["C", "0"],
+    ]

@@ -9,6 +9,7 @@ with OCR. The key comes from CONTEXT_DEV_API_KEY and is sent nowhere else.
 """
 
 import re
+from html.parser import HTMLParser
 
 import httpx
 
@@ -136,3 +137,56 @@ def _reason(answer: httpx.Response, key: str) -> str:
         body = None
     code = error_code(body, key) if isinstance(body, dict) else None
     return f"{code} (HTTP {answer.status_code})" if code else f"HTTP {answer.status_code}"
+
+
+def html_tables(content: str) -> list[tuple[int, int, int, list[str]]]:
+    """Original-response table rows, before a JS paginator removes offscreen rows."""
+    parser = _Tables()
+    parser.feed(content)
+    parser.close()
+    return parser.rows
+
+
+class _Tables(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.rows: list[tuple[int, int, int, list[str]]] = []
+        self.table = 0
+        self.depth = 0
+        self.row = 0
+        self.cells: list[str] | None = None
+        self.cell: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "table":
+            if self.depth == 0:
+                self.table += 1
+                self.row = 0
+            self.depth += 1
+        if self.depth != 1:
+            return
+        if tag == "tr":
+            self.cells = []
+        elif tag in ("td", "th") and self.cells is not None:
+            self.cell = []
+        elif tag == "br" and self.cell is not None:
+            self.cell.append(" ")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "table":
+            self.depth = max(0, self.depth - 1)
+            return
+        if self.depth != 1:
+            return
+        if tag in ("td", "th") and self.cell is not None and self.cells is not None:
+            self.cells.append(" ".join("".join(self.cell).split()))
+            self.cell = None
+        elif tag == "tr" and self.cells is not None:
+            if self.cells:
+                self.row += 1
+                self.rows.append((1, self.table, self.row, self.cells))
+            self.cells = None
+
+    def handle_data(self, data: str) -> None:
+        if self.depth == 1 and self.cell is not None:
+            self.cell.append(data)

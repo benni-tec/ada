@@ -86,6 +86,7 @@ class PeriodOption(DomainModel):
 
 
 class ShapeOptions(DomainModel):
+    include_provenance: bool = False
     rows: str | None = None
     fields: dict[str, str | FieldOption] | None = None
     csv: CsvOptions | None = None
@@ -109,8 +110,35 @@ def shape(data: FetchedData, options: JsonObject) -> FetchedData:
     match data.format:
         case DataFormat.JSON:
             content = _shape_json(data.content, parsed)
-        case DataFormat.CSV if parsed.csv is not None or parsed.period is not None:
+            if parsed.include_provenance:
+                provenance = {"source_url": data.origin, "fetched_at": data.fetched_at.isoformat()}
+                content = _json(
+                    [
+                        {
+                            key: value
+                            for key, value in record.items()
+                            if key.casefold() not in provenance
+                        }
+                        | provenance
+                        for record in json.loads(content)
+                    ]
+                )
+        case DataFormat.CSV if (
+            parsed.csv is not None or parsed.period is not None or parsed.include_provenance
+        ):
             content = _shape_csv(data.content, parsed.csv or CsvOptions(), parsed.period)
+            if parsed.include_provenance:
+                rows = list(csv.reader(io.StringIO(content.decode())))
+                if rows:
+                    if {"source_url", "fetched_at"} & {name.casefold() for name in rows[0]}:
+                        raise Invalid(
+                            "CSV provenance columns source_url and fetched_at are reserved"
+                        )
+                    rows = [
+                        rows[0] + ["source_url", "fetched_at"],
+                        *[row + [data.origin, data.fetched_at.isoformat()] for row in rows[1:]],
+                    ]
+                    content = _csv(rows)
         case _:
             return data
     return data.model_copy(update={"content": content})
