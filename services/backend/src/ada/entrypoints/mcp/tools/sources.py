@@ -54,6 +54,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         """Register a data source in a project, once, so that pipelines can read it. Use it
         for a stable URL that returns CSV, JSON or Parquet (access_kind "url"), or one HTTP
         request with method, headers and body in `options` (access_kind "request").
+        JSON HTTP options: `paginate` (token/param or more/page), `probe` (fields, method, body).
         For a PDF URL use access_kind "document" with format "pdf": `options.extract`
         "pages" (default) gives rows `page, text`, "tables" gives `page, "table", row,
         cells` (a list of strings); the columns are declared for you. For a web page use

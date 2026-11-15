@@ -1,7 +1,7 @@
 """Case types, cases, their field-change events and model results; a model's case type
 
-Revision ID: 0016
-Revises: 0015
+Revision ID: 0018
+Revises: 0017
 Create Date: 2026-11-15 10:00:00.000000
 """
 
@@ -11,8 +11,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0016"
-down_revision: str | Sequence[str] | None = "0015"
+revision: str = "0018"
+down_revision: str | Sequence[str] | None = "0017"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

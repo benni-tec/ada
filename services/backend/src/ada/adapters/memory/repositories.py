@@ -29,7 +29,7 @@ from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionAgent, SessionEntry
-from ada.core.models.sources import DataSource, FreshnessPolicy
+from ada.core.models.sources import CheckEvery, DataSource, FreshnessPolicy
 from ada.core.models.statistical_models import ModelVersion, StatisticalModel
 from ada.core.models.widgets import Widget
 from ada.core.ports.agents import ResearchCalls, TurnProgress
@@ -196,7 +196,9 @@ class MemoryDataSourceRepository(DataSourceRepository):
     async def update(self, source: DataSource, expected_revision: int) -> DataSource:
         # The monitor is written by set_monitor, outside the revision: an edit keeps it.
         current = _get(self.store.data_sources, "data source", source.id)
-        source = source.model_copy(update={"monitor_id": current.monitor_id})
+        source = source.model_copy(
+            update={"monitor_id": current.monitor_id, "check_every": current.check_every}
+        )
         return _update(self.store.data_sources, "data source", source, expected_revision)
 
     async def record_check(
@@ -213,9 +215,12 @@ class MemoryDataSourceRepository(DataSourceRepository):
         monitor_id: str | None,
         secret_encrypted: str | None,
         freshness_before: FreshnessPolicy | None,
+        check_every: CheckEvery | None = None,
     ) -> None:
         source = await self.get(id)
-        self.store.data_sources[id] = source.model_copy(update={"monitor_id": monitor_id})
+        self.store.data_sources[id] = source.model_copy(
+            update={"monitor_id": monitor_id, "check_every": check_every}
+        )
         if secret_encrypted is None:
             self.store.monitor_secrets.pop(id, None)
         else:

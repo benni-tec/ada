@@ -63,3 +63,24 @@ class Alert(DomainModel):
     condition_sql: str | None = None
     # The run of the rule's alert pipeline that this alert started, if the rule has one.
     pipeline_run_id: Id | None = None
+
+
+def key_text(key: JsonObject) -> str:
+    """What an alert is about, as the frontend writes it: "region: north", or "all rows"
+    for a rule without key columns."""
+    parts = [f"{column}: {value}" for column, value in key.items()]
+    return ", ".join(parts) if parts else "all rows"
+
+
+class AlertDelivery(DomainModel):
+    id: Id
+    alert_id: Id | None = None
+    project_id: Id
+    rule_id: Id
+    test: bool = False
+    channel: str
+    target: str
+    status: str
+    http_status: int | None = None
+    detail: str | None = None
+    created_at: datetime

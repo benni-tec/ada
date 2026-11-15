@@ -67,7 +67,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == [f"{n:04}" for n in range(1, 17)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(1, 19)]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -112,7 +112,7 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "cases" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == [f"{n:04}" for n in range(2, 17)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(2, 19)]
     assert migrate(database_url) == []
 
 

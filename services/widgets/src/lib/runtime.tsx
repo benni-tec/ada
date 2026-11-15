@@ -161,7 +161,7 @@ export function Sources({ sources }: { sources: NonNullable<WidgetData['sources'
             <span title={source.address}>{source.name}</span>
           )}
           {' · '}
-          {source.fetched_at ? `fetched ${fetched(source.fetched_at)}` : 'fetch time not recorded'}
+          {source.fetched_at ? <Fetched at={source.fetched_at} /> : 'fetch time not recorded'}
         </li>
       ))}
       {hidden > 0 && (
@@ -173,11 +173,33 @@ export function Sources({ sources }: { sources: NonNullable<WidgetData['sources'
   )
 }
 
-function fetched(value: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+/** "fetched 14:02:11, 40 s ago" (with the date when not today), counting up while shown:
+ * how live the data is, at a glance. */
+function Fetched({ at }: { at: string }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  const date = new Date(at)
+  if (Number.isNaN(date.getTime())) return <>fetched {at}</>
+  const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const day = date.toDateString() === new Date(now).toDateString() ? '' : `${date.toLocaleDateString(undefined, { dateStyle: 'medium' })} `
+  return (
+    <time dateTime={date.toISOString()} title={date.toLocaleString()}>
+      fetched {day}
+      {time}, {ago(now - date.getTime())}
+    </time>
+  )
+}
+
+function ago(ms: number) {
+  const seconds = Math.max(0, Math.floor(ms / 1000))
+  if (seconds < 60) return `${seconds} s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  return hours < 24 ? `${hours} h ago` : `${Math.floor(hours / 24)} d ago`
 }
 
 const SCENARIO_TITLE = 'This run binds inputs to other pipelines'

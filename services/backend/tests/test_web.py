@@ -35,6 +35,7 @@ from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.schema import Column, ColumnType, Schema
 from ada.core.models.sources import (
     AccessKind,
+    CheckEvery,
     DataFormat,
     DataSource,
     FreshnessKind,
@@ -656,7 +657,7 @@ async def test_context_dev_reads_extracts_and_watches_against_its_recorded_answe
     replay = WebReplay()
     tags = ["ada", "project:p"]
     async with _client(replay) as http:
-        web = ContextDevWeb(http, "test-key")
+        web = ContextDevWeb(http, "test-key", monitor_minutes=15)
         page = await web.read(SOTKANET, tags=tags, main_content_only=True)
         extraction = await web.extract(
             SOTKANET,
@@ -676,6 +677,7 @@ async def test_context_dev_reads_extracts_and_watches_against_its_recorded_answe
     assert monitor.secret.get_secret_value() == "test-secret"
     bodies = [json.loads(request.content) for request in replay.requests[:3]]
     assert [body.get("tags") for body in bodies] == [tags, tags, None]
+    assert bodies[2]["schedule"] == {"type": "interval", "frequency": 15, "unit": "minutes"}
     assert "secret" not in bodies[2]["webhook"]
     assert replay.requests[3].method == "DELETE"
 
@@ -935,3 +937,40 @@ async def test_the_web_budget_counts_in_its_own_transaction(migrated_database_ur
         await budget.adjust(project.id, day, -2)
         assert await budget.spend(project.id, day, 2, limit=4)
         assert not await budget.spend(project.id, day + timedelta(days=1), 5, limit=4)
+
+
+@pytest.mark.parametrize(
+    "check_every, minutes",
+    [(None, 15), (CheckEvery.TEN_MINUTES, 10), (CheckEvery.HOURLY, 60), (CheckEvery.DAILY, 1440)],
+)
+async def test_monitor_interval_payload(check_every: CheckEvery | None, minutes: int) -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST" and request.url.path == "/v1/monitors"
+        assert json.loads(request.content)["schedule"] == {
+            "type": "interval",
+            "frequency": minutes,
+            "unit": "minutes",
+        }
+        return httpx.Response(201, json={"id": "mon_1", "webhook": {"secret": "test-secret"}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        await ContextDevWeb(http, "test-key", monitor_minutes=15).watch(
+            "https://example.com/", "https://example.com/api/hooks/context/probe", check_every
+        )
+
+
+async def test_watch_mcp_rejects_other_intervals(
+    web: tuple[Client, Seen, FakeWebSearch, FakeExplorer],
+) -> None:
+    client, _, _, explorer = web
+    project_id, session_id = await _project_and_session(client)
+    before = len(explorer.calls)
+    with pytest.raises(ToolError, match="check_every"):
+        await call(
+            client,
+            "watch_source",
+            session_id=session_id,
+            source_id=project_id,
+            check_every="weekly",
+        )
+    assert len(explorer.calls) == before

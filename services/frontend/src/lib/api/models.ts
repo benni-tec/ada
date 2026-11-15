@@ -52,6 +52,7 @@ export type EventType =
   | 'project.order_changed'
   | 'alert.firing'
   | 'alert.resolved'
+  | 'alert.delivered'
   | 'agent.turn_started'
   | 'agent.turn_part'
   | 'agent.turn_finished'

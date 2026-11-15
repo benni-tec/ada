@@ -25,6 +25,7 @@ class EventType(StrEnum):
     # The project's dashboards or reports were put in a new order: payload {"list": ...}.
     ORDER_CHANGED = "project.order_changed"
     ALERT_FIRING = "alert.firing"
+    ALERT_DELIVERED = "alert.delivered"
     ALERT_RESOLVED = "alert.resolved"
     AGENT_TURN_STARTED = "agent.turn_started"
     # The one event that carries content (a part of the agent's answer), and the one sent

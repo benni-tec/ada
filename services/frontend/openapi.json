@@ -263,6 +263,84 @@
         "title": "Alert",
         "type": "object"
       },
+      "AlertDelivery": {
+        "properties": {
+          "alert_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "rule_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "test": {
+            "default": false,
+            "title": "Test",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "rule_id",
+          "channel",
+          "target",
+          "status",
+          "created_at"
+        ],
+        "title": "AlertDelivery",
+        "type": "object"
+      },
       "AlertRule": {
         "description": "A condition on the output of a measure pipeline, checked on its own interval.",
         "properties": {
@@ -963,6 +1041,15 @@
         "title": "CaseWithResults",
         "type": "object"
       },
+      "CheckEvery": {
+        "enum": [
+          "10min",
+          "hourly",
+          "daily"
+        ],
+        "title": "CheckEvery",
+        "type": "string"
+      },
       "CheckResult": {
         "properties": {
           "changed": {
@@ -1527,6 +1614,16 @@
           "address": {
             "title": "Address",
             "type": "string"
+          },
+          "check_every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckEvery"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "created_at": {
             "format": "date-time",
@@ -3179,6 +3276,46 @@
         "title": "NewDashboardRun",
         "type": "object"
       },
+      "NewHistory": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "history",
+            "title": "Kind",
+            "type": "string"
+          },
+          "last": {
+            "default": 10,
+            "minimum": 1.0,
+            "title": "Last",
+            "type": "integer"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "kind",
+          "source_id"
+        ],
+        "title": "NewHistory",
+        "type": "object"
+      },
       "NewInput": {
         "additionalProperties": false,
         "properties": {
@@ -3852,6 +3989,7 @@
       "OperatorKind": {
         "enum": [
           "source",
+          "history",
           "extract",
           "input",
           "transform",
@@ -6744,6 +6882,49 @@
         ]
       }
     },
+    "/api/alert-rules/{rule_id}/test": {
+      "post": {
+        "operationId": "test_alert_api_alert_rules__rule_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Alert",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
     "/api/alerts/{alert_id}/rows": {
       "get": {
         "description": "The rows that raised the alert, as its last run showed them.",
@@ -8611,6 +8792,53 @@
         ]
       }
     },
+    "/api/projects/{project_id}/alert-deliveries": {
+      "get": {
+        "operationId": "list_deliveries_api_projects__project_id__alert_deliveries_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlertDelivery"
+                  },
+                  "title": "Response List Deliveries Api Projects  Project Id  Alert Deliveries Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Deliveries",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
     "/api/projects/{project_id}/alert-rules": {
       "get": {
         "description": "Every dashboard of the project with its rules, dashboards oldest first.",
@@ -9379,6 +9607,7 @@
               "schema": {
                 "discriminator": {
                   "mapping": {
+                    "history": "#/components/schemas/NewHistory",
                     "input": "#/components/schemas/NewInput",
                     "source": "#/components/schemas/NewSourceOperator",
                     "transform": "#/components/schemas/NewTransform"
@@ -9388,6 +9617,9 @@
                 "oneOf": [
                   {
                     "$ref": "#/components/schemas/NewSourceOperator"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NewHistory"
                   },
                   {
                     "$ref": "#/components/schemas/NewTransform"
@@ -11756,6 +11988,22 @@
               "format": "uuid",
               "title": "Source Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "check_every",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CheckEvery"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Check Every"
             }
           }
         ],

@@ -43,6 +43,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/alert-rules/{rule_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Alert */
+        post: operations["test_alert_api_alert_rules__rule_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/alerts/{alert_id}/rows": {
         parameters: {
             query?: never;
@@ -681,6 +698,23 @@ export interface paths {
          * @description Rename it or set the session agent's instructions for it.
          */
         patch: operations["update_project_api_projects__project_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{project_id}/alert-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Deliveries */
+        get: operations["list_deliveries_api_projects__project_id__alert_deliveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/projects/{project_id}/alert-rules": {
@@ -1931,6 +1965,33 @@ export interface components {
             started_at: string;
             state: components["schemas"]["AlertState"];
         };
+        /** AlertDelivery */
+        AlertDelivery: {
+            alert_id?: components["schemas"]["Id"] | null;
+            /** Channel */
+            channel: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Detail */
+            detail?: string | null;
+            /** Http Status */
+            http_status?: number | null;
+            id: components["schemas"]["Id"];
+            project_id: components["schemas"]["Id"];
+            rule_id: components["schemas"]["Id"];
+            /** Status */
+            status: string;
+            /** Target */
+            target: string;
+            /**
+             * Test
+             * @default false
+             */
+            test: boolean;
+        };
         /**
          * AlertRule
          * @description A condition on the output of a measure pipeline, checked on its own interval.
@@ -2199,6 +2260,11 @@ export interface components {
              */
             latest: components["schemas"]["CaseResult"][];
         };
+        /**
+         * CheckEvery
+         * @enum {string}
+         */
+        CheckEvery: "10min" | "hourly" | "daily";
         /** CheckResult */
         CheckResult: {
             /** Changed */
@@ -2430,6 +2496,7 @@ export interface components {
             access_kind: components["schemas"]["AccessKind"];
             /** Address */
             address: string;
+            check_every?: components["schemas"]["CheckEvery"] | null;
             /**
              * Created At
              * Format: date-time
@@ -3114,6 +3181,26 @@ export interface components {
         NewDashboardRun: {
             time_range?: components["schemas"]["TimeRange"] | null;
         };
+        /** NewHistory */
+        NewHistory: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "history";
+            /**
+             * Last
+             * @default 10
+             */
+            last: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            session_id?: components["schemas"]["Id"] | null;
+            source_id: components["schemas"]["Id"];
+        };
         /** NewInput */
         NewInput: {
             default: components["schemas"]["OperatorId"];
@@ -3329,7 +3416,7 @@ export interface components {
          * OperatorKind
          * @enum {string}
          */
-        OperatorKind: "source" | "extract" | "input" | "transform" | "statistic" | "agent";
+        OperatorKind: "source" | "history" | "extract" | "input" | "transform" | "statistic" | "agent";
         /**
          * Order
          * @description A new order of a project's dashboards or reports: every id of them, once.
@@ -4519,6 +4606,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_alert_api_alert_rules__rule_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Alert"];
                 };
             };
             /** @description Validation Error */
@@ -5771,6 +5889,37 @@ export interface operations {
             };
         };
     };
+    list_deliveries_api_projects__project_id__alert_deliveries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertDelivery"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_project_alert_rules_api_projects__project_id__alert_rules_get: {
         parameters: {
             query?: never;
@@ -6245,7 +6394,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewSourceOperator"] | components["schemas"]["NewTransform"] | components["schemas"]["NewInput"];
+                "application/json": components["schemas"]["NewSourceOperator"] | components["schemas"]["NewHistory"] | components["schemas"]["NewTransform"] | components["schemas"]["NewInput"];
             };
         };
         responses: {
@@ -7782,7 +7931,9 @@ export interface operations {
     };
     watch_source_api_sources__source_id__watch_post: {
         parameters: {
-            query?: never;
+            query?: {
+                check_every?: components["schemas"]["CheckEvery"] | null;
+            };
             header?: never;
             path: {
                 source_id: string;

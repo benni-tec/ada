@@ -16,7 +16,7 @@ change them, minimally and backward compatibly, when a workstream asked for it.
 | `ada/core/models/**` | The domain models |
 | `ada/core/ports/**` | Outbound ports: repositories, analysis store, source readers, source locks and the check log, events, tasks, transactions, clock |
 | `ada/core/services/ports/**` | Inbound ports: one service per use-case group |
-| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent), `0010` named widget inputs and render errors, `0011` session attachments, widget verdicts and the sidebar's order (`dashboards.position`, `reports.position`), `0012` the judges (`judge_defaults`, seeded, and `project_judges`), `0013` agent turn recovery, `0014` the freshness policy a source had before it was watched, `0015` statistical models (`statistical_models`, `statistical_model_versions`), `0016` cases (`case_types`, `cases`, `case_events`, `case_results`; `statistical_models.case_type_id`, `auto_run`) |
+| `ada/adapters/db/tables.py`, `ada/adapters/db/migrations/**` | Every table. Migrations: `0001` the foundation, `0002` after wave 2, `0003` the agent (wave 3), `0004` alert conditions kept as SQL instead of operators (and the old condition operators removed), `0005` the agent's configuration (providers, models, settings), `0006` the web's daily credits (`web_usage`), `0007` tool call entries, `0008` the agent's instructions (`agent_settings.instructions`, `projects.agent_instructions`), `0009` the research merge (provenance, monitors, research sessions, the research agent), `0010` named widget inputs and render errors, `0011` session attachments, widget verdicts and the sidebar's order (`dashboards.position`, `reports.position`), `0012` the judges (`judge_defaults`, seeded, and `project_judges`), `0013` agent turn recovery, `0014` the freshness policy a source had before it was watched, `0015` alert deliveries (`alert_deliveries`), `0016` a source's check interval, `0017` statistical models (`statistical_models`, `statistical_model_versions`), `0018` cases (`case_types`, `cases`, `case_events`, `case_results`; `statistical_models.case_type_id`, `auto_run`) |
 | `ada/discovery.py`, `ada/composition/__init__.py`, `ada/composition/unbuilt.py` | How features register themselves |
 | `tach.toml` | Module boundaries. They are per package, so new files in an existing package need no change |
 
@@ -1070,7 +1070,7 @@ evaluations are ordinary tool calls, recorded in the session like any other. RES
 /projects/{id}/models` (a spec) and `/models/pathway` (the shipped one; body `{parameters?}`), `GET
 /models/{id}`, `/versions/latest`, `/versions/{n}`, `/population`, `POST
 /models/{id}/versions`, `POST /models/{id}/evaluate`. MCP: `create_pathway_model`,
-`list_models`, `get_model`, `evaluate_model`. Migration `0015`: `statistical_models`,
+`list_models`, `get_model`, `evaluate_model`. Migration `0017`: `statistical_models`,
 `statistical_model_versions`.
 
 ## Cases
