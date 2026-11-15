@@ -21,6 +21,7 @@ from ada.adapters.web import error_code
 from ada.adapters.web.scopes import DOMAINS
 from ada.core.models.base import JsonObject
 from ada.core.models.errors import Invalid, Unavailable
+from ada.core.models.sources import CheckEvery
 from ada.core.models.web import (
     Answer,
     Crawl,
@@ -261,12 +262,18 @@ class ContextDevWeb(_ContextDev, WebExplorer):
         sources = [str(source) for source in answer.get("sources") or []]
         return Answer(content=content, sources=sources, credits=_credits(answer, 10))
 
-    async def watch(self, url: str, webhook_url: str) -> Monitor:
+    async def watch(
+        self, url: str, webhook_url: str, check_every: CheckEvery | None = None
+    ) -> Monitor:
         body = {
             "name": f"ada {url}"[:120],
             "target": {"type": "page", "url": url},
             "webhook": {"url": webhook_url, "events": ["change.detected"]},
-            "schedule": {"type": "interval", "frequency": self.monitor_minutes, "unit": "minutes"},
+            "schedule": {
+                "type": "interval",
+                "frequency": check_every.minutes if check_every else self.monitor_minutes,
+                "unit": "minutes",
+            },
         }
         answer = await self._send("POST", "/monitors", f"watch {url}", None, json=body)
         webhook = answer.get("webhook") or {}

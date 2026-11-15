@@ -12,6 +12,7 @@ from ada.core.models.errors import Invalid
 from ada.core.models.schema import Schema
 from ada.core.models.sources import (
     AccessKind,
+    CheckEvery,
     DataFormat,
     DataSource,
     FreshnessPolicy,
@@ -186,9 +187,11 @@ async def refresh_source(
 
 
 @router.post("/sources/{source_id}/watch")
-async def watch_source(source_id: Id, service: FromDishka[SourceService]) -> DataSource:
+async def watch_source(
+    source_id: Id, service: FromDishka[SourceService], check_every: CheckEvery | None = None
+) -> DataSource:
     """Have Context.dev watch the source's page and refresh the source when it changes."""
-    return await service.watch(source_id)
+    return await service.watch(source_id, check_every)
 
 
 @router.delete("/sources/{source_id}/watch")

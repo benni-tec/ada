@@ -212,6 +212,16 @@ class Provenance(DomainModel):
     note: str | None = None
 
 
+class CheckEvery(StrEnum):
+    TEN_MINUTES = "10min"
+    HOURLY = "hourly"
+    DAILY = "daily"
+
+    @property
+    def minutes(self) -> int:
+        return {self.TEN_MINUTES: 10, self.HOURLY: 60, self.DAILY: 1440}[self]
+
+
 class DataSource(DomainModel):
     """Registered once per project and referenced by source operators."""
 
@@ -237,8 +247,9 @@ class DataSource(DomainModel):
     # Why the last refresh failed; None after a successful one. While it is set, widgets
     # on this source show their data as stale.
     last_error: str | None = None
-    # The monitor that watches a document source, written by watch. Its secret is never
-    # part of the model: only the repository holds it, encrypted.
+    # None keeps the configured global interval; written with the monitor by watch.
+    check_every: CheckEvery | None = None
+    # The monitor that watches the source. Its secret is held only by the repository, encrypted.
     monitor_id: str | None = None
     revision: int = 1
 

@@ -76,6 +76,7 @@ class DataSourceRow(Base):
     last_checked_at: Mapped[datetime | None] = mapped_column(_timestamp)
     last_probe_token: Mapped[str | None] = mapped_column(Text)
     last_error: Mapped[str | None] = mapped_column(Text)
+    check_every: Mapped[str | None] = mapped_column(Text)
     monitor_id: Mapped[str | None] = mapped_column(Text)
     # Sealed by the SecretBox; never on the model.
     monitor_secret_encrypted: Mapped[str | None] = mapped_column(Text)
