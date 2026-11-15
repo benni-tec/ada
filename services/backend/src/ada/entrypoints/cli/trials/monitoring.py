@@ -18,13 +18,14 @@ from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
-from ada.entrypoints.cli.trials.pages import PAGES, STUDY_PREFIX
+from ada.entrypoints.cli.trials.pages import page_options
 
 if TYPE_CHECKING:
     from ada.entrypoints.cli.trials.seed import TrialSteps
 
 DASHBOARD = "Trial site monitoring"
 FINNISH_RULE = "A Finnish site opened on a Nordic cancer trial"
+HOSPITAL_RULE = "A Finnish hospital page listed a new cancer trial"
 
 
 def site_changes_sql(site_sql: str) -> str:
@@ -153,15 +154,18 @@ async def create_monitoring(
 
     await table(trial_site_changes.id, "trial_site_changes")
     registered = {s.name: s for s in await source_service.list(project_id)}
+    await table(steps.hospital_trial_changes.id, "hospital_trial_changes")
     await table(steps.hospital_trials.id, "hospital_trials")
     await table(steps.hospital_trial_gaps.id, "hospital_trial_gaps")
     await table(steps.sponsor_sites.id, "sponsor_sites [model-extracted]")
     for source in registered.values():
-        if source.name not in {p.name for p in PAGES} and not source.name.startswith(STUDY_PREFIX):
+        metadata = page_options(source)
+        if not metadata:
             continue
         if (await request.get(Settings)).ada_public_url:
             if source.monitor_id is None:
                 try:
+                    # TODO: pass interval=metadata["interval"] when SourceService.watch accepts it.
                     await source_service.watch(source.id)
                 except Exception as error:
                     print(f"  {source.name}: watch failed ({type(error).__name__}); TTL refresh")
@@ -191,6 +195,14 @@ async def create_monitoring(
         session_id, AttachmentKind.DASHBOARD, str(dashboard.id), actor
     )
     rules = (
+        (
+            HOSPITAL_RULE,
+            steps.hospital_trial_changes,
+            _compare("change_kind", "listed_by_hospital", "hospital_listed"),
+            ["page", "trial_id"],
+            Severity.INFO,
+            None,
+        ),
         (
             FINNISH_RULE,
             trial_site_changes,
@@ -245,9 +257,19 @@ async def create_monitoring(
             7 * DAY,
         ),
     )
-    names = {r.name for r in await alerts.list_rules(dashboard.id)}
+    existing_rules = {r.name: r for r in await alerts.list_rules(dashboard.id)}
+    # Rules cannot change their measure operator; retain the old rule as disabled history.
+    hospital_rule = existing_rules.get(HOSPITAL_RULE)
+    if hospital_rule is not None and hospital_rule.operator_id != steps.hospital_trial_changes.id:
+        await alerts.update_rule(
+            hospital_rule.id,
+            hospital_rule.revision,
+            name=f"{HOSPITAL_RULE} (superseded {hospital_rule.id})",
+            enabled=False,
+        )
+        del existing_rules[HOSPITAL_RULE]
     for name, operator, formula, keys, severity, interval in rules:
-        if name not in names:
+        if name not in existing_rules:
             await alerts.create_rule(
                 dashboard.id,
                 name,

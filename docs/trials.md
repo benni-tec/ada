@@ -1,7 +1,7 @@
 # Nordic cancer trials
 
 `ada seed-trials` idempotently registers project **Nordic cancer trials**, eight registry
-sources plus hospital pages, ten SQL data steps and a session recording each operator. No credentials
+sources plus hospital pages, eleven SQL data steps and a session recording each operator. No credentials
 are needed to register sources. `ada seed-trials --refresh` fetches sources, then prints
 exact row counts per step through a run. A failure is reported by the command;
 successfully refreshed snapshots remain stored. Rerun to recover.
@@ -168,3 +168,34 @@ access through Context.dev remains unverified and daily footer change noise is
 accepted. Footer changes do not affect SQL trial rows. HUS has navigation noise;
 OUS includes a changing publication feed. A successful scrape of a block page
 can look like an empty trial list, so missing rows are not proof a trial closed.
+
+All hospital and sponsor page sources are watched when `ADA_PUBLIC_URL` is set;
+locally they retain their TTLs. Page definitions expose exactly three monitor
+intervals: `10min` (HUS, KYS/FICAN East, Tays), `hourly` (other Finnish hospital
+lists), and `daily` (Swedish/Norwegian lists and sponsor study pages). These are
+stored in `options.trial_page.interval`. The current `SourceService.watch(id)`
+has no interval argument: the call site has a TODO to pass it when available;
+until then Context.dev's existing monitor interval applies. Monitor check cadence
+is separate from source TTL and does not imply a scrape on every check.
+
+`hospital_trial_changes` compares the latest two stored snapshots of each Finnish
+hospital page using the same SQL identifier parser. Columns: change_kind, page,
+trial_id, hospital, country, id_kind, section, snippet, snapshot_at. Events are
+`listed_by_hospital` and `unlisted_by_hospital`; one snapshot yields no events.
+Footer/text edits without identifier changes yield no events. The monitoring rule
+**A Finnish hospital page listed a new cancer trial** is info-level, keyed by
+(page, trial_id), and checks when its upstream data changes.
+
+Research code can call
+`await register_trial_page(request, project_id, url, name, kind, country)` from
+`ada.entrypoints.cli.trials.seed` inside a request container for an already seeded
+project. `kind` is `hospital_list` or `sponsor_study_page`; `country` is Finland,
+Sweden, Norway or Denmark. It registers by (URL, kind), returns the `DataSource`,
+and idempotently rebuilds shared unions, session entries, dashboards and watches.
+Hospital metadata uses `name` as the hospital label; no URL-specific parser is
+needed. New Finnish hospital pages also enter history and alert inputs. Since an
+alert rule's measure cannot be changed, a changed hospital union replaces that
+rule and retains the previous rule, disabled, with its alert history. Sponsor
+URLs supplied this way need no known sponsor URL pattern. Registration does not
+scrape; refresh the returned source separately. `--refresh` includes these added
+pages in its paced web loop and credit estimate.

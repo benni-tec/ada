@@ -1,10 +1,18 @@
 """Hospital Markdown lists and bounded sponsor study-page registrations."""
 
 import re
+from collections.abc import Sequence
+from typing import Any, Literal
 
 from ada.adapters.sources.examples import DAY, ExampleSource
 from ada.core.models.schema import Column, ColumnType, Schema
-from ada.core.models.sources import AccessKind, DataFormat, FreshnessKind, FreshnessPolicy
+from ada.core.models.sources import (
+    AccessKind,
+    DataFormat,
+    DataSource,
+    FreshnessKind,
+    FreshnessPolicy,
+)
 
 MAX_STUDY_PAGES = 200
 WEB_REFRESHES_PER_MINUTE = 8
@@ -97,20 +105,80 @@ PAGE_DETAILS = (
         "https://www.ous-research.no/home/flatmark/Clinical-trials/23885",
     ),
 )
-PAGES = tuple(
-    ExampleSource(
+Interval = Literal["10min", "hourly", "daily"]
+PageKind = Literal["hospital_list", "sponsor_study_page"]
+
+
+class TrialPage(ExampleSource):
+    interval: Interval = "daily"
+
+    def registration(self) -> dict[str, Any]:
+        arguments = super().registration()
+        arguments.pop("interval")
+        return arguments
+
+
+def hospital_page(
+    url: str,
+    name: str,
+    country: str,
+    *,
+    hospital: str | None = None,
+    interval: Interval | None = None,
+) -> TrialPage:
+    interval = interval or ("hourly" if country == "Finland" else "daily")
+    return TrialPage(
         name=name,
         access_kind=AccessKind.WEB,
         address=url,
         format=DataFormat.HTML,
-        options={"operation": "scrape", "extract": "pages"},
+        interval=interval,
+        options={
+            "operation": "scrape",
+            "extract": "pages",
+            "trial_page": {
+                "kind": "hospital_list",
+                "country": country,
+                "hospital": hospital or name,
+                "interval": interval,
+            },
+        },
         freshness=FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=DAY),
     )
-    for name, _, _, url in PAGE_DETAILS
+
+
+PAGES = tuple(
+    hospital_page(
+        url,
+        name,
+        country,
+        hospital=hospital,
+        interval="10min"
+        if hospital in {"HUS", "KYS", "Tays"}
+        else "hourly"
+        if country == "Finland"
+        else "daily",
+    )
+    for name, hospital, country, url in PAGE_DETAILS
 )
 
 
-def hospital_trials_sql() -> str:
+def page_options(source: ExampleSource | DataSource) -> dict[str, Any]:
+    metadata = source.options.get("trial_page")
+    if isinstance(metadata, dict):
+        return metadata
+    # Sources registered by the earlier seed did not yet carry this metadata.
+    seeded = next((p for p in PAGES if p.name == source.name), None)
+    if seeded is not None:
+        return page_options(seeded)
+    return (
+        {"kind": "sponsor_study_page", "interval": "daily"}
+        if source.name.startswith(STUDY_PREFIX)
+        else {}
+    )
+
+
+def hospital_trials_sql(sources: Sequence[ExampleSource | DataSource] = PAGES) -> str:
     def literal(value: str) -> str:
         return "'" + value.replace("'", "''") + "'"
 
@@ -118,7 +186,10 @@ def hospital_trials_sql() -> str:
         f"SELECT {literal(name)} AS page_name, {literal(hospital)} AS hospital, "
         f"{literal(country)} AS country, string_agg(text, chr(10) ORDER BY page) AS text "
         f"FROM input_{i}"
-        for i, (name, hospital, country, _) in enumerate(PAGE_DETAILS)
+        for i, source in enumerate(sources)
+        for name, hospital, country in [
+            (source.name, page_options(source)["hospital"], page_options(source)["country"])
+        ]
     )
     return (
         r"""
@@ -169,7 +240,7 @@ SITE_COLUMNS = ("nct_id", "overall_status", "facility", "city", "country", "site
 EMPTY_SITES = "SELECT " + ", ".join(f"NULL::VARCHAR AS {c}" for c in SITE_COLUMNS) + " WHERE false"
 
 
-def study_page(nct_id: str, sponsor: str) -> ExampleSource | None:
+def study_page(nct_id: str, sponsor: str) -> TrialPage | None:
     """Only known sponsor URL patterns, with registry IDs validated before interpolation."""
     if not re.fullmatch(r"NCT\d{8}", nct_id):
         return None
@@ -182,15 +253,20 @@ def study_page(nct_id: str, sponsor: str) -> ExampleSource | None:
         url = f"https://www.pfizerclinicaltrials.com/find-a-trial/{nct_id.lower()}"
     else:
         return None
-    return ExampleSource(
-        name=STUDY_PREFIX + nct_id,
+    return sponsor_page(url, STUDY_PREFIX + nct_id)
+
+
+def sponsor_page(url: str, name: str) -> TrialPage:
+    return TrialPage(
+        name=name,
         access_kind=AccessKind.WEB,
         address=url,
         format=DataFormat.HTML,
+        interval="daily",
         options={
+            "trial_page": {"kind": "sponsor_study_page", "interval": "daily"},
             "operation": "extract",
-            "instruction": f"For study {nct_id}, list only sites in Finland, Sweden, "
-            "Norway or Denmark. "
+            "instruction": "List only sites in Finland, Sweden, Norway or Denmark. "
             "Copy nct_id, overall_status, facility, city, country and site_status exactly "
             "as this page states them; null where not stated. Do not infer recruitment "
             "from the registry or invent sites.",
@@ -200,3 +276,24 @@ def study_page(nct_id: str, sponsor: str) -> ExampleSource | None:
         ),
         freshness=FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=7 * DAY),
     )
+
+
+def hospital_trial_changes_sql(source: DataSource) -> str:
+    """Compare identifiers, so a changed footer or description creates no trial event."""
+    sql = hospital_trials_sql([source])
+    newest = sql.replace("input_0", "(SELECT * FROM history WHERE snapshot_rank = 1)")
+    previous = sql.replace("input_0", "(SELECT * FROM history WHERE snapshot_rank = 2)")
+    return f"""
+WITH history AS (SELECT * FROM input_0), newest AS ({newest}), previous AS ({previous}),
+events AS (
+    SELECT 'listed_by_hospital' AS change_kind, n.*
+    FROM newest n ANTI JOIN previous p USING (trial_id)
+    UNION ALL
+    SELECT 'unlisted_by_hospital', p.*
+    FROM previous p ANTI JOIN newest n USING (trial_id)
+)
+SELECT change_kind, page_name AS page, trial_id, hospital, country, id_kind, section, snippet,
+    (SELECT max(snapshot_at) FROM history WHERE snapshot_rank = 1) AS snapshot_at
+FROM events
+WHERE EXISTS (SELECT 1 FROM history WHERE snapshot_rank = 2)
+"""

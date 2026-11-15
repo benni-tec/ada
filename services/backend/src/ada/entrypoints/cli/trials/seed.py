@@ -8,9 +8,11 @@ from dishka import AsyncContainer
 
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.base import Id
+from ada.core.models.dashboards import Dashboard
+from ada.core.models.errors import Invalid
 from ada.core.models.operators import Operator
 from ada.core.models.schema import MeasureRole, Roles
-from ada.core.models.sources import Provenance
+from ada.core.models.sources import DataSource, Provenance
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
@@ -24,9 +26,13 @@ from ada.entrypoints.cli.trials.pages import (
     HOSPITAL_TRIAL_GAPS,
     MAX_STUDY_PAGES,
     PAGES,
-    STUDY_PREFIX,
     WEB_REFRESHES_PER_MINUTE,
+    PageKind,
+    hospital_page,
+    hospital_trial_changes_sql,
     hospital_trials_sql,
+    page_options,
+    sponsor_page,
     study_page,
 )
 from ada.entrypoints.cli.trials.sources import CTGOV, CTIS, SOURCES
@@ -49,6 +55,7 @@ class TrialSteps:
     hospital_trials: Operator
     hospital_trial_gaps: Operator
     sponsor_sites: Operator
+    hospital_trial_changes: Operator
 
 
 async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
@@ -87,11 +94,22 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                     # Move the former English Pirha source without leaving a duplicate monitor.
                     if saved.monitor_id is not None:
                         saved = await sources.unwatch(saved.id)
-                    await sources.update(saved.id, saved.revision, address=page.address)
+                    saved = await sources.update(saved.id, saved.revision, address=page.address)
+                if saved.options != page.options:
+                    await sources.update(saved.id, saved.revision, options=page.options)
         project_id = project.id
     async with container() as request:
         built = await _build(request, project_id, registered)
-    study_names = sorted(n for n in registered if n.startswith(STUDY_PREFIX))
+    async with container() as request:
+        web_sources = [
+            s for s in await (await request.get(SourceService)).list(project_id) if page_options(s)
+        ]
+    study_names = sorted(
+        s.name for s in web_sources if page_options(s)["kind"] == "sponsor_study_page"
+    )
+    hospital_names = sorted(
+        s.name for s in web_sources if page_options(s)["kind"] == "hospital_list"
+    )
     if refresh:
         for index, source in enumerate(SOURCES):
             if index:
@@ -126,14 +144,14 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                 saved = await sources.register(project_id, **page.registration())
                 registered[page.name] = saved.id
                 study_names.append(page.name)
-        web_names = [p.name for p in PAGES] + sorted(study_names)
+        web_names = hospital_names + sorted(study_names)
         for index, name in enumerate(web_names):
             if index:
                 await asyncio.sleep(60 / WEB_REFRESHES_PER_MINUTE)
             async with container() as request:
                 sources = await request.get(SourceService)
                 source = await sources.get(registered[name])
-                if name.startswith(STUDY_PREFIX) and source.last_checked_at is not None:
+                if name in study_names and source.last_checked_at is not None:
                     if datetime.now(UTC) - source.last_checked_at < timedelta(days=7):
                         continue
                 await sources.refresh(source.id, force=True)
@@ -145,22 +163,10 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                 )
                 print(f"  {field.name}: {data.rows[0][0]} rows")
     async with container() as request:
-        sessions = await request.get(SessionService)
-        session = next((s for s in await sessions.list(project_id) if s.title == SESSION), None)
-        if session is None:
-            session = await sessions.create(project_id, SESSION)
-        entries = {e.ref for e in await sessions.entries(session.id)}
-        for field in fields(built):
-            operator = getattr(built, field.name)
-            if operator.id not in entries:
-                await sessions.record_operator(
-                    session.id, operator.id, f"{field.name}: trial source data", SEED
-                )
-        dashboards = await create_dashboards(request, project_id, session.id, built, SEED)
-        await create_monitoring(request, project_id, session.id, registered, built, SEED)
+        dashboards = await _publish(request, project_id, registered, built)
     print(
-        f"  pages: {len(PAGES)} hospital, {len(study_names)} study; "
-        f"full web refresh estimate: {len(PAGES) + 5 * len(study_names)} credits "
+        f"  pages: {len(hospital_names)} hospital, {len(study_names)} study; "
+        f"full web refresh estimate: {len(hospital_names) + 5 * len(study_names)} credits "
         "(1/scrape, about 5/extract; fresh snapshots are reused)"
     )
     print(f"Project {PROJECT!r}: {project_id}")
@@ -190,13 +196,26 @@ async def _build(request: AsyncContainer, project_id: Id, sources: dict[str, Id]
         Roles(measures=(MeasureRole(value="per_million"),)),
     )
     cases = await transform(steps.CASE_TRIALS, [trials, sites])
-    pages = [await pipelines.add_source(project_id, sources[p.name], SEED) for p in PAGES]
-    hospital_trials = await transform(hospital_trials_sql(), pages)
+    registered_pages = sorted(
+        await (await request.get(SourceService)).list(project_id), key=lambda s: s.name
+    )
+    hospitals = [s for s in registered_pages if page_options(s).get("kind") == "hospital_list"]
+    pages = [await pipelines.add_source(project_id, s.id, SEED) for s in hospitals]
+    hospital_trials = await transform(hospital_trials_sql(hospitals), pages)
+    changes = []
+    for source in hospitals:
+        if page_options(source)["country"] != "Finland":
+            continue
+        history = await pipelines.add_history(project_id, source.id, SEED, last=2)
+        changes.append(await transform(hospital_trial_changes_sql(source), [history]))
+    hospital_changes = await transform(
+        " UNION ALL ".join(f"SELECT * FROM input_{i}" for i in range(len(changes))), changes
+    )
     gaps = await transform(HOSPITAL_TRIAL_GAPS, [hospital_trials, trials, sites])
     sponsor_inputs = [
-        await pipelines.add_source(project_id, sources[name], SEED)
-        for name in sorted(sources)
-        if name.startswith(STUDY_PREFIX)
+        await pipelines.add_source(project_id, source.id, SEED)
+        for source in registered_pages
+        if page_options(source).get("kind") == "sponsor_study_page"
     ]
     sponsor_sites = await transform(
         " UNION ALL ".join(f"SELECT * FROM input_{i}" for i in range(len(sponsor_inputs)))
@@ -215,4 +234,70 @@ async def _build(request: AsyncContainer, project_id: Id, sources: dict[str, Id]
         hospital_trials,
         gaps,
         sponsor_sites,
+        hospital_changes,
     )
+
+
+async def _publish(
+    request: AsyncContainer,
+    project_id: Id,
+    registered: dict[str, Id],
+    built: TrialSteps,
+) -> tuple[Dashboard, Dashboard]:
+    sessions = await request.get(SessionService)
+    session = next((s for s in await sessions.list(project_id) if s.title == SESSION), None)
+    if session is None:
+        session = await sessions.create(project_id, SESSION)
+    entries = {e.ref for e in await sessions.entries(session.id)}
+    for field in fields(built):
+        operator = getattr(built, field.name)
+        if operator.id not in entries:
+            await sessions.record_operator(
+                session.id, operator.id, f"{field.name}: trial source data", SEED
+            )
+    dashboards = await create_dashboards(request, project_id, session.id, built, SEED)
+    await create_monitoring(request, project_id, session.id, registered, built, SEED)
+    return dashboards
+
+
+async def register_trial_page(
+    request: AsyncContainer,
+    project_id: Id,
+    url: str,
+    name: str,
+    kind: PageKind,
+    country: str,
+) -> DataSource:
+    """Register a URL in an already seeded project and rebuild its shared page views."""
+    if kind not in ("hospital_list", "sponsor_study_page"):
+        raise Invalid("kind must be hospital_list or sponsor_study_page")
+    if country not in ("Finland", "Sweden", "Norway", "Denmark"):
+        raise Invalid("country must be Finland, Sweden, Norway or Denmark")
+    name, url = name.strip(), url.strip()
+    if not name:
+        raise Invalid("A trial page needs a name")
+    if not url.startswith(("https://", "http://")):
+        raise Invalid("A trial page needs an http(s) URL")
+    sources = await request.get(SourceService)
+    registered = await sources.list(project_id)
+    by_name = {s.name: s.id for s in registered}
+    if any(s.name not in by_name for s in SOURCES):
+        raise Invalid("Run ada seed-trials for this project before registering trial pages")
+    existing = next(
+        (s for s in registered if s.address == url and page_options(s).get("kind") == kind), None
+    )
+    if existing is None:
+        if name in by_name:
+            raise Invalid("That source name already belongs to another URL or page kind")
+        page = (
+            hospital_page(url, name, country)
+            if kind == "hospital_list"
+            else sponsor_page(url, name)
+        )
+        existing = await sources.register(project_id, **page.registration())
+        by_name[existing.name] = existing.id
+    elif kind == "hospital_list" and page_options(existing)["country"] != country:
+        raise Invalid("That page is already registered with another country")
+    built = await _build(request, project_id, by_name)
+    await _publish(request, project_id, by_name, built)
+    return await sources.get(existing.id)

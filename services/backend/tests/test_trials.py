@@ -27,9 +27,9 @@ from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.cli.trials import seed
 from ada.entrypoints.cli.trials.dashboards import DOORS, NEAR_YOU
-from ada.entrypoints.cli.trials.monitoring import DASHBOARD, FINNISH_RULE
-from ada.entrypoints.cli.trials.pages import PAGES, study_page
-from ada.entrypoints.cli.trials.seed import SEED, _build, seed_trials
+from ada.entrypoints.cli.trials.monitoring import DASHBOARD, FINNISH_RULE, HOSPITAL_RULE
+from ada.entrypoints.cli.trials.pages import PAGES, page_options, study_page
+from ada.entrypoints.cli.trials.seed import SEED, _build, register_trial_page, seed_trials
 from ada.entrypoints.cli.trials.sources import COUNTRIES
 from memory import MemoryBackground, memory_adapters
 
@@ -42,9 +42,21 @@ def finland_fixture() -> dict:
     return json.loads((RECORDINGS / "ctgov-Finland.json").read_text())
 
 
+@pytest.fixture
+def recorded_pages() -> dict[str, str]:
+    return {
+        p.address: "hus.md" if "hus.fi" in p.address else "fican-east.md"
+        for p in PAGES
+        if "hus.fi" in p.address or "itainen" in p.address
+    }
+
+
 @pytest.fixture(params=["memory", "postgres"])
 async def container(
-    request: pytest.FixtureRequest, tmp_path: Path, finland_fixture: dict
+    request: pytest.FixtureRequest,
+    tmp_path: Path,
+    finland_fixture: dict,
+    recorded_pages: dict[str, str],
 ) -> AsyncIterator[AsyncContainer]:
     def registry(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/v1/web/scrape":
@@ -71,7 +83,7 @@ async def container(
                         }
                     },
                 )
-            fixture = "hus.md" if "hus.fi" in url else "fican-east.md" if "itainen" in url else None
+            fixture = recorded_pages.get(url)
             markdown = (RECORDINGS / "pages" / fixture).read_text() if fixture else "No trial IDs"
             return httpx.Response(
                 200,
@@ -155,6 +167,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             "trial_site_changes",
             "hospital_trials",
             "hospital_trial_gaps",
+            "hospital_trial_changes",
             "sponsor_sites",
         }
         pipelines = await request.get(PipelineService)
@@ -357,6 +370,12 @@ async def test_hospital_markdown_and_gaps(container: AsyncContainer, finland_fix
 
 
 def test_sponsor_page_patterns() -> None:
+    assert {p.interval for p in PAGES} == {"10min", "hourly", "daily"}
+    assert {page_options(p)["hospital"] for p in PAGES if p.interval == "10min"} == {
+        "HUS",
+        "KYS",
+        "Tays",
+    }
     for sponsor, host in (
         ("AstraZeneca", "astrazeneca"),
         ("Merck Sharp & Dohme LLC", "merck"),
@@ -369,3 +388,119 @@ def test_sponsor_page_patterns() -> None:
         assert page.freshness.ttl_seconds == 7 * 86400
     assert study_page("NCT06217822", "Merck KGaA") is None
     assert study_page("bad/id", "Pfizer") is None
+
+
+async def test_hospital_page_changes_and_alert(
+    container: AsyncContainer,
+    recorded_pages: dict[str, str],
+) -> None:
+    project_id = await seed_trials(container, refresh=True)
+    hus = next(p for p in PAGES if "hus.fi" in p.address)
+    async with container() as request:
+        sources = await request.get(SourceService)
+        registered = {s.name: s.id for s in await sources.list(project_id)}
+        built = await _build(request, project_id, registered)
+        runs = await request.get(RunService)
+        run = await runs.start(project_id, SEED)
+        assert not (await runs.read(run.id, built.hospital_trial_changes.id)).rows
+    recorded_pages[hus.address] = "hus-new.md"
+    async with container() as request:
+        await (await request.get(SourceService)).refresh(registered[hus.name], force=True)
+    async with container() as request:
+        runs = await request.get(RunService)
+        run = await runs.start(project_id, SEED)
+        changes = await runs.read(run.id, built.hospital_trial_changes.id)
+        names = [c.name for c in changes.columns]
+        assert [
+            (r[names.index("change_kind")], r[names.index("page")], r[names.index("trial_id")])
+            for r in changes.rows
+        ] == [("listed_by_hospital", hus.name, "NCT07195695")]
+        dashboard = next(
+            d
+            for d in await (await request.get(DashboardService)).list(project_id)
+            if d.name == DASHBOARD
+        )
+        alerts = await request.get(AlertService)
+        rule = next(r for r in await alerts.list_rules(dashboard.id) if r.name == HOSPITAL_RULE)
+        await alerts.check(rule.id)
+        firing = [
+            a for a in await alerts.alerts(project_id, AlertState.FIRING) if a.rule_id == rule.id
+        ]
+        assert [a.key for a in firing] == [{"page": hus.name, "trial_id": "NCT07195695"}]
+    recorded_pages[hus.address] = "hus.md"
+    async with container() as request:
+        await (await request.get(SourceService)).refresh(registered[hus.name], force=True)
+    async with container() as request:
+        runs = await request.get(RunService)
+        run = await runs.start(project_id, SEED)
+        changes = await runs.read(run.id, built.hospital_trial_changes.id)
+        assert [r[names.index("change_kind")] for r in changes.rows] == ["unlisted_by_hospital"]
+        alerts = await request.get(AlertService)
+        await alerts.check(rule.id)
+        assert not [
+            a for a in await alerts.alerts(project_id, AlertState.FIRING) if a.rule_id == rule.id
+        ]
+
+
+async def test_register_page_wires_unions_and_watches_all_pages(
+    container: AsyncContainer,
+    recorded_pages: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_id = await seed_trials(container, refresh=True)
+    url = "https://hospital.example/trials"
+    recorded_pages[url] = "hus-new.md"
+    watched = []
+    async with container() as request:
+        settings = await request.get(Settings)
+        monkeypatch.setattr(settings, "ada_public_url", "https://ada.example")
+        source_service = await request.get(SourceService)
+
+        async def watch(service, id):  # noqa: ANN001, ANN202
+            watched.append(id)
+            return await service.get(id)
+
+        monkeypatch.setattr(type(source_service), "watch", watch)
+        page = await register_trial_page(
+            request, project_id, url, "New hospital", "hospital_list", "Finland"
+        )
+        assert page_options(page)["interval"] == "hourly"
+        registered = {s.name: s.id for s in await source_service.list(project_id)}
+        before = await _build(request, project_id, registered)
+        assert (
+            await register_trial_page(request, project_id, url, "Alias", "hospital_list", "Finland")
+        ).id == page.id
+        after = await _build(request, project_id, registered)
+        assert after.hospital_trials.id == before.hospital_trials.id
+        assert after.hospital_trial_changes.id == before.hospital_trial_changes.id
+        study = await register_trial_page(
+            request,
+            project_id,
+            "https://sponsor.example/study",
+            "Research study",
+            "sponsor_study_page",
+            "Sweden",
+        )
+        assert page_options(study)["interval"] == "daily"
+        all_sources = await source_service.list(project_id)
+        assert set(watched) == {s.id for s in all_sources if page_options(s)}
+        dashboard = next(
+            d
+            for d in await (await request.get(DashboardService)).list(project_id)
+            if d.name == DASHBOARD
+        )
+        rules = await (await request.get(AlertService)).list_rules(dashboard.id)
+        assert len([r for r in rules if r.name == HOSPITAL_RULE and r.enabled]) == 1
+        assert any(not r.enabled and r.name.startswith(HOSPITAL_RULE) for r in rules)
+    async with container() as request:
+        sources = await request.get(SourceService)
+        await sources.refresh(page.id)
+        await sources.refresh(study.id)
+    async with container() as request:
+        sources = {s.name: s.id for s in await (await request.get(SourceService)).list(project_id)}
+        built = await _build(request, project_id, sources)
+        runs = await request.get(RunService)
+        run = await runs.start(project_id, SEED)
+        listed = await runs.read(run.id, built.hospital_trials.id)
+        assert any(r[0] == "New hospital" for r in listed.rows)
+        assert len((await runs.read(run.id, built.sponsor_sites.id)).rows) == 1
