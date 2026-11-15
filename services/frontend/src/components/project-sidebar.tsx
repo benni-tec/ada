@@ -203,7 +203,8 @@ function Group({
         </CollapsibleTrigger>
         {action}
         <CollapsibleContent>
-          <SidebarMenuSub>{children}</SidebarMenuSub>
+          {/* The items reach the right edge, as the group's own button does. */}
+          <SidebarMenuSub className="mr-0 pr-0">{children}</SidebarMenuSub>
         </CollapsibleContent>
       </SidebarMenuItem>
     </Collapsible>
