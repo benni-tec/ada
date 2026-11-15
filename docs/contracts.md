@@ -1866,8 +1866,8 @@ not describe it.
   `test_worker_events` (on PostgreSQL: a failed call recorded while its own writes roll
   back) and `test_agent` (the in-platform agent's calls not recorded). A feature is tested through its service, then one transport for
   what the routes add (REST or MCP, not both), then PostgreSQL for what only it does.
-  `CI=1 moon run backend:test` runs them on every core (pytest-xdist, `-n auto --dist
-  worksteal`) in about a minute; `uv run pytest` alone runs them in one process.
+  `CI=1 moon run backend:test` runs them on every core (pytest-xdist, `-n auto --maxprocesses
+  16 --dist worksteal`) in about a minute; `uv run pytest` alone runs them in one process.
 - Backend tests run without services, except those that take the `database_url` or
   `migrated_database_url` fixture (PostgreSQL) or the `valkey` fixture of
   `tests/test_worker_events.py`. They need `moon run root:infra` and are skipped locally
