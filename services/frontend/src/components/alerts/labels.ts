@@ -30,6 +30,11 @@ export function countBySeverity(views: readonly AlertView[]): [Severity, number]
   return severities.filter((severity) => counts.has(severity)).map((severity) => [severity, counts.get(severity) ?? 0])
 }
 
+/** The views, most severe first; equal severities keep their order. */
+export function mostSevereFirst<T extends AlertView>(views: readonly T[]): T[] {
+  return [...views].sort((a, b) => severities.indexOf(a.rule.severity) - severities.indexOf(b.rule.severity))
+}
+
 /** The most severe of the active alerts, or null when none is active. */
 export function worstActive(views: readonly AlertView[]): Severity | null {
   return countBySeverity(views)[0]?.[0] ?? null
