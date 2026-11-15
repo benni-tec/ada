@@ -259,7 +259,7 @@ function Sessions({ projectId }: { projectId: Id }) {
   const navigate = useNavigate()
   const { data } = useQuery(sessionsQuery(projectId))
   const sessions = [...(data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))
-  // Research sessions hang under the session that delegated them.
+  // Delegated sessions (research, analysis) hang under the session that delegated them.
   const known = new Set(sessions.map((session) => session.id))
   const byParent = new Map<string, Session[]>()
   for (const session of sessions) {
@@ -300,7 +300,7 @@ function Sessions({ projectId }: { projectId: Id }) {
   )
 }
 
-/** A session and, nested under it, the research sessions it delegated. */
+/** A session and, nested under it, the sessions it delegated. */
 function SessionNode({
   session,
   byParent,
@@ -318,8 +318,10 @@ function SessionNode({
       <SidebarMenuSubButton asChild isActive={session.id === activeId}>
         <Link to="/projects/$projectId/sessions/$sessionId" params={{ projectId, sessionId: session.id }}>
           <span>{session.title}</span>
-          {session.agent === 'research' && (
-            <span className="ml-auto rounded-full border px-1.5 text-[10px] font-medium text-sidebar-foreground/70">research</span>
+          {session.agent !== 'session' && (
+            <span className="ml-auto rounded-full border px-1.5 text-[10px] font-medium text-sidebar-foreground/70">
+              {session.agent}
+            </span>
           )}
         </Link>
       </SidebarMenuSubButton>

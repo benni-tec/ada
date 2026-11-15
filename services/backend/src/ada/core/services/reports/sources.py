@@ -103,3 +103,12 @@ class SourcesList:
             content_hash=snapshot.content_hash if snapshot else None,
             widget_ids=tuple(widget_ids),
         )
+
+    async def of_operator(self, run: Run, operator_id: OperatorId) -> list[ReportSource]:
+        """The sources behind one operator as `run` read it, ordered by name."""
+        entries = [
+            await self._entry(source_id, run, [])
+            for source_id in dict.fromkeys(await self._sources_of(operator_id, run))
+        ]
+        entries.sort(key=lambda entry: (entry.name.lower(), entry.operator_id))
+        return entries

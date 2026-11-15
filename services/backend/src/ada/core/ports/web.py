@@ -59,6 +59,9 @@ class WebExplorer(Protocol):
         main_content_only: bool = False,
         focus: str | None = None,
         pdf: PdfOptions | None = None,
+        wait_for: int | str | None = None,
+        raw_html: bool = False,
+        original_html: bool = False,
     ) -> WebPage:
         """The page as Markdown; with `main_content_only` without navigation and footers.
         With `focus`, only the passages relevant to it (Markdown excerpts in page order,
@@ -74,6 +77,7 @@ class WebExplorer(Protocol):
         *,
         tags: Sequence[str],
         pdf: PdfOptions | None = None,
+        wait_for: int | str | None = None,
     ) -> Extraction:
         """Rows with the given columns, as a model reads them off the page following
         `instruction` (null where the page does not state a value); `pdf` as for read."""

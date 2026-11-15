@@ -13,6 +13,7 @@ from ada.core.models.operators import (
     OperatorId,
     OperatorKind,
     SourceParams,
+    StatisticParams,
     TransformParams,
 )
 from ada.core.models.runs import Run, Snapshot
@@ -281,10 +282,10 @@ class _Planner:
                 return history(operator.id, snapshots)
             case OperatorKind.INPUT:
                 return await self.node(self._bound(operator))
-            case OperatorKind.TRANSFORM:
+            case OperatorKind.TRANSFORM | OperatorKind.STATISTIC:
                 if operator.materializing:
                     self._require_fixing()
-                sql = TransformParams.model_validate(operator.params).sql
+                sql = _sql(operator)
                 inputs = tuple([await self.node(input_id) for input_id in operator.inputs])
                 query = QueryNode(operator.id, sql, inputs)
                 if not operator.materializing:
@@ -369,3 +370,10 @@ class _Planner:
     def _require_fixing(self) -> None:
         if not self.fix:
             raise _NeedsExecution
+
+
+def _sql(operator: Operator) -> str:
+    """The query of a transform, or the one a statistic compiled to when it was added."""
+    if operator.kind is OperatorKind.STATISTIC:
+        return StatisticParams.model_validate(operator.params).sql
+    return TransformParams.model_validate(operator.params).sql

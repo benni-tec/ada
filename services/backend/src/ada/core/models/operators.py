@@ -61,6 +61,9 @@ class TransformParams(DomainModel):
 class StatisticParams(DomainModel):
     tool: str
     arguments: JsonObject = {}
+    # The query the statistic compiled to over input_0, kept so a run replays exactly
+    # what was defined, even after the platform's statistics change.
+    sql: str = ""
 
 
 class AgentParams(DomainModel):

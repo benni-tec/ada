@@ -1835,6 +1835,33 @@
         "title": "NewAlertRule",
         "type": "object"
       },
+      "NewAnalysis": {
+        "additionalProperties": false,
+        "properties": {
+          "brief": {
+            "title": "Brief",
+            "type": "string"
+          },
+          "operator_ids": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OperatorId"
+            },
+            "title": "Operator Ids",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "brief",
+          "title"
+        ],
+        "title": "NewAnalysis",
+        "type": "object"
+      },
       "NewAttachment": {
         "additionalProperties": false,
         "properties": {
@@ -1893,6 +1920,46 @@
           }
         },
         "title": "NewDashboardRun",
+        "type": "object"
+      },
+      "NewHistory": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "history",
+            "title": "Kind",
+            "type": "string"
+          },
+          "last": {
+            "default": 10,
+            "minimum": 1.0,
+            "title": "Last",
+            "type": "integer"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "kind",
+          "source_id"
+        ],
+        "title": "NewHistory",
         "type": "object"
       },
       "NewInput": {
@@ -2556,6 +2623,7 @@
       "OperatorKind": {
         "enum": [
           "source",
+          "history",
           "extract",
           "input",
           "transform",
@@ -3495,7 +3563,8 @@
       "SessionAgent": {
         "enum": [
           "session",
-          "research"
+          "research",
+          "analysis"
         ],
         "title": "SessionAgent",
         "type": "string"
@@ -6410,6 +6479,7 @@
               "schema": {
                 "discriminator": {
                   "mapping": {
+                    "history": "#/components/schemas/NewHistory",
                     "input": "#/components/schemas/NewInput",
                     "source": "#/components/schemas/NewSourceOperator",
                     "transform": "#/components/schemas/NewTransform"
@@ -6419,6 +6489,9 @@
                 "oneOf": [
                   {
                     "$ref": "#/components/schemas/NewSourceOperator"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NewHistory"
                   },
                   {
                     "$ref": "#/components/schemas/NewTransform"
@@ -7660,6 +7733,60 @@
           }
         },
         "summary": "Change Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/analysis": {
+      "post": {
+        "description": "Delegate an analysis to the analyst, as the person: an analysis session under this\none, with the brief as its first message and its turn queued. Its findings are added\nto this session's record, each with the operator that shows it.",
+        "operationId": "delegate_analysis_api_sessions__session_id__analysis_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAnalysis"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delegate Analysis",
         "tags": [
           "sessions"
         ]
