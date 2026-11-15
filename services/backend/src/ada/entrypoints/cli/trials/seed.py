@@ -10,11 +10,13 @@ from ada.core.models.base import Id
 from ada.core.models.operators import Operator
 from ada.core.models.schema import MeasureRole, Roles
 from ada.core.models.sources import Provenance
+from ada.core.models.statistical_models import TrialMatcherSpec
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
+from ada.core.services.ports.statistical_models import StatisticalModelService
 from ada.entrypoints.cli.trials import steps
 from ada.entrypoints.cli.trials.dashboards import create_dashboards
 from ada.entrypoints.cli.trials.monitoring import create_monitoring
@@ -22,14 +24,15 @@ from ada.entrypoints.cli.trials.sources import CTGOV, CTIS, SOURCES
 
 PROJECT = "Nordic cancer trials"
 AGENT_INSTRUCTIONS = (
-    "Answer patient questions from case_trials. List only sites whose status is exactly "
-    "RECRUITING. Give each site's city and the km column for the patient's city when it is "
-    "Helsinki, Kuopio or Oulu, otherwise the nearest of the three, naming it. Quote each "
-    "trial's eligibility text as written, never shortened into a verdict. Never filter or "
-    "judge by age, sex, stage or any other eligibility criterion. Never say a patient "
-    "qualifies or is accepted. Do not rank by efficacy or make promises. Sort by distance "
-    "only. End every patient answer by saying to take the list to their oncologist, who "
-    "decides eligibility."
+    'For a patient, save a case on the "Cancer trial candidate" case type with set_case: '
+    "a new key such as PATIENT-1, never a name or identity code, and the site, sex, age group "
+    "and wellbeing services county as told. The trial matcher runs on save: answer from its "
+    "result, in its order, nearest first, with each nearest site's city and km and the city "
+    "the distances are from. Quote each eligibility text as written, never as a verdict. Sex "
+    "and age limits are information only: never filter or judge by them or any other "
+    "criterion, never say a patient qualifies, rank by efficacy or promise anything. End by "
+    "saying to take the list to their oncologist, who decides eligibility. For trials in "
+    "general, use the dashboards and data steps."
 )
 SESSION = "Nordic cancer trials"
 SEED = Actor(kind=ActorKind.SYSTEM, name="ada seed-trials")
@@ -45,6 +48,7 @@ class TrialSteps:
     ctis_finland_pending: Operator
     trial_rates: Operator
     case_trials: Operator
+    county_cities: Operator
 
 
 async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
@@ -95,6 +99,7 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                 )
         dashboards = await create_dashboards(request, project_id, session.id, built, SEED)
         await create_monitoring(request, project_id, session.id, registered, built, SEED)
+        await create_matcher(request, project_id, built)
     if refresh:
         for index, source in enumerate(SOURCES):
             if index:
@@ -115,6 +120,28 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
     for dashboard in dashboards:
         print(f"  dashboard {dashboard.id}  {dashboard.name}")
     return project_id
+
+
+async def create_matcher(request: AsyncContainer, project_id: Id, steps: TrialSteps) -> None:
+    """The project's trial matcher on its "Cancer trial candidate" case type, running on every
+    save of a case and reading case_trials and county_cities when it runs. A reseed that
+    rebuilt those steps gives the matcher a new version reading the new ones."""
+    models = await request.get(StatisticalModelService)
+    spec = TrialMatcherSpec(
+        operator_id=steps.case_trials.id, county_operator_id=steps.county_cities.id
+    )
+    matcher = next((m for m in await models.list(project_id) if m.kind == spec.kind), None)
+    if matcher is None:
+        await models.create_trial_matcher(
+            project_id, spec.operator_id, SEED, spec.county_operator_id, auto_run=True
+        )
+        return
+    current = (await models.version(matcher.id)).spec
+    if not isinstance(current, TrialMatcherSpec) or (
+        current.operator_id,
+        current.county_operator_id,
+    ) != (spec.operator_id, spec.county_operator_id):
+        await models.add_version(matcher.id, spec, SEED)
 
 
 async def _build(request: AsyncContainer, project_id: Id, sources: dict[str, Id]) -> TrialSteps:
@@ -138,4 +165,5 @@ async def _build(request: AsyncContainer, project_id: Id, sources: dict[str, Id]
         Roles(measures=(MeasureRole(value="per_million"),)),
     )
     cases = await transform(steps.CASE_TRIALS, [trials, sites])
-    return TrialSteps(trials, sites, doors, ctis_trials, pending, rates, cases)
+    counties = await transform(steps.COUNTY_CITIES, [])
+    return TrialSteps(trials, sites, doors, ctis_trials, pending, rates, cases, counties)

@@ -175,6 +175,7 @@ class World:
             MemoryDataSourceRepository(self.store),
             self.dispatcher,
             self.after_commit,
+            None,  # type: ignore[arg-type]  # the pathway model reads no data step
         )
 
     async def pathway(self) -> tuple[Any, Any]:
@@ -354,7 +355,10 @@ class ToyKind:
             Field(name="county", type=FieldType.TEXT),
         )
 
-    def run(self, version: Any, values: dict[str, Any]) -> Section:
+    def queries(self, version: Any, values: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    def run(self, version: Any, values: dict[str, Any], data: dict[str, Any]) -> Section:
         north = values.get("county") == "Lappi"
         return Section(
             kind="toy",

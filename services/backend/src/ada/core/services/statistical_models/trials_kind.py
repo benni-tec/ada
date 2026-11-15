@@ -1,8 +1,9 @@
-"""The trial matcher as a kind (ada.core.services.statistical_models.kinds): which
-recruiting Nordic trials a case could be discussed for, from the trials a version pinned
-(Felix's `case_trials` data step, docs/trials.md). Structured fields only: the case's site
-against the trial's cancer groups, sex, and the age group against the trial's age limits.
-The eligibility text is shown as the registry wrote it, never judged; nothing is scored."""
+"""The trial matcher as a kind (ada.core.services.statistical_models.kinds): the recruiting
+Nordic trials of a case's cancer group, read from Felix's `case_trials` step (docs/trials.md)
+whenever it runs, nearest first. It filters on the cancer group only, a topic match: sex and
+age limits are shown beside each trial and never leave one out, and the eligibility text is
+shown as the registry wrote it, never judged. Distances are from the city the `county_cities`
+step names for the case's county (Helsinki, Kuopio or Oulu)."""
 
 from typing import Literal
 
@@ -10,91 +11,39 @@ from ada.core.models.analysis import Rows
 from ada.core.models.base import JsonObject
 from ada.core.models.cases import Attention, DefaultCaseType, Field, FieldType, Section
 from ada.core.models.schema import Column, ColumnType
-from ada.core.models.statistical_models import (
-    ModelVersion,
-    PinnedTrial,
-    TrialMatcherSpec,
-    TrialSite,
-)
+from ada.core.models.statistical_models import ModelVersion, TrialMatcherSpec
+from ada.core.services.ports.exploration import Clauses
 from ada.core.services.statistical_models.pathway import AGE_BANDS, FEMALE, MALE
 
 KIND = "trial_matcher"
 NAME = "Trial matcher"
 DESCRIPTION = (
-    "Recruiting Nordic cancer trials a case could be discussed for, matched on cancer "
-    "group, sex and age; trials with a Finnish site first, then the nearest. Eligibility "
-    "is shown, not judged."
+    "Recruiting Nordic cancer trials of a case's cancer group, nearest first. Sex and age "
+    "limits are shown, not applied; eligibility is shown, not judged."
 )
 
 # The cities the trials data measures distances from (docs/trials.md).
 CITIES = ("helsinki", "kuopio", "oulu")
-# Each wellbeing services county's nearest of the three, by road sense rather than survey;
-# a county not listed is measured from Helsinki.
-COUNTY_CITY = {
-    "Etelä-Savo": "kuopio",
-    "Pohjois-Savo": "kuopio",
-    "Pohjois-Karjala": "kuopio",
-    "Keski-Suomi": "kuopio",
-    "Pohjois-Pohjanmaa": "oulu",
-    "Kainuu": "oulu",
-    "Lappi": "oulu",
-    "Keski-Pohjanmaa": "oulu",
-    "Pohjanmaa": "oulu",
-    "Etelä-Pohjanmaa": "oulu",
-}
-# The most matches a result keeps; the count says how many there were.
+DEFAULT_CITY = "helsinki"
+# The most trials a result keeps; the count says how many there were.
 MAX_MATCHES = 25
 
-Fit = Literal["fits", "partly", "unknown"]
+Age = Literal["inside", "partly", "outside", "unknown"]
 
 
-def _list(text: object) -> tuple[str, ...]:
-    return tuple(part.strip() for part in str(text or "").split(",") if part.strip())
+def _quote(text: str) -> str:
+    return "'" + text.replace("'", "''") + "'"
+
+
+def _rows(rows: Rows | None) -> list[dict[str, object]]:
+    if rows is None:
+        return []
+    names = [c.name for c in rows.columns]
+    return [dict(zip(names, values, strict=True)) for values in rows.rows]
 
 
 def _number(value: object) -> float | None:
     return None if value is None else float(str(value))
-
-
-def pinned(rows: Rows) -> list[PinnedTrial]:
-    """The trials as the matcher reads them: one row per trial with, per city, the nearest
-    recruiting Nordic site (`<city>_facility`, `_city`, `_country`, `_km`)."""
-    names = [c.name for c in rows.columns]
-    trials = []
-    for values in rows.rows:
-        row = dict(zip(names, values, strict=True))
-        nearest = {
-            city: TrialSite(
-                facility=row.get(f"{city}_facility"),
-                city=row.get(f"{city}_city"),
-                country=str(row.get(f"{city}_country") or ""),
-                km=_number(row.get(f"{city}_km")),
-            )
-            for city in CITIES
-            if row.get(f"{city}_country")
-        }
-        trials.append(
-            PinnedTrial(
-                nct_id=str(row["nct_id"]),
-                title=str(row.get("title") or ""),
-                phase=row.get("phase") or None,
-                conditions=str(row.get("conditions") or ""),
-                cancer_groups=_list(row.get("cancer_groups")),
-                sex=str(row.get("sex") or "ALL").upper(),
-                min_age_years=_number(row.get("min_age_years")),
-                max_age_years=_number(row.get("max_age_years")),
-                eligibility=str(row.get("eligibility") or ""),
-                recruiting_countries=_list(row.get("recruiting_countries")),
-                finnish_site=bool(row.get("finnish_site")),
-                nearest=nearest,
-                url=str(row.get("url") or f"https://clinicaltrials.gov/study/{row['nct_id']}"),
-            )
-        )
-    return trials
-
-
-def city_of(county: object) -> str:
-    return COUNTY_CITY.get(county, "helsinki") if isinstance(county, str) else "helsinki"
 
 
 def _band(age_band: object) -> tuple[int, int] | None:
@@ -104,40 +53,18 @@ def _band(age_band: object) -> tuple[int, int] | None:
     return int(low), int(high)
 
 
-def age_fit(trial: PinnedTrial, age_band: object) -> Fit | None:
-    """Whether an age group fits a trial's limits: wholly ("fits"), in part ("partly":
-    some ages of the group are outside), unknown without a group; None when no age of
-    the group is inside."""
+def age_fit(min_age: float | None, max_age: float | None, age_band: object) -> Age:
+    """How an age group sits against a trial's limits, as information only: inside,
+    partly inside, outside, or unknown without a group."""
     band = _band(age_band)
     if band is None:
         return "unknown"
     low, high = band
-    lowest = trial.min_age_years if trial.min_age_years is not None else 0
-    highest = trial.max_age_years if trial.max_age_years is not None else 200
+    lowest = min_age if min_age is not None else 0
+    highest = max_age if max_age is not None else 200
     if high < lowest or low > highest:
-        return None
-    return "fits" if low >= lowest and high <= highest else "partly"
-
-
-def matches(spec: TrialMatcherSpec, trials: tuple[PinnedTrial, ...], values: JsonObject):
-    """The trials a case's values match, with each one's age fit, in the matcher's order:
-    a Finnish site first, then the nearest site from the case's county's city."""
-    group = spec.groups.get(str(values.get("site")))
-    sex = str(values.get("sex", "")).upper()
-    city = city_of(values.get("county"))
-    found = []
-    for trial in trials:
-        if group is None or group not in trial.cancer_groups:
-            continue
-        if trial.sex not in ("ALL", "") and trial.sex != sex:
-            continue
-        fit = age_fit(trial, values.get("age_band"))
-        if fit is None:
-            continue
-        found.append((trial, fit))
-    near = lambda pair: pair[0].nearest.get(city).km if pair[0].nearest.get(city) else None  # noqa: E731
-    found.sort(key=lambda pair: (not pair[0].finnish_site, near(pair) is None, near(pair) or 0))
-    return found, city
+        return "outside"
+    return "inside" if low >= lowest and high <= highest else "partly"
 
 
 class TrialKind:
@@ -155,72 +82,111 @@ class TrialKind:
                 required=True,
                 label="Site",
             ),
-            Field(
-                name="sex", type=FieldType.ENUM, levels=(FEMALE, MALE), required=True, label="Sex"
-            ),
+            Field(name="sex", type=FieldType.ENUM, levels=(FEMALE, MALE), label="Sex"),
             Field(name="age_band", type=FieldType.ENUM, levels=AGE_BANDS, label="Age group"),
             Field(name="county", type=FieldType.TEXT, label="Wellbeing services county"),
         )
 
-    def run(self, version: ModelVersion, values: JsonObject) -> Section:
-        spec, compiled = version.spec, version.compiled
+    def queries(self, version: ModelVersion, values: JsonObject) -> dict[str, tuple[str, Clauses]]:
+        """The case's cancer group's trials, one row each with its nearest recruiting site
+        from each city; and the case county's city, when the matcher has the step for it."""
+        spec = version.spec
         assert isinstance(spec, TrialMatcherSpec)
-        trials = getattr(compiled, "trials", ())
-        found, city = matches(spec, trials, values)
-        finnish = sum(1 for trial, _ in found if trial.finnish_site)
-        partly = sum(1 for _, fit in found if fit == "partly")
-        nearest = [
-            trial.nearest[city].km
-            for trial, _ in found
-            if city in trial.nearest and trial.nearest[city].km is not None
-        ]
-        if not found:
-            summary = "No recruiting trial matches"
-        else:
-            s = "" if len(found) == 1 else "s"
-            summary = f"{len(found)} recruiting trial{s}, {finnish} with a Finnish site"
-        body: JsonObject = {
-            "city": city,
-            "total": len(found),
-            "matches": [
-                {
-                    "nct_id": trial.nct_id,
-                    "title": trial.title,
-                    "phase": trial.phase,
-                    "countries": list(trial.recruiting_countries),
-                    "finnish_site": trial.finnish_site,
-                    "nearest": trial.nearest[city].model_dump() if city in trial.nearest else None,
-                    "age": fit,
-                    "min_age_years": trial.min_age_years,
-                    "max_age_years": trial.max_age_years,
-                    "eligibility": trial.eligibility,
-                    "url": trial.url,
-                }
-                for trial, fit in found[:MAX_MATCHES]
-            ],
-            "read_at": getattr(compiled, "read_at", None) and compiled.read_at.isoformat(),
+        group = spec.groups.get(str(values.get("site")), "")
+        nearest = ", ".join(
+            f"arg_min(facility, km_{c}) AS {c}_facility, arg_min(city, km_{c}) AS {c}_city, "
+            f"arg_min(country, km_{c}) AS {c}_country, min(km_{c}) AS {c}_km"
+            for c in CITIES
+        )
+        found: dict[str, tuple[str, Clauses]] = {
+            "trials": (
+                spec.operator_id,
+                Clauses(
+                    select="nct_id, any_value(title) AS title, any_value(phase) AS phase, "
+                    "any_value(sex) AS sex, any_value(min_age_years) AS min_age_years, "
+                    "any_value(max_age_years) AS max_age_years, "
+                    "any_value(eligibility) AS eligibility, "
+                    "any_value(recruiting_countries) AS recruiting_countries, "
+                    f"bool_or(country = 'Finland') AS finnish_site, {nearest}, "
+                    "any_value(url) AS url",
+                    where=f"list_contains(string_split(cancer_groups, ', '), {_quote(group)})",
+                    group_by="nct_id",
+                    order_by="nct_id",
+                ),
+            )
         }
+        county = values.get("county")
+        if spec.county_operator_id and isinstance(county, str) and county:
+            found["county"] = (
+                spec.county_operator_id,
+                Clauses(select="city", where=f"county = {_quote(county)}"),
+            )
+        return found
+
+    def run(self, version: ModelVersion, values: JsonObject, data: dict[str, Rows]) -> Section:
+        county = _rows(data.get("county"))
+        named = str(county[0].get("city")) if county else ""
+        city = named if named in CITIES else DEFAULT_CITY
+        trials = []
+        for row in _rows(data.get("trials")):
+            low, high = _number(row.get("min_age_years")), _number(row.get("max_age_years"))
+            countries = str(row.get("recruiting_countries") or "")
+            trials.append(
+                {
+                    "nct_id": row["nct_id"],
+                    "title": row.get("title") or "",
+                    "phase": row.get("phase"),
+                    "countries": [c.strip() for c in countries.split(",") if c.strip()],
+                    "finnish_site": bool(row.get("finnish_site")),
+                    "nearest": {
+                        "facility": row.get(f"{city}_facility"),
+                        "city": row.get(f"{city}_city"),
+                        "country": row.get(f"{city}_country"),
+                        "km": _number(row.get(f"{city}_km")),
+                    },
+                    "sex": str(row.get("sex") or "ALL").upper(),
+                    "min_age_years": low,
+                    "max_age_years": high,
+                    "age": age_fit(low, high, values.get("age_band")),
+                    "eligibility": row.get("eligibility") or "",
+                    "url": row.get("url") or f"https://clinicaltrials.gov/study/{row['nct_id']}",
+                }
+            )
+
+        def km(trial: dict) -> float | None:
+            return trial["nearest"]["km"]
+
+        trials.sort(key=lambda t: (km(t) is None, km(t) or 0))
+        nearest = next((km(t) for t in trials if km(t) is not None), None)
+        if not trials:
+            summary = "No recruiting trial in this cancer group"
+        else:
+            s = "" if len(trials) == 1 else "s"
+            near = (
+                f", nearest {round(nearest)} km from {city.title()}" if nearest is not None else ""
+            )
+            summary = f"{len(trials)} recruiting trial{s}{near}"
         return Section(
             kind=KIND,
             title=NAME,
             summary=summary,
-            status="info" if found else "ok",
+            status="info" if trials else "ok",
             columns={
-                "trials": len(found),
-                "with_finnish_site": finnish,
-                "age_uncertain": partly,
-                "nearest_km": round(min(nearest)) if nearest else None,
+                "trials": len(trials),
+                "with_finnish_site": sum(1 for t in trials if t["finnish_site"]),
+                "nearest_km": None if nearest is None else round(nearest),
+                "city": city,
             },
             attention=Attention(open=False),
-            body=body,
+            body={"city": city, "total": len(trials), "matches": trials[:MAX_MATCHES]},
         )
 
     def columns(self, version: ModelVersion) -> tuple[Column, ...]:
         return (
             Column(name="trials", type=ColumnType.INTEGER),
             Column(name="with_finnish_site", type=ColumnType.INTEGER),
-            Column(name="age_uncertain", type=ColumnType.INTEGER),
             Column(name="nearest_km", type=ColumnType.INTEGER),
+            Column(name="city", type=ColumnType.TEXT),
         )
 
     def default_case_type(self, version: ModelVersion) -> DefaultCaseType:

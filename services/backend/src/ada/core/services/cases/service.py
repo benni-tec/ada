@@ -6,6 +6,7 @@ from typing import Any
 from uuid import uuid7
 
 from ada.core.models.actors import Actor
+from ada.core.models.analysis import Rows
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.cases import (
     Case,
@@ -42,6 +43,7 @@ from ada.core.services.cases.fields import (
     describe,
 )
 from ada.core.services.ports.cases import CaseService
+from ada.core.services.ports.exploration import MAX_EXPLORATION_ROWS, ExplorationService
 from ada.core.services.statistical_models.kinds import kind_of
 
 # How urgent a result is, most urgent first, for the open-case list.
@@ -57,8 +59,10 @@ class Cases(CaseService):
         sources: DataSourceRepository,
         dispatcher: TaskDispatcher,
         after_commit: AfterCommit,
+        exploration: ExplorationService,
     ) -> None:
         self.cases = cases
+        self.exploration = exploration
         self.statistical = models
         self.clock = clock
         self.sources = sources
@@ -257,8 +261,17 @@ class Cases(CaseService):
         needs = {f.name for f in kind.requires(version)}
         values = {k: v for k, v in case.values.items() if k in needs}
         try:
-            section = kind.run(version, values)
-        except Invalid as error:
+            data: dict[str, Rows] = {}
+            reads: dict[str, str] = {}
+            for name, (operator_id, clauses) in kind.queries(version, values).items():
+                explored = await self.exploration.query(
+                    operator_id, clauses, actor, limit=MAX_EXPLORATION_ROWS
+                )
+                data[name] = explored.rows
+                if explored.run_id is not None:
+                    reads[name] = str(explored.run_id)
+            section = kind.run(version, values, data).model_copy(update={"reads": reads})
+        except (Invalid, NotFound) as error:
             section = Section(
                 kind=model.kind, title=model.name, summary=f"Could not run: {error}", status="warn"
             )

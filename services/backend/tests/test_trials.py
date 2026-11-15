@@ -25,6 +25,7 @@ from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
+from ada.core.services.ports.statistical_models import StatisticalModelService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.cli.trials import seed
 from ada.entrypoints.cli.trials.dashboards import DOORS, NEAR_YOU
@@ -134,8 +135,13 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             "ctis_finland_pending",
             "trial_rates",
             "case_trials",
+            "county_cities",
             "trial_site_changes",
         }
+        # The trial matcher runs on its own case type, once, reading the current steps.
+        models = await (await request.get(StatisticalModelService)).list(project_id)
+        [matcher] = [m for m in models if m.kind == "trial_matcher"]
+        assert matcher.auto_run and matcher.latest_version == 1
         pipelines = await request.get(PipelineService)
         after = {
             o.id

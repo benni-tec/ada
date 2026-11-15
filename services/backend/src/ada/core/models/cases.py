@@ -112,6 +112,8 @@ class Section(DomainModel):
     columns: dict[str, str | int | float | bool | None] = {}
     attention: Attention = Attention()
     body: JsonObject = {}
+    # The data steps the model read for this result: its name for each -> the run it read.
+    reads: dict[str, str] = {}
 
 
 class CaseResult(DomainModel):

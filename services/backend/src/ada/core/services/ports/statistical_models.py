@@ -5,6 +5,7 @@ from ada.core.models.actors import Actor
 from ada.core.models.base import Id
 from ada.core.models.operators import OperatorId
 from ada.core.models.statistical_models import (
+    AnySpec,
     Evaluation,
     EvaluationInputs,
     ModelSpec,
@@ -59,23 +60,20 @@ class StatisticalModelService(Protocol):
         project_id: Id,
         operator_id: OperatorId,
         actor: Actor,
+        county_operator_id: OperatorId | None = None,
         case_type_id: Id | None = None,
         auto_run: bool = False,
     ) -> ModelVersion:
-        """Create a trial matcher: a version pins the recruiting trials of its cancer groups
-        from `operator_id` (a `case_trials` data step, docs/trials.md), read in a new run.
+        """Create a trial matcher reading `operator_id` (a `case_trials` step, docs/trials.md)
+        and, for distances, `county_operator_id` (a `county_cities` step) whenever it runs.
         On `case_type_id`, else on a case type that covers it (the cancer pathway one when
         the project has it), else on a new "Cancer trial candidate" type."""
         ...
 
-    async def refresh_trial_matcher(self, model_id: Id, actor: Actor) -> ModelVersion:
-        """A new version of a trial matcher with the trials read again; the old versions,
-        and the results made with them, stay as they were."""
-        ...
-
-    async def add_version(self, model_id: Id, spec: ModelSpec, actor: Actor) -> ModelVersion:
-        """Build a new version; the old ones stay as they are. Invalid when the model's
-        case type does not cover the new version."""
+    async def add_version(self, model_id: Id, spec: AnySpec, actor: Actor) -> ModelVersion:
+        """Build a new version of the model's own kind; the old ones stay as they are.
+        Invalid for a spec of another kind, or when the model's case type does not cover
+        the new version."""
         ...
 
     async def list(self, project_id: Id) -> Sequence[StatisticalModel]: ...

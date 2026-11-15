@@ -28,7 +28,7 @@ from ada.core.ports.repositories import (
 )
 from ada.core.ports.system import Clock
 from ada.core.services.cases.fields import coverage, describe
-from ada.core.services.ports.exploration import MAX_EXPLORATION_ROWS, Clauses, ExplorationService
+from ada.core.services.ports.exploration import Clauses, ExplorationService
 from ada.core.services.ports.statistical_models import StatisticalModelService
 from ada.core.services.statistical_models import pathway, trials_kind
 from ada.core.services.statistical_models.build import (
@@ -66,7 +66,7 @@ class StatisticalModels(StatisticalModelService):
         auto_run: bool = False,
     ) -> ModelVersion:
         return await self._store(
-            project_id, name, description, spec, compile_spec(spec), actor, case_type_id, auto_run
+            project_id, name, description, spec, _compile(spec), actor, case_type_id, auto_run
         )
 
     async def _store(
@@ -180,91 +180,32 @@ class StatisticalModels(StatisticalModelService):
         project_id: Id,
         operator_id: OperatorId,
         actor: Actor,
+        county_operator_id: OperatorId | None = None,
         case_type_id: Id | None = None,
         auto_run: bool = False,
     ) -> ModelVersion:
-        spec = TrialMatcherSpec(operator_id=operator_id)
-        compiled = await self._read_trials(spec, actor)
+        spec = TrialMatcherSpec(operator_id=operator_id, county_operator_id=county_operator_id)
         return await self._store(
             project_id,
             trials_kind.NAME,
             trials_kind.DESCRIPTION,
             spec,
-            compiled,
+            _compile(spec),
             actor,
             case_type_id,
             auto_run,
         )
 
-    async def refresh_trial_matcher(self, model_id: Id, actor: Actor) -> ModelVersion:
+    async def add_version(self, model_id: Id, spec: AnySpec, actor: Actor) -> ModelVersion:
         model = await self.models.get(model_id)
-        if model.kind != trials_kind.KIND:
-            raise Invalid(f"{model.name} is not a trial matcher")
-        latest = await self.models.version(model.id, model.latest_version)
-        spec = latest.spec
-        assert isinstance(spec, TrialMatcherSpec)
+        if spec.kind != model.kind:
+            raise Invalid(f"{model.name} is a {model.kind} model, not {spec.kind}")
         version = ModelVersion(
             id=uuid7(),
             model_id=model.id,
             version=model.latest_version + 1,
             spec=spec,
-            compiled=await self._read_trials(spec, actor),
-            created_by=actor,
-            created_at=self.clock.now(),
-        )
-        await self._check_covered(model, version)
-        await self.models.add_version(version)
-        return version
-
-    async def _read_trials(self, spec: TrialMatcherSpec, actor: Actor) -> TrialCompiled:
-        """The trials of the matcher's cancer groups, one row each, with the nearest
-        recruiting site from each city, read from the trials data step in a new run."""
-        groups = "|".join(sorted(set(spec.groups.values())))
-        nearest = ", ".join(
-            f"arg_min(facility, km_{c}) AS {c}_facility, arg_min(city, km_{c}) AS {c}_city, "
-            f"arg_min(country, km_{c}) AS {c}_country, min(km_{c}) AS {c}_km"
-            for c in trials_kind.CITIES
-        )
-        explored = await self.exploration.query(
-            spec.operator_id,
-            Clauses(
-                select="nct_id, any_value(title) AS title, any_value(phase) AS phase, "
-                "any_value(conditions) AS conditions, any_value(cancer_groups) AS cancer_groups, "
-                "any_value(sex) AS sex, any_value(min_age_years) AS min_age_years, "
-                "any_value(max_age_years) AS max_age_years, "
-                "any_value(eligibility) AS eligibility, "
-                "any_value(recruiting_countries) AS recruiting_countries, "
-                "bool_or(country = 'Finland') AS finnish_site, "
-                f"{nearest}, any_value(url) AS url",
-                where=f"regexp_matches(cancer_groups, '(^|, )({groups})(,|$)')",
-                group_by="nct_id",
-                order_by="nct_id",
-            ),
-            actor,
-            limit=MAX_EXPLORATION_ROWS,
-        )
-        if explored.rows.truncated:
-            raise Invalid(
-                f"More than {MAX_EXPLORATION_ROWS} recruiting trials match the matcher's cancer "
-                "groups: narrow the groups"
-            )
-        return TrialCompiled(
-            trials=tuple(trials_kind.pinned(explored.rows)),
-            run_id=None if explored.run_id is None else str(explored.run_id),
-            read_at=self.clock.now(),
-        )
-
-    async def add_version(self, model_id: Id, spec: ModelSpec, actor: Actor) -> ModelVersion:
-        model = await self.models.get(model_id)
-        if model.kind != pathway.KIND:
-            raise Invalid(f"{model.name} takes no spec of this shape; refresh it instead")
-        compiled = compile_spec(spec)
-        version = ModelVersion(
-            id=uuid7(),
-            model_id=model.id,
-            version=model.latest_version + 1,
-            spec=spec,
-            compiled=compiled,
+            compiled=_compile(spec),
             created_by=actor,
             created_at=self.clock.now(),
         )
@@ -301,3 +242,12 @@ class StatisticalModels(StatisticalModelService):
         model = await self.models.get(model_id)
         if model.kind != pathway.KIND:
             raise Invalid(f"{model.name} is a {model.kind} model: it has no profile evaluation")
+
+
+def _compile(spec: AnySpec) -> AnyCompiled:
+    """What a version's build derives from its spec, by kind: the survival model's targets,
+    parameters and population view; nothing for a trial matcher, which reads its data when
+    it runs."""
+    if isinstance(spec, TrialMatcherSpec):
+        return TrialCompiled()
+    return compile_spec(spec)
