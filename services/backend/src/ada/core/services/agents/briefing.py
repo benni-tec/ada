@@ -180,6 +180,7 @@ a table a model reads off the page; for a PDF, options.pdf {start, end, ocr} rea
 those pages, with OCR for a table that is an image). Give each full provenance: the publisher, the \
 licence ("unknown", with the reason, when it cannot be established), the landing page, \
 and found_by (the query and scope that found it).
+- JSON HTTP options: paginate (token/param or more/page), probe (field/fields, method, body).
 - Check that each source loads before you report it: refresh_source with wait, then \
 add_source_operator and preview_operator on it. Fix a source that fails with \
 update_source, or leave it out of the report.
