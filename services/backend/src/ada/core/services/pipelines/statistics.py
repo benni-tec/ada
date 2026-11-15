@@ -30,6 +30,11 @@ PERIODS = NUMERIC | {ColumnType.DATE, ColumnType.TIMESTAMP}
 
 # Two-sided 95 % critical values of Student's t by degrees of freedom. Between rows the
 # smaller df's (larger) value is used, so an interval is never too narrow.
+TREND_OUTPUTS = (
+    "n", "first_period", "last_period", "slope", "slope_lower", "slope_upper",
+    "confidence", "r2", "direction",
+)  # fmt: skip
+
 T_95 = (
     (1, 12.706), (2, 4.303), (3, 3.182), (4, 2.776), (5, 2.571), (6, 2.447), (7, 2.365),
     (8, 2.306), (9, 2.262), (10, 2.228), (11, 2.201), (12, 2.179), (13, 2.160),
@@ -73,6 +78,7 @@ def _trend(args: DomainModel, columns: tuple[Column, ...], roles: Roles) -> Comp
     cols.need(args.value, NUMERIC, "value")
     cols.need(args.time, PERIODS, "time")
     cols.distinct(args.by, (args.value, args.time))
+    cols.free(TREND_OUTPUTS, args.by)
     by = _list(args.by)
     x = _years(args.time, cols.type(args.time))
     partition = f"PARTITION BY {by}" if by else ""
@@ -81,22 +87,23 @@ def _trend(args: DomainModel, columns: tuple[Column, ...], roles: Roles) -> Comp
     df = "(count(*) - 2)"
     sql = f"""-- statistic trend: least-squares slope of {args.value} per year, 95 % CI
 WITH points AS (
-  SELECT {keys}CAST({x} AS DOUBLE) AS x, CAST({quote(args.value)} AS DOUBLE) AS y
+  SELECT {keys}CAST({x} AS DOUBLE) AS __x, CAST({quote(args.value)} AS DOUBLE) AS __y
   FROM input_0 WHERE {quote(args.value)} IS NOT NULL AND {quote(args.time)} IS NOT NULL
 ), fitted AS (
-  SELECT *, regr_slope(y, x) OVER w AS b, regr_intercept(y, x) OVER w AS a
+  SELECT *, regr_slope(__y, __x) OVER w AS __b, regr_intercept(__y, __x) OVER w AS __a
   FROM points WINDOW w AS ({partition})
 ), fit AS (
-  SELECT {keys}count(*) AS n, min(x) AS first_period, max(x) AS last_period,
-    any_value(b) AS slope, regr_r2(y, x) AS r2,
-    sqrt(sum(power(y - (a + b * x), 2)) / nullif({df}, 0) / nullif(regr_sxx(y, x), 0)) AS se,
-    {_t95(df)} AS t
+  SELECT {keys}count(*) AS n, min(__x) AS first_period, max(__x) AS last_period,
+    any_value(__b) AS slope, regr_r2(__y, __x) AS r2,
+    sqrt(sum(power(__y - (__a + __b * __x), 2)) / nullif({df}, 0)
+      / nullif(regr_sxx(__y, __x), 0)) AS __se,
+    {_t95(df)} AS __t
   FROM fitted {group}
 )
 SELECT {keys}n, first_period, last_period, slope,
-  slope - t * se AS slope_lower, slope + t * se AS slope_upper, 95 AS confidence, r2,
-  CASE WHEN n < 3 OR se IS NULL THEN 'too few points'
-    WHEN slope - t * se > 0 THEN 'rising' WHEN slope + t * se < 0 THEN 'falling'
+  slope - __t * __se AS slope_lower, slope + __t * __se AS slope_upper, 95 AS confidence, r2,
+  CASE WHEN n < 3 OR __se IS NULL THEN 'too few points'
+    WHEN slope - __t * __se > 0 THEN 'rising' WHEN slope + __t * __se < 0 THEN 'falling'
     ELSE 'no clear trend' END AS direction
 FROM fit"""
     measure = MeasureRole(value="slope", lower="slope_lower", upper="slope_upper")
@@ -131,12 +138,12 @@ def _gap_to_best(args: DomainModel, columns: tuple[Column, ...], roles: Roles) -
     cols.free(("best_value", "best_entity", "gap", "gap_pct", "rank"))
     value, entity = quote(args.value), quote(args.entity)
     best, pick = ("max", "arg_max") if args.better == "higher" else ("min", "arg_min")
-    gap = "best_value - v" if args.better == "higher" else "v - best_value"
+    gap = "best_value - __v" if args.better == "higher" else "__v - best_value"
     order = "DESC" if args.better == "higher" else "ASC"
     window = _window(args.within, "")
     sql = f"""-- statistic gap_to_best: shortfall of {args.value} against the best {args.entity}, {args.better} is better
-SELECT * EXCLUDE (v), {gap} AS gap, ({gap}) / nullif(abs(best_value), 0) * 100 AS gap_pct FROM (
-  SELECT *, {value} AS v, {best}({value}) OVER w AS best_value,
+SELECT * EXCLUDE (__v), {gap} AS gap, ({gap}) / nullif(abs(best_value), 0) * 100 AS gap_pct FROM (
+  SELECT *, {value} AS __v, {best}({value}) OVER w AS best_value,
     {pick}({entity}, {value}) OVER w AS best_entity,
     rank() OVER ({_window(args.within, f"ORDER BY {value} {order} NULLS LAST")}) AS rank
   FROM input_0 WINDOW w AS ({window})
@@ -152,11 +159,16 @@ def _outliers(args: DomainModel, columns: tuple[Column, ...], roles: Roles) -> C
     cols.free(("median", "mad", "robust_z", "is_outlier"))
     value = f"CAST({quote(args.value)} AS DOUBLE)"
     window = _window(args.within, "")
-    sql = f"""-- statistic outliers: robust z-score of {args.value} (median, MAD), flagged above {args.threshold:g}
+    sql = f"""-- statistic outliers: robust z-score of {args.value} (median, MAD; mean absolute deviation when MAD is 0), flagged above {args.threshold:g}
 SELECT *, coalesce(abs(robust_z) > {args.threshold!r}, false) AS is_outlier FROM (
-  SELECT *, 0.6745 * ({value} - median) / nullif(mad, 0) AS robust_z FROM (
-    SELECT *, median({value}) OVER w AS median, mad({value}) OVER w AS mad
-    FROM input_0 WINDOW w AS ({window})
+  SELECT * EXCLUDE (__v, __meanad), CASE
+      WHEN mad > 0 THEN 0.6745 * (__v - median) / mad
+      WHEN __meanad > 0 THEN (__v - median) / (1.253314 * __meanad)
+      WHEN __v IS NOT NULL THEN 0.0 END AS robust_z FROM (
+    SELECT *, avg(abs(__v - median)) OVER w AS __meanad FROM (
+      SELECT *, {value} AS __v, median({value}) OVER w AS median, mad({value}) OVER w AS mad
+      FROM input_0 WINDOW w AS ({window})
+    ) WINDOW w AS ({window})
   )
 )"""  # noqa: E501
     return Compiled(sql, _plus(roles, "robust_z"))
@@ -178,6 +190,8 @@ COMPILERS: dict[str, Callable[[DomainModel, tuple[Column, ...], Roles], Compiled
 class _Columns:
     def __init__(self, columns: tuple[Column, ...]) -> None:
         self.by_name = {column.name: column for column in columns}
+        # DuckDB resolves names case-insensitively, so a clash is one too.
+        self.folded = {column.name.lower() for column in columns}
 
     def type(self, name: str) -> ColumnType:
         return self.by_name[name].type
@@ -197,12 +211,15 @@ class _Columns:
         if len(set(group)) != len(group) or set(group) & set(used):
             raise Invalid("Each grouping column may appear once and not be the value or time")
 
-    def free(self, names: Sequence[str]) -> None:
-        taken = [name for name in names if name in self.by_name]
-        if taken:
+    def free(self, names: Sequence[str], among: Sequence[str] | None = None) -> None:
+        """The names this statistic adds must not clash with the input's columns (or, when
+        given, with the ones it keeps)."""
+        kept = self.folded if among is None else {name.lower() for name in among}
+        taken = [name for name in names if name.lower() in kept]
+        if taken or any(name.startswith("__") for name in kept):
             raise Invalid(
-                f"The input already has the column(s) {', '.join(taken)}, which this "
-                "statistic adds; rename them in a transform first"
+                f"The input already has the column(s) {', '.join(taken) or 'starting with __'}"
+                ", which this statistic uses; rename them in a transform first"
             )
 
 

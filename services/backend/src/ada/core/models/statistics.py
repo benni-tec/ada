@@ -75,7 +75,8 @@ CATALOGUE: dict[str, tuple[type[DomainModel], str]] = {
     "outliers": (
         Outliers,
         "every row with the median and median absolute deviation of `value` in its "
-        "`within` group, the robust z-score and is_outlier (|z| above `threshold`).",
+        "`within` group, the robust z-score (from the mean absolute deviation when the "
+        "median one is 0) and is_outlier (|z| above `threshold`).",
     ),
 }
 

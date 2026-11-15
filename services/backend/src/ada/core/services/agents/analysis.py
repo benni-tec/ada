@@ -8,11 +8,10 @@ figure that is not in that output, in the finding, the summary or a caveat. The 
 report names the run and, per finding, the operator and the snapshots it rests on (source,
 fetch time, content hash), so each number traces back like a widget's."""
 
-import math
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Context, Decimal, InvalidOperation
 
 from ada.core.models.actors import Actor
 from ada.core.models.agents import Finding
@@ -42,7 +41,11 @@ from ada.core.services.reports.sources import SourcesList
 
 # A figure as written in prose: digits with an optional decimal part and thousands commas,
 # not part of a word or an id (op_3f2…). The sign is left out: "fell by 1.5" cites -1.5.
-_FIGURE = re.compile(r"(?<![\w.])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\w])|(?<![\w.])\d+(?:\.\d+)?")
+# A figure as written: thousands separators, decimals and an exponent belong to it.
+_FIGURE = re.compile(r"(?<![\w.])(?:\d{1,3}(?:,\d{3})+(?![\d])|\d+)(?:\.\d+)?(?:[eE][+-]?\d+)?")
+# An ISO date is one figure, matched against date cells (and dates written in text cells).
+_DATE = re.compile(r"(?<![\w.-])\d{4}-\d{2}-\d{2}(?![\w])")
+_EXACT = Context(prec=200)
 
 
 class Analysis(AnalysisService):
@@ -126,9 +129,12 @@ class Analysis(AnalysisService):
                     f"{operator.id}{_cut_note(rows)}"
                 )
         evidence = [rows for _, rows in cited.values()]
-        for label, text in [("The summary", summary)] + [
-            (f"Caveat {number}", caveat) for number, caveat in enumerate(caveats, 1)
-        ]:
+        not_shown = [item.strip() for item in not_shown if item.strip()]
+        for label, text in (
+            [("The summary", summary)]
+            + [(f"Caveat {number}", caveat) for number, caveat in enumerate(caveats, 1)]
+            + [(f"Could not show {number}", item) for number, item in enumerate(not_shown, 1)]
+        ):
             if missing := unsupported(text, evidence):
                 problems.append(f"{label}: {', '.join(missing)} not in any cited output")
         if problems:
@@ -197,40 +203,60 @@ class Analysis(AnalysisService):
 
 
 def unsupported(text: str, evidence: Sequence[Rows]) -> list[str]:
-    """The figures in `text` that no cell of `evidence` holds, as written. A figure with d
-    decimals matches a value that rounds (half up) to it at d decimals, either sign; a date
-    matches its year; a text cell contributes the figures written in it."""
-    values = [value for rows in evidence for value in _values(rows)]
+    """The figures in `text` that no cell of `evidence` holds, as written. A figure matches a
+    value that rounds (half up, either sign) to it at its written precision; an ISO date
+    matches a date cell of that day, and a year any date in it; a text cell contributes the
+    figures and dates written in it."""
+    numbers: set[Decimal] = set()
+    days: set[str] = set()
+    for rows in evidence:
+        for row in rows.rows:
+            for cell in row:
+                _collect(cell, numbers, days)
     missing: list[str] = []
-    for match in _FIGURE.finditer(text):
-        written = match.group()
-        figure = float(written.replace(",", ""))
-        decimals = len(written.split(".")[1]) if "." in written else 0
-        # Rounded half up: the values in [figure - half, figure + half) print as it.
-        half, slack = 0.5 * 10**-decimals, 1e-9 * max(1.0, figure)
-        if not any(-half - slack <= value - figure < half - slack for value in values):
-            if written not in missing:
-                missing.append(written)
+    for found in _DATE.finditer(text):
+        if found.group() not in days and found.group() not in missing:
+            missing.append(found.group())
+    for found in _FIGURE.finditer(_DATE.sub(" ", text)):
+        written = found.group()
+        if not _held(written, numbers) and written not in missing:
+            missing.append(written)
     return missing
 
 
-def _values(rows: Rows) -> Iterable[float]:
-    for row in rows.rows:
-        for cell in row:
-            match cell:
-                case bool() | None:
-                    continue
-                case int() | float() | Decimal():
-                    number = float(cell)
-                    if math.isfinite(number):
-                        yield abs(number)
-                case datetime() | date():
-                    yield float(cell.year)
-                case str():
-                    for found in _FIGURE.finditer(cell):
-                        yield float(found.group().replace(",", ""))
-                case _:
-                    continue
+def _held(written: str, numbers: set[Decimal]) -> bool:
+    figure = Decimal(written.replace(",", ""))
+    step = Decimal(1).scaleb(figure.as_tuple().exponent)  # type: ignore[arg-type]
+    for number in numbers:
+        try:
+            if number.quantize(step, ROUND_HALF_UP, _EXACT) == figure:
+                return True
+        except InvalidOperation:
+            continue
+    return False
+
+
+def _collect(cell: object, numbers: set[Decimal], days: set[str]) -> None:
+    match cell:
+        case bool() | None:
+            return
+        case int() | Decimal():
+            if Decimal(cell).is_finite():
+                numbers.add(abs(Decimal(cell)))
+        case float():
+            if Decimal(repr(cell)).is_finite():
+                numbers.add(abs(Decimal(repr(cell))))
+        case datetime() | date():
+            days.add(cell.isoformat()[:10])
+            numbers.add(Decimal(cell.year))
+        case str():
+            for day in _DATE.findall(cell):
+                days.add(day)
+                numbers.add(Decimal(day[:4]))
+            for found in _FIGURE.finditer(_DATE.sub(" ", cell)):
+                numbers.add(Decimal(found.group().replace(",", "")))
+        case _:
+            return
 
 
 def _cut_note(rows: Rows) -> str:

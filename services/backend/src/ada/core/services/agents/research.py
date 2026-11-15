@@ -132,6 +132,8 @@ class Research(ResearchService):
         actor: Actor,
     ) -> SessionEntry:
         child = await self.sessions.get(child_session_id)
+        if child.agent is not SessionAgent.RESEARCH:
+            raise Invalid("Only a research session reports back; an analysis uses report_findings")
         if not summary.strip():
             raise Invalid("A report needs a summary")
         sections = [summary.strip()]

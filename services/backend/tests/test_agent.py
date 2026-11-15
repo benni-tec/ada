@@ -8,7 +8,8 @@ container, in the client's event loop."""
 import asyncio
 import json
 from collections.abc import AsyncIterator, Iterator, Sequence
-from datetime import timedelta
+from datetime import date, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid7
@@ -36,6 +37,7 @@ from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.agents import AgentTurn, ProviderKind, ResearchLimits, ToolPart, TurnStatus
 from ada.core.models.agents import TextPart as AnswerText
 from ada.core.models.alerts import Alert, AlertRule, AlertState
+from ada.core.models.analysis import Rows
 from ada.core.models.base import Id
 from ada.core.models.judges import Finding, Outcome
 from ada.core.models.reports import Report, ReportVersion
@@ -48,6 +50,7 @@ from ada.core.ports.sources import SourceReaders
 from ada.core.ports.system import Clock
 from ada.core.ports.web import WebBudget, WebSearch
 from ada.core.services.agents import service as agent_service
+from ada.core.services.agents.analysis import unsupported
 from ada.core.services.agents.research import ResearchReaders, researching
 from ada.core.services.ports.agents import AgentTurnService, ResearchService
 from ada.core.services.ports.projects import ProjectService
@@ -1609,3 +1612,18 @@ def test_an_analysis_without_a_checked_report_passes_on_no_figures(
     assert posted["kind"] == "report"
     assert "12.5" not in posted["text"]
     assert posted["text"].startswith("The analysis ended without a checked report")
+
+
+def test_the_gate_reads_each_figure_as_written() -> None:
+    rows = Rows(
+        columns=(),
+        rows=((1_000_000_000.0, Decimal("12.75"), date(2024, 3, 12), "-0.4 per year"),),
+    )
+    passes = "1000000000.00, 1,000,000,000, 12.8, 12.75, 13, 2024-03-12, 2024 and 0.4"
+    assert unsupported(passes, [rows]) == []
+    assert unsupported("1e99, 12.7, 2024-03-13 and 12.751", [rows]) == [
+        "2024-03-13",
+        "1e99",
+        "12.7",
+        "12.751",
+    ]
