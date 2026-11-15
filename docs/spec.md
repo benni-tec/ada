@@ -19,7 +19,7 @@ An MCP server for traceable data analysis: an agent builds pipelines from data s
 | Two outputs: live monitoring dashboards, and reports frozen at a run | Settled |
 | Reports are versioned with semantic versions under one name | Settled; what each level means is proposed |
 | Time ranges are a first-class concept | Settled |
-| Input operators make sources swappable, which gives simulation and templates | Settled |
+| Input operators compose pipelines into a DAG and make sources swappable, which gives templates | Settled |
 | Recommendations come from an agent operator and are shown by a widget | Settled |
 | Alerts are defined on pipelines, not on widgets | Settled; the condition is a formula tree in the rule |
 | Definitions in a relational database, analysis data in DuckDB | Proposed |
