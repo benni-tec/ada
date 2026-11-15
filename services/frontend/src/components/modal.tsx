@@ -1,10 +1,11 @@
 import { X } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
 import { Hint } from './icon-action'
+import { useInertBehind } from './inert-behind'
 
 /**
  * A large modal dialog over the page, on shadcn's Dialog (Radix), which gives it:
@@ -87,23 +88,4 @@ export function Modal({
       </DialogContent>
     </Dialog>
   )
-}
-
-/** Makes everything outside the dialog's layer `inert` while it is open. Layers opened
- * later (a tooltip, a dialog on top) are new children of <body> and stay reachable. */
-function useInertBehind(dialog: HTMLElement | null) {
-  useEffect(() => {
-    if (!dialog) return
-    const others = [...document.body.children].filter(
-      (element): element is HTMLElement =>
-        element instanceof HTMLElement &&
-        !element.contains(dialog) &&
-        element.getAttribute('data-slot') !== 'dialog-overlay' &&
-        !element.hasAttribute('inert'),
-    )
-    for (const element of others) element.setAttribute('inert', '')
-    return () => {
-      for (const element of others) element.removeAttribute('inert')
-    }
-  }, [dialog])
 }
