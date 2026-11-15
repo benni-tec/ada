@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { RunsBadge } from '@/components/cases/labels'
-import { ErrorNotice } from '@/components/notices'
+import { ErrorNotice, Loading } from '@/components/notices'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -27,7 +27,7 @@ export const Route = createFileRoute('/projects/$projectId/models/')({
 function ModelsPage() {
   const { projectId } = Route.useParams()
   const queryClient = useQueryClient()
-  const { data: models } = useQuery(statisticalModelsQuery(projectId))
+  const { data: models, error } = useQuery(statisticalModelsQuery(projectId))
   const { data: caseTypes } = useQuery(caseTypesQuery(projectId))
   const create = useMutation({
     mutationFn: () => createPathwayModel(projectId),
@@ -51,7 +51,11 @@ function ModelsPage() {
         }
       />
       {create.isError && <ErrorNotice error={create.error} />}
-      {models && models.length === 0 ? (
+      {error ? (
+        <ErrorNotice error={error} prefix="Could not load the models:" />
+      ) : !models ? (
+        <Loading what="the models" />
+      ) : models.length === 0 ? (
         <p className="text-sm text-muted-foreground">No models yet.</p>
       ) : (
         <div className="rounded-xl border bg-card">
@@ -68,7 +72,7 @@ function ModelsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {models?.map((model) => (
+              {models.map((model) => (
                 <ModelRow key={model.id} projectId={projectId} model={model} caseTypes={caseTypes ?? []} />
               ))}
             </TableBody>

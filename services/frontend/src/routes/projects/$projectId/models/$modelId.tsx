@@ -43,10 +43,22 @@ function ModelPage() {
   const { projectId, modelId } = Route.useParams()
   const { view = 'card' } = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { data: model } = useQuery(statisticalModelQuery(modelId))
-  const { data: version } = useQuery(latestVersionQuery(modelId))
+  const { data: model, error: modelError } = useQuery(statisticalModelQuery(modelId))
+  const { data: version, error: versionError } = useQuery(latestVersionQuery(modelId))
   const { data: caseType } = useQuery({ ...caseTypeQuery(model?.case_type_id ?? ''), enabled: model?.case_type_id != null })
-  if (!model || !version) return <p className="p-6 text-sm text-muted-foreground">Loading…</p>
+  const error = modelError ?? versionError
+  if (error)
+    return (
+      <div className="p-4 md:p-6">
+        <ErrorNotice error={error} prefix="Could not load the model:" />
+      </div>
+    )
+  if (!model || !version)
+    return (
+      <div className="p-4 md:p-6">
+        <Loading what="the model" />
+      </div>
+    )
   return (
     <div className="flex max-w-6xl flex-col gap-6 p-4 md:p-6">
       <PageHeader

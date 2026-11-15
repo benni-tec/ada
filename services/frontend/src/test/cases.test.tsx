@@ -248,6 +248,12 @@ test('the pathway result in the sheet leads with the deadlines', async () => {
   expect(within(sheet).getByText(/would start a pathway in Norway and Sweden/)).toBeInTheDocument()
   expect(within(sheet).getByText('overdue by 3 days')).toBeInTheDocument()
   expect(within(sheet).getByText('Offer a patient navigator to keep the next steps on time.')).toBeInTheDocument()
+  // Survival is relative survival per 100, said so, never "alive".
+  const survival = sheet.querySelector('[data-section="survival"]') as HTMLElement
+  expect(within(survival).getByRole('heading', { name: '5-year relative survival, per 100' })).toBeInTheDocument()
+  expect(within(survival).getByRole('img', { name: '5-year relative survival 35 per 100' })).toBeInTheDocument()
+  expect(within(survival).getByText(/same age and sex without cancer/)).toBeInTheDocument()
+  expect(sheet).not.toHaveTextContent(/alive/i)
 })
 
 test('the model page lists every eligible case, with "Not run" where there is no result', async () => {

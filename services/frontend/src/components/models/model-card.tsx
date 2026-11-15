@@ -67,6 +67,7 @@ export function ModelCard({ version }: { version: ModelVersion }) {
           <table className="mt-3 w-full text-sm">
             <thead className="text-left text-muted-foreground">
               <tr>
+                <th className="py-1 pr-2 font-medium">Site</th>
                 <th className="py-1 pr-2 font-medium">Step</th>
                 <th className="py-1 pr-2 font-medium">By country</th>
                 <th className="py-1 font-medium">Target</th>
@@ -77,7 +78,8 @@ export function ModelCard({ version }: { version: ModelVersion }) {
                 const key = t.step ?? 'pathway'
                 const target = compiled.targets[t.site]?.[key]?.[t.modality ?? 'any']
                 return (
-                  <tr key={i} className="border-t">
+                  <tr key={i} className="border-t" data-site={t.site}>
+                    <td className="py-1 pr-2 capitalize">{t.site}</td>
                     <td className="py-1 pr-2">
                       {stepLabel(t.step)}
                       {t.modality && <span className="text-muted-foreground"> · {t.modality}</span>}
@@ -145,9 +147,9 @@ export function ModelCard({ version }: { version: ModelVersion }) {
                   <td className="py-2 pr-2 font-medium">
                     baseline · {[cell.site, cell.sex, cell.age_band, cell.stage].filter(Boolean).join(' · ')}
                   </td>
-                  <td className="py-2 pr-2">{Math.round(cell.survival * 100)} of 100 alive at 5 years</td>
+                  <td className="py-2 pr-2">{Math.round(cell.survival * 100)} per 100</td>
                   <td className="py-2 pr-2 text-muted-foreground">{cell.provenance.source}</td>
-                  <td className="py-2 pr-2 text-muted-foreground">survival</td>
+                  <td className="py-2 pr-2 text-muted-foreground">5-year relative survival</td>
                   <td className="py-2">
                     <GradePill grade={cell.provenance.grade} />
                   </td>
@@ -156,6 +158,11 @@ export function ModelCard({ version }: { version: ModelVersion }) {
             </tbody>
           </table>
         </div>
+        {spec.baseline.length > 0 && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Baseline rows: 5-year relative survival per 100, compared with people of the same age and sex without cancer.
+          </p>
+        )}
         {compiled.warnings.length > 0 && (
           <ul className="mt-3 list-disc pl-5 text-xs text-muted-foreground">
             {compiled.warnings.map((w) => (
@@ -181,7 +188,7 @@ export function ModelCard({ version }: { version: ModelVersion }) {
           <h2 className="text-base font-semibold">Validation</h2>
           <ul className="mt-2 flex flex-col gap-1 text-sm">
             <li>Deadlines and days behind target: exact, tested against hand calculations.</li>
-            <li>The average Finnish profile lands on Finland's observed survival; the residual is reported (Population).</li>
+            <li>The average Finnish profile lands on Finland's observed relative survival; the residual is reported (Population).</li>
           </ul>
           {compiled.validation.length > 0 && (
             <table className="mt-3 w-full text-sm" data-validation>

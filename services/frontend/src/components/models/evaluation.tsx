@@ -39,7 +39,13 @@ export function EvaluationTab({ modelId, version }: { modelId: Id; version: Mode
     treatment_started: false,
     toggles: {},
   })
-  const evaluate = useMutation({ mutationFn: (body: EvaluationInputs) => evaluateModel(modelId, body) })
+  // The last result with the inputs it was computed from, so it never shows next to a
+  // profile it was not computed for.
+  const [shown, setShown] = useState<{ result: Evaluation; inputs: EvaluationInputs } | null>(null)
+  const evaluate = useMutation({
+    mutationFn: (body: EvaluationInputs) => evaluateModel(modelId, body, version.version),
+    onSuccess: (result, body) => setShown({ result, inputs: body }),
+  })
   const set = (patch: Partial<EvaluationInputs>) => setInputs((current) => ({ ...current, ...patch }))
   const setDay = (step: PathwayStep, value: string) =>
     setInputs((current) => {
@@ -130,18 +136,45 @@ export function EvaluationTab({ modelId, version }: { modelId: Id; version: Mode
       </form>
 
       <div className="flex min-w-0 flex-1 basis-[520px] flex-col gap-6">
-        {evaluate.data ? (
-          <Result result={evaluate.data} version={version} inputs={inputs} onToggle={(name, on) => {
-            const next = { ...inputs, toggles: { ...inputs.toggles, [name]: on } }
-            setInputs(next)
-            evaluate.mutate(next)
-          }} />
+        {shown ? (
+          <>
+            {!sameInputs(shown.inputs, inputs) && (
+              <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+                The profile has changed since this result. Evaluate again to update it.
+              </p>
+            )}
+            <Result
+              result={shown.result}
+              version={version}
+              inputs={shown.inputs}
+              onToggle={(name, on) => {
+                const toggles = { ...shown.inputs.toggles, [name]: on }
+                setInputs((current) => ({ ...current, toggles: { ...current.toggles, [name]: on } }))
+                evaluate.mutate({ ...shown.inputs, toggles })
+              }}
+            />
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">Fill in the profile and evaluate.</p>
         )}
       </div>
     </div>
   )
+}
+
+/** Whether two profiles are the same, whatever order their keys were set in. */
+function sameInputs(a: EvaluationInputs, b: EvaluationInputs) {
+  const stable = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(stable)
+      : value !== null && typeof value === 'object'
+        ? Object.fromEntries(
+            Object.entries(value)
+              .sort(([x], [y]) => x.localeCompare(y))
+              .map(([k, v]) => [k, stable(v)]),
+          )
+        : value
+  return JSON.stringify(stable(a)) === JSON.stringify(stable(b))
 }
 
 function Select({ label, value, options, onChange }: { label: string; value: string; options: readonly string[]; onChange: (value: string) => void }) {
@@ -242,10 +275,10 @@ function Result({ result, version, inputs, onToggle }: { result: Evaluation; ver
       </section>
 
       <section className="rounded-lg border bg-card p-4" data-section="survival">
-        <h2 className="text-base font-semibold">Alive at 5 years, out of 100 people with this profile</h2>
+        <h2 className="text-base font-semibold">5-year relative survival</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Nordic survival for this profile, adjusted for the days beyond target. The evidence for these figures is weaker
-          than for the deadlines above.
+          Per 100 people with this profile, compared with people of the same age and sex without cancer. The Nordic level,
+          adjusted for the days beyond target. The evidence for these figures is weaker than for the deadlines above.
         </p>
         <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Settings">
           {version.spec.toggles.map((t) => {
@@ -263,9 +296,9 @@ function Result({ result, version, inputs, onToggle }: { result: Evaluation; ver
           <div className="min-w-[200px] flex-1 rounded-md bg-muted p-3 text-sm">
             <strong>Range across the settings</strong>
             <br />
-            As it stands: {survival.range_now.low}–{survival.range_now.high} of 100
+            As it stands: {survival.range_now.low}–{survival.range_now.high} per 100
             <br />
-            On target: {survival.range_on_target.low}–{survival.range_on_target.high} of 100
+            On target: {survival.range_on_target.low}–{survival.range_on_target.high} per 100
           </div>
         </div>
         {levers.length > 0 && (
@@ -274,7 +307,7 @@ function Result({ result, version, inputs, onToggle }: { result: Evaluation; ver
               <li key={lever.step + lever.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-md border p-3 text-sm">
                 <span>
                   <strong>{lever.label}</strong>
-                  {lever.gain > 0 && <span> · about {lever.gain} more of 100</span>}
+                  {lever.gain > 0 && <span> · about {lever.gain} more per 100</span>}
                   <span className="block text-muted-foreground">{lever.text}</span>
                 </span>
                 <GradePill grade={lever.grade} />
@@ -317,9 +350,9 @@ function IconArray({ value, extra, label, total }: { value: number; extra: numbe
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline gap-2">
         <span className={`text-3xl font-bold ${total != null ? 'text-blue-700 dark:text-blue-400' : ''}`}>{shown}</span>
-        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="text-sm text-muted-foreground">per 100, {label}</span>
       </div>
-      <div role="img" aria-label={`${shown} of 100 people alive at 5 years ${label}`} className="grid grid-cols-10 gap-1">
+      <div role="img" aria-label={`5-year relative survival ${shown} per 100, ${label}`} className="grid grid-cols-10 gap-1">
         {Array.from({ length: 100 }, (_, i) => (
           <span key={i} className={`size-3 rounded-full ${i < value ? 'bg-neutral-700' : i < value + extra ? 'bg-blue-700' : 'bg-muted'}`} />
         ))}
