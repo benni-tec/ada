@@ -93,28 +93,33 @@ class Pipelines(PipelineService):
         id = operator_identity(project_id, OperatorKind.HISTORY, params, (upstream.id,))
         if existing := await self._find(id):
             return existing
-        anchor = await self.columns.source_snapshot(upstream)
-        snapshots = sorted(
-            (
-                s
-                for s in await self.columns.snapshots.list(upstream.id)
-                if s.parameters_key == SOURCE_KEY
-                and (s.fetched_at, s.id) <= (anchor.fetched_at, anchor.id)
-            ),
-            key=lambda s: (s.fetched_at, s.id),
-            reverse=True,
-        )[:last]
-        columns = await self.store.describe(
-            compose(
-                QueryNode(
-                    id,
-                    " UNION ALL BY NAME ".join(
-                        f"SELECT * FROM input_{i}" for i in range(len(snapshots))
-                    ),
-                    tuple(SnapshotNode(s) for s in snapshots),
+        anchor = await self.columns.snapshots.current(upstream.id, SOURCE_KEY)
+        if anchor is None and upstream.output.columns:
+            # Declared columns let projects build before their first scheduled refresh.
+            columns = upstream.output.columns
+        else:
+            anchor = await self.columns.source_snapshot(upstream)
+            snapshots = sorted(
+                (
+                    s
+                    for s in await self.columns.snapshots.list(upstream.id)
+                    if s.parameters_key == SOURCE_KEY
+                    and (s.fetched_at, s.id) <= (anchor.fetched_at, anchor.id)
+                ),
+                key=lambda s: (s.fetched_at, s.id),
+                reverse=True,
+            )[:last]
+            columns = await self.store.describe(
+                compose(
+                    QueryNode(
+                        id,
+                        " UNION ALL BY NAME ".join(
+                            f"SELECT * FROM input_{i}" for i in range(len(snapshots))
+                        ),
+                        tuple(SnapshotNode(s) for s in snapshots),
+                    )
                 )
             )
-        )
         if any(c.name.lower() in {"snapshot_at", "snapshot_rank"} for c in columns):
             raise Invalid("Source history reserves the columns snapshot_at and snapshot_rank")
         return await self.operators.add(
