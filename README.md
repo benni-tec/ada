@@ -175,3 +175,19 @@ agent are shared by all projects.
 
 `GET /api/llm/models` lists the configured models and whether each can be used; no
 response ever carries a key.
+
+## Data and services
+
+- NORDCAN (IARC / Association of the Nordic Cancer Registries): cancer survival and incidence; used under its citation terms, systematic retrieval needs ANCR permission.
+- Sotkanet (THL): county indicators such as screening, survival and referrals; CC BY 4.0.
+- Statistics Finland: county boundaries and deaths; CC BY 4.0.
+- ClinicalTrials.gov (US National Library of Medicine): recruiting trial records, via its public API.
+- EU Clinical Trials Information System, CTIS (EMA): EU-authorised trials, via its public search.
+- Khalife et al. and a second article, Acta Oncologica 2025;64 (pp. 734 and 909): lung cancer pathway figures read from the PDFs; CC BY 4.0.
+- Drug-shortage pages of regulators and publishers (for example FDA, ASHP, Fimea, BfArM, AIFA, KNMP): read from each publisher's page under its own terms.
+- Context.dev: web scraping and page monitors (commercial service, its terms apply).
+- OpenAI and Google Gemini models: session, analyst and research agents (providers' terms apply).
+
+Data is fetched at runtime and belongs to its publishers; it is not part of this licence.
+
+Licensed under MIT; see LICENSE.
