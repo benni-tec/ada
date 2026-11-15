@@ -3,7 +3,8 @@ import { AbsoluteFill, Img, interpolate, Sequence, spring, staticFile, useCurren
 
 import { s } from './frame'
 import { LowerThird } from './LowerThird'
-import { CASES_FRAMES, CasesScene } from './scenes/CasesScene'
+import { CASES_FRAMES, CasesScene, TRIALS_FRAMES, TrialsScene } from './scenes/CasesScene'
+import { CASES_DATA_FRAMES, CasesDataScene } from './scenes/CasesDataScene'
 import { CHAT_FRAMES, ChatScene } from './scenes/ChatScene'
 import { Credits } from './scenes/Credits'
 import { FeedbackLoop, LOOP_FRAMES } from './scenes/FeedbackLoop'
@@ -60,16 +61,7 @@ const SECTIONS: Section[] = [
 
   // 1. The central tool: cases with models.
   { name: 'Cases', frames: CASES_FRAMES, scene: <CasesScene /> },
-  {
-    name: 'Trials',
-    frames: s(6),
-    scene: (
-      <Planned
-        title="And the trials worth discussing"
-        shows="The trial matcher on the same case: recruiting Nordic trials matched on cancer group, sex and age, Finnish sites first, then the nearest site from the case's county."
-      />
-    ),
-  },
+  { name: 'Trials', frames: TRIALS_FRAMES, scene: <TrialsScene /> },
 
   // 2. Where the models' data comes from: ADA's analysis.
   { name: 'Data', frames: s(2), scene: <Punch sub="where the models' data comes from">The data</Punch> },
@@ -101,7 +93,7 @@ const SECTIONS: Section[] = [
   },
   {
     name: 'Evidence',
-    frames: s(6),
+    frames: s(4),
     scene: (
       <Planned
         title="The model's figures cite their papers"
@@ -121,16 +113,7 @@ const SECTIONS: Section[] = [
       />
     ),
   },
-  {
-    name: 'Cases as data',
-    frames: s(12),
-    scene: (
-      <Planned
-        title="The cases are data too"
-        shows="The cases become a source: share within target per county and step, median days, the bottleneck step, and an alert when a step slips."
-      />
-    ),
-  },
+  { name: 'Cases as data', frames: CASES_DATA_FRAMES, scene: <CasesDataScene /> },
 
   // 4. The loop: why it lasts.
   { name: 'Loop', frames: LOOP_FRAMES, scene: <FeedbackLoop /> },

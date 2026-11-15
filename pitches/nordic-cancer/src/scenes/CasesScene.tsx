@@ -15,11 +15,12 @@ import { Cursor, type Point } from '../Cursor'
 import { s } from '../frame'
 import { LowerThird } from '../LowerThird'
 
-// A synthetic case from the dev database (SYN-00291) with the pathway model's real result.
+// A synthetic case from the dev database (SYN-00291) with the real results of both models.
 const caseType = caseTypeJson as unknown as CaseType
 const full = stateJson as unknown as CaseState
 const models = modelsJson as unknown as ModelOnCase[]
-const pathway = models[0]
+const pathway = models.find((model) => model.kind === 'patient_pathway')!
+const matcher = models.find((model) => model.kind === 'trial_matcher')!
 
 /** The steps the case has, in pathway order, revealed one at a time. */
 const DAYS = Object.entries((full.case.values.days ?? {}) as Record<string, number>)
@@ -30,26 +31,6 @@ function caseAt(frame: number): CaseState {
   return { ...full, case: { ...full.case, values: { ...full.case.values, days: Object.fromEntries(DAYS.slice(0, shown)) } } }
 }
 
-const SAVED = s(0.4) * DAYS.length + s(0.3)
-const SHEET = s(5)
-
-/** The pointer: along the steps as they are entered, to the result, a click on View result,
- * then the overdue deadline, the late step and the survival in the sheet. */
-const POINTER: Point[] = [
-  { at: 0, x: 1500, y: 980 },
-  { at: 10, x: 1110, y: 330 },
-  { at: 22, x: 1110, y: 372 },
-  { at: 34, x: 1110, y: 414 },
-  { at: SAVED + 16, x: 1120, y: 892 },
-  { at: SHEET - 10, x: 1560, y: 892 },
-  { at: SHEET - 5, x: 1560, y: 892, click: true },
-  { at: s(6.5), x: 1800, y: 300 },
-  { at: s(11.5), x: 1222, y: 682 },
-  { at: s(17.5), x: 1150, y: 952 },
-]
-
-export const CASES_FRAMES = s(26)
-
 const FOCUS_CSS = `
 [data-focus] [data-section]:not([data-section="pathway-result"]) { opacity: 0.22; }
 [data-focus="deadlines"] [data-section="deadlines"],
@@ -58,17 +39,52 @@ const FOCUS_CSS = `
 [data-focus="survival"] [data-section="support"] { opacity: 1 !important; }
 `
 
-/** The central tool: a case, the models that run on it, and what they give back. */
-export function CasesScene() {
-  const frame = useCurrentFrame()
-  const { fps } = useVideoConfig()
-  const state = caseAt(frame)
-  const ran = frame >= SAVED
-  const sheet = spring({ frame: frame - SHEET, fps, config: { damping: 200 }, durationInFrames: 14 })
-  // The part of the result the banner talks about; the rest dims.
-  const focus = frame < s(6) ? null : frame < s(11) ? 'deadlines' : frame < s(17) ? 'days' : 'survival'
+/**
+ * The case page as the app draws it: the case's data and timeline, the models on its type
+ * with their latest results, and, when `sheet` is set, a model's result sliding in from
+ * the right as the app's side sheet does.
+ */
+function CasePage({
+  state,
+  pathwayRan,
+  matcherRan,
+  sheet,
+  sheetIn,
+  focus,
+}: {
+  state: CaseState
+  pathwayRan: boolean
+  matcherRan: boolean
+  sheet: ModelOnCase | null
+  sheetIn: number
+  focus: string | null
+}) {
+  const row = (model: ModelOnCase, ran: boolean) => (
+    <TableRow key={model.model_id}>
+      <TableCell className="px-4 py-3 font-medium">{model.name}</TableCell>
+      <TableCell className="px-4 py-3">
+        <RunsBadge autoRun={model.auto_run} />
+      </TableCell>
+      <TableCell className="px-4 py-3">
+        {ran && model.latest ? (
+          <ResultBadge section={model.latest.section} />
+        ) : (
+          <span className="text-xs text-muted-foreground">{model.auto_run ? 'Running…' : 'Not evaluated for this case'}</span>
+        )}
+      </TableCell>
+      <TableCell className="px-4 py-3 text-right">
+        {model.auto_run || ran ? (
+          <Button variant="outline" disabled={!ran}>
+            View result
+          </Button>
+        ) : (
+          <Button>Evaluate</Button>
+        )}
+      </TableCell>
+    </TableRow>
+  )
   return (
-    <AbsoluteFill className="bg-background text-foreground">
+    <>
       <style>{FOCUS_CSS}</style>
       <TooltipProvider>
         <div style={{ zoom: 1.45, padding: '28px 40px' }} className="flex max-w-[1180px] flex-col gap-4">
@@ -76,7 +92,7 @@ export function CasesScene() {
             <div className="text-sm text-muted-foreground">Cases / {caseType.name}</div>
             <div className="flex items-center justify-between">
               <h1 className="font-mono text-2xl font-semibold">{full.case.key}</h1>
-              {ran && pathway.latest && <ResultBadge section={pathway.latest.section} className="h-6 px-2.5 text-sm" />}
+              {pathwayRan && pathway.latest && <ResultBadge section={pathway.latest.section} className="h-6 px-2.5 text-sm" />}
             </div>
             <div className="text-sm text-muted-foreground">Synthetic</div>
           </div>
@@ -84,7 +100,7 @@ export function CasesScene() {
             caseType={caseType}
             state={state}
             own={ownFields(caseType, models)}
-            clockStart={ran ? ((pathway.latest?.section.columns.clock_start as number | undefined) ?? null) : null}
+            clockStart={pathwayRan ? ((pathway.latest?.section.columns.clock_start as number | undefined) ?? null) : null}
             onSave={async () => undefined}
             saving={false}
             error={null}
@@ -101,43 +117,63 @@ export function CasesScene() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow>
-                  <TableCell className="px-4 py-3 font-medium">{pathway.name}</TableCell>
-                  <TableCell className="px-4 py-3">
-                    <RunsBadge autoRun={pathway.auto_run} />
-                  </TableCell>
-                  <TableCell className="px-4 py-3">
-                    {ran && pathway.latest ? (
-                      <ResultBadge section={pathway.latest.section} />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Running…</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-right">
-                    <Button variant="outline" disabled={!ran}>
-                      View result
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                {row(pathway, pathwayRan)}
+                {row(matcher, matcherRan)}
               </TableBody>
             </Table>
           </section>
         </div>
-        {frame >= SHEET && pathway.latest && (
+        {sheet?.latest && (
           <div
             className="absolute inset-y-0 right-0 overflow-hidden border-l bg-background"
-            style={{ width: 1040, transform: `translateX(${(1 - sheet) * 1040}px)`, boxShadow: '-24px 0 60px rgba(0,0,0,0.15)' }}
+            style={{ width: 1040, transform: `translateX(${(1 - sheetIn) * 1040}px)`, boxShadow: '-24px 0 60px rgba(0,0,0,0.15)' }}
           >
             <div style={{ zoom: 1.35, padding: '24px 28px' }}>
-              <div className="text-sm text-muted-foreground">{full.case.key} · {caseType.name}</div>
-              <div className="mb-4 text-lg font-semibold">{pathway.name}</div>
+              <div className="text-sm text-muted-foreground">
+                {full.case.key} · {caseType.name}
+              </div>
+              <div className="mb-4 text-lg font-semibold">{sheet.name}</div>
               <div data-focus={focus ?? undefined}>
-                <SectionView section={pathway.latest.section} />
+                <SectionView section={sheet.latest.section} />
               </div>
             </div>
           </div>
         )}
       </TooltipProvider>
+    </>
+  )
+}
+
+const SAVED = s(0.4) * DAYS.length + s(0.3)
+const SHEET = s(5)
+
+/** The pointer: along the steps as they are entered, to the result, a click on View result,
+ * then the overdue deadline, the late step and the survival in the sheet. */
+const POINTER: Point[] = [
+  { at: 0, x: 1500, y: 980 },
+  { at: 10, x: 1110, y: 330 },
+  { at: 22, x: 1110, y: 372 },
+  { at: 34, x: 1110, y: 414 },
+  { at: SAVED + 16, x: 1120, y: 878 },
+  { at: SHEET - 10, x: 1560, y: 878 },
+  { at: SHEET - 5, x: 1560, y: 878, click: true },
+  { at: s(6.5), x: 1800, y: 300 },
+  { at: s(11.5), x: 1222, y: 682 },
+  { at: s(17.5), x: 1150, y: 952 },
+]
+
+export const CASES_FRAMES = s(26)
+
+/** The central tool: a case, the models that run on it, and what they give back. */
+export function CasesScene() {
+  const frame = useCurrentFrame()
+  const { fps } = useVideoConfig()
+  const sheetIn = spring({ frame: frame - SHEET, fps, config: { damping: 200 }, durationInFrames: 14 })
+  // The part of the result the banner talks about; the rest dims.
+  const focus = frame < s(6) ? null : frame < s(11) ? 'deadlines' : frame < s(17) ? 'days' : 'survival'
+  return (
+    <AbsoluteFill className="bg-background text-foreground">
+      <CasePage state={caseAt(frame)} pathwayRan={frame >= SAVED} matcherRan={false} sheet={frame >= SHEET ? pathway : null} sheetIn={sheetIn} focus={focus} />
       <Cursor path={POINTER} />
       <Sequence durationInFrames={s(3)}>
         <LowerThird title="A case: one patient's pathway" line="Entered step by step by the clinician (synthetic data)" exitAt={s(2.6)} />
@@ -154,6 +190,33 @@ export function CasesScene() {
       <Sequence from={s(17)}>
         <LowerThird title="Evidence a clinician can act on" line="Survival and delay effects, each with its published source" accent="#22c55e" />
       </Sequence>
+    </AbsoluteFill>
+  )
+}
+
+const EVALUATE = s(1)
+const MATCHED = s(1.5)
+const TRIALS_SHEET = s(1.9)
+
+export const TRIALS_FRAMES = s(8)
+
+/** On request, the trial matcher: the recruiting Nordic trials the case could be discussed for. */
+export function TrialsScene() {
+  const frame = useCurrentFrame()
+  const { fps } = useVideoConfig()
+  const sheetIn = spring({ frame: frame - TRIALS_SHEET, fps, config: { damping: 200 }, durationInFrames: 14 })
+  return (
+    <AbsoluteFill className="bg-background text-foreground">
+      <CasePage state={full} pathwayRan matcherRan={frame >= MATCHED} sheet={frame >= TRIALS_SHEET ? matcher : null} sheetIn={sheetIn} focus={null} />
+      <Cursor
+        path={[
+          { at: 0, x: 1150, y: 952 },
+          { at: EVALUATE - 4, x: 1575, y: 958 },
+          { at: EVALUATE, x: 1575, y: 958, click: true },
+          { at: s(3.4), x: 1560, y: 330 },
+        ]}
+      />
+      <LowerThird title="And the trials worth discussing" line={matcher.latest?.section.summary ?? ''} accent="#2563eb" />
     </AbsoluteFill>
   )
 }
