@@ -5,6 +5,7 @@ import { useEffect, useId, type ReactNode } from 'react'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { PageType } from '@/components/page-header'
 import { Provenance } from '@/components/provenance'
+import { DownloadPdf } from '@/components/reports/download-pdf'
 import { ReportTree } from '@/components/reports/report-tree'
 import { SourcesList } from '@/components/reports/sources-list'
 import {
@@ -85,7 +86,10 @@ function ReportPage() {
           <h1 id="report-title" className="text-2xl font-semibold">
             {report.data.name}
           </h1>
-          {sorted.length > 0 && <VersionPicker versions={sorted} shown={shown} latest={latest} />}
+          <div className="flex flex-wrap items-center gap-3">
+            {sorted.length > 0 && <VersionPicker versions={sorted} shown={shown} latest={latest} />}
+            {shown && <DownloadPdf report={report.data} version={shown} />}
+          </div>
         </div>
         <Owner report={report.data} />
         {shown && <Frozen version={shown} />}

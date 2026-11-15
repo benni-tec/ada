@@ -698,6 +698,18 @@ Reports and their versions (`core/services/reports/`).
   `fetched_at`, `content_hash` (of the snapshot the run used), `widget_ids`. An `input`
   operator the run binds leads to what it is bound to. A caller that sends `sources` gets
   `Invalid`.
+- **PDF.** "Download PDF" on a version's page makes the PDF in the browser
+  (`components/reports/report-pdf*`, `@react-pdf/renderer`, Inter served from this host
+  for Greek and mathematical signs); nothing is rendered on the server. The blocks become
+  text, and each widget a picture of itself at the version's run. The picture comes from
+  a frame of its own: unseen, light, as tall as its content. The page asks it with
+  `{type: 'ada:snapshot', id}` until it answers. Once nothing in it is `aria-busy`, the
+  widget lays itself out for paper (`data-snapshot`: nothing scrolls, no sources line) and
+  answers `{type: 'ada:snapshot', id, image, width, height}` (a PNG data URL, drawn with
+  `html-to-image`) or `{…, error}`. The widget footers cite the sources by number in a
+  bibliography at the end, ordered by first use. One callout at the top links to the
+  version in ADA on the host the PDF was made on. A custom widget draws in a frame of
+  its own, which the picture cannot see.
 - **Concurrency.** Adding a version moves `latest_version_id` with the report's revision,
   so two versions added at once conflict; REST and MCP also take an optional
   `expected_revision`.
@@ -1831,7 +1843,7 @@ project's verdict lists.
 | `/projects/{id}/sessions/{session_id}` | A session: its record as a chat with its widget cards, all at one run of the page (each can be added to a dashboard), the composer, and its attachments beside it as tabs; `?widget=<id>` scrolls to one. MCP tools return this address for widgets made in a session |
 | `/projects/{id}/widgets/{widget_id}` | One widget on its own page, at `?run=` when given, else at one run of the page; the address MCP tools return for widgets made outside a session. In-app links open widgets full size instead (`?open=`) |
 | `/projects/{id}/dashboards/{dashboard_id}` | The slots on the grid, all on one run; firing alert badges; the time range control (whole years; "Show" starts a run, "Save as default"); "Edit layout"; "Add widget" and the agent panel; "Generate report"; version history with view (`?version=n`) and restore; start a session from it |
-| `/projects/{id}/reports/{report_id}` | A report version (`?version=1.2.0`, default the latest): its tree with each widget at the version's run (opening full size at that run), the run, range, dashboard version, the sources list; each card's pipeline view previews the version's run |
+| `/projects/{id}/reports/{report_id}` | A report version (`?version=1.2.0`, default the latest): its tree with each widget at the version's run (opening full size at that run), the run, range, dashboard version, the sources list; each card's pipeline view previews the version's run; "Download PDF" (Reports: PDF) |
 | `/projects/{id}/reports/new` | Generate a report from a dashboard (`?dashboard=<id>` preselects it) |
 | `/projects/{id}/alerts` | The project's alerts are its dashboards' alerts, so the page has one card per dashboard (those with active alerts first): its name (a link), the number of active alerts, and a table of its rules (severity, name, condition, checking, alerts, check now and edit); a rule with alerts opens to a nested table of them (key, Active or Ended, when; one with an active alert starts open), and each alert opens to the rows behind it (`GET /alerts/{id}/rows`). The filter All / Active / Ended is for the whole page; "New rule" opens the rule editor and its formula builder. The words people read are "active" and "ended", not the API's `firing` and `resolved` |
 | `/projects/{id}/settings` | Redirects to the overview with the settings open: at Data sources when the address names one (`#source-<id>`, kept), else at Models and providers |

@@ -1,9 +1,24 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import type { DataSource, Operator, Report, ReportSource, ReportVersion, Verdict, Widget } from '@/lib/api'
 
+import type { PdfInput } from '@/components/reports/report-pdf-document'
+
 import { claude, emit, json, project, renderAt, run, serveApi, session, web, widget } from './app'
+
+// The PDF is drawn by the widgets in frames of their own, which jsdom does not run: the page
+// is tested up to what it hands the PDF.
+const pdf = vi.hoisted(() => ({ made: [] as unknown[], finish: () => {}, fail: null as Error | null }))
+vi.mock('@/components/reports/report-pdf', () => ({
+  downloadReportPdf: async (input: unknown, progress: (done: number, total: number) => void) => {
+    pdf.made.push(input)
+    progress(0, 2)
+    progress(1, 2)
+    await new Promise<void>((resolve) => (pdf.finish = resolve))
+    if (pdf.fail) throw pdf.fail
+  },
+}))
 
 // Reports, frozen at a version's run; the pipeline dialog of a widget card; the widget page.
 
@@ -219,6 +234,29 @@ test('a report opens at its latest version, frozen, every widget at the version�
   await waitFor(() => expect(screen.getByTitle('Widget: Coverage by region')).toHaveAttribute('src', 'http://localhost:5174/line-chart.html#widget=w1&run=r1&fit=content'))
   expect(screen.getByRole('complementary', { name: 'About this version' })).toHaveTextContent('Data periodAll periods')
   expect(screen.getByRole('link', { name: '1.1.0' })).toHaveAttribute('href', '/projects/p1/reports/rep1?version=1.1.0')
+})
+
+test('“Download PDF” hands the version, its widgets and sources and this host to the PDF, saying how far it got', async () => {
+  serveReport()
+  renderAt('/projects/p1/reports/rep1')
+  const button = await screen.findByRole('button', { name: 'Download PDF' })
+  fireEvent.click(button)
+  expect(await screen.findByRole('button', { name: 'Drawing widget 2 of 2…' })).toBeDisabled()
+  const made = pdf.made.at(-1) as PdfInput
+  expect(made.version.id).toBe('v2')
+  expect([...made.widgets.keys()]).toEqual(['w1', 'w2'])
+  expect(made.sources).toEqual(recorded)
+  expect(made.origin).toBe(window.location.origin)
+  act(() => pdf.finish())
+  expect(await screen.findByRole('button', { name: 'Download PDF' })).toBeEnabled()
+
+  // A PDF that could not be made says why, and can be tried again.
+  pdf.fail = new Error('the fonts did not load')
+  fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }))
+  await waitFor(() => expect(pdf.made).toHaveLength(2))
+  act(() => pdf.finish())
+  expect(await screen.findByRole('alert')).toHaveTextContent('No PDF: the fonts did not load')
+  pdf.fail = null
 })
 
 test('a text widget’s value opens the pipeline of the input it comes from', async () => {

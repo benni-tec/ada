@@ -152,6 +152,8 @@ export function followFit(): () => void {
 export type PageMessage =
   | { type: 'ada:resize'; height: number }
   | { type: 'ada:open-pipeline'; input: string }
+  | { type: 'ada:snapshot'; id: string; image: string; width: number; height: number }
+  | { type: 'ada:snapshot'; id: string; error: string }
 
 /** Framed by an ADA page, which listens for PageMessages (an MCP host does not). */
 function framedByPage(): boolean {
@@ -206,6 +208,62 @@ export function reportHeight(element: HTMLElement): () => void {
     busy?.disconnect()
     window.removeEventListener('hashchange', onHash)
   }
+}
+
+/** A picture of an element as a PNG data URL, at twice its size (a report's PDF). */
+export type Capture = (element: HTMLElement) => Promise<string>
+
+const captureAsPng: Capture = async (element) => {
+  const { toPng } = await import('html-to-image')
+  const background = getComputedStyle(document.body).backgroundColor
+  return toPng(element, { pixelRatio: 2, backgroundColor: background === 'rgba(0, 0, 0, 0)' ? '#fff' : background })
+}
+
+// How long a picture waits for the widget to finish loading before it is taken anyway.
+const SNAPSHOT_WAIT_MS = 20_000
+
+/**
+ * Answers the page's requests for a picture of the widget (`{type: 'ada:snapshot', id}`),
+ * which a report's PDF is made of: once the widget is drawn (nothing in it `aria-busy`),
+ * the element as a PNG, laid out for paper (all of it, without its sources line), or why
+ * there is none. Only the framing ADA page is answered.
+ * Returns the function that stops it.
+ */
+export function answerSnapshots(element: HTMLElement, capture: Capture = captureAsPng): () => void {
+  if (!framedByPage()) return () => {}
+  const drawn = async () => {
+    const until = Date.now() + SNAPSHOT_WAIT_MS
+    while (Date.now() < until && (!element.firstElementChild || element.querySelector('[aria-busy="true"]')))
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    // A moment more, for the layout of what just arrived. Not an animation frame: a frame
+    // the browser does not show gets none.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  // The page repeats a request until it is answered: one picture per request at a time.
+  const working = new Set<string>()
+  const onMessage = (event: MessageEvent) => {
+    const { type, id } = (event.data ?? {}) as { type?: unknown; id?: unknown }
+    if (event.source !== window.parent || type !== 'ada:snapshot' || typeof id !== 'string' || working.has(id)) return
+    working.add(id)
+    void (async () => {
+      try {
+        await drawn()
+        // Laid out for paper while the picture is taken (styles.css `data-snapshot`).
+        document.documentElement.dataset.snapshot = ''
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        const { width, height } = element.getBoundingClientRect()
+        const image = await capture(element)
+        tellPage({ type: 'ada:snapshot', id, image, width: Math.ceil(width), height: Math.ceil(height) })
+      } catch (error) {
+        tellPage({ type: 'ada:snapshot', id, error: error instanceof Error ? error.message : String(error) })
+      } finally {
+        delete document.documentElement.dataset.snapshot
+        working.delete(id)
+      }
+    })()
+  }
+  window.addEventListener('message', onMessage)
+  return () => window.removeEventListener('message', onMessage)
 }
 
 /**

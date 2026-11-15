@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { coverage, widget } from '@/test/samples'
 import { Any } from '@/widgets/any/any'
 
-import { fetchAll, followFit, followTheme, reportHeight } from './host'
+import { answerSnapshots, fetchAll, followFit, followTheme, reportHeight } from './host'
 import { Sources, WidgetRuntime } from './runtime'
 import type { WidgetData } from './types'
 
@@ -290,4 +290,37 @@ test('where the page fits the frame to its content, the widget tells it its heig
   stop()
   stopFit()
   delete document.documentElement.dataset.fit
+})
+
+test('asked by its page, a widget sends a picture of itself once it is drawn, or why there is none', async () => {
+  const parent = { postMessage: vi.fn() }
+  Object.defineProperty(window, 'parent', { value: parent, configurable: true })
+  window.location.hash = '#widget=w1'
+  const element = document.createElement('div')
+  element.innerHTML = '<div role="status" aria-busy="true">Loading…</div>'
+  element.getBoundingClientRect = () => ({ width: 640.2, height: 300 }) as DOMRect
+  let fail = false
+  const capture = vi.fn(async () => {
+    if (fail) throw new Error('no canvas')
+    return 'data:image/png;base64,AAA'
+  })
+  const stop = answerSnapshots(element, capture)
+  const ask = (id: string, source: unknown = parent) =>
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'ada:snapshot', id }, source: source as Window }))
+
+  // Another window's request is not answered.
+  ask('s0', {})
+  // Still loading: the picture waits for the widget.
+  ask('s1')
+  await new Promise((resolve) => setTimeout(resolve, 250))
+  expect(capture).not.toHaveBeenCalled()
+  element.innerHTML = '<div class="ada-widget">drawn</div>'
+  await vi.waitFor(() =>
+    expect(parent.postMessage).toHaveBeenCalledWith({ type: 'ada:snapshot', id: 's1', image: 'data:image/png;base64,AAA', width: 641, height: 300 }, '*'),
+  )
+  fail = true
+  ask('s2')
+  await vi.waitFor(() => expect(parent.postMessage).toHaveBeenCalledWith({ type: 'ada:snapshot', id: 's2', error: 'no canvas' }, '*'))
+  expect(capture).toHaveBeenCalledTimes(2)
+  stop()
 })
