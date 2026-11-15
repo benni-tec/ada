@@ -250,6 +250,35 @@ out). When a tool refuses a call, read its message and correct the call.
 
 
 # Who the agent is and its rules, by the kind of session it works in.
+# The analyst's order when the deployment asks for quick analyses (AGENT_ANALYSIS_DEPTH).
+QUICK_ORDER = """\
+Rules:
+- This is a quick analysis: the person waits for it. When the brief asks for a deep, \
+thorough or full analysis, follow the full order instead (profile every input with \
+add_statistic "profile", then check and drill down by region, sex, age and period before \
+you claim).
+- Work on the project's data: the operators the brief names, and list_pipelines and \
+get_lineage for the rest. When data the question needs is missing, say so under \
+not_shown; you cannot add sources.
+- Work in this order, and call tools that do not depend on each other in the same step:
+  1. Look once: one query_operator per input for its grain, the periods and regions \
+covered, and missing values.
+  2. Compute the comparison that answers the question with a vetted statistic (trend, \
+change, gap_to_best, outliers) or one add_transform for a share, count or gap.
+  3. Check only what could overturn a finding: comparability, too few points, a \
+difference inside its confidence intervals. Drill down only when a figure looks wrong.
+  4. Report two or three findings, most important first.
+"""
+
+
+def quick_rules(rules: str) -> str:
+    """The analyst's rules with the quick order in place of the full one; the rules about
+    citing, figures and caveats stay."""
+    start = rules.index("- Work on the project's data:")
+    end = rules.index("- Every finding cites")
+    return QUICK_ORDER + rules[end:] if start < end else rules
+
+
 BRIEFS = {
     SessionAgent.SESSION: (ABOUT_ADA, RULES),
     SessionAgent.RESEARCH: (ABOUT_RESEARCH, RESEARCH_RULES),
@@ -290,6 +319,7 @@ class Briefing:
         alerts: AlertRepository,
         reports: ReportRepository,
         clock: Clock,
+        quick_analysis: bool = False,
     ) -> None:
         self.operators = operators
         self.dashboards = dashboards
@@ -299,6 +329,7 @@ class Briefing:
         self.alerts = alerts
         self.reports = reports
         self.clock = clock
+        self.quick_analysis = quick_analysis
 
     async def request(
         self,
@@ -317,6 +348,8 @@ class Briefing:
         position = next(i for i, entry in enumerate(entries) if entry.id == turn.prompt_entry_id)
         prompt_entry, earlier = entries[position], entries[:position]
         about, rules = BRIEFS[session.agent]
+        if self.quick_analysis and session.agent is SessionAgent.ANALYSIS:
+            rules = quick_rules(rules)
         sections = [
             about,
             HOW_ADA_WORKS,

@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # Faster modes of the same agent models. Unset: the provider's default. "fast" is
     # OpenAI's fast tier (about 2x the price) and Gemini's priority tier.
     agent_service_tier: Literal["fast", "priority", "default", "flex"] | None = None
+    # "quick": the analyst looks once, computes and reports in fewer steps, and does the
+    # full profile-check-drill-down order only when its brief asks for depth.
+    agent_analysis_depth: Literal["quick", "deep"] = "deep"
     # Reasoning effort per agent step. Unset: the model's default.
     agent_thinking: Literal["minimal", "low", "medium", "high"] | None = None
 
