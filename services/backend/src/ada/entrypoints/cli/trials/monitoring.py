@@ -290,8 +290,9 @@ async def create_monitoring(
     existing_rules = {r.name: r for r in await alerts.list_rules(dashboard.id)}
     # Rules cannot change their measure operator; retain the old rule as disabled history.
     hospital_rule = existing_rules.get(HOSPITAL_RULE)
+    superseded = None
     if hospital_rule is not None and hospital_rule.operator_id != steps.hospital_trial_changes.id:
-        await alerts.update_rule(
+        superseded = await alerts.update_rule(
             hospital_rule.id,
             hospital_rule.revision,
             name=f"{HOSPITAL_RULE} (superseded {hospital_rule.id})",
@@ -299,14 +300,21 @@ async def create_monitoring(
         )
         del existing_rules[HOSPITAL_RULE]
     for name, operator, formula, keys, severity, interval in rules:
-        if name not in existing_rules:
-            await alerts.create_rule(
-                dashboard.id,
-                name,
-                operator.id,
-                formula,
-                keys,
-                severity=severity,
-                check_interval_seconds=interval,
-            )
+        if name in existing_rules:
+            continue
+        # The replacement keeps the settings people gave the superseded rule.
+        kept = superseded if name == HOSPITAL_RULE else None
+        created = await alerts.create_rule(
+            dashboard.id,
+            name,
+            operator.id,
+            formula,
+            keys,
+            severity=kept.severity if kept else severity,
+            check_interval_seconds=kept.check_interval_seconds if kept else interval,
+            max_data_age_seconds=kept.max_data_age_seconds if kept else None,
+            alert_pipeline_id=kept.alert_pipeline_id if kept else None,
+        )
+        if kept is not None and not hospital_rule.enabled:
+            await alerts.update_rule(created.id, created.revision, enabled=False)
     return dashboard

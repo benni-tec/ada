@@ -15,7 +15,7 @@ from ada.adapters.memory.web import MemoryWebBudget
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.composition import create_container
 from ada.config import Settings
-from ada.core.models.alerts import AlertState
+from ada.core.models.alerts import AlertState, Severity
 from ada.core.models.base import Id
 from ada.core.models.sessions import EntryKind
 from ada.core.models.sources import CheckEvery
@@ -491,6 +491,16 @@ async def test_register_page_wires_unions_and_watches_all_pages(
             return await service.get(id)
 
         monkeypatch.setattr(type(source_service), "watch", watch)
+        alert_service = await request.get(AlertService)
+        monitoring = next(
+            d
+            for d in await (await request.get(DashboardService)).list(project_id)
+            if d.name == DASHBOARD
+        )
+        rule = next(
+            r for r in await alert_service.list_rules(monitoring.id) if r.name == HOSPITAL_RULE
+        )
+        await alert_service.update_rule(rule.id, rule.revision, severity=Severity.CRITICAL)
         page = await register_trial_page(
             request, project_id, url, "New hospital", "hospital_list", "Finland"
         )
@@ -527,7 +537,8 @@ async def test_register_page_wires_unions_and_watches_all_pages(
             if d.name == DASHBOARD
         )
         rules = await (await request.get(AlertService)).list_rules(dashboard.id)
-        assert len([r for r in rules if r.name == HOSPITAL_RULE and r.enabled]) == 1
+        [active] = [r for r in rules if r.name == HOSPITAL_RULE and r.enabled]
+        assert active.severity == Severity.CRITICAL
         assert any(not r.enabled and r.name.startswith(HOSPITAL_RULE) for r in rules)
     await seed_trials(container)
     assert watched == [(hus.id, CheckEvery.TEN_MINUTES)]
