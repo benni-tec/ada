@@ -501,6 +501,10 @@ async def test_crawls_answers_and_extractions_become_rows() -> None:
 
 
 async def test_a_web_source_fails_readably_and_stays_counted() -> None:
+    empty = FakeExplorer()
+    empty.page = empty.page.model_copy(update={"markdown": "| Name | Free |\n| --- | --- |\n| | |"})
+    with pytest.raises(Invalid, match="No table data rows.*not proof"):
+        await _reader(empty)[0].fetch(_web_source(options={"extract": "tables"}), TimeRange())
     explorer = FakeExplorer()
     reader, budget = _reader(explorer, limit=1)
     explorer.failure = Invalid("Context.dev could not read https://example.test/screening: 404")
@@ -1029,3 +1033,4 @@ async def test_original_html_tables_keep_rows_hidden_by_client_pagination() -> N
         ["A & B", "4"],
         ["C", "0"],
     ]
+

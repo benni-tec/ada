@@ -202,6 +202,14 @@ class WebPageReader(SourceReader):
             if source.options.get("original_html")
             else markdown_tables(markdown)
         )
+        if extract is DocumentExtract.TABLES and not any(
+            row[2] > 1 and any(cell.strip() for cell in row[3]) for row in rows
+        ):
+            raise Invalid(
+                "No table data rows were found. The page may be blocked or load its data "
+                "with JavaScript. Inspect it with read_page(raw_html=true), try wait_for, "
+                "or use its public CSV/JSON endpoint; this is not proof of no matching records."
+            )
         return await asyncio.to_thread(document_parquet, extract, rows)
 
 
