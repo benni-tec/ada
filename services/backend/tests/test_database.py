@@ -1035,7 +1035,7 @@ async def test_cases_and_their_results_round_trip_through_the_database(
             assert [r.case_revision for r in state.results] == [2, 2, 1]
             assert state.results[0].trigger.value == "request"
             assert state.results[0].section.body["model_id"] == str(model.id)
-            assert {e.step for e in state.events} >= set(OVERDUE["days"])
+            assert {e.level for e in state.events if e.field == "days"} >= set(OVERDUE["days"])
             assert [c.case.key for c in await cases.model_cases(model.id)] == ["SYN-1", "SYN-2"]
             on_case = await cases.models(type_id, "SYN-1")
             assert on_case[0].results == 3

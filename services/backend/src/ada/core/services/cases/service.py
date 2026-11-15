@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from functools import partial
+from typing import Any
 from uuid import uuid7
 
 from ada.core.models.actors import Actor
@@ -13,6 +14,7 @@ from ada.core.models.cases import (
     CaseState,
     CaseType,
     CaseWithResult,
+    CaseWithResults,
     Field,
     FieldType,
     ModelOnCase,
@@ -39,9 +41,8 @@ from ada.core.services.cases.fields import (
     coverage,
     describe,
 )
-from ada.core.services.cases.models import adapter
 from ada.core.services.ports.cases import CaseService
-from ada.core.services.statistical_models import pathway
+from ada.core.services.statistical_models.kinds import kind_of
 
 # How urgent a result is, most urgent first, for the open-case list.
 URGENCY = {"urgent": 0, "warn": 1, "info": 2, "ok": 3}
@@ -110,7 +111,7 @@ class Cases(CaseService):
                     )
             for model in await self._on_type(case_type):
                 version = await self.statistical.version(model.id, model.latest_version)
-                gaps = coverage(fields, adapter(model.kind).requires(version))
+                gaps = coverage(fields, kind_of(model.kind).requires(version))
                 if gaps:
                     raise Invalid(f"{model.name} would no longer be covered: {describe(gaps)}")
             update["fields"] = fields
@@ -154,9 +155,7 @@ class Cases(CaseService):
                 }
             )
             await self.cases.update(case)
-        await self.cases.add_events(
-            _changed_steps(case_type, before.values if before else {}, case)
-        )
+        await self.cases.add_events(_changes(case_type, before.values if before else {}, case))
         await self._stale(case_type.id)
         ran: list[Id] = []
         for model in await self._on_type(case_type):
@@ -169,9 +168,16 @@ class Cases(CaseService):
     async def get_case(self, case_type_id: Id, key: str) -> CaseState:
         return await self._state(await self._case(case_type_id, key))
 
-    async def list_cases(self, case_type_id: Id) -> Sequence[Case]:
-        await self.cases.get_type(case_type_id)
-        return await self.cases.list(case_type_id)
+    async def list_cases(self, case_type_id: Id) -> Sequence[CaseWithResults]:
+        case_type = await self.cases.get_type(case_type_id)
+        latest: dict[Id, list[CaseResult]] = {}
+        for model in await self._on_type(case_type):
+            for case_id, result in (await self.cases.latest_results(model.id)).items():
+                latest.setdefault(case_id, []).append(result)
+        return [
+            CaseWithResults(case=case, latest=tuple(latest.get(case.id, ())))
+            for case in await self.cases.list(case_type_id)
+        ]
 
     async def models(self, case_type_id: Id, key: str) -> Sequence[ModelOnCase]:
         case = await self._case(case_type_id, key)
@@ -179,6 +185,7 @@ class Cases(CaseService):
         out = []
         for model in await self._on_type(await self.cases.get_type(case_type_id)):
             mine = [r for r in results if r.model_id == model.id]
+            version = await self.statistical.version(model.id, model.latest_version)
             out.append(
                 ModelOnCase(
                     model_id=model.id,
@@ -186,6 +193,7 @@ class Cases(CaseService):
                     kind=model.kind,
                     version=model.latest_version,
                     auto_run=model.auto_run,
+                    reads=tuple(f.name for f in kind_of(model.kind).requires(version)),
                     latest=mine[0] if mine else None,
                     results=len(mine),
                 )
@@ -200,19 +208,16 @@ class Cases(CaseService):
         return await self._run(model, case, ResultTrigger.REQUEST, actor)
 
     async def open_cases(self, case_type_id: Id) -> Sequence[CaseWithResult]:
-        case_type = await self.cases.get_type(case_type_id)
-        pathways = [m for m in await self._on_type(case_type) if m.kind == pathway.KIND]
-        latest: dict[Id, CaseResult] = {}
-        for model in pathways:
-            for case_id, result in (await self.cases.latest_results(model.id)).items():
-                if case_id not in latest or result.created_at > latest[case_id].created_at:
-                    latest[case_id] = result
-        open_ = [
-            CaseWithResult(case=case, latest=latest[case.id])
-            for case in await self.cases.list(case_type_id)
-            if case.id in latest and _open(latest[case.id].section)
-        ]
-        return sorted(open_, key=_urgency)
+        """Every case some model's latest result says is open, with its most urgent open
+        result, most urgent first."""
+        urgent: dict[Id, CaseResult] = {}
+        for item in await self.list_cases(case_type_id):
+            open_ = [r for r in item.latest if r.section.attention.open]
+            if open_:
+                urgent[item.case.id] = min(open_, key=_urgency)
+        cases = {c.id: c for c in await self.cases.list(case_type_id)}
+        ranked = sorted(urgent.values(), key=_urgency)
+        return [CaseWithResult(case=cases[r.case_id], latest=r) for r in ranked]
 
     async def model_cases(self, model_id: Id) -> Sequence[CaseWithResult]:
         model = await self.statistical.get(model_id)
@@ -248,7 +253,7 @@ class Cases(CaseService):
         self, model: StatisticalModel, case: Case, trigger: ResultTrigger, actor: Actor
     ) -> CaseResult:
         version = await self.statistical.version(model.id, model.latest_version)
-        kind = adapter(model.kind)
+        kind = kind_of(model.kind)
         needs = {f.name for f in kind.requires(version)}
         values = {k: v for k, v in case.values.items() if k in needs}
         try:
@@ -290,44 +295,39 @@ class Cases(CaseService):
                 self.after_commit.add(partial(self.dispatcher.refresh_source, source.id, True))
 
 
-def _changed_steps(case_type: CaseType, before: JsonObject, case: Case) -> list[CaseEvent]:
-    """An event for every step of a day-map field whose days are new or changed."""
+def _changes(case_type: CaseType, before: JsonObject, case: Case) -> list[CaseEvent]:
+    """An event for every field whose value is new or changed; a day map per level."""
     events = []
+
+    def event(field: str, level: str | None, old: Any, new: Any) -> None:
+        events.append(
+            CaseEvent(
+                case_id=case.id,
+                field=field,
+                level=level,
+                old=old,
+                new=new,
+                recorded_at=case.updated_at,
+            )
+        )
+
     for f in case_type.fields:
-        if f.type is not FieldType.DAY_MAP:
-            continue
-        old = before.get(f.name) or {}
-        for step, days in (case.values.get(f.name) or {}).items():
-            if old.get(step) != days:
-                events.append(
-                    CaseEvent(
-                        case_id=case.id,
-                        field=f.name,
-                        step=step,
-                        days=days,
-                        recorded_at=case.updated_at,
-                    )
-                )
+        old, new = before.get(f.name), case.values.get(f.name)
+        if f.type is FieldType.DAY_MAP:
+            old, new = old or {}, new or {}
+            for level in f.levels:
+                if old.get(level) != new.get(level):
+                    event(f.name, level, old.get(level), new.get(level))
+        elif old != new:
+            event(f.name, None, old, new)
     return events
 
 
-def _open(section: Section) -> bool:
-    """Open until treatment has started: its deadline met or late, or no pathway at all."""
-    status = section.columns.get("treatment_start_status")
-    return section.columns.get("trigger") != "none" and status not in ("met", "late")
-
-
-def _urgency(item: CaseWithResult) -> tuple[int, int]:
-    assert item.latest is not None
-    section = item.latest.section
-    overdue = max(
-        (
-            int(v)
-            for k, v in section.columns.items()
-            if k.endswith("_by")
-            and section.columns.get(k.removesuffix("_by") + "_status") == "overdue"
-            and isinstance(v, int)
-        ),
-        default=0,
+def _urgency(result: CaseResult) -> tuple[int, int, int]:
+    """Most urgent first: by status, then the most overdue, then the soonest due."""
+    attention = result.section.attention
+    return (
+        URGENCY.get(result.section.status, 9),
+        -(attention.overdue_by or 0),
+        attention.due_in if attention.due_in is not None else 1_000_000,
     )
-    return URGENCY.get(section.status, 9), -overdue

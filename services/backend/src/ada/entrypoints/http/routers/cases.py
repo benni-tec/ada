@@ -9,11 +9,11 @@ from fastapi import APIRouter
 
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.cases import (
-    Case,
     CaseResult,
     CaseState,
     CaseType,
     CaseWithResult,
+    CaseWithResults,
     Field,
     ModelOnCase,
     SavedCase,
@@ -77,7 +77,10 @@ async def update_case_type(
 
 
 @router.get("/case-types/{case_type_id}/cases")
-async def list_cases(case_type_id: Id, service: FromDishka[CaseService]) -> Sequence[Case]:
+async def list_cases(
+    case_type_id: Id, service: FromDishka[CaseService]
+) -> Sequence[CaseWithResults]:
+    """Every case of the type, oldest first, with each model's latest result for it."""
     return await service.list_cases(case_type_id)
 
 
@@ -85,8 +88,8 @@ async def list_cases(case_type_id: Id, service: FromDishka[CaseService]) -> Sequ
 async def open_cases(
     case_type_id: Id, service: FromDishka[CaseService]
 ) -> Sequence[CaseWithResult]:
-    """Cases whose pathway has not reached treatment start, overdue first; never by
-    survival."""
+    """The cases needing attention, each with its most urgent open result: by status, the
+    most overdue, the soonest due. Never by survival."""
     return await service.open_cases(case_type_id)
 
 

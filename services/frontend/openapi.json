@@ -553,6 +553,40 @@
         "title": "AttachmentKind",
         "type": "string"
       },
+      "Attention": {
+        "description": "What a result says about whether the case needs someone: still open, how many\ndays the most overdue thing is late, how many days until the next thing is due.\nEach model kind fills it from its own result; lists sort by it.",
+        "properties": {
+          "due_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due In"
+          },
+          "open": {
+            "default": false,
+            "title": "Open",
+            "type": "boolean"
+          },
+          "overdue_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overdue By"
+          }
+        },
+        "title": "Attention",
+        "type": "object"
+      },
       "BaselineCell": {
         "description": "5-year relative survival for a profile in the baseline population (the Nordic\nlevel). `age_band` or `stage` None: all of them.",
         "properties": {
@@ -662,34 +696,41 @@
         "type": "object"
       },
       "CaseEvent": {
-        "description": "A day-map field's step and its days, as recorded at a save: the history of a\npathway as it grows.",
+        "description": "A field whose value changed at a save: the case's history. A day map changes per\nlevel, so `level` names the step and `old`/`new` are its days; for other fields\n`level` is None. `old` is None for a value set for the first time.",
         "properties": {
           "case_id": {
             "$ref": "#/components/schemas/Id"
-          },
-          "days": {
-            "title": "Days",
-            "type": "integer"
           },
           "field": {
             "title": "Field",
             "type": "string"
           },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "new": {
+            "title": "New"
+          },
+          "old": {
+            "title": "Old"
+          },
           "recorded_at": {
             "format": "date-time",
             "title": "Recorded At",
-            "type": "string"
-          },
-          "step": {
-            "title": "Step",
             "type": "string"
           }
         },
         "required": [
           "case_id",
           "field",
-          "step",
-          "days",
           "recorded_at"
         ],
         "title": "CaseEvent",
@@ -899,6 +940,27 @@
           "latest"
         ],
         "title": "CaseWithResult",
+        "type": "object"
+      },
+      "CaseWithResults": {
+        "description": "A case with the latest result of each model on its type that has run on it.",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/Case"
+          },
+          "latest": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CaseResult"
+            },
+            "title": "Latest",
+            "type": "array"
+          }
+        },
+        "required": [
+          "case"
+        ],
+        "title": "CaseWithResults",
         "type": "object"
       },
       "CheckResult": {
@@ -2780,6 +2842,14 @@
             "title": "Name",
             "type": "string"
           },
+          "reads": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reads",
+            "type": "array"
+          },
           "results": {
             "title": "Results",
             "type": "integer"
@@ -2845,6 +2915,12 @@
           },
           "intended_use": {
             "title": "Intended Use",
+            "type": "string"
+          },
+          "kind": {
+            "const": "patient_pathway",
+            "default": "patient_pathway",
+            "title": "Kind",
             "type": "string"
           },
           "outcome": {
@@ -4906,6 +4982,12 @@
       "Section": {
         "description": "What one model said about one case. `body` is the model's own result (for\n`patient_pathway`, an Evaluation); `summary`, `status` and `columns` are what lists\nand the cases data source show.",
         "properties": {
+          "attention": {
+            "$ref": "#/components/schemas/Attention",
+            "default": {
+              "open": false
+            }
+          },
           "body": {
             "$ref": "#/components/schemas/JsonObject",
             "default": {}
@@ -5506,6 +5588,18 @@
           },
           "project_id": {
             "$ref": "#/components/schemas/Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "required": [
@@ -6800,6 +6894,7 @@
     },
     "/api/case-types/{case_type_id}/cases": {
       "get": {
+        "description": "Every case of the type, oldest first, with each model's latest result for it.",
         "operationId": "list_cases_api_case_types__case_type_id__cases_get",
         "parameters": [
           {
@@ -6819,7 +6914,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Case"
+                    "$ref": "#/components/schemas/CaseWithResults"
                   },
                   "title": "Response List Cases Api Case Types  Case Type Id  Cases Get",
                   "type": "array"
@@ -7078,7 +7173,7 @@
     },
     "/api/case-types/{case_type_id}/open-cases": {
       "get": {
-        "description": "Cases whose pathway has not reached treatment start, overdue first; never by\nsurvival.",
+        "description": "The cases needing attention, each with its most urgent open result: by status, the\nmost overdue, the soonest due. Never by survival.",
         "operationId": "open_cases_api_case_types__case_type_id__open_cases_get",
         "parameters": [
           {

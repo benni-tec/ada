@@ -5,7 +5,16 @@ from collections.abc import Mapping, Sequence
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ada.adapters.db.support import add_row, dump, dump_all, fetch, oldest_first, require, rows
+from ada.adapters.db.support import (
+    add_row,
+    dump,
+    dump_all,
+    fetch,
+    json_object,
+    oldest_first,
+    require,
+    rows,
+)
 from ada.adapters.db.tables import (
     CaseEventRow,
     CaseResultRow,
@@ -109,8 +118,9 @@ class SqlCaseRepository(CaseRepository):
                 CaseEventRow(
                     case_id=event.case_id,
                     field=event.field,
-                    step=event.step,
-                    days=event.days,
+                    level=event.level,
+                    old=json_object(event.old),
+                    new=json_object(event.new),
                     recorded_at=event.recorded_at,
                 )
             )
@@ -126,8 +136,9 @@ class SqlCaseRepository(CaseRepository):
             CaseEvent(
                 case_id=row.case_id,
                 field=row.field,
-                step=row.step,
-                days=row.days,
+                level=row.level,
+                old=row.old,
+                new=row.new,
                 recorded_at=row.recorded_at,
             )
             for row in await rows(self.session, statement)

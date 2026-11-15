@@ -27,6 +27,7 @@ const version: ModelVersion = {
   model_id: 'm1',
   version: 1,
   spec: {
+    kind: 'patient_pathway',
     outcome: '5-year relative survival',
     structure: 'relative_survival_dag',
     sites: ['lung'],

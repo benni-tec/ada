@@ -1080,9 +1080,10 @@ A **case type** (`core/models/cases.py`) is a schema of fields (`text`, `number`
 `date`, `boolean`, `enum`, `enum_list`, `day_map`). A **case** is one instance under a `key`
 its caller sets, unique within the type, 1–128 characters of `[A-Za-z0-9._:-]`, and never
 a Finnish personal identity code; saving is an upsert by key. A case keeps its latest
-`values`, a `revision` per save, and append-only **events**: a day-map field's step and its
-days whenever they change. A statistical model names one case type
-(`StatisticalModel.case_type_id`), which must cover what its latest version reads (same
+`values`, a `revision` per save, and append-only **events**: every field whose value changed
+at a save (`field`, `level` for a day map's step, `old`, `new`). A statistical model names one case type
+(`StatisticalModel.case_type_id`; created without one, it gets its kind's default case
+type, `ModelKind.default_case_type`), which must cover what its latest version reads (same
 name and type, required where the model requires, enum levels a subset of the model's);
 creating a model or a version, and changing a case type, are refused otherwise. While a
 case type has cases, its fields may only grow (new optional fields, new levels).
@@ -1106,6 +1107,18 @@ of the type's push cases sources after the commit (`Cases` through `DataSourceRe
 /case-types/{id}/cases/{key}/models`, `POST /case-types/{id}/cases/{key}/evaluate`, `GET
 /models/{id}/cases`, `PUT /models/{id}/case-type`. MCP: `list_case_types`,
 `create_case_type`, `set_case`, `get_case`, `evaluate_case`, `list_open_cases`.
+
+Nothing in cases assumes a use case. A model **kind**
+(`core/services/statistical_models/kinds.py`, `KINDS`) says which fields it reads, runs on a
+case's values, declares its result columns and brings a default case type; the patient
+pathway model is the first kind (`pathway_kind.py`). Each result's `Section.attention`
+(`open`, `overdue_by`, `due_in`) is filled by its kind; the open-case list is "the cases
+needing attention" across every model on the type, by status, then the most overdue, then
+the soonest due. `ModelOnCase.reads` names the fields a model reads; `GET
+/case-types/{id}/cases` returns each case with the latest result of every model on it. A
+model's spec carries its `kind`; the first kind with a spec of its own makes
+`ModelVersion.spec` a union tagged by it. A profile's evaluation and the population view
+belong to the survival kind and refuse others.
 
 ## REST
 

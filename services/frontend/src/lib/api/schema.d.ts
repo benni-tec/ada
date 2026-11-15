@@ -88,7 +88,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Cases */
+        /**
+         * List Cases
+         * @description Every case of the type, oldest first, with each model's latest result for it.
+         */
         get: operations["list_cases_api_case_types__case_type_id__cases_get"];
         put?: never;
         post?: never;
@@ -163,8 +166,8 @@ export interface paths {
         };
         /**
          * Open Cases
-         * @description Cases whose pathway has not reached treatment start, overdue first; never by
-         *     survival.
+         * @description The cases needing attention, each with its most urgent open result: by status, the
+         *     most overdue, the soonest due. Never by survival.
          */
         get: operations["open_cases_api_case_types__case_type_id__open_cases_get"];
         put?: never;
@@ -2029,6 +2032,23 @@ export interface components {
          */
         AttachmentKind: "dashboard" | "report" | "alert_rule" | "source" | "operator" | "session" | "widget" | "web_page";
         /**
+         * Attention
+         * @description What a result says about whether the case needs someone: still open, how many
+         *     days the most overdue thing is late, how many days until the next thing is due.
+         *     Each model kind fills it from its own result; lists sort by it.
+         */
+        Attention: {
+            /** Due In */
+            due_in?: number | null;
+            /**
+             * Open
+             * @default false
+             */
+            open: boolean;
+            /** Overdue By */
+            overdue_by?: number | null;
+        };
+        /**
          * BaselineCell
          * @description 5-year relative survival for a profile in the baseline population (the Nordic
          *     level). `age_band` or `stage` None: all of them.
@@ -2075,22 +2095,25 @@ export interface components {
         };
         /**
          * CaseEvent
-         * @description A day-map field's step and its days, as recorded at a save: the history of a
-         *     pathway as it grows.
+         * @description A field whose value changed at a save: the case's history. A day map changes per
+         *     level, so `level` names the step and `old`/`new` are its days; for other fields
+         *     `level` is None. `old` is None for a value set for the first time.
          */
         CaseEvent: {
             case_id: components["schemas"]["Id"];
-            /** Days */
-            days: number;
             /** Field */
             field: string;
+            /** Level */
+            level?: string | null;
+            /** New */
+            new?: unknown;
+            /** Old */
+            old?: unknown;
             /**
              * Recorded At
              * Format: date-time
              */
             recorded_at: string;
-            /** Step */
-            step: string;
         };
         /** CaseResult */
         CaseResult: {
@@ -2163,6 +2186,18 @@ export interface components {
         CaseWithResult: {
             case: components["schemas"]["Case"];
             latest: components["schemas"]["CaseResult"] | null;
+        };
+        /**
+         * CaseWithResults
+         * @description A case with the latest result of each model on its type that has run on it.
+         */
+        CaseWithResults: {
+            case: components["schemas"]["Case"];
+            /**
+             * Latest
+             * @default []
+             */
+            latest: components["schemas"]["CaseResult"][];
         };
         /** CheckResult */
         CheckResult: {
@@ -2955,6 +2990,11 @@ export interface components {
             model_id: components["schemas"]["Id"];
             /** Name */
             name: string;
+            /**
+             * Reads
+             * @default []
+             */
+            reads: string[];
             /** Results */
             results: number;
             /** Version */
@@ -2984,6 +3024,12 @@ export interface components {
             flags: components["schemas"]["Flag"][];
             /** Intended Use */
             intended_use: string;
+            /**
+             * Kind
+             * @default patient_pathway
+             * @constant
+             */
+            kind: "patient_pathway";
             /** Outcome */
             outcome: string;
             /** Parameters */
@@ -3732,6 +3778,12 @@ export interface components {
          *     and the cases data source show.
          */
         Section: {
+            /**
+             * @default {
+             *       "open": false
+             *     }
+             */
+            attention: components["schemas"]["Attention"];
             /** @default {} */
             body: components["schemas"]["JsonObject"];
             /**
@@ -3964,6 +4016,8 @@ export interface components {
             /** Name */
             name: string;
             project_id: components["schemas"]["Id"];
+            /** Updated At */
+            updated_at?: string | null;
         };
         /**
          * StoredFile
@@ -4594,7 +4648,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Case"][];
+                    "application/json": components["schemas"]["CaseWithResults"][];
                 };
             };
             /** @description Validation Error */

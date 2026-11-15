@@ -79,6 +79,8 @@ const theCase: Case = {
   updated_at: '2026-11-15T10:42:00Z',
 }
 
+const pathwayReads = ['site', 'sex', 'age_band', 'education', 'route', 'stage', 'intent', 'modality', 'presentation', 'days', 'treatment_started']
+
 function result(overrides: Partial<CaseResult> = {}): CaseResult {
   return {
     id: 'r1',
@@ -92,6 +94,7 @@ function result(overrides: Partial<CaseResult> = {}): CaseResult {
       summary: 'Treatment start overdue by 3 days',
       status: 'urgent',
       columns: { trigger: 'well_founded', treatment_start_status: 'overdue', treatment_start_by: 3 },
+      attention: { open: true, overdue_by: 3, due_in: null },
       body: evaluation as unknown as Record<string, unknown>,
     },
     trigger: 'auto',
@@ -106,7 +109,7 @@ const trialResult = result({
   model_id: 'm2',
   trigger: 'request',
   created_at: '2026-11-15T11:00:00Z',
-  section: { kind: 'trial_matcher', title: 'Clinical trial matcher', summary: '2 recruiting trials', status: 'ok', columns: { trials: 2 }, body: {} },
+  section: { kind: 'trial_matcher', title: 'Clinical trial matcher', summary: '2 recruiting trials', status: 'ok', columns: { trials: 2 }, attention: { open: false }, body: {} },
 })
 
 /** The fake API around one case; `state` changes as the case is saved and evaluated. */
@@ -115,7 +118,7 @@ function serve() {
   const models = (): ModelOnCase[] =>
     [pathwayModel, trialModel].map((m) => {
       const mine = state.results.filter((r) => r.model_id === m.id)
-      return { model_id: m.id, name: m.name, kind: m.kind, version: 1, auto_run: m.auto_run, latest: mine[0] ?? null, results: mine.length }
+      return { model_id: m.id, name: m.name, kind: m.kind, version: 1, auto_run: m.auto_run, reads: m.kind === 'patient_pathway' ? pathwayReads : ['site'], latest: mine[0] ?? null, results: mine.length }
     })
   const puts: unknown[] = []
   const fetch = serveApi({
@@ -123,7 +126,7 @@ function serve() {
     'GET /api/projects/p1/models': [pathwayModel, trialModel],
     'GET /api/projects/p1/case-types': [caseType],
     'GET /api/case-types/ct1': caseType,
-    'GET /api/case-types/ct1/cases': () => [state.case],
+    'GET /api/case-types/ct1/cases': () => [{ case: state.case, latest: state.results.slice(0, 1) }],
     'GET /api/case-types/ct1/open-cases': () => [{ case: state.case, latest: state.results[0] }],
     'GET /api/case-types/ct1/cases/SYN-0042': () => state,
     'GET /api/case-types/ct1/cases/SYN-0042/models': models,

@@ -1,12 +1,11 @@
-"""What a model kind needs from a case, and how it runs on one. One adapter per kind; a
-new kind (a trial matcher, say) is one more entry in KINDS."""
+"""The patient pathway model as a kind (ada.core.services.statistical_models.kinds): the
+fields it reads from a case, its result on one, and its default case type, "Suspected
+cancer pathway"."""
 
 import re
-from typing import Protocol
 
 from ada.core.models.base import JsonObject
-from ada.core.models.cases import Field, FieldType, Section
-from ada.core.models.errors import Invalid
+from ada.core.models.cases import Attention, DefaultCaseType, Field, FieldType, Section
 from ada.core.models.schema import Column, ColumnType
 from ada.core.models.statistical_models import (
     Deadline,
@@ -19,21 +18,6 @@ from ada.core.models.statistical_models import (
 )
 from ada.core.services.statistical_models import pathway
 from ada.core.services.statistical_models.evaluate import evaluate
-
-
-class CaseModel(Protocol):
-    def requires(self, version: ModelVersion) -> tuple[Field, ...]:
-        """The fields this version reads, with the levels it accepts."""
-        ...
-
-    def run(self, version: ModelVersion, values: JsonObject) -> Section:
-        """The version's result for a case's values (only the fields it requires)."""
-        ...
-
-    def columns(self, version: ModelVersion) -> tuple[Column, ...]:
-        """Every column a section of this version can have (`Section.columns`), with its
-        type, unprefixed: the cases source declares them for its results table."""
-        ...
 
 
 def _slug(text: str) -> str:
@@ -53,9 +37,13 @@ DEADLINES = (
 )
 
 
-class PathwayModel:
+DEFAULT_CASE_TYPE = "Suspected cancer pathway"
+
+
+class PathwayKind:
     """The patient pathway model on a case: the fields come from its spec's terms,
-    criteria and steps; the section leads with the most pressing deadline."""
+    criteria and steps; the section leads with the most pressing deadline, and the case
+    needs attention until treatment has started."""
 
     def columns(self, version: ModelVersion) -> tuple[Column, ...]:
         columns = [
@@ -141,8 +129,40 @@ class PathwayModel:
             summary=summary,
             status=status,
             columns=columns,
+            attention=_attention(result.deadlines, result.trigger.well_founded.fired),
             body=result.model_dump(mode="json"),
         )
+
+    def default_case_type(self, version: ModelVersion) -> DefaultCaseType:
+        """What the model reads, site and sex required, plus the county, the date of the
+        first contact (so pathways can be counted by month) and who referred the patient."""
+        return DefaultCaseType(
+            name=DEFAULT_CASE_TYPE,
+            description="A patient on a suspected cancer pathway, step by step. Synthetic only.",
+            fields=self.requires(version)
+            + (
+                Field(name="county", type=FieldType.TEXT, label="Wellbeing services county"),
+                Field(name="first_contact", type=FieldType.DATE, label="First contact"),
+                Field(name="referred_by", type=FieldType.TEXT, label="Referred by"),
+            ),
+        )
+
+
+def _attention(deadlines: tuple[Deadline, ...], fired: bool) -> Attention:
+    """Open from the trigger until treatment has started (its deadline met or late)."""
+    by_label = {d.label: d for d in deadlines}
+    treatment = by_label.get("Treatment start")
+    started = treatment is not None and treatment.status in (
+        DeadlineStatus.MET,
+        DeadlineStatus.LATE,
+    )
+    overdue = [d.by for d in deadlines if d.status is DeadlineStatus.OVERDUE]
+    due = [d.by for d in deadlines if d.status is DeadlineStatus.DUE]
+    return Attention(
+        open=fired and not started,
+        overdue_by=max(overdue) if overdue else None,
+        due_in=min(due) if due else None,
+    )
 
 
 def _headline(deadlines: tuple[Deadline, ...], fired: bool) -> tuple[str, str]:
@@ -166,25 +186,3 @@ def _headline(deadlines: tuple[Deadline, ...], fired: bool) -> tuple[str, str]:
             return f"{last.label} {_days(last.by)} late", "warn"
         return f"{last.label} on target", "ok"
     return "Pathway started", "info"
-
-
-KINDS: dict[str, CaseModel] = {pathway.KIND: PathwayModel()}
-
-
-def adapter(kind: str) -> CaseModel:
-    try:
-        return KINDS[kind]
-    except KeyError:
-        raise Invalid(f"Models of kind {kind} cannot run on cases") from None
-
-
-def pathway_case_type_fields(version: ModelVersion) -> tuple[Field, ...]:
-    """The shipped "Suspected cancer pathway" case type: what the pathway model needs,
-    site and sex required, plus the county, the date of the first contact (so the
-    pathways can be counted by month) and who referred the patient."""
-    needs = PathwayModel().requires(version)
-    return needs + (
-        Field(name="county", type=FieldType.TEXT, label="Wellbeing services county"),
-        Field(name="first_contact", type=FieldType.DATE, label="First contact"),
-        Field(name="referred_by", type=FieldType.TEXT, label="Referred by"),
-    )

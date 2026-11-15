@@ -24,7 +24,6 @@ from ada.core.ports.repositories import (
 )
 from ada.core.ports.system import Clock
 from ada.core.services.cases.fields import coverage, describe
-from ada.core.services.cases.models import adapter, pathway_case_type_fields
 from ada.core.services.ports.exploration import Clauses, ExplorationService
 from ada.core.services.ports.statistical_models import StatisticalModelService
 from ada.core.services.statistical_models import pathway
@@ -34,8 +33,7 @@ from ada.core.services.statistical_models.build import (
     read_parameters,
 )
 from ada.core.services.statistical_models.evaluate import evaluate
-
-PATHWAY_CASE_TYPE = "Suspected cancer pathway"
+from ada.core.services.statistical_models.kinds import kind_of
 
 
 class StatisticalModels(StatisticalModelService):
@@ -71,12 +69,13 @@ class StatisticalModels(StatisticalModelService):
             project_id=project_id,
             name=name,
             description=description,
-            kind=pathway.KIND,
+            kind=spec.kind,
             latest_version=0,
             case_type_id=case_type_id,
             auto_run=auto_run,
             created_by=actor,
             created_at=now,
+            updated_at=now,
         )
         version = ModelVersion(
             id=uuid7(),
@@ -87,10 +86,35 @@ class StatisticalModels(StatisticalModelService):
             created_by=actor,
             created_at=now,
         )
+        if model.case_type_id is None:
+            case_type = await self._default_case_type(project_id, model.kind, version, actor)
+            model = model.model_copy(update={"case_type_id": case_type.id})
         await self._check_covered(model, version)
         await self.models.add(model)
         await self.models.add_version(version)
         return version
+
+    async def _default_case_type(
+        self, project_id: Id, kind: str, version: ModelVersion, actor: Actor
+    ) -> CaseType:
+        """The project's case type of the kind's default name when it covers the version,
+        else a new one."""
+        default = kind_of(kind).default_case_type(version)
+        needs = kind_of(kind).requires(version)
+        for case_type in await self.cases.list_types(project_id):
+            if case_type.name == default.name and not coverage(case_type.fields, needs):
+                return case_type
+        case_type = CaseType(
+            id=uuid7(),
+            project_id=project_id,
+            name=default.name,
+            description=default.description,
+            fields=default.fields,
+            created_by=actor,
+            created_at=self.clock.now(),
+        )
+        await self.cases.add_type(case_type)
+        return case_type
 
     async def set_case_type(
         self, model_id: Id, case_type_id: Id | None, auto_run: bool
@@ -110,7 +134,7 @@ class StatisticalModels(StatisticalModelService):
         case_type = await self.cases.get_type(model.case_type_id)
         if case_type.project_id != model.project_id:
             raise Invalid("A model's case type must be in the model's project")
-        gaps = coverage(case_type.fields, adapter(model.kind).requires(version))
+        gaps = coverage(case_type.fields, kind_of(model.kind).requires(version))
         if gaps:
             raise Invalid(f"{case_type.name} does not cover {model.name}: {describe(gaps)}")
 
@@ -125,44 +149,9 @@ class StatisticalModels(StatisticalModelService):
             if explored.rows.truncated:
                 raise Invalid(f"operator {parameters} has more rows than one model reads")
             spec = read_parameters(spec, explored.rows, parameters, str(explored.run_id))
-        case_type = await self._pathway_case_type(project_id, spec, actor)
         return await self.create(
-            project_id,
-            pathway.NAME,
-            pathway.DESCRIPTION,
-            spec,
-            actor,
-            case_type_id=case_type.id,
-            auto_run=True,
+            project_id, pathway.NAME, pathway.DESCRIPTION, spec, actor, auto_run=True
         )
-
-    async def _pathway_case_type(self, project_id: Id, spec: ModelSpec, actor: Actor) -> CaseType:
-        """The project's "Suspected cancer pathway" case type when it covers the model,
-        else a new one."""
-        probe = ModelVersion(
-            id=uuid7(),
-            model_id=uuid7(),
-            version=1,
-            spec=spec,
-            compiled=compile_spec(spec),
-            created_by=actor,
-            created_at=self.clock.now(),
-        )
-        needs = adapter(pathway.KIND).requires(probe)
-        for case_type in await self.cases.list_types(project_id):
-            if case_type.name == PATHWAY_CASE_TYPE and not coverage(case_type.fields, needs):
-                return case_type
-        case_type = CaseType(
-            id=uuid7(),
-            project_id=project_id,
-            name=PATHWAY_CASE_TYPE,
-            description="A patient on a suspected cancer pathway, step by step. Synthetic only.",
-            fields=pathway_case_type_fields(probe),
-            created_by=actor,
-            created_at=self.clock.now(),
-        )
-        await self.cases.add_type(case_type)
-        return case_type
 
     async def add_version(self, model_id: Id, spec: ModelSpec, actor: Actor) -> ModelVersion:
         model = await self.models.get(model_id)
@@ -194,9 +183,18 @@ class StatisticalModels(StatisticalModelService):
     async def evaluate(
         self, model_id: Id, inputs: EvaluationInputs, number: int | None = None
     ) -> Evaluation:
+        await self._survival(model_id)
         return evaluate(await self.version(model_id, number), inputs)
 
     async def population(
         self, model_id: Id, number: int | None = None
     ) -> Sequence[PopulationFigure]:
+        await self._survival(model_id)
         return (await self.version(model_id, number)).compiled.population
+
+    async def _survival(self, model_id: Id) -> None:
+        """Invalid unless the model is of the survival kind: a profile's evaluation and the
+        population view are that kind's."""
+        model = await self.models.get(model_id)
+        if model.kind != pathway.KIND:
+            raise Invalid(f"{model.name} is a {model.kind} model: it has no profile evaluation")

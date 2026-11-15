@@ -42,9 +42,9 @@ from ada.core.models.sources import (
     FreshnessPolicy,
 )
 from ada.core.models.time import TimeRange
-from ada.core.services.cases.models import PathwayModel
 from ada.core.services.cases.service import Cases
 from ada.core.services.sources.service import WHOLE_SOURCE, DataSources, source_operator_id
+from ada.core.services.statistical_models.pathway_kind import PathwayKind
 from ada.core.services.statistical_models.service import StatisticalModels
 from api_support import Overrides, new_project, send, serve
 from api_support import dispatcher as recorded
@@ -179,9 +179,13 @@ async def test_the_events_table_has_a_row_per_step_event(world: World) -> None:
     rows = await world.rows(source)
     events = (await world.cases.get_case(case_type.id, "SYN-0001")).events
     assert len(rows) == len(events)
-    assert set(world.columns) == {"key", "field", "step", "days", "recorded_at"}
-    finished = [r for r in rows if r["step"] == "workup_to_treatment"]
-    assert [(r["key"], r["field"], r["days"]) for r in finished] == [("SYN-0001", "days", 12)]
+    assert set(world.columns) == {"key", "field", "level", "old", "new", "recorded_at"}
+    finished = [r for r in rows if r["level"] == "workup_to_treatment"]
+    assert [(r["key"], r["field"], r["old"], r["new"]) for r in finished] == [
+        ("SYN-0001", "days", None, "12")
+    ]
+    county = [r for r in rows if r["field"] == "county"]
+    assert {(r["old"], r["new"]) for r in county} == {(None, '"Lappi"'), ('"Lappi"', '"Pirkanmaa"')}
 
 
 async def test_the_results_table_prefixes_each_section_column_by_model_kind(
@@ -201,6 +205,7 @@ async def test_the_results_table_prefixes_each_section_column_by_model_kind(
     )
     assert row["summary"] == "Treatment start overdue by 3 days"
     assert row["status"] == "urgent"
+    assert (row["open"], row["overdue_by"], row["due_in"]) == (True, 3, None)
     assert row["patient_pathway_treatment_start_status"] == "overdue"
     assert row["patient_pathway_treatment_start_by"] == 3
     assert world.columns["patient_pathway_days_behind"] == ColumnType.INTEGER
@@ -212,7 +217,7 @@ async def test_a_model_declares_every_column_its_sections_have(world: World) -> 
     early = await world.cases.put_case(case_type.id, "SYN-0002", EARLY, ACTOR)
     model = await world.models.get(saved.results[0].model_id)
     version = await world.models.version(model.id, model.latest_version)
-    declared = {c.name for c in PathwayModel().columns(version)}
+    declared = {c.name for c in PathwayKind().columns(version)}
     for result in (saved.results[0], early.results[0]):
         assert set(result.section.columns) <= declared
 

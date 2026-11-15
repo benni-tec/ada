@@ -12,14 +12,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   casesQuery,
   caseTypesQuery,
-  modelCasesQuery,
+  mostUrgent,
   openCasesQuery,
-  statisticalModelsQuery,
   type Case,
   type CaseResult,
   type CaseType,
   type Id,
-  type StatisticalModel,
 } from '@/lib/api'
 import { day, displayValue } from '@/lib/cases'
 
@@ -31,7 +29,6 @@ export const Route = createFileRoute('/projects/$projectId/cases/')({
 function CasesPage() {
   const { projectId } = Route.useParams()
   const { data: caseTypes, error } = useQuery(caseTypesQuery(projectId))
-  const { data: models } = useQuery(statisticalModelsQuery(projectId))
   const only = caseTypes?.length === 1 ? caseTypes[0] : undefined
 
   return (
@@ -57,7 +54,6 @@ function CasesPage() {
           key={caseType.id}
           projectId={projectId}
           caseType={caseType}
-          model={headlineModel(models ?? [], caseType.id)}
           titled={!only}
         />
       ))}
@@ -78,37 +74,32 @@ function NewCase({ projectId, caseTypeId }: { projectId: Id; caseTypeId: Id }) {
 
 /** The model whose latest result the list shows: the pathway model, else one that runs
  * automatically, else any model on the type. */
-function headlineModel(models: readonly StatisticalModel[], caseTypeId: Id) {
-  const on = models.filter((m) => m.case_type_id === caseTypeId)
-  return on.find((m) => m.kind === 'patient_pathway') ?? on.find((m) => m.auto_run) ?? on[0]
-}
-
 type View = 'all' | 'open'
 
 /** One case type's cases: all of them, newest first, or the open ones by deadline. */
 function CaseTypeCases({
   projectId,
   caseType,
-  model,
   titled,
 }: {
   projectId: Id
   caseType: CaseType
-  model: StatisticalModel | undefined
   titled: boolean
 }) {
   const [view, setView] = useState<View>('all')
   const { data: cases } = useQuery(casesQuery(caseType.id))
   const { data: open } = useQuery(openCasesQuery(caseType.id))
-  const { data: results } = useQuery({ ...modelCasesQuery(model?.id ?? ''), enabled: model !== undefined })
   const latest = new Map<Id, CaseResult>()
-  for (const row of results ?? []) if (row.latest) latest.set(row.case.id, row.latest)
-  for (const row of open ?? []) if (row.latest && !latest.has(row.case.id)) latest.set(row.case.id, row.latest)
+  for (const row of cases ?? []) {
+    const result = mostUrgent(row.latest)
+    if (result) latest.set(row.case.id, result)
+  }
+  for (const row of open ?? []) if (row.latest) latest.set(row.case.id, row.latest)
 
   const rows: Case[] =
     view === 'open'
       ? (open ?? []).map((row) => row.case)
-      : [...(cases ?? [])].sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+      : (cases ?? []).map((row) => row.case).sort((a, b) => b.updated_at.localeCompare(a.updated_at))
   const field = (name: string) => caseType.fields.find((f) => f.name === name)
   const county = field('county')
   const site = field('site')

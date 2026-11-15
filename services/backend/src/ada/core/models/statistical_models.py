@@ -213,6 +213,9 @@ class ModelSpec(DomainModel):
     """Everything a version is built from. Validated when a version is created
     (StatisticalModelService.create)."""
 
+    # The model kind this spec is for (ada.core.services.statistical_models.kinds). The
+    # first kind with a spec of its own makes ModelVersion.spec a union tagged by `kind`.
+    kind: Literal["patient_pathway"] = "patient_pathway"
     outcome: str
     structure: Literal["relative_survival_dag"] = "relative_survival_dag"
     sites: tuple[str, ...]
@@ -285,6 +288,8 @@ class StatisticalModel(DomainModel):
     auto_run: bool = False
     created_by: Actor
     created_at: datetime
+    # When its latest version was made.
+    updated_at: datetime | None = None
 
 
 class ModelVersion(DomainModel):

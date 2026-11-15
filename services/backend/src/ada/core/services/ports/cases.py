@@ -4,11 +4,11 @@ from typing import Protocol
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.cases import (
-    Case,
     CaseResult,
     CaseState,
     CaseType,
     CaseWithResult,
+    CaseWithResults,
     Field,
     ModelOnCase,
     SavedCase,
@@ -47,7 +47,9 @@ class CaseService(Protocol):
         ...
 
     async def get_case(self, case_type_id: Id, key: str) -> CaseState: ...
-    async def list_cases(self, case_type_id: Id) -> Sequence[Case]: ...
+    async def list_cases(self, case_type_id: Id) -> Sequence[CaseWithResults]:
+        """Oldest first, each with the latest result of every model that ran on it."""
+        ...
 
     async def models(self, case_type_id: Id, key: str) -> Sequence[ModelOnCase]:
         """Every model on the case's type, with its latest result for the case or none."""
@@ -58,8 +60,9 @@ class CaseService(Protocol):
         ...
 
     async def open_cases(self, case_type_id: Id) -> Sequence[CaseWithResult]:
-        """Cases whose pathway has not reached treatment start, by their latest pathway
-        result: overdue first, then the nearest deadline. Never by survival."""
+        """The cases needing attention: those a model's latest result says are open, each
+        with its most urgent open result; by status, then the most overdue, then the
+        soonest due (`Section.attention`). Never by survival."""
         ...
 
     async def model_cases(self, model_id: Id) -> Sequence[CaseWithResult]:

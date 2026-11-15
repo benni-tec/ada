@@ -10,7 +10,6 @@ import {
   caseKeys,
   caseTypesQuery,
   createPathwayModel,
-  latestVersionQuery,
   modelCasesQuery,
   statisticalModelKeys,
   statisticalModelsQuery,
@@ -83,7 +82,6 @@ function ModelsPage() {
 function ModelRow({ projectId, model, caseTypes }: { projectId: string; model: StatisticalModel; caseTypes: readonly CaseType[] }) {
   const caseType = caseTypes.find((t) => t.id === model.case_type_id)
   const { data: cases } = useQuery({ ...modelCasesQuery(model.id), enabled: model.case_type_id != null })
-  const { data: version } = useQuery(latestVersionQuery(model.id))
   const eligible = cases?.length
   const withResult = cases?.filter((row) => row.latest !== null).length
   return (
@@ -114,7 +112,7 @@ function ModelRow({ projectId, model, caseTypes }: { projectId: string; model: S
           </>
         )}
       </TableCell>
-      <TableCell className="px-4 py-3 text-xs text-muted-foreground">{day(version?.created_at ?? model.created_at)}</TableCell>
+      <TableCell className="px-4 py-3 text-xs text-muted-foreground">{day(model.updated_at ?? model.created_at)}</TableCell>
     </TableRow>
   )
 }

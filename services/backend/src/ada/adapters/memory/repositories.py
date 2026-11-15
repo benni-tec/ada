@@ -893,7 +893,10 @@ class MemoryStatisticalModelRepository(StatisticalModelRepository):
         model = _get(self.store.statistical_models, "statistical model", version.model_id)
         self.store.model_versions[(version.model_id, version.version)] = version
         self.store.statistical_models[model.id] = model.model_copy(
-            update={"latest_version": max(model.latest_version, version.version)}
+            update={
+                "latest_version": max(model.latest_version, version.version),
+                "updated_at": version.created_at,
+            }
         )
 
     async def version(self, model_id: Id, number: int) -> ModelVersion:

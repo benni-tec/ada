@@ -567,6 +567,7 @@ class StatisticalModelRow(Base):
     auto_run: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     created_by: Mapped[Json] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(_timestamp)
+    updated_at: Mapped[datetime | None] = mapped_column(_timestamp, nullable=True)
 
 
 class StatisticalModelVersionRow(Base):
@@ -620,7 +621,7 @@ class CaseRow(Base):
 
 
 class CaseEventRow(Base):
-    """Append-only: a step's days as recorded at a save."""
+    """Append-only: a field's value changed at a save (a day map per level)."""
 
     __tablename__ = "case_events"
 
@@ -629,8 +630,9 @@ class CaseEventRow(Base):
         Uuid, ForeignKey("cases.id", ondelete="CASCADE"), index=True
     )
     field: Mapped[str] = mapped_column(String(64))
-    step: Mapped[str] = mapped_column(String(64))
-    days: Mapped[int] = mapped_column(Integer)
+    level: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    old: Mapped[Any] = mapped_column(JSONB, nullable=True)
+    new: Mapped[Any] = mapped_column(JSONB, nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(_timestamp)
 
 

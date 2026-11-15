@@ -18,7 +18,7 @@ from ada.core.models.errors import Invalid
 from ada.core.models.schema import Column, OutputKind, Roles, Schema, TimeRole
 from ada.core.models.sources import AccessKind, DataSource, FreshnessKind, FreshnessPolicy
 from ada.core.ports.repositories import CaseRepository, StatisticalModelRepository
-from ada.core.services.cases.models import KINDS
+from ada.core.services.statistical_models.kinds import KINDS
 
 # Saving a case or storing a result refreshes them; nothing else needs to.
 CASES_FRESHNESS = FreshnessPolicy(kind=FreshnessKind.PUSH)

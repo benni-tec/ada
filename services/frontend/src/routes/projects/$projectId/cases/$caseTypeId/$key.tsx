@@ -15,12 +15,11 @@ import {
   caseTypeQuery,
   evaluateCase,
   invalidateCase,
+  mostUrgent,
   ownFields,
   putCase,
   ranText,
-  type CaseResult,
   type CaseValues,
-  type Evaluation,
   type ModelOnCase,
 } from '@/lib/api'
 import { when } from '@/lib/cases'
@@ -62,8 +61,9 @@ function CasePage() {
   if (error) return <div className="p-4 md:p-6"><ErrorNotice error={error} /></div>
   if (!caseType || !state) return <div className="p-4 md:p-6"><Loading what="the case" /></div>
 
-  const headline = latestHeadline(models ?? [])
-  const pathway = models?.find((m) => m.kind === 'patient_pathway')?.latest?.section.body as Evaluation | undefined
+  const headline = mostUrgent((models ?? []).map((m) => m.latest))
+  // A model that has a clock says on which day it started (the pathway: the trigger).
+  const clocks = (models ?? []).map((m) => m.latest?.section.columns.clock_start).filter((d) => typeof d === 'number')
   const saved = new Date(state.case.updated_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
   return (
@@ -94,7 +94,7 @@ function CasePage() {
         caseType={caseType}
         state={state}
         own={ownFields(caseType, models ?? [])}
-        clockStart={pathway?.trigger?.clock_start ?? null}
+        clockStart={clocks.length > 0 ? Math.min(...clocks) : null}
         onSave={(values) => save.mutateAsync(values)}
         saving={save.isPending}
         error={save.error}
@@ -177,14 +177,4 @@ function CasePage() {
       <ResultSheet caseTypeId={caseTypeId} caseKey={key} caseTypeName={caseType.name} target={target} onClose={() => setTarget(null)} />
     </div>
   )
-}
-
-/** The result the header shows: the pathway model's latest, else the newest of any model. */
-function latestHeadline(models: readonly ModelOnCase[]): CaseResult | undefined {
-  const pathway = models.find((m) => m.kind === 'patient_pathway' && m.latest)?.latest
-  if (pathway) return pathway
-  return models
-    .map((m) => m.latest)
-    .filter((r): r is CaseResult => r != null)
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
 }

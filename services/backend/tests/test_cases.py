@@ -23,9 +23,17 @@ from ada.adapters.memory.tasks import RecordingTaskDispatcher
 from ada.adapters.transactions import PendingWork
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
-from ada.core.models.cases import Field, FieldType, ResultTrigger
+from ada.core.models.cases import (
+    Attention,
+    DefaultCaseType,
+    Field,
+    FieldType,
+    ResultTrigger,
+    Section,
+)
 from ada.core.models.errors import Invalid
 from ada.core.models.projects import Project
+from ada.core.models.schema import Column, ColumnType
 from ada.core.services.cases.fields import (
     check_key,
     check_values,
@@ -33,8 +41,10 @@ from ada.core.services.cases.fields import (
     coverage,
 )
 from ada.core.services.cases.service import Cases
+from ada.core.services.statistical_models.kinds import KINDS
 from ada.core.services.statistical_models.pathway import pathway_spec
-from ada.core.services.statistical_models.service import PATHWAY_CASE_TYPE, StatisticalModels
+from ada.core.services.statistical_models.pathway_kind import DEFAULT_CASE_TYPE
+from ada.core.services.statistical_models.service import StatisticalModels
 from api_support import Overrides, new_project, send, serve
 from fakes import FixedClock
 
@@ -189,7 +199,7 @@ class World:
 async def test_the_pathway_model_comes_with_its_case_type() -> None:
     world = World()
     model, case_type = await world.pathway()
-    assert model.auto_run and case_type.name == PATHWAY_CASE_TYPE
+    assert model.auto_run and case_type.name == DEFAULT_CASE_TYPE
     assert {"site", "sex", "days", "presentation", "county", "referred_by"} <= {
         f.name for f in case_type.fields
     }
@@ -206,7 +216,8 @@ async def test_saving_a_case_runs_the_automatic_models_and_keeps_history() -> No
     assert saved.ran == (model.id,)
     assert [r.trigger for r in saved.results] == [ResultTrigger.AUTO]
     assert saved.results[0].section.summary == "First specialist visit due in 7 days"
-    assert {e.step for e in saved.events} == set(EARLY["days"])
+    assert {e.level for e in saved.events if e.field == "days"} == set(EARLY["days"])
+    assert {e.field for e in saved.events if e.level is None} >= {"site", "county"}
     # The county is the case type's own field: saved, not passed to the model.
     assert saved.case.values["county"] == "Lappi"
 
@@ -217,7 +228,7 @@ async def test_saving_a_case_runs_the_automatic_models_and_keeps_history() -> No
     assert later.results[0].section.status == "urgent"
     # Only the steps whose days changed or started were recorded again: imaging to referral
     # stayed at 1 day.
-    again = [e.step for e in later.events[len(saved.events) :]]
+    again = [e.level or e.field for e in later.events[len(saved.events) :]]
     assert "imaging_to_referral" not in again and "workup_to_treatment" in again
 
 
@@ -330,3 +341,63 @@ async def test_the_synthetic_generator_makes_cases_the_case_type_accepts() -> No
     assert len(cases) == 40 and all(c.latest is not None for c in cases)
     open_ = await world.cases.open_cases(case_type.id)
     assert 0 < len(open_) < 40
+
+
+class ToyKind:
+    """A model kind that is not the pathway: it reads the site and the county, and asks
+    for attention in Lappi."""
+
+    def requires(self, version: Any) -> tuple[Field, ...]:
+        sites = ("lung", "colorectal", "pancreas")
+        return (
+            Field(name="site", type=FieldType.ENUM, levels=sites, required=True),
+            Field(name="county", type=FieldType.TEXT),
+        )
+
+    def run(self, version: Any, values: dict[str, Any]) -> Section:
+        north = values.get("county") == "Lappi"
+        return Section(
+            kind="toy",
+            title="Toy",
+            summary="Far north" if north else "South",
+            status="warn" if north else "ok",
+            columns={"north": north},
+            attention=Attention(open=north, due_in=1 if north else None),
+        )
+
+    def columns(self, version: Any) -> tuple[Column, ...]:
+        return (Column(name="north", type=ColumnType.BOOLEAN),)
+
+    def default_case_type(self, version: Any) -> DefaultCaseType:
+        return DefaultCaseType(name="Toy", description="", fields=self.requires(version))
+
+
+async def test_the_case_machinery_serves_any_model_kind(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(KINDS, "toy", ToyKind())
+    world = World()
+    pathway, case_type = await world.pathway()
+    version = await world.models.version(pathway.id)
+    toy = pathway.model_copy(update={"id": uuid7(), "name": "Toy", "kind": "toy"})
+    world.store.statistical_models[toy.id] = toy
+    world.store.model_versions[(toy.id, 1)] = version.model_copy(update={"model_id": toy.id})
+
+    saved = await world.cases.put_case(case_type.id, "SYN-NORTH", EARLY, ACTOR)
+    assert set(saved.ran) == {pathway.id, toy.id}
+    by_kind = {r.section.kind: r for r in saved.results}
+    assert by_kind["toy"].section.summary == "Far north"
+    on_case = {m.kind: m for m in await world.cases.models(case_type.id, "SYN-NORTH")}
+    assert on_case["toy"].reads == ("site", "county")
+    # Treatment started, so the pathway is done; the toy model still wants attention.
+    done = {**OVERDUE, "county": "Lappi", "treatment_started": True}
+    done["days"] = {**OVERDUE["days"], "workup_to_treatment": 5}
+    await world.cases.put_case(case_type.id, "SYN-DONE", done, ACTOR)
+    await world.cases.put_case(case_type.id, "SYN-SOUTH", {**done, "county": "Pirkanmaa"}, ACTOR)
+    open_ = await world.cases.open_cases(case_type.id)
+    kinds = {c.case.key: c.latest.section.kind for c in open_ if c.latest}
+    assert set(kinds) == {"SYN-NORTH", "SYN-DONE"}
+    assert kinds["SYN-DONE"] == "toy"
+    listed = {
+        c.case.key: {r.section.kind for r in c.latest}
+        for c in await world.cases.list_cases(case_type.id)
+    }
+    assert listed["SYN-SOUTH"] == {"patient_pathway", "toy"}

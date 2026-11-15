@@ -141,7 +141,7 @@ function Timeline({
 }) {
   const given = field.levels.filter((level) => days[level] != null)
   const recorded = (step: string) => {
-    const last = events.filter((e) => e.step === step).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0]
+    const last = events.filter((e) => e.field === field.name && e.level === step).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0]
     return last ? day(last.recorded_at) : undefined
   }
   const done = treatmentStarted && given.includes('workup_to_treatment')

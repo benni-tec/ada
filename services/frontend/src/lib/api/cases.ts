@@ -19,6 +19,7 @@ export type CaseResult = Schemas['CaseResult']
 export type Section = Schemas['Section']
 export type ModelOnCase = Schemas['ModelOnCase']
 export type CaseWithResult = Schemas['CaseWithResult']
+export type CaseWithResults = Schemas['CaseWithResults']
 export type CaseValues = Record<string, unknown>
 
 type Answer<T> = { data?: T; error?: unknown; response: Response }
@@ -153,30 +154,31 @@ export function invalidateModelCaseType(queryClient: QueryClient, projectId: Id,
   ])
 }
 
-/** The fields each model kind reads from a case; a case type's other fields are its own.
- * Mirrors the backend's `PathwayModel.requires` (no endpoint lists them yet). */
-export const modelKindReads: Record<string, readonly string[]> = {
-  patient_pathway: [
-    'site',
-    'sex',
-    'age_band',
-    'education',
-    'route',
-    'stage',
-    'intent',
-    'modality',
-    'presentation',
-    'days',
-    'treatment_started',
-  ],
-}
-
 /** The case type's own fields: the ones no model on it reads. None are marked while no
  * model is on the type. */
-export function ownFields(caseType: CaseType, models: readonly { kind: string }[]): Set<string> {
+export function ownFields(caseType: CaseType, models: readonly { reads: readonly string[] }[]): Set<string> {
   if (models.length === 0) return new Set()
-  const read = new Set(models.flatMap((m) => modelKindReads[m.kind] ?? []))
+  const read = new Set(models.flatMap((m) => m.reads))
   return new Set(caseType.fields.map((f) => f.name).filter((name) => !read.has(name)))
+}
+
+const urgency = { urgent: 0, warn: 1, info: 2, ok: 3 } as const
+
+/** The result that most needs someone, whatever model made it: by status, then the most
+ * overdue, then the soonest due, then the newest. Never by survival. */
+export function mostUrgent(results: readonly (CaseResult | null | undefined)[]): CaseResult | undefined {
+  const rank = (r: CaseResult) => [
+    urgency[r.section.status],
+    -(r.section.attention.overdue_by ?? 0),
+    r.section.attention.due_in ?? Number.MAX_SAFE_INTEGER,
+  ]
+  return results
+    .filter((r): r is CaseResult => r != null)
+    .sort((a, b) => {
+      const [x, y] = [rank(a), rank(b)]
+      for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]
+      return b.created_at.localeCompare(a.created_at)
+    })[0]
 }
 
 /** "Patient pathway model ran automatically.", after a save. */

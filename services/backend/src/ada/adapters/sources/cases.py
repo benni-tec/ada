@@ -8,6 +8,7 @@ registered with and the data no longer has (a field removed while the type had n
 a model's column no result has yet) is kept, empty, so the declared schema always fits."""
 
 import asyncio
+import json
 import tempfile
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
@@ -110,8 +111,9 @@ class CaseSourceReader(SourceReader):
             {
                 "key": case.key,
                 "field": event.field,
-                "step": event.step,
-                "days": event.days,
+                "level": event.level,
+                "old": None if event.old is None else json.dumps(event.old),
+                "new": None if event.new is None else json.dumps(event.new),
                 "recorded_at": event.recorded_at,
             }
             for case in await self.cases.list(case_type.id)
@@ -138,6 +140,9 @@ class CaseSourceReader(SourceReader):
                     "trigger": result.trigger.value,
                     "created_at": result.created_at,
                     "summary": section.summary,
+                    "open": section.attention.open,
+                    "overdue_by": section.attention.overdue_by,
+                    "due_in": section.attention.due_in,
                     "status": section.status,
                 }
                 for name, value in section.columns.items():

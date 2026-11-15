@@ -89,6 +89,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
     async def list_open_cases(
         case_type_id: Id, session_id: SessionId, service: FromDishka[CaseService]
     ) -> Sequence[CaseWithResult]:
-        """The cases whose pathway has not reached treatment start, with their latest
-        pathway result: overdue first, then the nearest deadline. Never ordered by survival."""
+        """The cases needing attention: those a model's latest result says are still open,
+        each with its most urgent open result, ordered by status, then the most overdue,
+        then the soonest due. Never ordered by survival."""
         return await service.open_cases(case_type_id)

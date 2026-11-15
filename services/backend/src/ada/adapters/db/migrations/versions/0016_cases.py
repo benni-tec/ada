@@ -1,4 +1,4 @@
-"""Case types, cases, their step events and model results; a model's case type
+"""Case types, cases, their field-change events and model results; a model's case type
 
 Revision ID: 0016
 Revises: 0015
@@ -52,8 +52,9 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("case_id", sa.Uuid(), nullable=False),
         sa.Column("field", sa.String(length=64), nullable=False),
-        sa.Column("step", sa.String(length=64), nullable=False),
-        sa.Column("days", sa.Integer(), nullable=False),
+        sa.Column("level", sa.String(length=64), nullable=True),
+        sa.Column("old", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("new", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["case_id"], ["cases.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -81,6 +82,9 @@ def upgrade() -> None:
         "statistical_models",
         sa.Column("auto_run", sa.Boolean(), server_default=sa.text("false"), nullable=False),
     )
+    op.add_column(
+        "statistical_models", sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True)
+    )
     op.create_foreign_key(
         "statistical_models_case_type_id_fkey",
         "statistical_models",
@@ -99,6 +103,7 @@ def downgrade() -> None:
     op.drop_constraint(
         "statistical_models_case_type_id_fkey", "statistical_models", type_="foreignkey"
     )
+    op.drop_column("statistical_models", "updated_at")
     op.drop_column("statistical_models", "auto_run")
     op.drop_column("statistical_models", "case_type_id")
     op.drop_index(op.f("ix_case_results_model_id"), table_name="case_results")

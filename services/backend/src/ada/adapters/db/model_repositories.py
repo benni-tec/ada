@@ -39,6 +39,7 @@ class SqlStatisticalModelRepository(StatisticalModelRepository):
                 case_type_id=model.case_type_id,
                 auto_run=model.auto_run,
                 created_by=dump(model.created_by),
+                updated_at=model.updated_at,
                 created_at=model.created_at,
             ),
         )
@@ -68,6 +69,7 @@ class SqlStatisticalModelRepository(StatisticalModelRepository):
             ),
         )
         model.latest_version = max(model.latest_version, version.version)
+        model.updated_at = version.created_at
         await self.session.flush()
 
     async def version(self, model_id: Id, number: int) -> ModelVersion:
@@ -100,5 +102,6 @@ def _model(row: StatisticalModelRow) -> StatisticalModel:
         case_type_id=row.case_type_id,
         auto_run=row.auto_run,
         created_by=Actor.model_validate(row.created_by),
+        updated_at=row.updated_at,
         created_at=row.created_at,
     )

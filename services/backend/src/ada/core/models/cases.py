@@ -73,19 +73,31 @@ class Case(DomainModel):
 
 
 class CaseEvent(DomainModel):
-    """A day-map field's step and its days, as recorded at a save: the history of a
-    pathway as it grows."""
+    """A field whose value changed at a save: the case's history. A day map changes per
+    level, so `level` names the step and `old`/`new` are its days; for other fields
+    `level` is None. `old` is None for a value set for the first time."""
 
     case_id: Id
     field: str
-    step: str
-    days: int
+    level: str | None = None
+    old: Any = None
+    new: Any = None
     recorded_at: datetime
 
 
 class ResultTrigger(StrEnum):
     AUTO = "auto"
     REQUEST = "request"
+
+
+class Attention(DomainModel):
+    """What a result says about whether the case needs someone: still open, how many
+    days the most overdue thing is late, how many days until the next thing is due.
+    Each model kind fills it from its own result; lists sort by it."""
+
+    open: bool = False
+    overdue_by: int | None = None
+    due_in: int | None = None
 
 
 class Section(DomainModel):
@@ -98,6 +110,7 @@ class Section(DomainModel):
     summary: str
     status: Literal["ok", "info", "warn", "urgent"] = "info"
     columns: dict[str, str | int | float | bool | None] = {}
+    attention: Attention = Attention()
     body: JsonObject = {}
 
 
@@ -135,6 +148,8 @@ class ModelOnCase(DomainModel):
     kind: str
     version: int
     auto_run: bool
+    # The fields of the case type this model reads; the others are the type's own.
+    reads: tuple[str, ...] = ()
     latest: CaseResult | None
     results: int
 
@@ -144,6 +159,22 @@ class CaseWithResult(DomainModel):
 
     case: Case
     latest: CaseResult | None
+
+
+class CaseWithResults(DomainModel):
+    """A case with the latest result of each model on its type that has run on it."""
+
+    case: Case
+    latest: tuple[CaseResult, ...] = ()
+
+
+class DefaultCaseType(DomainModel):
+    """The case type a model kind brings: seeded when a model of the kind is created
+    without one."""
+
+    name: str
+    description: str
+    fields: tuple[Field, ...]
 
 
 # The cases source (AccessKind.CASES): one table of a case type, read inside ADA. Its
@@ -196,8 +227,11 @@ CASE_TABLE_COLUMNS: dict[CaseTable, tuple[Column, ...]] = {
     CaseTable.EVENTS: (
         _required("key", ColumnType.TEXT),
         _required("field", ColumnType.TEXT),
-        _required("step", ColumnType.TEXT),
-        _required("days", ColumnType.INTEGER),
+        # The day map's level (a step); None for other fields.
+        Column(name="level", type=ColumnType.TEXT),
+        # The values as JSON text; None for the first value.
+        Column(name="old", type=ColumnType.TEXT),
+        Column(name="new", type=ColumnType.TEXT),
         _required("recorded_at", ColumnType.TIMESTAMP),
     ),
     CaseTable.RESULTS: (
@@ -211,6 +245,9 @@ CASE_TABLE_COLUMNS: dict[CaseTable, tuple[Column, ...]] = {
         _required("created_at", ColumnType.TIMESTAMP),
         _required("summary", ColumnType.TEXT),
         _required("status", ColumnType.TEXT),
+        _required("open", ColumnType.BOOLEAN),
+        Column(name="overdue_by", type=ColumnType.INTEGER),
+        Column(name="due_in", type=ColumnType.INTEGER),
     ),
 }
 
