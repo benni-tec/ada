@@ -1,12 +1,14 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 
 import {
+  canOpenPipeline,
   context,
   fetchData,
   fetchWidget,
   inMcpHost,
   loadFromMcpHost,
   onContextChange,
+  openPipeline,
   readFromMcpHost,
   type WidgetContext,
 } from './host'
@@ -135,15 +137,60 @@ export function WidgetRuntime({ children }: { children: (loaded: Loaded) => Reac
     <div className="ada-widget" data-scenario={data.is_scenario || undefined} data-stale={data.is_stale || undefined}>
       <Flags data={data} />
       <div className="ada-body">{children(result.loaded)}</div>
-      <Sources sources={data.sources ?? []} />
+      <Sources sources={data.sources ?? []} stale={data.is_stale} />
     </div>
   )
 }
 
 /** Where the numbers came from and when they were fetched, under every widget, so no
  * number is shown without its source. */
-export function Sources({ sources }: { sources: NonNullable<WidgetData['sources']> }) {
+export function Sources({ sources, stale = false }: { sources: NonNullable<WidgetData['sources']>; stale?: boolean }) {
+  const [expanded, setExpanded] = useState(false)
   if (sources.length === 0) return null
+  const compact = sources.length > 3
+  const pipeline = canOpenPipeline()
+  return (
+    <>
+      {compact && (
+        <SourceSummary sources={sources} stale={stale}>
+          <button
+            type="button"
+            aria-expanded={pipeline ? undefined : expanded}
+            onClick={() => pipeline ? openPipeline(MAIN_INPUT) : setExpanded(!expanded)}
+          >
+            {sources.length} sources
+          </button>
+        </SourceSummary>
+      )}
+      {(!compact || expanded) && <SourceList sources={sources} />}
+    </>
+  )
+}
+
+function SourceSummary({ sources, stale, children }: { sources: WidgetSource[]; stale: boolean; children: ReactNode }) {
+  const now = useNow()
+  const times = sources.map((source) => source.fetched_at ? Date.parse(source.fetched_at) : NaN)
+  const missing = times.some((time) => !Number.isFinite(time))
+  const oldest = Math.min(...times.filter(Number.isFinite))
+  const old = now - oldest > 48 * 60 * 60 * 1000
+  const status = stale ? 'red' : missing || old ? 'yellow' : 'green'
+  const label = stale
+    ? 'A source could not be refreshed'
+    : missing
+      ? 'A source has no recorded fetch time'
+      : old
+        ? 'A source was fetched more than 48 h ago'
+        : `All ${sources.length} sources fetched within 48 h`
+  return (
+    <div className="ada-sources ada-sources-summary">
+      <span className="ada-source-led" data-status={status} role="img" aria-label={label} title={label} />
+      {children}
+      <span> · {Number.isFinite(oldest) ? <>oldest <Fetched at={new Date(oldest).toISOString()} /></> : 'fetch time not recorded'}</span>
+    </div>
+  )
+}
+
+function SourceList({ sources }: { sources: WidgetSource[] }) {
   return (
     <ul className="ada-sources" aria-label="Sources">
       {sources.map((source) => (
@@ -163,14 +210,19 @@ export function Sources({ sources }: { sources: NonNullable<WidgetData['sources'
   )
 }
 
-/** "fetched 14:02:11, 40 s ago" (with the date when not today), counting up while shown:
- * how live the data is, at a glance. */
-function Fetched({ at }: { at: string }) {
+function useNow() {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [])
+  return now
+}
+
+/** "fetched 14:02:11, 40 s ago" (with the date when not today), counting up while shown:
+ * how live the data is, at a glance. */
+function Fetched({ at }: { at: string }) {
+  const now = useNow()
   const date = new Date(at)
   if (Number.isNaN(date.getTime())) return <>fetched {at}</>
   const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
