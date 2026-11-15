@@ -312,7 +312,7 @@ async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
             dashboard_id = first[name]
             version = await dashboards.current(dashboard_id)
             assert version is not None
-            assert len(version.slots) == (6 if name == DOORS else 2)
+            assert len(version.slots) == (7 if name == DOORS else 2)
             for slot in version.slots:
                 data = await widgets.data(slot.widget_id)
                 assert data.rows

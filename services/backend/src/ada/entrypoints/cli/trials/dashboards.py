@@ -46,8 +46,43 @@ LABELS = {
     "trials": "Trials",
     "per_million": "Trials per million",
     "rate_ratio_fi": "Finland rate / country rate",
+    "finland_trials": "Finland trials",
+    "finland_per_million": "Finland per million",
+    "nordic_per_million": "SE+NO+DK per million",
+    "more_trials_needed": "More trials needed",
+    "population_source": "Population source",
     **DISTANCES,
 }
+
+
+MORE_NEEDED = "More recruiting trials Finland needs to match SE/NO/DK"
+# Pooled SE+NO+DK rate times Finland's population, rounded up.
+MORE_NEEDED_SQL = """
+WITH nb AS (
+    SELECT registry, cancer_group, sum(trials) / sum(population_m) AS nordic_per_million
+    FROM input_0 WHERE country IN ('Sweden', 'Norway', 'Denmark') GROUP BY ALL
+)
+SELECT f.registry, f.cancer_group,
+       f.trials AS finland_trials,
+       round(f.per_million, 1) AS finland_per_million,
+       round(nb.nordic_per_million, 1) AS nordic_per_million,
+       greatest(0, ceil((nb.nordic_per_million - f.per_million) * f.population_m))::INTEGER
+           AS more_trials_needed,
+       f.population_source
+FROM input_0 f JOIN nb USING (registry, cancer_group)
+WHERE f.country = 'Finland' AND f.cancer_group IN ('all', 'lung', 'pancreas', 'liver')
+ORDER BY CASE f.cancer_group WHEN 'all' THEN 0 WHEN 'lung' THEN 1 WHEN 'pancreas' THEN 2 ELSE 3
+    END, f.registry
+"""
+MORE_NEEDED_COLUMNS = [
+    "registry",
+    "cancer_group",
+    "finland_trials",
+    "finland_per_million",
+    "nordic_per_million",
+    "more_trials_needed",
+    "population_source",
+]
 
 
 def _table(columns: list[str]) -> JsonObject:
@@ -183,6 +218,12 @@ async def create_dashboards(
             },
         },
     )
+    needed = await widget(
+        await view(MORE_NEEDED_SQL, steps.trial_rates),
+        "table",
+        MORE_NEEDED,
+        _table(MORE_NEEDED_COLUMNS),
+    )
     pending = await widget(
         steps.ctis_finland_pending,
         "table",
@@ -259,10 +300,11 @@ async def create_dashboards(
             [
                 (definitions, 0, 0, 12, 3),
                 (rates, 0, 3, 12, 6),
-                (cancer_table, 0, 9, 6, 7),
-                (site_map, 6, 9, 6, 7),
-                (doors_table, 0, 16, 12, 8),
-                (pending, 0, 24, 12, 7),
+                (needed, 0, 9, 12, 5),
+                (cancer_table, 0, 14, 6, 7),
+                (site_map, 6, 14, 6, 7),
+                (doors_table, 0, 21, 12, 8),
+                (pending, 0, 29, 12, 7),
             ],
         ),
         await dashboard(NEAR_YOU, [(advice, 0, 0, 12, 3), (patient_table, 0, 3, 12, 10)]),
