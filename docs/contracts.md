@@ -1866,12 +1866,13 @@ not describe it.
   `test_worker_events` (on PostgreSQL: a failed call recorded while its own writes roll
   back) and `test_agent` (the in-platform agent's calls not recorded). A feature is tested through its service, then one transport for
   what the routes add (REST or MCP, not both), then PostgreSQL for what only it does.
-  `CI=1 moon run backend:test` takes well under a minute.
+  `CI=1 moon run backend:test` runs them on every core (pytest-xdist, `-n auto --maxprocesses
+  16 --dist worksteal`) in about a minute; `uv run pytest` alone runs them in one process.
 - Backend tests run without services, except those that take the `database_url` or
   `migrated_database_url` fixture (PostgreSQL) or the `valkey` fixture of
   `tests/test_worker_events.py`. They need `moon run root:infra` and are skipped locally
   when it is not running; with `CI` set they fail instead. CI starts both.
-- **Shared setup, for speed.** One database is migrated per run and emptied (`TRUNCATE`)
+- **Shared setup, for speed.** One database is migrated per run (per worker) and emptied (`TRUNCATE`)
   before each test that takes `migrated_database_url`; only the migration tests get a new
   database (`database_url`). Building an app or an MCP server takes a while, so a module
   builds one (`scope="module"`) and its tests share it: each works in a project of its
