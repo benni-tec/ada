@@ -298,7 +298,7 @@
       "x": 6,
       "y": 0
      },
-     "widget": "01a1dd42-e2d7-7027-b87f-3f20346ca068"
+     "widget": "01a1ddef-22f2-715f-9f6b-80fe29a833ce"
     },
     {
      "name": "trend",
@@ -1112,8 +1112,8 @@
    },
    "note": "Synthetic cases: median per county; tick: the Nordic standard time for its case mix"
   },
-  "01a1dd42-e2d7-7027-b87f-3f20346ca068": {
-   "operator_id": "op_315f4f6be6d8b50f47d98854d843c108",
+  "01a1ddef-22f2-715f-9f6b-80fe29a833ce": {
+   "operator_id": "op_6707bbb0b73c8ab0af83d0760b112b4f",
    "inputs": {},
    "type": "chart",
    "title": "Lung: days per pathway step, against the Nordic standard",
@@ -1164,6 +1164,19 @@
         "field": "nordic_days"
        }
       }
+     },
+     {
+      "mark": {
+       "type": "tick",
+       "color": "#f59e0b",
+       "thickness": 3
+      },
+      "encoding": {
+       "y": {
+        "type": "quantitative",
+        "field": "expected_finland_days"
+       }
+      }
      }
     ],
     "encoding": {
@@ -1177,7 +1190,7 @@
      }
     }
    },
-   "note": "Synthetic cases: median days per step; tick: the Nordic standard; red where a step takes longer"
+   "note": "Synthetic cases: median days per step; black tick: the Nordic standard; amber tick: expected in Finland without a pathway; red where a step takes longer than the standard"
   },
   "01a1dd43-5e87-7490-995d-a50145b73ddf": {
    "operator_id": "op_1936d20e43ee40018405dce7eae7b3eb",
@@ -2248,11 +2261,17 @@
    "materialize": false
   },
   {
-   "key": "op_315f4f6be6d8b50f47d98854d843c108",
+   "key": "op_80dbc8cf6819673b5d6481f3457e8a1d",
+   "kind": "source",
+   "source": "01a1dddd-f011-7323-9fd0-b11e7c40a833"
+  },
+  {
+   "key": "op_6707bbb0b73c8ab0af83d0760b112b4f",
    "kind": "transform",
-   "sql": "-- Lung cancer pathways (synthetic cases): median days per step against the Nordic standard\n-- time of that step, as the patient pathway model compiles the Danish, Norwegian and Swedish\n-- standards (work-up to treatment: surgery).\nWITH t(step, nordic_days) AS (\n  VALUES ('days_contact_to_physician', 7), ('days_physician_to_imaging', 6),\n    ('days_imaging_to_referral', 4), ('days_referral_to_specialist', 6),\n    ('days_specialist_to_workup', 22), ('days_workup_to_treatment', 14)\n),\nd AS (\n  UNPIVOT (SELECT * FROM input_0 WHERE site = 'lung')\n  ON days_contact_to_physician, days_physician_to_imaging, days_imaging_to_referral,\n    days_referral_to_specialist, days_specialist_to_workup, days_workup_to_treatment\n  INTO NAME step VALUE days\n)\nSELECT CASE step\n    WHEN 'days_contact_to_physician' THEN '1 Contact to physician'\n    WHEN 'days_physician_to_imaging' THEN '2 Physician to imaging'\n    WHEN 'days_imaging_to_referral' THEN '3 Imaging to referral'\n    WHEN 'days_referral_to_specialist' THEN '4 Referral to specialist'\n    WHEN 'days_specialist_to_workup' THEN '5 Specialist to work-up'\n    ELSE '6 Work-up to treatment' END AS step,\n  median(days) AS median_days, any_value(nordic_days) AS nordic_days\nFROM d JOIN t USING (step)\nGROUP BY 1 ORDER BY 1",
+   "sql": "-- Lung cancer pathways (synthetic cases): median days per step against the Nordic standard\n-- time of that step, as the patient pathway model compiles the Danish, Norwegian and Swedish\n-- standards (work-up to treatment: surgery), and the days expected in Finland without a\n-- standardised pathway: the standard times the median diagnostic interval before / after\n-- Denmark's cancer patient pathways, read from Jensen et al. 2015 (input_1), on the\n-- diagnostic steps; the step from work-up to treatment keeps the standard.\nWITH effect AS (\n  SELECT\n    CAST(regexp_extract(text, 'lower across time: (\\d+) \\(interquartile', 1) AS DOUBLE) AS before_days,\n    CAST(regexp_extract(text, '(\\d+) \\(IQI: \\d+;\\d+\\) days after CPP implementation', 1) AS DOUBLE) AS after_days\n  FROM input_1\n),\nt(step, nordic_days, diagnostic) AS (\n  VALUES ('days_contact_to_physician', 7, true), ('days_physician_to_imaging', 6, true),\n    ('days_imaging_to_referral', 4, true), ('days_referral_to_specialist', 6, true),\n    ('days_specialist_to_workup', 22, true), ('days_workup_to_treatment', 14, false)\n),\nd AS (\n  UNPIVOT (SELECT * FROM input_0 WHERE site = 'lung')\n  ON days_contact_to_physician, days_physician_to_imaging, days_imaging_to_referral,\n    days_referral_to_specialist, days_specialist_to_workup, days_workup_to_treatment\n  INTO NAME step VALUE days\n)\nSELECT CASE step\n    WHEN 'days_contact_to_physician' THEN '1 Contact to physician'\n    WHEN 'days_physician_to_imaging' THEN '2 Physician to imaging'\n    WHEN 'days_imaging_to_referral' THEN '3 Imaging to referral'\n    WHEN 'days_referral_to_specialist' THEN '4 Referral to specialist'\n    WHEN 'days_specialist_to_workup' THEN '5 Specialist to work-up'\n    ELSE '6 Work-up to treatment' END AS step,\n  median(days) AS median_days, any_value(nordic_days) AS nordic_days,\n  round(any_value(nordic_days * CASE WHEN diagnostic THEN effect.before_days / effect.after_days ELSE 1 END), 1) AS expected_finland_days\nFROM d JOIN t USING (step) CROSS JOIN effect\nGROUP BY 1 ORDER BY 1",
    "inputs": [
-    "op_0a9e1dcca222d610538d6d164ee0b4ea"
+    "op_0a9e1dcca222d610538d6d164ee0b4ea",
+    "op_80dbc8cf6819673b5d6481f3457e8a1d"
    ],
    "roles": {
     "time": null,
@@ -2275,11 +2294,6 @@
     "measures": []
    },
    "materialize": false
-  },
-  {
-   "key": "op_80dbc8cf6819673b5d6481f3457e8a1d",
-   "kind": "source",
-   "source": "01a1dddd-f011-7323-9fd0-b11e7c40a833"
   },
   {
    "key": "op_424f6c07a72c8c72f83ace42013f5c47",
