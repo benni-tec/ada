@@ -26,3 +26,22 @@ Code inspected: `entrypoints/mcp/agent.py`, `entrypoints/mcp/tools/{sources,watc
 MCP: `watch_source(..., check_every="hourly")`. HTTP: `POST /api/sources/{id}/watch?check_every=hourly`; omit the query parameter to keep the server default. Unsupported values are rejected. Re-watching replaces the monitor; unwatching clears the choice.
 
 Apply migration `0015` with `ada migrate` before deploying the backend/worker, then deploy the frontend. No new environment variables; `CONTEXT_MONITOR_MINUTES` remains the fallback. Existing watch requirements (`CONTEXT_DEV_API_KEY`, `ADA_PUBLIC_URL`, `ADA_SECRET_KEY`) still apply. Existing monitors are not rescheduled by deployment.
+
+## Batch page watching
+
+`watch_sources(project_id, pages=[{url, name, check_every?, provenance?}, ...])` is
+available to both agents. HTTP: `POST /api/projects/{project_id}/sources/watch` with
+the same list as its JSON body. Accepts 1–50 pages; returns ordered per-page
+`url`, `ok`, `source_id` or `error`, and `already_watched`. Existing addresses are
+reused, and watched pages keep their monitor and schedule. Repeated URLs within a
+batch use the first entry's choices. Concurrent batches serialize the same URL.
+
+Registration uses the existing web/html scrape default, with automatic `page, text`
+columns. No initial read, extraction model or pipeline is run, so success confirms
+monitor creation, not readability. Change instructions are not supported by the
+existing watch path. For structured extraction use the individual source tools.
+
+Four pages run concurrently, each limited to ten seconds, so 50 pages take at most
+about 130 seconds; slow pages return an error for a separate retry. A timeout after the
+provider created the monitor can leave a remote monitor to delete by hand. Research's
+paid-call budget defaults to 80 (`RESEARCH_WEB_CALLS`).

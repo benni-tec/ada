@@ -120,7 +120,7 @@ class AgentSettingsView(DomainModel):
 
 class ResearchLimits(DomainModel):
     # Paid web tool calls a research session may make, over all its turns.
-    web_calls: int = 40
+    web_calls: int = 80
 
 
 class ModelTarget(DomainModel):

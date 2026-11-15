@@ -37,6 +37,7 @@ RESEARCH_TOOLS = frozenset(
         "add_source_operator",
         "preview_operator",
         "watch_source",
+        "watch_sources",
         "report_back",
     }
 )

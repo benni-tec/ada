@@ -46,12 +46,12 @@ depends_on = [
     "ada.core.ports",
     "ada.core.services.ports",
     # The MCP app is mounted into the HTTP app.
-    "ada.entrypoints.mcp", "ada.discovery",
+    "ada.entrypoints.mcp", "ada.discovery", "ada.entrypoints.watch_sources",
 ]
 
 [[modules]]
 path = "ada.entrypoints.mcp"
-depends_on = ["ada.core.models", "ada.core.ports", "ada.core.services.ports", "ada.discovery"]
+depends_on = ["ada.core.models", "ada.core.ports", "ada.core.services.ports", "ada.discovery", "ada.entrypoints.watch_sources"]
 
 [[modules]]
 path = "ada.entrypoints.worker"
@@ -99,3 +99,7 @@ depends_on = []
 [[modules]]
 path = "ada.discovery"
 depends_on = []
+
+[[modules]]
+path = "ada.entrypoints.watch_sources"
+depends_on = ["ada.core.models", "ada.core.ports", "ada.core.services.ports"]
