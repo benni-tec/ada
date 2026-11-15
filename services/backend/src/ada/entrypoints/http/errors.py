@@ -49,15 +49,30 @@ class DomainErrorMiddleware:
             await self.app(scope, receive, send)
             return
         started = False
+        # REST writes return finite responses. Hold them until the request container has
+        # committed; otherwise the next request can observe a 201's object as missing.
+        # MCP and GET streams must keep streaming.
+        deferred = scope["path"].startswith("/api/") and scope["method"] in {
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+        }
+        messages: list[Message] = []
 
         async def watch(message: Message) -> None:
             nonlocal started
+            if deferred:
+                messages.append(message)
+                return
             if message["type"] == "http.response.start":
                 started = True
             await send(message)
 
         try:
             await self.app(scope, receive, watch)
+            for message in messages:
+                await send(message)
         except DOMAIN_ERRORS as error:
             if started:
                 # A streamed response failed midway; there is no status left to change.
