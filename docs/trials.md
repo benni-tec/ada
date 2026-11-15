@@ -84,7 +84,9 @@ Missing coordinates yield NULL distances; no route or travel-time claim is made.
 ## Definitions and caveats
 
 Recruiting means the registry's site status, not confirmed availability. Site
-statuses lag. A pending CTIS listing is not a Finnish recruiting site. The two
+statuses lag. The `trial_site_changes` table suppresses `trial_left_list` and
+`nordic_site_closed` removals for a source when its newest snapshot contains fewer
+than half as many trials as its previous snapshot; additions still count. A pending CTIS listing is not a Finnish recruiting site. The two
 registries overlap and their counts must not be added. CTIS code meanings are
 inferred from samples, not an authoritative codebook. Broad CT.gov search can
 include non-cancer conditions. Basket trials can belong to several cancer groups;

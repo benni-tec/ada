@@ -3215,6 +3215,33 @@
         "title": "NewAlertRule",
         "type": "object"
       },
+      "NewAnalysis": {
+        "additionalProperties": false,
+        "properties": {
+          "brief": {
+            "title": "Brief",
+            "type": "string"
+          },
+          "operator_ids": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OperatorId"
+            },
+            "title": "Operator Ids",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "brief",
+          "title"
+        ],
+        "title": "NewAnalysis",
+        "type": "object"
+      },
       "NewAttachment": {
         "additionalProperties": false,
         "properties": {
@@ -5401,7 +5428,8 @@
       "SessionAgent": {
         "enum": [
           "session",
-          "research"
+          "research",
+          "analysis"
         ],
         "title": "SessionAgent",
         "type": "string"
@@ -6703,6 +6731,89 @@
         ],
         "title": "VersionBump",
         "type": "string"
+      },
+      "WatchPage": {
+        "additionalProperties": false,
+        "properties": {
+          "check_every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckEvery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Provenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "name"
+        ],
+        "title": "WatchPage",
+        "type": "object"
+      },
+      "WatchResult": {
+        "properties": {
+          "already_watched": {
+            "default": false,
+            "title": "Already Watched",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "ok"
+        ],
+        "title": "WatchResult",
+        "type": "object"
       },
       "WebSettings": {
         "description": "What the web tools may do, from the platform's configuration (read only).",
@@ -10555,6 +10666,70 @@
         ]
       }
     },
+    "/api/projects/{project_id}/sources/watch": {
+      "post": {
+        "description": "Register and watch up to 50 pages; each page commits independently.",
+        "operationId": "watch_sources_api_projects__project_id__sources_watch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/WatchPage"
+                },
+                "maxItems": 50,
+                "minItems": 1,
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WatchResult"
+                  },
+                  "title": "Response Watch Sources Api Projects  Project Id  Sources Watch Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Watch Sources",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
     "/api/projects/{project_id}/templates": {
       "get": {
         "operationId": "list_templates_api_projects__project_id__templates_get",
@@ -11261,6 +11436,60 @@
           }
         },
         "summary": "Change Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/analysis": {
+      "post": {
+        "description": "Delegate an analysis to the analyst, as the person: an analysis session under this\none, with the brief as its first message and its turn queued. Its findings are added\nto this session's record, each with the operator that shows it.",
+        "operationId": "delegate_analysis_api_sessions__session_id__analysis_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAnalysis"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delegate Analysis",
         "tags": [
           "sessions"
         ]

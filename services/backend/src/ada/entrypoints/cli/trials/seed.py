@@ -17,6 +17,7 @@ from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.cli.trials import steps
 from ada.entrypoints.cli.trials.dashboards import create_dashboards
+from ada.entrypoints.cli.trials.monitoring import create_monitoring
 from ada.entrypoints.cli.trials.sources import CTGOV, CTIS, SOURCES
 
 PROJECT = "Nordic cancer trials"
@@ -77,7 +78,7 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                     SEED,
                 )
         dashboards = await create_dashboards(request, project_id, session.id, built, SEED)
-        # Monitoring can attach here with project_id, session.id and built.
+        await create_monitoring(request, project_id, session.id, registered, built, SEED)
     if refresh:
         for index, source in enumerate(SOURCES):
             if index:

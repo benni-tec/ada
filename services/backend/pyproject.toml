@@ -16,6 +16,7 @@ dependencies = [
     "psycopg[binary,pool]>=3.3.9",
     "pydantic-ai-slim[google,openai]>=2.68.0",
     "pydantic-settings>=2.16.3",
+    "pytz>=2026.6",
     "sqlalchemy[asyncio]>=2.1.8",
     "taskiq>=0.13.0",
     "taskiq-redis>=1.2.4",

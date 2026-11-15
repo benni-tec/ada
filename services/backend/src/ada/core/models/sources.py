@@ -160,6 +160,10 @@ WEB_ANSWERS_CREDITS = 10
 WEB_EXTRACT_CREDITS = 5
 # The column of an answers source with the URLs the answer cites, added to its declared
 # columns.
+WEB_PROVENANCE_COLUMNS = (
+    Column(name="source_url", type=ColumnType.TEXT, nullable=False),
+    Column(name="fetched_at", type=ColumnType.TIMESTAMP, nullable=False),
+)
 WEB_SOURCES_COLUMN = Column(name="sources", type=ColumnType.JSON, nullable=True)
 
 

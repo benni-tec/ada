@@ -1,11 +1,11 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { coverage, widget } from '@/test/samples'
 import { Any } from '@/widgets/any/any'
 
 import { fetchAll, followFit, followTheme, reportHeight } from './host'
-import { WidgetRuntime } from './runtime'
+import { Sources, WidgetRuntime } from './runtime'
 import type { WidgetData } from './types'
 
 // A widget loads itself from its address in our frontend, or from its MCP host.
@@ -56,18 +56,49 @@ test('names the source and its fetch time under the numbers', async () => {
   expect(sources).toHaveTextContent(/fetched .*2026/)
 })
 
-test('lists the first two sources and points to the pipeline for the rest', async () => {
-  const source = (n: number) => ({ operator_id: `op${n}`, name: `Source ${n}`, address: 'x', fetched_at: null })
-  serve({ data: coverage({ sources: [1, 2, 3, 4].map(source) }) })
-  show()
+function sourceList(count: number, fetched_at: string | null = new Date().toISOString()) {
+  return Array.from({ length: count }, (_, i) => ({ operator_id: `op${i}`, name: `Source ${i}`, address: `https://example.test/${i}`, fetched_at }))
+}
 
-  const sources = await screen.findByRole('list', { name: 'Sources' })
-  const items = within(sources).getAllByRole('listitem').map((item) => item.textContent)
-  expect(items).toEqual([
-    expect.stringContaining('Source 1'),
-    expect.stringContaining('Source 2'),
-    'and 2 more: the Pipeline, under the widget, lists every source',
-  ])
+test('two sources keep the full list', () => {
+  render(<Sources sources={sourceList(2)} />)
+  expect(within(screen.getByRole('list', { name: 'Sources' })).getAllByRole('listitem')).toHaveLength(2)
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+})
+
+test('more sources show the first two, then a line for the rest that expands without a page host', () => {
+  const sources = sourceList(5)
+  render(<Sources sources={sources} />)
+  const listed = () => within(screen.getByRole('list', { name: 'Sources' })).getAllByRole('listitem')
+  expect(listed().map((item) => item.textContent)).toEqual([expect.stringContaining('Source 0'), expect.stringContaining('Source 1')])
+  const button = screen.getByRole('button', { name: 'and 3 more: the Pipeline lists every source' })
+  expect(button).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(button)
+  expect(listed()).toHaveLength(5)
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+})
+
+test.each([
+  { stale: true, hours: 0, missing: false, color: 'red', label: 'A source could not be refreshed' },
+  { stale: false, hours: 49, missing: false, color: 'yellow', label: 'A source was fetched more than 48 h ago' },
+  { stale: false, hours: 0, missing: true, color: 'yellow', label: 'A source has no recorded fetch time' },
+  { stale: false, hours: 0, missing: false, color: 'green', label: 'All 5 sources fetched within 48 h' },
+])('the light for the rest is $color: $label', ({ stale, hours, missing, color, label }) => {
+  const sources = sourceList(5, new Date(Date.now() - hours * 60 * 60 * 1000).toISOString())
+  if (missing) sources[0].fetched_at = null
+  render(<Sources sources={sources} stale={stale} />)
+  expect(screen.getByRole('img', { name: label })).toHaveAttribute('data-status', color)
+  expect(screen.getByRole('img', { name: label })).toHaveAttribute('title', label)
+})
+
+test('the line for the rest asks the ada page to open the main pipeline', () => {
+  const parent = { postMessage: vi.fn() }
+  Object.defineProperty(window, 'parent', { value: parent, configurable: true })
+  window.location.hash = '#widget=w1'
+  render(<Sources sources={sourceList(5)} />)
+  fireEvent.click(screen.getByRole('button', { name: 'and 3 more: the Pipeline lists every source' }))
+  expect(parent.postMessage).toHaveBeenCalledWith({ type: 'ada:open-pipeline', input: 'main' }, '*')
+  expect(within(screen.getByRole('list', { name: 'Sources' })).getAllByRole('listitem')).toHaveLength(2)
 })
 
 test('a custom widget lists each source once, with the fetch time any input knows', async () => {

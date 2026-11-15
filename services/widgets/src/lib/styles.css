@@ -205,6 +205,40 @@ body,
   color: inherit;
 }
 
+.ada-sources-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.ada-sources-summary button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ada-source-led {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  align-self: center;
+  border-radius: 50%;
+  background: var(--error);
+}
+
+.ada-source-led[data-status='yellow'] {
+  background: var(--warning);
+}
+
+.ada-source-led[data-status='green'] {
+  background: var(--series-3);
+}
+
 /* The same markers on a single value, in the line of the text. */
 .ada-flag-inline {
   display: inline-block;

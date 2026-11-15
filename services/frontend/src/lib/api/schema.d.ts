@@ -1110,6 +1110,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/sources/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Watch Sources
+         * @description Register and watch up to 50 pages; each page commits independently.
+         */
+        post: operations["watch_sources_api_projects__project_id__sources_watch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/templates": {
         parameters: {
             query?: never;
@@ -1295,6 +1315,28 @@ export interface paths {
         head?: never;
         /** Change Session */
         patch: operations["change_session_api_sessions__session_id__patch"];
+        trace?: never;
+    };
+    "/api/sessions/{session_id}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delegate Analysis
+         * @description Delegate an analysis to the analyst, as the person: an analysis session under this
+         *     one, with the brief as its first message and its turn queued. Its findings are added
+         *     to this session's record, each with the operator that shows it.
+         */
+        post: operations["delegate_analysis_api_sessions__session_id__analysis_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/sessions/{session_id}/attachments": {
@@ -3201,6 +3243,18 @@ export interface components {
             /** @default warning */
             severity: components["schemas"]["Severity"];
         };
+        /** NewAnalysis */
+        NewAnalysis: {
+            /** Brief */
+            brief: string;
+            /**
+             * Operator Ids
+             * @default []
+             */
+            operator_ids: components["schemas"]["OperatorId"][];
+            /** Title */
+            title: string;
+        };
         /** NewAttachment */
         NewAttachment: {
             kind: components["schemas"]["AttachmentKind"];
@@ -4037,7 +4091,7 @@ export interface components {
          * SessionAgent
          * @enum {string}
          */
-        SessionAgent: "session" | "research";
+        SessionAgent: "session" | "research" | "analysis";
         /** SessionAgentChoice */
         SessionAgentChoice: {
             /** Expected Revision */
@@ -4565,6 +4619,30 @@ export interface components {
          * @enum {string}
          */
         VersionBump: "major" | "minor" | "patch";
+        /** WatchPage */
+        WatchPage: {
+            check_every?: components["schemas"]["CheckEvery"] | null;
+            /** Name */
+            name: string;
+            provenance?: components["schemas"]["Provenance"] | null;
+            /** Url */
+            url: string;
+        };
+        /** WatchResult */
+        WatchResult: {
+            /**
+             * Already Watched
+             * @default false
+             */
+            already_watched: boolean;
+            /** Error */
+            error?: string | null;
+            /** Ok */
+            ok: boolean;
+            source_id?: components["schemas"]["Id"] | null;
+            /** Url */
+            url: string;
+        };
         /**
          * WebSettings
          * @description What the web tools may do, from the platform's configuration (read only).
@@ -6983,6 +7061,41 @@ export interface operations {
             };
         };
     };
+    watch_sources_api_projects__project_id__sources_watch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchPage"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchResult"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_templates_api_projects__project_id__templates_get: {
         parameters: {
             query?: never;
@@ -7421,6 +7534,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delegate_analysis_api_sessions__session_id__analysis_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewAnalysis"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

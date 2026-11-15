@@ -15,6 +15,7 @@
     }
   },
   "markdownParams": {
-    "includeLinks": false
-  }
+    "includeLinks": true
+  },
+  "maxAgeMs": 0
 }

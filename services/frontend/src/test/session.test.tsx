@@ -726,3 +726,34 @@ test('an alert of an attached rule shows in the record, coloured by the rule’s
   expect(alert.querySelector('[data-severity]')).toHaveAttribute('data-severity', 'critical')
   expect(within(alert).getByRole('link', { name: 'See the alerts' })).toHaveAttribute('href', '/projects/p1/alerts')
 })
+
+test('the attachment chooser uploads a CSV and attaches its registered source', async () => {
+  const registered: unknown[] = []
+  const attached: unknown[] = []
+  const made = attachment({ id: 'csv-att', kind: 'source', ref: 'csv-source', title: 'inventory.csv' })
+  serveSession({
+    'POST /api/projects/p1/files': async (_body: unknown, request: Request) => {
+      expect(new URL(request.url).searchParams.get('filename')).toBe('inventory.csv')
+      expect(await request.text()).toBe('name,quantity\nExample,4\n')
+      return json({ address: 'upload://p1/file.csv', sha256: 'file', size: 24 }, 201)
+    },
+    'POST /api/projects/p1/sources': (body: unknown) => {
+      registered.push(body)
+      return json({ id: 'csv-source' }, 201)
+    },
+    'POST /api/sessions/s1/attachments': (body: unknown) => {
+      attached.push(body)
+      return json(made, 201)
+    },
+  })
+  renderAt('/projects/p1/sessions/s1')
+  // Nothing attached yet, so the pane starts closed; opened, it offers the way to attach.
+  const panel = await screen.findByRole('complementary', { name: 'Attachments' })
+  fireEvent.click(await within(panel).findByRole('button', { name: 'Open the attachments' }))
+  expect(await within(panel).findByText(/Nothing is attached/)).toBeInTheDocument()
+  fireEvent.click(within(panel).getByRole('button', { name: 'Attach' }))
+  const file = new File(['name,quantity\nExample,4\n'], 'inventory.csv', { type: 'text/csv' })
+  fireEvent.change(await screen.findByLabelText('Upload CSV'), { target: { files: [file] } })
+  await waitFor(() => expect(attached).toEqual([{ kind: 'source', ref: 'csv-source' }]))
+  expect(registered).toEqual([{ name: 'inventory.csv', address: 'upload://p1/file.csv', access_kind: 'url', format: 'csv' }])
+})

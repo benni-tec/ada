@@ -46,6 +46,10 @@ export function shortName(operator: Operator, source?: SourceInfo): string {
   switch (operator.kind) {
     case 'source':
       return source?.name ?? 'A data source'
+    case 'history': {
+      const last = params.last
+      return typeof last === 'number' ? `Last ${last} snapshots` : 'Snapshot history'
+    }
     case 'transform':
       return sqlHeadline(text(params, 'sql'))
     case 'input':
@@ -56,10 +60,6 @@ export function shortName(operator: Operator, source?: SourceInfo): string {
       return shorten(text(params, 'prompt')) || 'An agent step'
     case 'extract':
       return shorten(text(params, 'instruction')) || 'An extraction'
-    case 'history': {
-      const last = params.last
-      return typeof last === 'number' ? `The last ${last} snapshots` : 'Earlier snapshots'
-    }
   }
 }
 

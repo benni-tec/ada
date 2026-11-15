@@ -168,15 +168,19 @@ class Sessions(SessionService):
             raise Invalid("The session belongs to another project than the one given")
         return session
 
-    async def create_research(self, parent_session_id: Id, title: str, actor: Actor) -> Session:
+    async def create_child(
+        self, parent_session_id: Id, title: str, agent: SessionAgent, actor: Actor
+    ) -> Session:
         parent = await self.sessions.get(parent_session_id)
-        if parent.agent is SessionAgent.RESEARCH:
-            raise Invalid("A research session cannot delegate research")
+        if agent is SessionAgent.SESSION:
+            raise Invalid("A delegated session is a research or an analysis session")
+        if parent.agent is not SessionAgent.SESSION:
+            raise Invalid("A delegated session cannot delegate further")
         child = Session(
             id=uuid7(),
             project_id=parent.project_id,
             title=_title(title),
-            agent=SessionAgent.RESEARCH,
+            agent=agent,
             parent_session_id=parent.id,
             created_at=self.clock.now(),
         )
@@ -186,8 +190,8 @@ class Sessions(SessionService):
 
     async def record_report(self, child_session_id: Id, text: str, actor: Actor) -> SessionEntry:
         child = await self.sessions.get(child_session_id)
-        if child.agent is not SessionAgent.RESEARCH or child.parent_session_id is None:
-            raise Invalid("Only a research session reports back, into the session it serves")
+        if child.agent is SessionAgent.SESSION or child.parent_session_id is None:
+            raise Invalid("Only a delegated session reports back, into the session it serves")
         if not text.strip():
             raise Invalid("A report needs text")
         parent = await self.sessions.get(child.parent_session_id)

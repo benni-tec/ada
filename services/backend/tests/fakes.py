@@ -306,9 +306,21 @@ class FakeExplorer(WebExplorer):
         main_content_only: bool = False,
         focus: str | None = None,
         pdf: PdfOptions | None = None,
+        wait_for: int | str | None = None,
+        raw_html: bool = False,
+        original_html: bool = False,
     ) -> WebPage:
         # Focus and PDF options are noted only when given.
-        given = {k: v for k, v in {"focus": focus, "pdf": pdf}.items() if v is not None}
+        given = {
+            k: v
+            for k, v in {
+                "focus": focus,
+                "pdf": pdf,
+                "wait_for": wait_for,
+                **({"raw_html": True} if raw_html else {}),
+            }.items()
+            if v is not None
+        }
         self._called("read", url=url, tags=tags, **given)
         if focus:
             # The passages of the page relevant to the focus: its table.
@@ -323,8 +335,9 @@ class FakeExplorer(WebExplorer):
         *,
         tags: Sequence[str],
         pdf: PdfOptions | None = None,
+        wait_for: int | str | None = None,
     ) -> Extraction:
-        given = {"pdf": pdf} if pdf is not None else {}
+        given = {k: v for k, v in {"pdf": pdf, "wait_for": wait_for}.items() if v is not None}
         self._called(
             "extract",
             url=url,
