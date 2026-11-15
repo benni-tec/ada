@@ -115,9 +115,9 @@ km_helsinki, km_kuopio, km_oulu, url. Eligibility is the registry's text as writ
 no score, ranking or eligibility judgement is added. Each distance describes that
 row's site, not the trial's nearest site.
 
-Find the project and its **Nordic cancer trials** session, then the recorded
-operator whose note starts `case_trials:`. All seven notes start with their contract
-name. In the seed integration, `TrialSteps` exposes every operator by that same name;
+Find the project and its **Nordic cancer trials** session, then the most recently
+recorded operator whose note starts `case_trials:` (a reseed after a SQL change
+records the rebuilt step again). Every step note starts with its contract name. In the seed integration, `TrialSteps` exposes every operator by that same name;
 `seed.py` attaches dashboards and leaves a hand-over for monitoring.
 
 The checked-in seven CT.gov recording records all pass the condition filter; their
