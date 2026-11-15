@@ -1,4 +1,4 @@
-import { useMutation, useQuery, type UseQueryResult } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { Globe, Paperclip } from 'lucide-react'
 import { useId, useState, type ComponentProps, type FormEvent } from 'react'
 
@@ -10,6 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   attach,
+  uploadFile,
+  registerSource,
+  keys,
   dashboardsQuery,
   errorMessage,
   pipelinesQuery,
@@ -173,6 +176,7 @@ export function AttachChooser({
   variant?: ComponentProps<typeof Button>['variant']
   className?: string
 }) {
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [url, setUrl] = useState('')
   const [urlProblem, setUrlProblem] = useState<string | null>(null)
@@ -183,6 +187,26 @@ export function AttachChooser({
     onSuccess: (attachment) => {
       setOpen(false)
       setUrl('')
+      onAttached(attachment)
+    },
+  })
+
+  const upload = useMutation({
+    mutationFn: async (file: File) => {
+      if (!file.name.toLowerCase().endsWith('.csv')) throw new Error('Choose a CSV file.')
+      if (!file.size || file.size > 50 * 1024 * 1024) throw new Error('Choose a nonempty CSV up to 50 MiB.')
+      const stored = await uploadFile(projectId, file)
+      const source = await registerSource(projectId, {
+        name: file.name,
+        address: stored.address,
+        access_kind: 'url',
+        format: 'csv',
+      })
+      return attach(sessionId, 'source', source.id)
+    },
+    onSuccess: (attachment) => {
+      void queryClient.invalidateQueries({ queryKey: keys.sources(projectId) })
+      setOpen(false)
       onAttached(attachment)
     },
   })
@@ -218,6 +242,7 @@ export function AttachChooser({
         setOpen(next)
         if (!next) {
           add.reset()
+          upload.reset()
           setUrlProblem(null)
         }
       }}
@@ -229,6 +254,23 @@ export function AttachChooser({
         </Button>
       </PopoverTrigger>
       <PopoverContent align={align} className="w-[min(28rem,calc(100vw-2rem))] p-0">
+        <div className="border-b p-3">
+          <label className="flex flex-col gap-2 text-sm">
+            Upload CSV
+            <Input
+              type="file"
+              accept=".csv,text/csv"
+              disabled={upload.isPending || add.isPending}
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) upload.mutate(file)
+                event.target.value = ''
+              }}
+            />
+          </label>
+          {upload.isPending && <p role="status" className="mt-2 text-xs">Uploading and attaching…</p>}
+          {upload.error && <p role="alert" className="mt-2 text-xs text-destructive">Not attached: {errorMessage(upload.error)}</p>}
+        </div>
         <Command
           label="Search what to attach"
           // The name, the kind and the details: people remember any of them.
@@ -263,7 +305,7 @@ export function AttachChooser({
                         value={`${option.name} ${kind} ${option.ref}`}
                         keywords={[label, option.detail, ...option.keywords]}
                         data-checked={attached ? true : undefined}
-                        disabled={add.isPending}
+                        disabled={add.isPending || upload.isPending}
                         onSelect={() => choose(option)}
                         className="items-start"
                       >
@@ -299,7 +341,7 @@ export function AttachChooser({
               aria-describedby={urlProblem ? urlHintId : undefined}
               className="h-8"
             />
-            <Button type="submit" size="sm" variant="secondary" disabled={!url.trim() || add.isPending}>
+            <Button type="submit" size="sm" variant="secondary" disabled={!url.trim() || add.isPending || upload.isPending}>
               Attach
             </Button>
           </div>

@@ -52,10 +52,16 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         provenance: Provenance | None = None,
     ) -> DataSource:
         """Register a data source in a project, once, so that pipelines can read it. Use it
-        for a stable URL that returns CSV, JSON or Parquet (access_kind "url"), or one HTTP
+        for a stable URL or an uploaded file address (upload://...) that returns CSV,
+        JSON or Parquet (access_kind "url"), or one HTTP
         request with method, headers and body in `options` (access_kind "request").
         JSON HTTP options: `paginate` (token/param or more/page), `probe` (fields, method, body).
-        For a PDF URL use access_kind "document" with format "pdf": `options.extract`
+        For URL/request JSON or CSV, `options.include_provenance: true` adds the actual
+        source_url and fetched_at to each row after shaping (`rows` selects a JSON array;
+        `fields` maps output columns to paths or {path, type}). Prefer a public JSON/CSV
+        endpoint linked by a JS page over model extraction: it keeps types, all rows and
+        supports short refresh intervals. For a PDF URL use access_kind "document" with
+        format "pdf": `options.extract`
         "pages" (default) gives rows `page, text`, "tables" gives `page, "table", row,
         cells` (a list of strings); the columns are declared for you. For a web page use
         access_kind "web" with format "html": read as Markdown through Context.dev, with
@@ -65,6 +71,14 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         you declare the columns it fills; model-extracted; ttl at least 7 days) or "answers"
         (`task` and `json_format`, an example object with one array of records; you declare
         the columns; model-extracted rows plus `sources`; ttl at least 30 days). When the
+        page loads rows asynchronously, scrape and extract accept `options.wait_for`
+        (milliseconds 0–30000 or a CSS selector). `options.include_provenance: true` adds
+        platform-owned source_url and fetched_at columns to scrape/extract rows: preserve
+        them in SQL joins and table widgets. Do not ask the model to invent these fields.
+        For HTML tables whose client pagination hides rows, scrape with extract="tables"
+        and options.original_html=true parses all table rows in the original HTTP response,
+        through Context.dev. This is for server-sent rows, not JS-fetched data.
+        Reads bypass the upstream cache. When the
         web address is a PDF, scrape and extract take `options.pdf`, e.g. {"start": 25,
         "end": 26, "ocr": true}: only those pages, with OCR for tables that are images
         (each page starts with a `<!-- page N -->` line); freshness

@@ -37,5 +37,6 @@
       ]
     },
     "instructions": "Return the metadata table of the indicator (name/value pairs). Use only facts stated on the page."
-  }
+  },
+  "maxAgeMs": 0
 }
