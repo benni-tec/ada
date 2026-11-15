@@ -80,10 +80,15 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
         session = next((s for s in await sessions.list(project_id) if s.title == SESSION), None)
         if session is None:
             session = await sessions.create(project_id, SESSION)
-            for field in fields(built):
+        # A reseed after the SQL changed builds new operators; record those too, so the
+        # session points the agent at the current steps.
+        recorded = {e.ref for e in await sessions.entries(session.id)}
+        for field in fields(built):
+            operator_id = getattr(built, field.name).id
+            if str(operator_id) not in recorded:
                 await sessions.record_operator(
                     session.id,
-                    getattr(built, field.name).id,
+                    operator_id,
                     f"{field.name}: registry data transformed with SQL",
                     SEED,
                 )
