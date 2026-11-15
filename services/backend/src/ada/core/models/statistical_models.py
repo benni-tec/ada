@@ -295,46 +295,18 @@ class StatisticalModel(DomainModel):
     updated_at: datetime | None = None
 
 
-class TrialSite(DomainModel):
-    """A trial's recruiting Nordic site nearest to one of the cities the trials data
-    measures from, and the great-circle distance to it."""
-
-    facility: str | None
-    city: str | None
-    country: str
-    km: float | None
-
-
-class PinnedTrial(DomainModel):
-    """A recruiting trial as the trial matcher's version read it from the trials data
-    (`case_trials`, docs/trials.md): what it matches on, and its nearest recruiting sites.
-    The eligibility text is the registry's, as written."""
-
-    nct_id: str
-    title: str
-    phase: str | None = None
-    conditions: str = ""
-    # The trials data's cancer groups (lung, pancreas, colorectal, ...).
-    cancer_groups: tuple[str, ...] = ()
-    # ALL, FEMALE or MALE, as the registry says.
-    sex: str = "ALL"
-    min_age_years: float | None = None
-    max_age_years: float | None = None
-    eligibility: str = ""
-    recruiting_countries: tuple[str, ...] = ()
-    finnish_site: bool = False
-    # helsinki | kuopio | oulu -> the nearest recruiting Nordic site.
-    nearest: dict[str, TrialSite] = {}
-    url: str
-
-
 class TrialMatcherSpec(DomainModel):
-    """The trial matcher: which recruiting trials a case could be discussed for, matched
-    on structured fields only (cancer group, sex, age), never on the eligibility text."""
+    """The trial matcher: the recruiting trials a case could be discussed for. It filters on
+    the case's cancer group only, a topic match and not an eligibility judgement; sex and
+    age limits are shown beside each trial, never used to leave one out; trials are sorted
+    by distance. It reads its data steps whenever it runs, so it is as current as they are."""
 
     kind: Literal["trial_matcher"] = "trial_matcher"
-    # The trials data step to read (Felix's `case_trials`).
+    # The trials data step (Felix's `case_trials`, docs/trials.md).
     operator_id: str
+    # The step that names each wellbeing services county's distance city (`county_cities`);
+    # without it, or for a county it does not list, distances are from Helsinki.
+    county_operator_id: str | None = None
     # A case's site -> the trials data's cancer group.
     groups: dict[str, str] = {
         "lung": "lung",
@@ -342,23 +314,22 @@ class TrialMatcherSpec(DomainModel):
         "pancreas": "pancreas",
     }
     intended_use: str = (
-        "Educational: lists recruiting Nordic trials a synthetic case could be discussed for "
-        "with an oncologist. Not an eligibility decision; never patient data."
+        "Educational: lists recruiting Nordic trials of a synthetic case's cancer group, "
+        "nearest first, to discuss with an oncologist. Not an eligibility decision; never "
+        "patient data."
     )
     cautions: tuple[str, ...] = (
-        "Matched on cancer group, sex and age only; the eligibility text is not judged.",
+        "Filtered on cancer group only; sex and age limits are shown, not applied.",
+        "The eligibility text is the registry's, as written, and is not judged.",
         "Recruiting means the registry's site status, which lags.",
-        "An age group that only partly fits a trial's age limits is marked uncertain.",
     )
 
 
 class TrialCompiled(DomainModel):
-    """What a trial matcher version read: the trials, as they were, from one run."""
+    """A trial matcher's build: nothing to precompute, since it reads its data steps when it
+    runs."""
 
     kind: Literal["trial_matcher"] = "trial_matcher"
-    trials: tuple[PinnedTrial, ...]
-    run_id: str | None = None
-    read_at: datetime
     warnings: tuple[str, ...] = ()
 
 

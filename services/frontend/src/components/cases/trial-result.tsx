@@ -5,7 +5,8 @@ type Match = {
   countries?: string[]
   finnish_site?: boolean
   nearest?: { facility?: string | null; city?: string | null; country: string; km?: number | null } | null
-  age?: 'fits' | 'partly' | 'unknown'
+  sex?: string | null
+  age?: 'inside' | 'partly' | 'outside' | 'unknown'
   min_age_years?: number | null
   max_age_years?: number | null
   eligibility?: string
@@ -14,10 +15,22 @@ type Match = {
 
 type Body = { city?: string; total?: number; matches?: Match[] }
 
-const ageText = { fits: 'age group fits', partly: 'age group only partly inside the limits', unknown: 'age not given' } as const
+const ageText = {
+  inside: 'age group inside the limits',
+  partly: 'age group partly inside the limits',
+  outside: 'age group outside the limits',
+  unknown: 'no age group given',
+} as const
 
-/** The trial matcher's result: the recruiting trials the case matches, Finnish sites first,
- * then the nearest. The eligibility text is the registry's, folded, and never judged. */
+// A limit the registry did not give is said to be missing, never read as no limit.
+const ages = (min?: number | null, max?: number | null) =>
+  min == null && max == null ? 'age not reported' : max == null ? `${min} and over` : `${min ?? 0}–${max}`
+
+const sexText = (sex?: string | null) => (!sex ? 'sex not reported' : sex === 'ALL' ? 'all sexes' : sex === 'FEMALE' ? 'women' : sex === 'MALE' ? 'men' : sex.toLowerCase())
+
+/** The trial matcher's result: the recruiting trials of the case's cancer group, nearest
+ * first. Sex and age limits are shown, not applied; the eligibility text is the registry's,
+ * folded, and never judged. */
 export function TrialResult({ body, summary }: { body: Body; summary: string }) {
   const matches = body.matches ?? []
   const city = body.city ? body.city[0].toUpperCase() + body.city.slice(1) : 'Helsinki'
@@ -25,7 +38,7 @@ export function TrialResult({ body, summary }: { body: Body; summary: string }) 
     <div className="flex flex-col gap-4">
       <p className="rounded-lg bg-foreground px-3.5 py-3 text-sm text-background">{summary}</p>
       <p className="text-xs text-muted-foreground">
-        Matched on cancer group, sex and age group only. Something to discuss with an oncologist, not an eligibility decision. Distances from {city}.
+        The case's cancer group only; sex and age limits are shown, not applied. Something to discuss with an oncologist, not an eligibility decision. Distances from {city}.
       </p>
       <ol className="flex flex-col gap-3">
         {matches.map((m) => (
@@ -43,9 +56,10 @@ export function TrialResult({ body, summary }: { body: Body; summary: string }) 
             </p>
             <p className="mt-1 text-xs">
               {m.nearest ? `Nearest: ${[m.nearest.facility, m.nearest.city, m.nearest.country].filter(Boolean).join(', ')}${m.nearest.km != null ? `, ${Math.round(m.nearest.km)} km` : ''}` : 'No site distance'}
-              {m.age && (
-                <span className={m.age === 'partly' ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}> · {ageText[m.age]}</span>
-              )}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Registry limits: {sexText(m.sex)}, {ages(m.min_age_years, m.max_age_years)}
+              {m.age && <> · {ageText[m.age]}</>}
             </p>
             {m.eligibility && (
               <details className="mt-2">

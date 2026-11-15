@@ -78,6 +78,7 @@ class World:
             MemoryDataSourceRepository(self.memory),
             self.dispatcher,
             self.after_commit,
+            None,  # type: ignore[arg-type]  # the pathway model reads no data step
         )
         self.reader = CaseSourceReader(self.repo, models, self.clock)
         self.store = DuckDbAnalysisStore(data_dir)
@@ -267,6 +268,7 @@ async def test_a_result_on_request_marks_the_sources_stale(world: World) -> None
         MemoryDataSourceRepository(world.memory),
         world.dispatcher,
         world.after_commit,
+        None,  # type: ignore[arg-type]  # the pathway model reads no data step
     )
     await world.after_commit.run()
     world.dispatcher.refreshes.clear()

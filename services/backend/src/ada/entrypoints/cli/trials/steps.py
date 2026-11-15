@@ -205,3 +205,34 @@ FROM rates r JOIN rates f ON r.registry = f.registry AND r.cancer_group = f.canc
     f.country = 'Finland'
 """
 """Country-site rates; pooling sums country counts, including multinational trials."""
+
+_COUNTY_CITIES = (
+    ("Helsinki", "helsinki"),
+    ("Itä-Uusimaa", "helsinki"),
+    ("Keski-Uusimaa", "helsinki"),
+    ("Länsi-Uusimaa", "helsinki"),
+    ("Vantaa ja Kerava", "helsinki"),
+    ("Varsinais-Suomi", "helsinki"),
+    ("Satakunta", "helsinki"),
+    ("Kanta-Häme", "helsinki"),
+    ("Pirkanmaa", "helsinki"),
+    ("Päijät-Häme", "helsinki"),
+    ("Kymenlaakso", "helsinki"),
+    ("Etelä-Karjala", "helsinki"),
+    ("Etelä-Savo", "kuopio"),
+    ("Pohjois-Savo", "kuopio"),
+    ("Pohjois-Karjala", "kuopio"),
+    ("Keski-Suomi", "kuopio"),
+    ("Etelä-Pohjanmaa", "oulu"),
+    ("Pohjanmaa", "oulu"),
+    ("Keski-Pohjanmaa", "oulu"),
+    ("Pohjois-Pohjanmaa", "oulu"),
+    ("Kainuu", "oulu"),
+    ("Lappi", "oulu"),
+)
+COUNTY_CITIES = "SELECT * FROM (VALUES {}) AS c(county, city)".format(
+    ", ".join(f"('{county}', '{city}')" for county, city in _COUNTY_CITIES)
+)
+"""Each wellbeing services county and the city its distances are read from: the nearest of
+Helsinki, Kuopio and Oulu, the cities the km_ columns measure from. A county not listed has
+no row; a case model then measures from Helsinki."""

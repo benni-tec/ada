@@ -125,6 +125,22 @@ In the seed integration, `TrialSteps` exposes every operator by that same name;
 The checked-in seven CT.gov recording records all pass the condition filter; their
 counts are unchanged (including two recruiting Finnish trials).
 
+`county_cities` (county, city) names, for each wellbeing services county, the city its
+distances are read from: the nearest of Helsinki, Kuopio and Oulu, the cities of the km_
+columns.
+
+## Patient level: the trial matcher
+
+The dashboards are the national picture. For one patient, the seed puts a trial matcher
+model (docs/contracts.md "Cases") on a "Cancer trial candidate" case type in this project
+(or a type the project already has that covers it; the agent instructions name the one it is
+on), running on every save of a case. It reads `case_trials` and `county_cities` whenever it runs,
+keeps the trials of the case's cancer group only, shows sex and age limits without applying
+them, and sorts by distance from the county's city. The agent instructions send patient
+questions through it: save a case with `set_case`, answer from the matcher's result. A reseed
+that rebuilds the steps gives the matcher a new version reading the new ones. Any project can
+add its own matcher with `create_trial_matcher` (e.g. on the cancer pathway case type).
+
 ## Hospital and sponsor pages
 
 `ada seed-trials` also registers 14 daily Context.dev Markdown scrape sources:
