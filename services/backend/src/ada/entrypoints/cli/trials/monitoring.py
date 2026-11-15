@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from ada.entrypoints.cli.trials.seed import TrialSteps
 
 DASHBOARD = "Trial site monitoring"
+MIN_SNAPSHOT_TRIAL_RATIO = 0.5
 FINNISH_RULE = "A Finnish site opened on a Nordic cancer trial"
 PAGES = tuple(
     ExampleSource(
@@ -72,11 +73,15 @@ def site_changes_sql(site_sql: str) -> str:
 
     return f"""
 WITH history AS (
-    {" UNION ALL ".join(f"SELECT * FROM input_{i}" for i in range(4))}
+    {" UNION ALL ".join(f"SELECT *, {i} AS source_index FROM input_{i}" for i in range(4))}
+), guarded_sources AS (
+    SELECT source_index FROM history GROUP BY source_index
+    HAVING count(DISTINCT nct_id) FILTER (WHERE snapshot_rank = 1)
+        < {MIN_SNAPSHOT_TRIAL_RATIO} * count(DISTINCT nct_id) FILTER (WHERE snapshot_rank = 2)
 ), observations AS (
     SELECT * FROM history
     QUALIFY row_number() OVER (PARTITION BY snapshot_rank, nct_id
-        ORDER BY snapshot_at DESC, last_update DESC NULLS LAST, locations::VARCHAR DESC) = 1
+        ORDER BY last_update DESC NULLS LAST, snapshot_at DESC, locations::VARCHAR DESC) = 1
 ), parsed_sites AS (
     SELECT *, 1 AS snapshot_rank FROM ({sites(1)})
     UNION ALL
@@ -131,6 +136,10 @@ SELECT DISTINCT e.*, (SELECT max(snapshot_at) FROM history WHERE snapshot_rank =
         AS has_fi_site
 FROM events e
 WHERE EXISTS (SELECT 1 FROM history WHERE snapshot_rank = 2)
+    AND (e.change_kind NOT IN ('trial_left_list', 'nordic_site_closed') OR NOT EXISTS (
+        SELECT 1 FROM history h JOIN guarded_sources g USING (source_index)
+        WHERE h.snapshot_rank = 2 AND h.nct_id = e.nct_id
+    ))
 """
 
 

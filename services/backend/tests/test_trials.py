@@ -320,6 +320,14 @@ def test_site_changes_reconcile_sources_and_unnamed_sites() -> None:
         # Moving between country pulls, duplicate unnamed sites and casing are not changes.
         assert db.execute(sql).fetchall() == []
 
+        observation(0, 1, ["RECRUITING"])
+        observation(3, 1, ["COMPLETED"])
+        db.execute("UPDATE input_0 SET last_update = '2026-02-01' WHERE snapshot_rank = 1")
+        assert db.execute(sql).fetchall() == []
+        # With matching registry revisions, the later fetch breaks the tie.
+        db.execute("UPDATE input_3 SET last_update = '2026-02-01'")
+        assert [row[0] for row in db.execute(sql).fetchall()] == ["nordic_site_closed"]
+        db.execute("DELETE FROM input_3")
         db.execute("DELETE FROM input_0")
         observation(0, 2, ["not_yet_recruiting", "COMPLETED"])
         result = db.execute(sql)
@@ -348,4 +356,46 @@ def test_site_changes_reconcile_sources_and_unnamed_sites() -> None:
         assert {r["change_kind"] for r in rows if r["nct_id"] == "NCT3"} == {
             "new_trial",
             "finnish_site_added",
+        }
+
+
+def test_site_changes_guard_truncated_sources() -> None:
+    with duckdb.connect() as db:
+        for source in range(4):
+            db.execute(f"""
+                CREATE TABLE input_{source} AS
+                SELECT 'NCT' || i AS nct_id, 'Trial' AS title,
+                    '2026-01-01' AS last_update,
+                    '[{{"country":"Sweden","status":"RECRUITING"}}]'::JSON AS locations,
+                    TIMESTAMP '2026-01-01' AS snapshot_at, 2 AS snapshot_rank
+                FROM range({source * 10}, {source * 10 + 4}) t(i)
+            """)
+        sql = site_changes_sql(TRIAL_SITES)
+        # Empty and truncated sources suppress removals; exactly half is valid.
+        for source, count in ((1, 1), (2, 2), (3, 3)):
+            db.execute(f"""
+                INSERT INTO input_{source}
+                SELECT nct_id, title, last_update, locations,
+                    TIMESTAMP '2026-01-02', 1
+                FROM input_{source} LIMIT {count}
+            """)
+        db.execute("""
+            INSERT INTO input_1 VALUES ('NEW', 'New trial', '2026-01-02',
+                '[{"country":"Sweden","status":"RECRUITING"}]', '2026-01-02', 1)
+        """)
+        # Keep this source below half even with the addition.
+        db.execute("""
+            INSERT INTO input_1 SELECT 'OLD', title, last_update, locations, snapshot_at, 2
+            FROM input_1 LIMIT 1
+        """)
+        rows = db.execute(sql).fetchall()
+        assert {(r[0], r[1]) for r in rows} == {
+            ("trial_left_list", "NCT22"),
+            ("nordic_site_closed", "NCT22"),
+            ("trial_left_list", "NCT23"),
+            ("nordic_site_closed", "NCT23"),
+            ("trial_left_list", "NCT33"),
+            ("nordic_site_closed", "NCT33"),
+            ("new_trial", "NEW"),
+            ("nordic_site_opened", "NEW"),
         }
