@@ -1,3 +1,6 @@
 packages:
   - "services/*"
   - "pitches/*"
+
+allowBuilds:
+  esbuild: true
