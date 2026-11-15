@@ -9,6 +9,7 @@ import pytest
 from dishka import AsyncContainer, Provider, Scope
 
 from ada.adapters.clock import SystemClock
+from ada.adapters.memory.web import MemoryWebBudget
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.composition import create_container
 from ada.config import Settings
@@ -27,6 +28,7 @@ from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.cli.trials import seed
 from ada.entrypoints.cli.trials.dashboards import DOORS, NEAR_YOU
 from ada.entrypoints.cli.trials.monitoring import DASHBOARD, FINNISH_RULE
+from ada.entrypoints.cli.trials.pages import PAGES, study_page
 from ada.entrypoints.cli.trials.seed import SEED, _build, seed_trials
 from ada.entrypoints.cli.trials.sources import COUNTRIES
 from memory import MemoryBackground, memory_adapters
@@ -45,6 +47,36 @@ async def container(
     request: pytest.FixtureRequest, tmp_path: Path, finland_fixture: dict
 ) -> AsyncIterator[AsyncContainer]:
     def registry(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/web/scrape":
+            body = json.loads(request.content)
+            url = body["url"]
+            if "jsonParams" in body:
+                return httpx.Response(
+                    200,
+                    json={
+                        "json": {
+                            "success": True,
+                            "data": {
+                                "rows": [
+                                    {
+                                        "nct_id": "NCT05634889",
+                                        "overall_status": None,
+                                        "facility": "HUS",
+                                        "city": "Helsinki",
+                                        "country": "Finland",
+                                        "site_status": "Recruiting",
+                                    }
+                                ]
+                            },
+                        }
+                    },
+                )
+            fixture = "hus.md" if "hus.fi" in url else "fican-east.md" if "itainen" in url else None
+            markdown = (RECORDINGS / "pages" / fixture).read_text() if fixture else "No trial IDs"
+            return httpx.Response(
+                200,
+                json={"url": url, "markdown": {"success": True, "data": markdown}, "metadata": {}},
+            )
         if request.url.host == "clinicaltrials.gov":
             country = request.url.params["query.locn"]
             name = f"ctgov-{country}.json"
@@ -60,7 +92,12 @@ async def container(
         return httpx.Response(200, json=json.loads((RECORDINGS / name).read_text()))
 
     readers = HttpSourceReaders(
-        create_client(httpx.MockTransport(registry)), SystemClock(), allow_private=True
+        create_client(httpx.MockTransport(registry)),
+        SystemClock(),
+        allow_private=True,
+        context_dev_key="test-key",
+        web_budget=MemoryWebBudget(),
+        web_daily_credit_limit=2000,
     )
     outside = Provider(scope=Scope.APP)
     outside.provide(lambda: readers, provides=SourceReaders)
@@ -84,6 +121,12 @@ async def container(
         await result.close()
 
 
+@pytest.fixture(autouse=True)
+def no_refresh_delays(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(seed, "REFRESH_DELAY_SECONDS", 0)
+    monkeypatch.setattr(seed, "WEB_REFRESHES_PER_MINUTE", 1e12)
+
+
 async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) -> None:
     project_id = await seed_trials(container)
     async with container() as request:
@@ -96,7 +139,7 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
     assert await seed_trials(container) == project_id
     async with container() as request:
         sources = await (await request.get(SourceService)).list(project_id)
-        assert len(sources) == 10
+        assert len(sources) == 8 + len(PAGES)
         assert all(s.last_checked_at is None for s in sources)
         sessions = await request.get(SessionService)
         [session] = await sessions.list(project_id)
@@ -110,6 +153,9 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
             "trial_rates",
             "case_trials",
             "trial_site_changes",
+            "hospital_trials",
+            "hospital_trial_gaps",
+            "sponsor_sites",
         }
         pipelines = await request.get(PipelineService)
         after = {
@@ -275,3 +321,51 @@ async def test_monitoring_changes_and_finnish_alert(
         ]
         assert len(firing) == 1
         assert "NCT07195695" in str((await alerts.rows(firing[0].id)).rows)
+
+
+async def test_hospital_markdown_and_gaps(container: AsyncContainer, finland_fixture: dict) -> None:
+    finland_fixture["studies"][0]["protocolSection"]["sponsorCollaboratorsModule"]["leadSponsor"][
+        "name"
+    ] = "Pfizer"
+    finland_fixture["studies"][0]["protocolSection"]["statusModule"]["lastUpdatePostDateStruct"] = {
+        "date": "2026-11-15"
+    }
+    project_id = await seed_trials(container, refresh=True)
+    async with container() as request:
+        sources = await (await request.get(SourceService)).list(project_id)
+        built = await _build(request, project_id, {s.name: s.id for s in sources})
+        runs = await request.get(RunService)
+        [run] = await runs.list(project_id)
+        listed = await runs.read(run.id, built.hospital_trials.id)
+        gaps = await runs.read(run.id, built.hospital_trial_gaps.id)
+        sponsor_sites = await runs.read(run.id, built.sponsor_sites.id)
+        assert len(sponsor_sites.rows) == 1
+        study = next(s for s in sources if s.name == "Sponsor study: NCT05634889")
+        assert study.provenance is not None and study.provenance.extracted_by_model
+    names = [c.name for c in listed.columns]
+    rows = [dict(zip(names, row, strict=True)) for row in listed.rows]
+    assert any(r["hospital"] == "KYS" and r["trial_id"] == "NCT06217822" for r in rows)
+    assert any(
+        r["hospital"] == "HUS" and r["section"] == "ALL (AKUUTTI LYMFOBLASTILEUKEMIA)" for r in rows
+    )
+    gap_names = [c.name for c in gaps.columns]
+    assert any(
+        row[gap_names.index("gap_kind")] == "hospital_only"
+        and row[gap_names.index("nct_id")] == "NCT06217822"
+        for row in gaps.rows
+    )
+
+
+def test_sponsor_page_patterns() -> None:
+    for sponsor, host in (
+        ("AstraZeneca", "astrazeneca"),
+        ("Merck Sharp & Dohme LLC", "merck"),
+        ("MSD", "merck"),
+        ("Pfizer", "pfizer"),
+    ):
+        page = study_page("NCT06217822", sponsor)
+        assert page is not None and host in page.address
+        assert page.options["operation"] == "extract"
+        assert page.freshness.ttl_seconds == 7 * 86400
+    assert study_page("NCT06217822", "Merck KGaA") is None
+    assert study_page("bad/id", "Pfizer") is None

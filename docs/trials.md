@@ -1,8 +1,8 @@
 # Nordic cancer trials
 
-`ada seed-trials` idempotently registers project **Nordic cancer trials**, eight
-sources, seven SQL data steps and a session recording each operator. No credentials
-are needed. `ada seed-trials --refresh` forces all sources to fetch, then prints
+`ada seed-trials` idempotently registers project **Nordic cancer trials**, eight registry
+sources plus hospital pages, ten SQL data steps and a session recording each operator. No credentials
+are needed to register sources. `ada seed-trials --refresh` fetches sources, then prints
 exact row counts per step through a run. A failure is reported by the command;
 successfully refreshed snapshots remain stored. Rerun to recover.
 
@@ -111,6 +111,60 @@ no score, ranking or eligibility judgement is added. Each distance describes tha
 row's site, not the trial's nearest site.
 
 Find the project and its **Nordic cancer trials** session, then the recorded
-operator whose note starts `case_trials:`. All seven notes start with their contract
+operator whose note starts `case_trials:`. All step notes start with their contract
 name. In the seed integration, `TrialSteps` exposes every operator by that same name;
 `seed.py` attaches dashboards and leaves a hand-over for monitoring.
+
+## Hospital and sponsor pages
+
+`ada seed-trials` also registers 14 daily Context.dev Markdown scrape sources:
+HUS, Pirha's Finnish list (not its English duplicate), FICAN East/KYS,
+FICAN West/Tyks; Karolinska's seven kpeks unit lists, KI Nordic SBRT,
+Cancerstudier i Sverige; and OUS-research's Flatmark list. Addresses and page
+metadata are seed data in `trials/pages.py`. Web refreshes need a Context.dev key.
+With `ADA_PUBLIC_URL`, the monitoring seed watches these and sponsor pages;
+without it their daily / seven-day TTLs remain. Watching changes freshness to push.
+
+- `hospital_trials`: page_name, hospital, country, trial_id, id_kind, section,
+  snippet. SQL splits Markdown into lines, takes NCT, EU CT (20xx-5xxxxx-xx-xx)
+  and older EudraCT identifiers, carries the nearest preceding Markdown heading,
+  and keeps the first occurrence per (page, ID). Snippets are at most 400 characters.
+  No model runs for hospital parsing. Pages without identifiers, including kpeks
+  and FICAN West, currently yield no rows; acronym/title-only rows are not parsed.
+  An accordion label rendered as plain text is not a heading, so section may be
+  the broader page heading. Inclusion in a list does not establish current recruitment.
+- `hospital_trial_gaps`: gap_kind, nct_id, title, page_name, facility, city,
+  country, section, snippet. `hospital_only` means a Finnish page lists an NCT
+  absent from this CT.gov pull or with fi_recruiting false. `registry_only` means
+  a Finnish recruiting registry site has no matching NCT on any Finnish page.
+  These rows include facility/city; hospital-only rows use the page's hospital
+  as facility and NULL city. These are coverage discrepancies, not confirmed errors:
+  the registry pull is restricted and hospital lists are incomplete.
+- `sponsor_sites`: nct_id, overall_status, facility, city, country, site_status.
+  After `--refresh` reads the registries, up to `MAX_STUDY_PAGES = 200` sources
+  are registered by NCT source name, ordered by NCT ID, for door trials or trials
+  recruiting in Finland with AstraZeneca, MSD/Merck Sharp & Dohme, or Pfizer as
+  lead sponsor. Merck KGaA is excluded. Existing sources are retained on reruns.
+  Each extracts only FI/SE/NO/DK sites exactly as stated, with missing values NULL.
+  These values are **model-extracted**, marked in source provenance, and may be
+  incomplete or incorrect; confirm them on the linked sponsor page. Refreshes
+  respect seven days even for watched sponsor pages.
+
+The monitoring dashboard includes hospital rows (Finland first), discrepancies,
+and sponsor sites. The patient table adds `listed_by_finnish_hospital` through a
+view; the `case_trials` contract stays unchanged. Reseeding updates dashboard slots
+when their generated operators change.
+
+`--refresh` reads registries first, then spaces web refresh starts by at least
+7.5 seconds (`WEB_REFRESHES_PER_MINUTE = 8`). A full web refresh costs about
+14 + 5 × study-page count credits (at the cap: 1,014); hospital scrapes cost one,
+extracts about five each. Fresh sponsor snapshots are reused. The project's daily
+web budget can stop a refresh; completed snapshots persist. Monitors and scheduled
+refreshes have their own lifecycle; the seed's pacing applies to its refresh loop.
+
+kpeks needs a full browser User-Agent and changes today's date in its footer.
+The current web reader exposes neither target headers nor a content selector, so
+access through Context.dev remains unverified and daily footer change noise is
+accepted. Footer changes do not affect SQL trial rows. HUS has navigation noise;
+OUS includes a changing publication feed. A successful scrape of a block page
+can look like an empty trial list, so missing rows are not proof a trial closed.

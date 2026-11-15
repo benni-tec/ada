@@ -23,6 +23,7 @@ NEAR_YOU = "Open cancer trials near you"
 
 DISTANCES = {"km_helsinki": "Helsinki, km", "km_kuopio": "Kuopio, km", "km_oulu": "Oulu, km"}
 LABELS = {
+    "listed_by_finnish_hospital": "Listed by a Finnish hospital page",
     "title": "Trial",
     "url": "Registry URL",
     "phase": "Phase",
@@ -204,8 +205,15 @@ async def create_dashboards(
             )
         },
     )
-    patient_table = await widget(
+    patient_trials = await view(
+        "SELECT c.*, h.trial_id IS NOT NULL AS listed_by_finnish_hospital "
+        "FROM input_0 c LEFT JOIN (SELECT DISTINCT trial_id FROM input_1 "
+        "WHERE country = 'Finland' AND id_kind = 'NCT') h ON c.nct_id = h.trial_id",
         steps.case_trials,
+        steps.hospital_trials,
+    )
+    patient_table = await widget(
+        patient_trials,
         "table",
         "Recruiting cancer trials and sites",
         _table(
@@ -222,6 +230,7 @@ async def create_dashboards(
                 "min_age_years",
                 "max_age_years",
                 "eligibility",
+                "listed_by_finnish_hospital",
             ]
         ),
     )
@@ -239,7 +248,11 @@ async def create_dashboards(
         found = next((d for d in await dashboards.list(project_id) if d.name == name), None)
         if found is None:
             found = await dashboards.create(project_id, name, actor)
-        if await dashboards.current(found.id) is None:
+        current = await dashboards.current(found.id)
+        current_widgets = [await widgets.get(s.widget_id) for s in current.slots] if current else []
+        if current is None or [(w.operator_id, w.title) for w in current_widgets] != [
+            (w.operator_id, w.title) for w in [w for w, *_ in content]
+        ]:
             await dashboards.edit(
                 found.id,
                 [

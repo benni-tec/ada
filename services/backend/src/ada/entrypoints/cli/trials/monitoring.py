@@ -4,14 +4,13 @@ from typing import TYPE_CHECKING
 
 from dishka import AsyncContainer
 
-from ada.adapters.sources.examples import DAY, ExampleSource
+from ada.adapters.sources.examples import DAY
 from ada.config import Settings
 from ada.core.models.actors import Actor
 from ada.core.models.alerts import Severity
 from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.dashboards import Dashboard, Slot
-from ada.core.models.sources import AccessKind, DataFormat, FreshnessKind, FreshnessPolicy
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
@@ -19,37 +18,13 @@ from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
+from ada.entrypoints.cli.trials.pages import PAGES, STUDY_PREFIX
 
 if TYPE_CHECKING:
     from ada.entrypoints.cli.trials.seed import TrialSteps
 
 DASHBOARD = "Trial site monitoring"
 FINNISH_RULE = "A Finnish site opened on a Nordic cancer trial"
-PAGES = tuple(
-    ExampleSource(
-        name=name,
-        access_kind=AccessKind.WEB,
-        address=url,
-        format=DataFormat.HTML,
-        options={"operation": "scrape", "extract": "pages"},
-        freshness=FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=DAY),
-    )
-    for name, url in (
-        (
-            "HUS: recruiting cancer trials",
-            "https://www.hus.fi/tutkimus-ja-opetus/tieteelliset-tutkimukset/syopatutkimukset",
-        ),
-        (
-            "Tays: recruiting cancer trials",
-            "https://pirha.fi/web/english/services/hospitals/cancer-researches",
-        ),
-    )
-)
-PAGE_TRIALS = r"""
-SELECT DISTINCT unnest(regexp_extract_all(text,
-    'NCT\d{8}|\d{4}-\d{6}-\d{2}-\d{2}')) AS trial_identifier
-FROM input_0
-"""
 
 
 def site_changes_sql(site_sql: str) -> str:
@@ -178,29 +153,30 @@ async def create_monitoring(
 
     await table(trial_site_changes.id, "trial_site_changes")
     registered = {s.name: s for s in await source_service.list(project_id)}
-    for page in PAGES:
-        source = registered.get(page.name)
-        if source is None:
-            source = await source_service.register(project_id, **page.registration())
+    await table(steps.hospital_trials.id, "hospital_trials")
+    await table(steps.hospital_trial_gaps.id, "hospital_trial_gaps")
+    await table(steps.sponsor_sites.id, "sponsor_sites [model-extracted]")
+    for source in registered.values():
+        if source.name not in {p.name for p in PAGES} and not source.name.startswith(STUDY_PREFIX):
+            continue
         if (await request.get(Settings)).ada_public_url:
             if source.monitor_id is None:
                 try:
                     await source_service.watch(source.id)
                 except Exception as error:
-                    print(f"  {page.name}: watch failed ({type(error).__name__}); daily refresh")
+                    print(f"  {source.name}: watch failed ({type(error).__name__}); TTL refresh")
                 else:
-                    print(f"  watching {page.name}")
-            else:
-                print(f"  watching {page.name}")
+                    print(f"  watching {source.name}")
         else:
-            print(f"  {page.name}: daily refresh (ADA_PUBLIC_URL is not configured)")
-        operator = await pipelines.add_source(project_id, source.id, actor)
-        listed = await pipelines.add_transform(project_id, PAGE_TRIALS, [operator.id], actor)
-        await table(listed.id, page.name)
+            print(f"  {source.name}: TTL refresh (ADA_PUBLIC_URL is not configured)")
     dashboard = next((d for d in await dashboards.list(project_id) if d.name == DASHBOARD), None)
     if dashboard is None:
         dashboard = await dashboards.create(project_id, DASHBOARD, actor)
-    if await dashboards.current(dashboard.id) is None:
+    current = await dashboards.current(dashboard.id)
+    current_widgets = [await widgets.get(s.widget_id) for s in current.slots] if current else []
+    if current is None or [(w.operator_id, w.title) for w in current_widgets] != [
+        (w.operator_id, w.title) for w in tables
+    ]:
         await dashboards.edit(
             dashboard.id,
             [
