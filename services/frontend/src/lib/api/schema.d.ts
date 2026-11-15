@@ -582,9 +582,8 @@ export interface paths {
         };
         /**
          * Step Times
-         * @description Per site and step: the Nordic standard, the days expected in Finland without a
-         *     standardised pathway, Finland's published typical days, and the median of the model's
-         *     cases.
+         * @description Per site and step: the Nordic standard, Finland's published typical days, and the
+         *     median of the model's cases.
          */
         get: operations["step_times_api_models__model_id__step_times_get"];
         put?: never;
@@ -3584,8 +3583,6 @@ export interface components {
             current: boolean;
             /** Days */
             days: number | null;
-            /** Expected */
-            expected?: number | null;
             /** Gap */
             gap: number;
             /** Label */
@@ -3960,7 +3957,7 @@ export interface components {
          *     the excess scale at build (Compiled.parameters), the others are used as they are.
          * @enum {string}
          */
-        Scale: "excess" | "cause_specific" | "overall" | "odds_ratio" | "per_day" | "days" | "survival" | "ratio";
+        Scale: "excess" | "cause_specific" | "overall" | "odds_ratio" | "per_day" | "days" | "survival";
         /**
          * Schema
          * @description What an operator produces. Every operator states it; `derived` says whether the
@@ -4243,15 +4240,12 @@ export interface components {
         };
         /**
          * StepTime
-         * @description One step of one site's pathway, four ways: the Nordic standard, the days expected in
-         *     Finland without a standardised pathway, Finland's published typical days, and the
-         *     median of the model's cases. Each is None where there is none.
+         * @description One step of one site's pathway, three ways: the Nordic standard, Finland's published
+         *     typical days, and the median of the model's cases. Each is None where there is none.
          */
         StepTime: {
             /** Cases */
             cases: number;
-            /** Expected */
-            expected: number | null;
             /** Label */
             label: string;
             /** Measured */

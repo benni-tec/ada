@@ -138,9 +138,8 @@ async def evaluate_model(
 async def step_times(
     model_id: Id, service: FromDishka[StatisticalModelService]
 ) -> Sequence[StepTime]:
-    """Per site and step: the Nordic standard, the days expected in Finland without a
-    standardised pathway, Finland's published typical days, and the median of the model's
-    cases."""
+    """Per site and step: the Nordic standard, Finland's published typical days, and the
+    median of the model's cases."""
     return await service.step_times(model_id)
 
 

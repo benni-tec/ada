@@ -97,9 +97,8 @@ class StatisticalModelService(Protocol):
         ...
 
     async def step_times(self, model_id: Id, number: int | None = None) -> Sequence[StepTime]:
-        """Per site and step: the Nordic standard, the days expected in Finland without a
-        standardised pathway, Finland's published typical days, and the median of the
-        model's cases. Invalid for a model that is not the patient pathway model."""
+        """Per site and step: the Nordic standard, Finland's published typical days, and the
+        median of the model's cases. Invalid for a model that is not the patient pathway model."""
         ...
 
     async def population(

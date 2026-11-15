@@ -70,9 +70,8 @@ export function PopulationTab({ modelId, version }: { modelId: Id; version: Path
 
 const days = (value: number | null | undefined) => (value == null ? '–' : `${value} d`)
 
-/** Each step four ways, per site: the Nordic standard, what Finland, with no standardised
- * pathway, is expected to take (the Danish before-and-after effect on the diagnostic
- * steps), Finland's published typical days, and the median of the model's cases. */
+/** Each step three ways, per site: the Nordic standard, Finland's published typical days,
+ * and the median of the model's cases. */
 function StepTimes({ modelId, country, source }: { modelId: Id; country: string; source: string }) {
   const { data: times, error } = useQuery(stepTimesQuery(modelId))
   const sites = [...new Set((times ?? []).map((t) => t.site))]
@@ -80,10 +79,9 @@ function StepTimes({ modelId, country, source }: { modelId: Id; country: string;
     <section className="rounded-lg border bg-card p-4">
       <h2 className="text-base font-semibold">Where the days go in {country}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Days per step: the Nordic standard; what {country}, with no standardised pathway, is expected to take (the
-        standard times the Danish before-and-after effect on the diagnostic steps); {country}&apos;s published typical
-        days; and the median of this model&apos;s cases. The steps before the trigger are system levers: appointment
-        access, nurse-ordered imaging, direct CT from primary care.
+        Days per step: the Nordic standard, {country}&apos;s published typical days, and the median of this
+        model&apos;s cases. The steps before the trigger are system levers: appointment access, nurse-ordered imaging,
+        direct CT from primary care.
       </p>
       {error ? (
         <ErrorNotice error={error} prefix="Could not load the days per step:" />
@@ -108,7 +106,6 @@ function StepTable({ site, times, country }: { site: string; times: StepTime[]; 
         <tr className="text-xs text-muted-foreground">
           <th className="py-1 pr-2 text-left font-normal">Step</th>
           <th className="py-1 text-right font-normal">Nordic standard</th>
-          <th className="py-1 text-right font-normal">{country}, expected</th>
           <th className="py-1 text-right font-normal">{country}, published</th>
           <th className="py-1 text-right font-normal">Cases, median</th>
         </tr>
@@ -118,7 +115,6 @@ function StepTable({ site, times, country }: { site: string; times: StepTime[]; 
           <tr key={t.step} className="border-t">
             <td className="py-1 pr-2">{t.label}</td>
             <td className="py-1 text-right font-medium tabular-nums">{days(t.nordic)}</td>
-            <td className="py-1 text-right font-medium text-amber-700 tabular-nums dark:text-amber-400">{days(t.expected)}</td>
             <td className="py-1 text-right font-medium tabular-nums">{days(t.published)}</td>
             <td className="py-1 text-right font-medium tabular-nums">
               {days(t.measured)}

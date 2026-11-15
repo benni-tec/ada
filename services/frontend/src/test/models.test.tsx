@@ -84,11 +84,11 @@ const figure: PopulationFigure = { site: 'lung', sex: 'female', baseline: 38, ti
 
 const bodies: unknown[] = []
 
-/** Two sites, one step each way: the standard, expected, published and the cases' median. */
+/** Two sites, one step each way: the standard, published and the cases' median. */
 const stepTimes = [
-  { site: 'lung', step: 'physician_to_imaging', label: 'Physician → imaging done', nordic: 6, expected: 9.2, published: 27, measured: 29, cases: 154 },
-  { site: 'lung', step: 'symptoms_to_contact', label: 'Symptoms → first contact', nordic: null, expected: null, published: 52, measured: 61, cases: 154 },
-  { site: 'colorectal', step: 'physician_to_imaging', label: 'Physician → imaging done', nordic: 10, expected: 15.3, published: null, measured: null, cases: 0 },
+  { site: 'lung', step: 'physician_to_imaging', label: 'Physician → imaging done', nordic: 6, published: 27, measured: 29, cases: 154 },
+  { site: 'lung', step: 'symptoms_to_contact', label: 'Symptoms → first contact', nordic: null, published: 52, measured: 61, cases: 154 },
+  { site: 'colorectal', step: 'physician_to_imaging', label: 'Physician → imaging done', nordic: 10, published: null, measured: null, cases: 0 },
 ]
 
 function serve(overrides: Record<string, unknown> = {}) {
@@ -203,18 +203,17 @@ test('the population view labels each site, and scales the bars against 100', as
   const figures = section.closest('section') as HTMLElement
   const bars = figures.querySelectorAll<HTMLElement>('[style]')
   expect([...bars].map((bar) => bar.style.width)).toEqual(['38%', '36%', '31%'])
-  // Each step four ways: the Nordic standard, Finland expected without a pathway, published, the cases.
+  // Each step three ways: the Nordic standard, Finland's published days, the cases.
   const lung = await screen.findByRole('table', { name: 'lung cancer' })
   expect(within(lung).getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
     'Step',
     'Nordic standard',
-    'Finland, expected',
     'Finland, published',
     'Cases, median',
   ])
-  expect(within(lung).getByRole('row', { name: /Physician → imaging done/ })).toHaveTextContent('Physician → imaging done6 d9.2 d27 d29 d(154)')
-  expect(within(lung).getByRole('row', { name: /Symptoms → first contact/ })).toHaveTextContent('Symptoms → first contact––52 d61 d(154)')
-  expect(within(screen.getByRole('table', { name: 'colorectal cancer' })).getByRole('row', { name: /imaging/ })).toHaveTextContent('10 d15.3 d––')
+  expect(within(lung).getByRole('row', { name: /Physician → imaging done/ })).toHaveTextContent('Physician → imaging done6 d27 d29 d(154)')
+  expect(within(lung).getByRole('row', { name: /Symptoms → first contact/ })).toHaveTextContent('Symptoms → first contact–52 d61 d(154)')
+  expect(within(screen.getByRole('table', { name: 'colorectal cancer' })).getByRole('row', { name: /imaging/ })).toHaveTextContent('10 d––')
   expect(document.body).not.toHaveTextContent(/alive/i)
 })
 

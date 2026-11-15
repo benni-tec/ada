@@ -4221,17 +4221,6 @@
             ],
             "title": "Days"
           },
-          "expected": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expected"
-          },
           "gap": {
             "title": "Gap",
             "type": "integer"
@@ -5202,8 +5191,7 @@
           "odds_ratio",
           "per_day",
           "days",
-          "survival",
-          "ratio"
+          "survival"
         ],
         "title": "Scale",
         "type": "string"
@@ -5884,22 +5872,11 @@
         "type": "object"
       },
       "StepTime": {
-        "description": "One step of one site's pathway, four ways: the Nordic standard, the days expected in\nFinland without a standardised pathway, Finland's published typical days, and the\nmedian of the model's cases. Each is None where there is none.",
+        "description": "One step of one site's pathway, three ways: the Nordic standard, Finland's published\ntypical days, and the median of the model's cases. Each is None where there is none.",
         "properties": {
           "cases": {
             "title": "Cases",
             "type": "integer"
-          },
-          "expected": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expected"
           },
           "label": {
             "title": "Label",
@@ -5951,7 +5928,6 @@
           "step",
           "label",
           "nordic",
-          "expected",
           "published",
           "measured",
           "cases"
@@ -8768,7 +8744,7 @@
     },
     "/api/models/{model_id}/step-times": {
       "get": {
-        "description": "Per site and step: the Nordic standard, the days expected in Finland without a\nstandardised pathway, Finland's published typical days, and the median of the model's\ncases.",
+        "description": "Per site and step: the Nordic standard, Finland's published typical days, and the\nmedian of the model's cases.",
         "operationId": "step_times_api_models__model_id__step_times_get",
         "parameters": [
           {

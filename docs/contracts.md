@@ -1077,14 +1077,11 @@ is then read from it through `ExplorationService`, refused unless its passage wa
 the source, and cited by that operator and run. Building a model may thus start a run;
 evaluating one never does.
 
-**Expected Finland.** Finland has no standardised cancer pathway. The parameter
-`no_pathway_ratio` (1.531, 1.441 to 1.633: 49 over 32 days, Jensen et al. 2015, Denmark's
-diagnostic interval before and after its pathways) turns the Nordic standard of each
-diagnostic step (first contact to work-up complete) into the days expected in Finland
-(`PathwayRow.expected`); the treatment step keeps the standard. `step_times` gives per site
-and step the standard, the expected days, Finland's published days and the median of the
-model's cases; the Population tab shows it, and a case's result marks the expected days in
-amber beside the blue target.
+**Days per step.** `step_times` gives per site and step the Nordic standard, Finland's
+published days and the median of the model's cases; the Population tab shows it. The
+comparison with Finland before and with its pathway is data, on the pathway times
+dashboard (demo.json): Finland's pre-pathway lung days (the preliminary UEF study, via Yle)
+times the Danish before-and-after effect on the diagnostic interval (Jensen et al. 2015).
 
 **An evaluation is computed and returned, never stored**: no run, snapshot, operator or
 widget, and no DuckDB. A model run on a case is the exception: its result is stored on the

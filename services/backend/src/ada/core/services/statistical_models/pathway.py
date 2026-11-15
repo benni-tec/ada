@@ -7,7 +7,6 @@ run."""
 import math
 
 from ada.core.models.statistical_models import (
-    NO_PATHWAY,
     BaselineCell,
     Citation,
     ComparisonPopulation,
@@ -90,24 +89,6 @@ KHALIFE = Citation(
     url="https://medicaljournalssweden.se/actaoncologica/article/view/42778",
     source_id="01a1dc01-a016-7643-8c5d-87f8f76a46c9",
 )
-# The effect of having no standardised cancer pathway on the diagnostic interval: Denmark
-# before (2004/05) and after (2010) its cancer patient pathways. Finland has none, so its
-# expected days per diagnostic step are the Nordic standard times before / after.
-JENSEN = Citation(
-    source="Jensen et al., BMC Cancer 2015;15:308 (PMC4412104; Denmark, three cohorts)",
-    passage="The median DI was statistically significantly lower across time: 49 "
-    "(interquartile interval (IQI): 24;96) days before, 35 (IQI: 16;78) days during and 32 "
-    "(IQI: 14;73) days after CPP implementation. The median diagnostic interval was 14 (95% "
-    "CI: 11;16) days shorter during and 17 (95% CI: 15;19) days shorter after the "
-    "implementation of CPPs than before.",
-    grade=EvidenceGrade.COHORT,
-    url="https://doi.org/10.1186/s12885-015-1317-7",
-    country="Denmark",
-)
-# 49 days before over 32 after; the interval from the 17 (15 to 19) days the after cohort
-# was shorter: 49 / 34 to 49 / 30.
-NO_PATHWAY_RATIO = (round(49 / 32, 3), round(49 / 34, 3), round(49 / 30, 3))
-
 HANNA = Citation(
     source="Hanna et al., BMJ 2020;371:m4087 (PMC7610021)",
     passage="The results for lung surgery were consistent with other sites, though not "
@@ -884,7 +865,6 @@ def pathway_spec() -> ModelSpec:
         targets=_targets(),
         baseline=_baseline(),
         parameters={
-            NO_PATHWAY: _parameter(NO_PATHWAY, *NO_PATHWAY_RATIO, Scale.RATIO, F.VALUE, JENSEN),
             "heiden_lung_surgery": _parameter(
                 "heiden_lung_surgery", 1.132, 1.064, 1.204, OV, F.BEYOND_12_WEEKS, HEIDEN
             ),

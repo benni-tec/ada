@@ -14,8 +14,6 @@ from statistics import median
 from ada.core.models.base import JsonObject
 from ada.core.models.errors import Invalid
 from ada.core.models.statistical_models import (
-    DIAGNOSTIC_STEPS,
-    NO_PATHWAY,
     POST_TRIGGER_STEPS,
     PRE_TRIGGER_STEPS,
     STEP_LABELS,
@@ -94,18 +92,6 @@ def target(
     by_modality = by_step.get(step.value if step else PATHWAY, {})
     days = by_modality.get(modality.value, by_modality.get(ANY))
     return days
-
-
-def expected(spec: ModelSpec, step: PathwayStep, nordic: int | None) -> float | None:
-    """The days a step is expected to take in Finland, with no standardised pathway: the
-    Nordic standard times the no-pathway ratio on a diagnostic step (the interval the ratio
-    was measured on), the standard itself on the others; None without a standard."""
-    if nordic is None:
-        return None
-    ratio = spec.parameters.get(NO_PATHWAY)
-    if ratio is None or step not in DIAGNOSTIC_STEPS:
-        return float(nordic)
-    return round(nordic * ratio.estimate, 1)
 
 
 def to_excess(parameter: Parameter, cell: BaselineCell | None) -> tuple[float, str | None]:
@@ -353,7 +339,6 @@ def _rows(
                 label=STEP_LABELS[step],
                 days=days,
                 target=t,
-                expected=expected(spec, step, t),
                 gap=gap,
                 countries=_countries(spec, inputs.site, step, inputs.modality),
                 patient_interval=step is PathwayStep.SYMPTOMS_TO_CONTACT,
@@ -567,10 +552,9 @@ def evaluate(version: ModelVersion, inputs: EvaluationInputs) -> Evaluation:
 def step_times(
     spec: ModelSpec, compiled: Compiled, cases: Sequence[JsonObject]
 ) -> tuple[StepTime, ...]:
-    """Per site and step, the four ways to read its days: the Nordic standard (for surgery
-    where the step depends on the treatment), the days expected in Finland without a
-    standardised pathway, Finland's published typical days, and the median of the cases of
-    that site that have the step's days."""
+    """Per site and step, three ways to read its days: the Nordic standard (for surgery where
+    the step depends on the treatment), Finland's published typical days, and the median of
+    the cases of that site that have the step's days."""
     times = []
     for site in spec.sites:
         published = spec.comparison.days.get(site, {})
@@ -589,7 +573,6 @@ def step_times(
                     step=step,
                     label=STEP_LABELS[step],
                     nordic=nordic,
-                    expected=expected(spec, step, nordic),
                     published=published.get(step),
                     measured=round(median(days), 1) if days else None,
                     cases=len(days),

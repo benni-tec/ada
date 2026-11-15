@@ -234,23 +234,6 @@ def test_days_behind_are_exact_and_do_not_depend_on_the_toggles(version: ModelVe
         assert result.days_behind == 20
 
 
-def test_expected_finland_is_the_nordic_standard_times_the_danish_ratio_on_diagnostic_steps(
-    version: ModelVersion,
-) -> None:
-    ratio = version.spec.parameters["no_pathway_ratio"]
-    assert (ratio.estimate, ratio.ci_low, ratio.ci_high) == (1.531, 1.441, 1.633)
-    assert ratio.provenance.grade is EvidenceGrade.COHORT
-    assert "49 (interquartile interval (IQI): 24;96) days before" in ratio.provenance.passage
-    rows = {r.step: r for r in evaluate(version, EXAMPLE).pathway}
-    # The patient interval has no standard, so nothing is expected of it.
-    assert rows[S.SYMPTOMS_TO_CONTACT].expected is None
-    # A diagnostic step: the standard (7 days) times 49 / 32.
-    assert rows[S.CONTACT_TO_PHYSICIAN].expected == round(7 * 1.531, 1)
-    # The treatment step lies outside the interval the ratio was measured on.
-    treatment = rows[S.WORKUP_TO_TREATMENT]
-    assert treatment.expected == treatment.target
-
-
 def test_survival_is_second_graded_and_bounded_by_the_settings(version: ModelVersion) -> None:
     result = evaluate(version, EXAMPLE)
     survival = result.survival
@@ -470,7 +453,7 @@ def test_rest_creates_the_pathway_model_and_evaluates_without_storing_anything(
     )
 
 
-def test_rest_compares_each_step_four_ways_with_the_cases_of_the_models_case_type(
+def test_rest_compares_each_step_three_ways_with_the_cases_of_the_models_case_type(
     client: TestClient,
 ) -> None:
     project = new_project(client, "Step times")
@@ -483,12 +466,7 @@ def test_rest_compares_each_step_four_ways_with_the_cases_of_the_models_case_typ
     times = send(client, "GET", f"/models/{version['model_id']}/step-times")
     lung = {t["step"]: t for t in times if t["site"] == "lung"}
     imaging = lung["physician_to_imaging"]
-    assert (imaging["nordic"], imaging["expected"], imaging["measured"], imaging["cases"]) == (
-        6,
-        round(6 * 1.531, 1),
-        65.0,
-        2,
-    )
+    assert (imaging["nordic"], imaging["measured"], imaging["cases"]) == (6, 65.0, 2)
     # Finland's published days, and no cases yet for the steps they did not reach.
     assert lung["workup_to_treatment"]["published"] is not None
     assert lung["workup_to_treatment"]["measured"] is None

@@ -84,8 +84,8 @@ export const statisticalModelQuery = (id: Id) =>
 export const latestVersionQuery = (id: Id) =>
   queryOptions({ queryKey: statisticalModelKeys.latest(id), queryFn: () => latestVersion(id) })
 
-/** Per site and step: the Nordic standard, the days expected in Finland without a
- * standardised pathway, Finland's published typical days, and the median of the model's cases. */
+/** Per site and step: the Nordic standard, Finland's published typical days, and the median
+ * of the model's cases. */
 export async function getStepTimes(id: Id): Promise<StepTime[]> {
   return unwrap(api.GET('/api/models/{model_id}/step-times', { params: { path: { model_id: id } } }))
 }

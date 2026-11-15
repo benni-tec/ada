@@ -20,7 +20,7 @@ function Label({ children }: { children: ReactNode }) {
 
 export function PathwayResult({ evaluation, summary }: { evaluation: Evaluation; summary: string }) {
   const { trigger, deadlines, pathway, survival, flags } = evaluation
-  const max = Math.max(60, ...pathway.map((row) => Math.max(row.days ?? 0, row.target ?? 0, row.expected ?? 0)))
+  const max = Math.max(60, ...pathway.map((row) => Math.max(row.days ?? 0, row.target ?? 0)))
   const pct = (days: number) => `${Math.min(100, (days / max) * 100)}%`
   return (
     <div className="flex flex-col gap-5" data-section="pathway-result">
@@ -67,9 +67,6 @@ export function PathwayResult({ evaluation, summary }: { evaluation: Evaluation;
                 {row.gap > 0 && row.target != null && (
                   <b className="absolute inset-y-0 rounded-r-sm bg-orange-700 dark:bg-orange-500" style={{ left: pct(row.target), width: pct(row.gap) }} />
                 )}
-                {row.expected != null && row.expected !== row.target && (
-                  <s className="absolute -inset-y-[3px] w-0.5 bg-amber-500" style={{ left: pct(row.expected) }} data-expected={row.expected} />
-                )}
                 {row.target != null && <s className="absolute -inset-y-[3px] w-0.5 bg-blue-600" style={{ left: pct(row.target) }} />}
               </div>
               <span className="text-right tabular-nums">
@@ -86,10 +83,7 @@ export function PathwayResult({ evaluation, summary }: { evaluation: Evaluation;
             </div>
           ))}
         </div>
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          Blue line: the target, from the Nordic standards. Amber line: the days expected in Finland, which has no
-          standardised pathway (the Danish before-and-after effect).
-        </p>
+        <p className="mt-1.5 text-xs text-muted-foreground">Blue line: the target, from the Nordic standards.</p>
       </section>
 
       <section data-section="survival">

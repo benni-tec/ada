@@ -242,10 +242,6 @@ function Result({ result, version, inputs, onToggle }: { result: Evaluation; ver
 
       <section className="rounded-lg border bg-card p-4" data-section="pathway">
         <h2 className="text-base font-semibold">Where the days go</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Blue: the Nordic target. Amber: the days expected in Finland, which has no standardised pathway (the Danish
-          before-and-after effect on the diagnostic steps).
-        </p>
         <p className="mt-1">
           This pathway is <strong className="text-orange-700 dark:text-orange-400">{result.days_behind} days behind target</strong> so far.
         </p>
@@ -265,19 +261,13 @@ function Result({ result, version, inputs, onToggle }: { result: Evaluation; ver
                 {row.gap > 0 && row.target != null && (
                   <div className="absolute inset-y-0 rounded-r bg-orange-700" style={{ left: `${Math.min(100, (row.target / max) * 100)}%`, width: `${Math.min(100, (row.gap / max) * 100)}%` }} />
                 )}
-                {row.expected != null && row.expected !== row.target && (
-                  <div className="absolute -inset-y-1 w-0.5 bg-amber-500" style={{ left: `${Math.min(100, (row.expected / max) * 100)}%` }} data-expected={row.expected} />
-                )}
                 {row.target != null && <div className="absolute -inset-y-1 w-0.5 bg-blue-700" style={{ left: `${Math.min(100, (row.target / max) * 100)}%` }} />}
               </div>
               <span className="text-right text-xs">
                 <span className={`block text-sm font-semibold ${row.gap > 0 ? 'text-orange-700 dark:text-orange-400' : ''}`}>
                   {row.days == null ? '–' : `${row.days} d${row.gap > 0 ? ` (+${row.gap})` : ''}`}
                 </span>
-                <span className="text-muted-foreground">
-                  {row.target == null ? 'no target' : `target ${row.target} d`}
-                  {row.expected != null && row.expected !== row.target ? ` · Finland ${row.expected} d` : ''}
-                </span>
+                <span className="text-muted-foreground">{row.target == null ? 'no target' : `target ${row.target} d`}</span>
               </span>
             </div>
           ))}

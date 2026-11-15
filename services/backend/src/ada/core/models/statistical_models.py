@@ -40,8 +40,6 @@ class Scale(StrEnum):
     PER_DAY = "per_day"
     DAYS = "days"
     SURVIVAL = "survival"
-    # A ratio of two durations: days without a standardised pathway over days with one.
-    RATIO = "ratio"
 
 
 class Citation(DomainModel):
@@ -107,19 +105,6 @@ POST_TRIGGER_STEPS = (
     PathwayStep.SPECIALIST_TO_WORKUP,
     PathwayStep.WORKUP_TO_TREATMENT,
 )
-
-# The diagnostic interval of the Danish before-and-after study (first presentation to
-# diagnosis): the steps the effect of having no standardised pathway applies to.
-DIAGNOSTIC_STEPS = (
-    PathwayStep.CONTACT_TO_PHYSICIAN,
-    PathwayStep.PHYSICIAN_TO_IMAGING,
-    PathwayStep.IMAGING_TO_REFERRAL,
-    PathwayStep.REFERRAL_TO_SPECIALIST,
-    PathwayStep.SPECIALIST_TO_WORKUP,
-)
-
-# The parameter that holds that effect: days without a standardised pathway over days with.
-NO_PATHWAY = "no_pathway_ratio"
 
 STEP_LABELS: dict[PathwayStep, str] = {
     PathwayStep.SYMPTOMS_TO_CONTACT: "Symptoms → first contact",
@@ -271,15 +256,13 @@ class PopulationFigure(DomainModel):
 
 
 class StepTime(DomainModel):
-    """One step of one site's pathway, four ways: the Nordic standard, the days expected in
-    Finland without a standardised pathway, Finland's published typical days, and the
-    median of the model's cases. Each is None where there is none."""
+    """One step of one site's pathway, three ways: the Nordic standard, Finland's published
+    typical days, and the median of the model's cases. Each is None where there is none."""
 
     site: str
     step: PathwayStep
     label: str
     nordic: int | None
-    expected: float | None
     published: int | None
     measured: float | None
     # How many of the model's cases have this step's days.
@@ -463,9 +446,6 @@ class PathwayRow(DomainModel):
     label: str
     days: int | None
     target: int | None
-    # The days expected in Finland without a standardised pathway: the target times the
-    # no-pathway ratio on a diagnostic step, the target on the others; None without one.
-    expected: float | None = None
     gap: int
     countries: tuple[str, ...]
     patient_interval: bool
