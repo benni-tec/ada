@@ -13,6 +13,8 @@ import {
   type Id,
 } from '@/lib/api'
 
+import { enableBrowserAlerts } from '@/lib/browser-alerts'
+
 import { DashboardRuleList } from './alert-rules'
 import { severityPillClasses, worstActive } from './labels'
 
@@ -28,6 +30,7 @@ const filters: { state: AlertState | null; label: string }[] = [
  * come first.
  */
 export function ProjectAlerts({ projectId }: { projectId: Id }) {
+  const [permission, setPermission] = useState<string>()
   const [state, setState] = useState<AlertState | null>(null)
   const feed = useQuery(alertFeedQuery(projectId, state))
   const rules = useQuery(projectAlertRulesQuery(projectId))
@@ -45,6 +48,10 @@ export function ProjectAlerts({ projectId }: { projectId: Id }) {
   const groups = [...rules.data].sort((a, b) => Number(active(b) > 0) - Number(active(a) > 0))
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <button type="button" className="rounded-md border px-3 py-1 text-sm" onClick={() => { void enableBrowserAlerts().then(setPermission).catch(() => setPermission('unsupported')) }}>Enable browser alerts</button>
+        {permission && <span role="status" className="text-xs">{permission === 'granted' ? 'Browser alerts enabled' : 'In-app alerts enabled; system notifications unavailable'}</span>}
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div role="group" aria-label="Show alerts" className="flex gap-1">
           {filters.map((filter) => (

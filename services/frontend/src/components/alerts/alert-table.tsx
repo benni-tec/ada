@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { alertRowsQuery, type AlertView } from '@/lib/api'
 import { cell, cellText, isLong } from '@/lib/cells'
 
+import { Deliveries } from './deliveries'
 import { keyText, severityTextClasses } from './labels'
 
 /** What the people reading it call an alert's state: it is active, or it has ended. */
@@ -66,6 +67,7 @@ function AlertRow({ view }: { view: AlertView }) {
           </IconButton>
         </TableCell>
       </TableRow>
+      <TableRow><TableCell colSpan={4}><Deliveries projectId={alert.project_id} alertId={alert.id} /></TableCell></TableRow>
       {open && (
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={4} id={rowsId} className="bg-muted/30 whitespace-normal">

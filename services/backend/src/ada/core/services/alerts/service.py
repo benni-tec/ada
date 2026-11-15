@@ -223,6 +223,35 @@ class Alerts(AlertService):
 
     # Checks
 
+    async def test(self, rule_id: Id) -> Alert:
+        rule = await self.rules.get(rule_id)
+        measure = await self._measure(rule)
+        run = await self.run_service.start(rule.project_id, PLATFORM)
+        rows = await self.run_service.read(run.id, measure.id, 1)
+        if not rows.rows:
+            raise Invalid("The rule has no current data to use for a test alert")
+        names = [column.name for column in rows.columns]
+        sample = [
+            {name: _json_value(value) for name, value in zip(names, row, strict=True)}
+            for row in rows.rows
+        ]
+        alert = Alert(
+            id=uuid7(),
+            project_id=rule.project_id,
+            rule_id=rule.id,
+            key={name: sample[0].get(name) for name in rule.key_columns} if sample else {},
+            state=AlertState.FIRING,
+            since_run_id=run.id,
+            last_run_id=run.id,
+            started_at=self.clock.now(),
+        )
+
+        async def notify() -> None:
+            await self.notifier.firing(rule, alert, sample, test=True)
+
+        self.after_commit.add(notify)
+        return alert
+
     async def check(self, rule_id: Id) -> Sequence[Alert]:
         rule = await self.rules.get(rule_id)
         # Recorded as the time the check started: data that arrives while it runs is newer

@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 
 import type { Id, LiveEvent } from '@/lib/api'
 import { forgetLiveParts, receivePart } from '@/lib/agent-turns'
+import { notifyBrowser } from '@/lib/browser-alerts'
 import { effectsOf, EVENT_TYPES } from '@/lib/events'
 
 export type Connection = 'connecting' | 'open' | 'reconnecting'
@@ -45,6 +46,7 @@ export function useProjectEvents(projectId: Id): Live {
       } catch {
         return
       }
+      void notifyBrowser(event).catch(() => undefined)
       const { invalidate, reloadWidgets, turnPart, turnFinished } = effectsOf(event)
       if (turnPart) receivePart(queryClient, turnPart.turnId, turnPart.index, turnPart.part)
       if (turnFinished) forgetLiveParts(turnFinished)

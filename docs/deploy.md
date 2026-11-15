@@ -47,6 +47,7 @@ Optional backend settings in `.env.local`:
 
 - `CONTEXT_MONITOR_MINUTES`: page monitor interval, default 1440; minimum 10 minutes. Applies to newly created monitors.
 - `ALERT_NTFY_URL`: full ntfy topic URL; unset disables push notifications.
+- `ALERT_EMAIL_TO`: optional comma-separated addresses. Records simulated emails (subject and body) in the delivery log; never sends email.
 - `ALERT_WEBHOOK_URL`: outbound JSON webhook URL; unset disables webhook notifications.
 
 ## Order of deploys

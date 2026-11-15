@@ -11,6 +11,7 @@ import { ErrorNotice } from '@/components/notices'
 import {
   alertKeys,
   checkAlertRule,
+  testAlertRule,
   type AlertRule,
   type AlertView,
   type CheckResult,
@@ -18,9 +19,12 @@ import {
   type Id,
 } from '@/lib/api'
 
+import { showBrowserAlert } from '@/lib/browser-alerts'
+
+import { Deliveries } from './deliveries'
 import { AlertTable } from './alert-table'
 import { asFormula, describe } from './formula'
-import { intervalText, severityTextClasses } from './labels'
+import { intervalText, keyText, severityTextClasses } from './labels'
 import { RuleEditor } from './rule-editor'
 import { SeverityBadge } from './severity'
 
@@ -93,6 +97,13 @@ function RuleRow({ projectId, rule, alerts }: { projectId: Id; rule: AlertRule; 
   const [open, setOpen] = useState<boolean>()
   const shown = open ?? active > 0
   const alertsId = useId()
+  const test = useMutation({
+    mutationFn: () => testAlertRule(rule.id),
+    onSuccess: (alert) => {
+      showBrowserAlert(`[TEST] ${rule.name}`, keyText(alert.key), alert.id, projectId)
+      void queryClient.invalidateQueries({ queryKey: alertKeys.all() })
+    },
+  })
   const check = useMutation({
     mutationFn: () => checkAlertRule(rule.id),
     onSuccess: () => {
@@ -154,6 +165,8 @@ function RuleRow({ projectId, rule, alerts }: { projectId: Id; rule: AlertRule; 
             {checkSummary(check.data)}
           </p>
         )}
+        {test.error && <ErrorNotice error={test.error} prefix="Test send failed:" />}
+        {test.isSuccess && <p role="status">Test alert queued</p>}
         {check.error && <ErrorNotice error={check.error} prefix="The check failed:" />}
       </TableCell>
       <TableCell className={active > 0 ? severityTextClasses[rule.severity] : 'text-muted-foreground'}>
@@ -161,6 +174,7 @@ function RuleRow({ projectId, rule, alerts }: { projectId: Id; rule: AlertRule; 
       </TableCell>
       <TableCell className="w-0">
         <div className="flex justify-end gap-1">
+          <button type="button" className="whitespace-nowrap text-xs underline" disabled={test.isPending} onClick={() => test.mutate()}>Send test alert</button>
           <IconButton label="Check now" disabled={check.isPending} onClick={() => check.mutate()}>
             <RefreshCw className={check.isPending ? 'animate-spin motion-reduce:animate-none' : undefined} />
           </IconButton>
@@ -170,6 +184,7 @@ function RuleRow({ projectId, rule, alerts }: { projectId: Id; rule: AlertRule; 
         </div>
       </TableCell>
     </TableRow>
+    <TableRow><TableCell colSpan={7}><Deliveries projectId={projectId} ruleId={rule.id} browserAlertId={test.data?.id} /></TableCell></TableRow>
     {shown && alerts.length > 0 && (
       <TableRow className="hover:bg-transparent">
         <TableCell colSpan={7} id={alertsId} className="bg-muted/30 py-2 pl-12 whitespace-normal">
