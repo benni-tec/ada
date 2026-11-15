@@ -19,7 +19,15 @@ os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://ada:ada-dev@localhos
 os.environ.pop("ADA_SECRET_KEY", None)
 os.environ.pop("ADA_SECRET_KEY_FILE", None)
 # Nor the developer's web keys and public address: no test calls Context.dev or Exa.
-for name in ("CONTEXT_DEV_API_KEY", "CONTEXT_API_KEY", "EXA_API_KEY", "ADA_PUBLIC_URL"):
+for name in (
+    "CONTEXT_DEV_API_KEY",
+    "CONTEXT_API_KEY",
+    "EXA_API_KEY",
+    "ADA_PUBLIC_URL",
+    "ALERT_NTFY_URL",
+    "ALERT_WEBHOOK_URL",
+    "CONTEXT_MONITOR_MINUTES",
+):
     os.environ.pop(name, None)
 
 

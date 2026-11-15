@@ -656,7 +656,7 @@ async def test_context_dev_reads_extracts_and_watches_against_its_recorded_answe
     replay = WebReplay()
     tags = ["ada", "project:p"]
     async with _client(replay) as http:
-        web = ContextDevWeb(http, "test-key")
+        web = ContextDevWeb(http, "test-key", monitor_minutes=15)
         page = await web.read(SOTKANET, tags=tags, main_content_only=True)
         extraction = await web.extract(
             SOTKANET,
@@ -676,6 +676,7 @@ async def test_context_dev_reads_extracts_and_watches_against_its_recorded_answe
     assert monitor.secret.get_secret_value() == "test-secret"
     bodies = [json.loads(request.content) for request in replay.requests[:3]]
     assert [body.get("tags") for body in bodies] == [tags, tags, None]
+    assert bodies[2]["schedule"] == {"type": "interval", "frequency": 15, "unit": "minutes"}
     assert "secret" not in bodies[2]["webhook"]
     assert replay.requests[3].method == "DELETE"
 
