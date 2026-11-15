@@ -11,13 +11,15 @@ class DashboardService(Protocol):
     async def create(self, project_id: Id, name: str, actor: Actor) -> Dashboard: ...
     async def get(self, id: Id) -> Dashboard: ...
     async def list(self, project_id: Id) -> Sequence[Dashboard]:
-        """In the order people gave them; new ones last."""
+        """The pinned ones in the order people gave them, then the others oldest first."""
         ...
 
     async def reorder(self, project_id: Id, ids: Sequence[Id]) -> Sequence[Dashboard]:
-        """Put the project's dashboards in this order: every one of them, once. Changes no
-        revision and adds no version."""
+        """Pin these dashboards in this order and unpin the rest. Changes no revision and
+        adds no version. Only people pin; no agent tool calls it."""
         ...
+
+    async def rename(self, id: Id, name: str, expected_revision: int) -> Dashboard: ...
 
     async def current(self, id: Id) -> DashboardVersion | None:
         """The version the dashboard points at; None before its first edit."""

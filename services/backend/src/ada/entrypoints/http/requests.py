@@ -11,6 +11,6 @@ class Request(DomainModel):
 
 
 class Order(Request):
-    """A new order of a project's dashboards or reports: every id of them, once."""
+    """The pinned dashboards or reports of a project, in order; the rest are unpinned."""
 
     ids: list[Id]

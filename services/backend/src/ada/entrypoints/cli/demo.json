@@ -1,0 +1,6045 @@
+{
+ "dashboards": [
+  {
+   "name": "National Cancer Strategy 2026–2035",
+   "default_time_range": {
+    "start": null,
+    "end": null
+   },
+   "slots": [
+    {
+     "name": "goal1_about",
+     "description": "",
+     "layout": {
+      "h": 4,
+      "w": 4,
+      "x": 0,
+      "y": 0
+     },
+     "widget": "01a1dd31-b216-7251-985c-65ea7a965f9e"
+    },
+    {
+     "name": "goal1_nps",
+     "description": "",
+     "layout": {
+      "h": 4,
+      "w": 4,
+      "x": 4,
+      "y": 0
+     },
+     "widget": "01a1dd31-b219-740f-a5da-22e90a55cf18"
+    },
+    {
+     "name": "goal1_time",
+     "description": "",
+     "layout": {
+      "h": 4,
+      "w": 4,
+      "x": 8,
+      "y": 0
+     },
+     "widget": "01a1dd3f-b9d8-74e3-b9bb-7975c7b28d6e"
+    },
+    {
+     "name": "goal2_about",
+     "description": "",
+     "layout": {
+      "h": 3,
+      "w": 7,
+      "x": 0,
+      "y": 5
+     },
+     "widget": "01a1dd31-b21c-7649-8bd8-97a116121341"
+    },
+    {
+     "name": "goal2_counties",
+     "description": "",
+     "layout": {
+      "h": 4,
+      "w": 7,
+      "x": 0,
+      "y": 8
+     },
+     "widget": "01a1dd3f-b9db-71cf-9802-8abd007ddf0d"
+    },
+    {
+     "name": "goal2_screening",
+     "description": "",
+     "layout": {
+      "h": 6,
+      "w": 5,
+      "x": 7,
+      "y": 5
+     },
+     "widget": "01a1dd20-04b1-76da-a51e-aa37abe6c69c"
+    },
+    {
+     "name": "goal3_about",
+     "description": "",
+     "layout": {
+      "h": 6,
+      "w": 4,
+      "x": 0,
+      "y": 12
+     },
+     "widget": "01a1dd31-b21e-7018-811b-46b793f553a4"
+    },
+    {
+     "name": "goal3_deaths",
+     "description": "",
+     "layout": {
+      "h": 6,
+      "w": 3,
+      "x": 4,
+      "y": 12
+     },
+     "widget": "01a1dd3f-b9de-7551-974f-956e323fcda8"
+    },
+    {
+     "name": "goal3_gap",
+     "description": "",
+     "layout": {
+      "h": 6,
+      "w": 5,
+      "x": 7,
+      "y": 12
+     },
+     "widget": "01a1dd20-04bc-7570-bd53-b10aa891876a"
+    },
+    {
+     "name": "goal3_survival",
+     "description": "",
+     "layout": {
+      "h": 6,
+      "w": 6,
+      "x": 0,
+      "y": 18
+     },
+     "widget": "01a1dd20-04d5-732d-81ff-3266b1a66867"
+    },
+    {
+     "name": "goal3_pathways",
+     "description": "",
+     "layout": {
+      "h": 6,
+      "w": 6,
+      "x": 6,
+      "y": 18
+     },
+     "widget": "01a1dd42-e310-7364-94e3-48b801038aec"
+    },
+    {
+     "name": "goal4_about",
+     "description": "",
+     "layout": {
+      "h": 8,
+      "w": 4,
+      "x": 0,
+      "y": 25
+     },
+     "widget": "01a1dd31-b223-767e-88a3-e08face93252"
+    },
+    {
+     "name": "goal4_trials",
+     "description": "",
+     "layout": {
+      "h": 4,
+      "w": 8,
+      "x": 4,
+      "y": 25
+     },
+     "widget": "01a1dd3f-b9e1-708f-a0bf-e3328ffc0694"
+    },
+    {
+     "name": "goal4_per_million",
+     "description": "",
+     "layout": {
+      "h": 4,
+      "w": 8,
+      "x": 4,
+      "y": 29
+     },
+     "widget": "01a1dd3f-b9e4-7468-9e8d-3ebfbdac200a"
+    }
+   ],
+   "rules": [
+    {
+     "name": "A county below 80 % in a screening programme",
+     "operator_id": "op_64655342c690ba2343ed106c3008c9e7",
+     "formula": {
+      "id": "root",
+      "op": "<",
+      "args": [
+       {
+        "id": "v",
+        "kind": "column",
+        "column": "participation_pct"
+       },
+       {
+        "id": "t",
+        "kind": "constant",
+        "value": 80
+       }
+      ],
+      "kind": "compare"
+     },
+     "key_columns": [
+      "programme",
+      "county"
+     ],
+     "severity": "warning",
+     "check_interval_seconds": null,
+     "max_data_age_seconds": null
+    },
+    {
+     "name": "Cancer deaths above the 2035 target",
+     "operator_id": "op_12f6c42f28539da39af93c685e8380aa",
+     "formula": {
+      "id": "root",
+      "op": ">",
+      "args": [
+       {
+        "id": "v",
+        "kind": "column",
+        "column": "above_target"
+       },
+       {
+        "id": "z",
+        "kind": "constant",
+        "value": 0
+       }
+      ],
+      "kind": "compare"
+     },
+     "key_columns": [],
+     "severity": "critical",
+     "check_interval_seconds": null,
+     "max_data_age_seconds": null
+    },
+    {
+     "name": "Trials per million below the Nordic level",
+     "operator_id": "op_c87909d25caf4a480bec441b2688301a",
+     "formula": {
+      "id": "root",
+      "op": "<",
+      "args": [
+       {
+        "id": "f",
+        "kind": "column",
+        "column": "finland_per_million"
+       },
+       {
+        "id": "n",
+        "kind": "column",
+        "column": "nordic_level_per_million"
+       }
+      ],
+      "kind": "compare"
+     },
+     "key_columns": [],
+     "severity": "warning",
+     "check_interval_seconds": null,
+     "max_data_age_seconds": null
+    },
+    {
+     "name": "Survival gap to the Nordic level over 10 points",
+     "operator_id": "op_2ba2332d30a9b86812c89727de46c4da",
+     "formula": {
+      "id": "root",
+      "op": ">",
+      "args": [
+       {
+        "id": "g",
+        "kind": "column",
+        "column": "gap_pp"
+       },
+       {
+        "id": "t",
+        "kind": "constant",
+        "value": 10
+       }
+      ],
+      "kind": "compare"
+     },
+     "key_columns": [
+      "cancer",
+      "sex"
+     ],
+     "severity": "warning",
+     "check_interval_seconds": null,
+     "max_data_age_seconds": null
+    }
+   ]
+  },
+  {
+   "name": "Pathway times by county (synthetic)",
+   "default_time_range": {
+    "start": null,
+    "end": null
+   },
+   "slots": [
+    {
+     "name": "county",
+     "description": "",
+     "layout": {
+      "h": 8,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "widget": "01a1dd42-e2d5-72e1-98fc-238ec17a8edb"
+    },
+    {
+     "name": "steps",
+     "description": "",
+     "layout": {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 0
+     },
+     "widget": "01a1dd42-e2d7-7027-b87f-3f20346ca068"
+    },
+    {
+     "name": "trend",
+     "description": "",
+     "layout": {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 4
+     },
+     "widget": "01a1dd43-5e87-7490-995d-a50145b73ddf"
+    }
+   ],
+   "rules": []
+  },
+  {
+   "name": "Data quality: county indicators",
+   "default_time_range": {
+    "start": null,
+    "end": null
+   },
+   "slots": [
+    {
+     "name": "Coverage",
+     "description": "",
+     "layout": {
+      "h": 8,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "widget": "01a1d9b7-8df1-7388-9115-b98187d1b0fe"
+    },
+    {
+     "name": "Series breaks",
+     "description": "",
+     "layout": {
+      "h": 8,
+      "w": 6,
+      "x": 6,
+      "y": 0
+     },
+     "widget": "01a1d9b7-8df6-7356-98fa-e3b3a280d041"
+    },
+    {
+     "name": "Indicator profile",
+     "description": "",
+     "layout": {
+      "h": 7,
+      "w": 12,
+      "x": 0,
+      "y": 8
+     },
+     "widget": "01a1d9b7-8df8-70bb-adb5-383a3047c0b0"
+    },
+    {
+     "name": "Outlier-driven correlations",
+     "description": "",
+     "layout": {
+      "h": 7,
+      "w": 9,
+      "x": 0,
+      "y": 15
+     },
+     "widget": "01a1d9b9-0bd8-7705-bfaf-ae031132d248"
+    }
+   ],
+   "rules": [
+    {
+     "name": "Suspected series break in an indicator",
+     "operator_id": "op_00c7105a384f2a4663fbbf2136af51c2",
+     "formula": {
+      "id": "root",
+      "args": [
+       {
+        "id": "hi",
+        "op": ">",
+        "args": [
+         {
+          "id": "r1",
+          "kind": "column",
+          "column": "ratio"
+         },
+         {
+          "id": "c15",
+          "kind": "constant",
+          "value": 1.5
+         }
+        ],
+        "kind": "compare"
+       },
+       {
+        "id": "lo",
+        "op": "<",
+        "args": [
+         {
+          "id": "r2",
+          "kind": "column",
+          "column": "ratio"
+         },
+         {
+          "id": "c067",
+          "kind": "constant",
+          "value": 0.67
+         }
+        ],
+        "kind": "compare"
+       }
+      ],
+      "kind": "or"
+     },
+     "key_columns": [
+      "indicator"
+     ],
+     "severity": "warning",
+     "check_interval_seconds": null,
+     "max_data_age_seconds": null
+    }
+   ]
+  }
+ ],
+ "widgets": {
+  "01a1dd31-b216-7251-985c-65ea7a965f9e": {
+   "operator_id": "op_0d47cf61241f47ba78dd7553f9a6b800",
+   "inputs": {},
+   "type": "text",
+   "title": "Goal 1",
+   "spec": {
+    "markdown": "### {{main.title[goal=1][n=1]}}\n\nPatients take part in their care, and how they experience it is measured.\n\nThe strategy's targets:\n\n- {{main.target[goal=1][n=1]}}\n- {{main.target[goal=1][n=2]}}"
+   },
+   "note": "The goal and its targets as page 5 of the National Cancer Strategy 2026–2035 states them"
+  },
+  "01a1dd31-b219-740f-a5da-22e90a55cf18": {
+   "operator_id": "op_5484e7f4daf7dfa0c879c353f33ad478",
+   "inputs": {},
+   "type": "value",
+   "title": "Goal 1 · Patient NPS, Tays Cancer Centre",
+   "spec": {
+    "label": "Autumn 2023, the only published NPS found; target above 80",
+    "column": "nps",
+    "decimals": 1,
+    "compare_to": "target_nps"
+   },
+   "note": ""
+  },
+  "01a1dd3f-b9d8-74e3-b9bb-7975c7b28d6e": {
+   "operator_id": "op_32b12deb02fd90117a57e2094fe8afb5",
+   "inputs": {},
+   "type": "chart",
+   "title": "Goal 1 · Enough time at the visit",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "line",
+       "color": "#7c3aed",
+       "point": true
+      }
+     },
+     {
+      "mark": {
+       "dy": -12,
+       "type": "text"
+      },
+      "encoding": {
+       "text": {
+        "field": "enough_time_pct",
+        "format": ".1f"
+       }
+      }
+     }
+    ],
+    "encoding": {
+     "x": {
+      "axis": {
+       "labelAngle": 0
+      },
+      "type": "ordinal",
+      "field": "year",
+      "title": null
+     },
+     "y": {
+      "type": "quantitative",
+      "field": "enough_time_pct",
+      "scale": {
+       "zero": false,
+       "padding": 12
+      },
+      "title": "% with enough time"
+     }
+    }
+   },
+   "note": "Share who had enough time at their last health visit, per survey (FinSote, Sotkanet)"
+  },
+  "01a1dd31-b21c-7649-8bd8-97a116121341": {
+   "operator_id": "op_0d47cf61241f47ba78dd7553f9a6b800",
+   "inputs": {},
+   "type": "text",
+   "title": "Goal 2",
+   "spec": {
+    "markdown": "### {{main.title[goal=2][n=1]}}\n\nFewer cancers, and those that occur found early.\n\nThe strategy's targets:\n\n- {{main.target[goal=2][n=1]}}\n- {{main.target[goal=2][n=2]}}\n- {{main.target[goal=2][n=3]}}"
+   },
+   "note": "The goal and its targets as page 5 of the National Cancer Strategy 2026–2035 states them"
+  },
+  "01a1dd3f-b9db-71cf-9802-8abd007ddf0d": {
+   "operator_id": "op_4bfe59d848c77468e2d6fda15a565bcc",
+   "inputs": {},
+   "type": "chart",
+   "title": "Goal 2 · Counties at 80 % in all screenings",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "bar",
+       "color": "#f97316"
+      },
+      "encoding": {
+       "x": {
+        "axis": {
+         "labelAngle": 0
+        },
+        "type": "ordinal",
+        "field": "year",
+        "title": null
+       },
+       "y": {
+        "type": "quantitative",
+        "field": "counties_all_at_target",
+        "scale": {
+         "domain": [
+          0,
+          22
+         ]
+        },
+        "title": "counties at 80 %"
+       }
+      }
+     },
+     {
+      "mark": {
+       "dy": -8,
+       "type": "text"
+      },
+      "encoding": {
+       "x": {
+        "axis": {
+         "labelAngle": 0
+        },
+        "type": "ordinal",
+        "field": "year",
+        "title": null
+       },
+       "y": {
+        "type": "quantitative",
+        "field": "counties_all_at_target"
+       },
+       "text": {
+        "field": "label"
+       }
+      }
+     },
+     {
+      "mark": {
+       "size": 2,
+       "type": "rule",
+       "color": "#0f172a",
+       "strokeDash": [
+        5,
+        4
+       ]
+      },
+      "encoding": {
+       "y": {
+        "type": "quantitative",
+        "field": "counties",
+        "aggregate": "max"
+       }
+      }
+     }
+    ],
+    "transform": [
+     {
+      "as": "label",
+      "calculate": "datum.counties_all_at_target + ' of ' + datum.counties"
+     }
+    ]
+   },
+   "note": "Target: every county at 80 % in breast, cervical and colorectal screening (dashed: all 22)"
+  },
+  "01a1dd20-04b1-76da-a51e-aa37abe6c69c": {
+   "operator_id": "op_64655342c690ba2343ed106c3008c9e7",
+   "inputs": {},
+   "type": "chart",
+   "title": "Goal 2 · Screening participation by county",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "rule",
+       "strokeDash": [
+        4,
+        4
+       ]
+      },
+      "encoding": {
+       "x": {
+        "datum": 80
+       }
+      }
+     },
+     {
+      "mark": {
+       "size": 70,
+       "type": "point",
+       "filled": true,
+       "opacity": 0.9
+      },
+      "encoding": {
+       "x": {
+        "type": "quantitative",
+        "field": "participation_pct",
+        "scale": {
+         "zero": false
+        },
+        "title": "% of invited"
+       },
+       "y": {
+        "axis": {
+         "labelLimit": 150
+        },
+        "sort": {
+         "op": "min",
+         "field": "county_lowest",
+         "order": "ascending"
+        },
+        "type": "nominal",
+        "field": "county",
+        "title": null
+       },
+       "color": {
+        "type": "nominal",
+        "field": "programme",
+        "title": null,
+        "legend": {
+         "orient": "bottom"
+        }
+       },
+       "shape": {
+        "type": "nominal",
+        "field": "programme",
+        "legend": null
+       },
+       "tooltip": [
+        {
+         "field": "county",
+         "title": "County"
+        },
+        {
+         "field": "programme",
+         "title": "Programme"
+        },
+        {
+         "field": "year",
+         "title": "Year"
+        },
+        {
+         "field": "participation_pct",
+         "title": "%",
+         "format": ".1f"
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "note": ""
+  },
+  "01a1dd31-b21e-7018-811b-46b793f553a4": {
+   "operator_id": "op_0d47cf61241f47ba78dd7553f9a6b800",
+   "inputs": {},
+   "type": "text",
+   "title": "Goal 3",
+   "spec": {
+    "markdown": "### {{main.title[goal=3][n=1]}}\n\nThe same chance of good care and survival wherever you live.\n\nThe strategy's targets:\n\n- {{main.target[goal=3][n=1]}}\n- {{main.target[goal=3][n=2]}}\n- {{main.target[goal=3][n=3]}}"
+   },
+   "note": "The goal and its targets as page 5 of the National Cancer Strategy 2026–2035 states them"
+  },
+  "01a1dd3f-b9de-7551-974f-956e323fcda8": {
+   "operator_id": "op_12f6c42f28539da39af93c685e8380aa",
+   "inputs": {},
+   "type": "chart",
+   "title": "Goal 3 · Cancer deaths against the target",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "bar",
+       "color": "#dc2626"
+      },
+      "encoding": {
+       "x": {
+        "axis": {
+         "labelAngle": 0
+        },
+        "type": "ordinal",
+        "field": "year",
+        "title": null
+       },
+       "y": {
+        "type": "quantitative",
+        "field": "deaths",
+        "title": "cancer deaths"
+       }
+      }
+     },
+     {
+      "mark": {
+       "dy": -8,
+       "type": "text"
+      },
+      "encoding": {
+       "x": {
+        "axis": {
+         "labelAngle": 0
+        },
+        "type": "ordinal",
+        "field": "year",
+        "title": null
+       },
+       "y": {
+        "type": "quantitative",
+        "field": "deaths"
+       },
+       "text": {
+        "field": "deaths",
+        "format": ","
+       }
+      }
+     },
+     {
+      "mark": {
+       "size": 2,
+       "type": "rule",
+       "color": "#0f172a",
+       "strokeDash": [
+        5,
+        4
+       ]
+      },
+      "encoding": {
+       "y": {
+        "type": "quantitative",
+        "field": "target_deaths",
+        "aggregate": "max"
+       }
+      }
+     }
+    ]
+   },
+   "note": "Deaths a year against the 2035 target of 11,970 (dashed), Statistics Finland"
+  },
+  "01a1dd20-04bc-7570-bd53-b10aa891876a": {
+   "operator_id": "op_2ba2332d30a9b86812c89727de46c4da",
+   "inputs": {},
+   "type": "table",
+   "title": "Goal 3 · Survival gap to the Nordic level",
+   "spec": {
+    "format": {
+     "gap_pp": "number",
+     "finland_pct": "percent",
+     "target_2035_pct": "percent",
+     "nordic_level_pct": "percent"
+    },
+    "labels": {
+     "sex": "Sex",
+     "cancer": "Cancer",
+     "gap_pp": "Gap (points)",
+     "finland_pct": "Finland",
+     "target_2035_pct": "2035 target",
+     "nordic_level_pct": "Nordic level"
+    },
+    "columns": [
+     "cancer",
+     "sex",
+     "finland_pct",
+     "nordic_level_pct",
+     "gap_pp",
+     "target_2035_pct"
+    ],
+    "decimals": 1
+   },
+   "note": "Nordic level = average of Sweden and Norway; target = Finland + 14 (lung, liver) or + 6 (pancreas) points"
+  },
+  "01a1dd20-04d5-732d-81ff-3266b1a66867": {
+   "operator_id": "op_4b7bce3e6267b143abc8a0299c8c781c",
+   "inputs": {},
+   "type": "chart",
+   "title": "Goal 3 · Five-year survival against the Nordic level",
+   "spec": {
+    "spec": {
+     "mark": {
+      "type": "line",
+      "point": true
+     },
+     "width": 140,
+     "height": 150,
+     "encoding": {
+      "x": {
+       "axis": {
+        "format": "%Y",
+        "tickCount": 4
+       },
+       "type": "temporal",
+       "field": "period_start",
+       "title": null
+      },
+      "y": {
+       "type": "quantitative",
+       "field": "survival",
+       "title": "Survival, %"
+      },
+      "color": {
+       "type": "nominal",
+       "field": "series",
+       "title": null,
+       "legend": {
+        "orient": "top"
+       }
+      }
+     }
+    },
+    "facet": {
+     "type": "nominal",
+     "field": "cancer",
+     "title": null
+    },
+    "columns": 3
+   },
+   "note": "Equal in the 1990s, apart since 2005; men and women averaged. NORDCAN"
+  },
+  "01a1dd42-e310-7364-94e3-48b801038aec": {
+   "operator_id": "op_df963593c4031b9e1f7d84accf5642bd",
+   "inputs": {},
+   "type": "chart",
+   "title": "Goal 3 · Days from trigger to treatment, against the Nordic target",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "bar",
+       "color": "#f97316"
+      },
+      "encoding": {
+       "x": {
+        "type": "quantitative",
+        "field": "median_days",
+        "title": "median days, trigger to treatment"
+       }
+      }
+     },
+     {
+      "mark": {
+       "dx": 4,
+       "type": "text",
+       "align": "left"
+      },
+      "encoding": {
+       "x": {
+        "type": "quantitative",
+        "field": "median_days"
+       },
+       "text": {
+        "field": "median_days",
+        "format": ".0f"
+       }
+      }
+     },
+     {
+      "mark": {
+       "size": 14,
+       "type": "tick",
+       "color": "#0f172a",
+       "thickness": 3
+      },
+      "encoding": {
+       "x": {
+        "type": "quantitative",
+        "field": "nordic_target_days"
+       }
+      }
+     }
+    ],
+    "encoding": {
+     "y": {
+      "sort": "-x",
+      "type": "nominal",
+      "field": "county",
+      "title": null
+     }
+    }
+   },
+   "note": "Synthetic cases: median per county; tick: the Nordic standard time for its case mix"
+  },
+  "01a1dd31-b223-767e-88a3-e08face93252": {
+   "operator_id": "op_0d47cf61241f47ba78dd7553f9a6b800",
+   "inputs": {},
+   "type": "text",
+   "title": "Goal 4",
+   "spec": {
+    "markdown": "### {{main.title[goal=4][n=1]}}\n\nResearch and new treatments reach patients in Finland.\n\nThe strategy's targets:\n\n- {{main.target[goal=4][n=1]}}\n- {{main.target[goal=4][n=2]}}\n- {{main.target[goal=4][n=3]}}"
+   },
+   "note": "The goal and its targets as page 5 of the National Cancer Strategy 2026–2035 states them"
+  },
+  "01a1dd3f-b9e1-708f-a0bf-e3328ffc0694": {
+   "operator_id": "op_f19452e7f6af813fc533783ea702bd3d",
+   "inputs": {},
+   "type": "chart",
+   "title": "Goal 4 · New cancer trials with a site in Finland",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "bar",
+       "color": "#2563eb"
+      },
+      "encoding": {
+       "y": {
+        "type": "quantitative",
+        "field": "trials",
+        "title": "new trials"
+       }
+      }
+     },
+     {
+      "mark": {
+       "dy": -8,
+       "type": "text"
+      },
+      "encoding": {
+       "y": {
+        "type": "quantitative",
+        "field": "trials"
+       },
+       "text": {
+        "field": "trials"
+       }
+      }
+     },
+     {
+      "mark": {
+       "type": "tick",
+       "color": "#0f172a",
+       "thickness": 3
+      },
+      "encoding": {
+       "y": {
+        "type": "quantitative",
+        "field": "target"
+       }
+      }
+     }
+    ],
+    "encoding": {
+     "x": {
+      "axis": {
+       "labelAngle": 0
+      },
+      "type": "ordinal",
+      "field": "year",
+      "title": null
+     }
+    },
+    "transform": [
+     {
+      "as": "target",
+      "calculate": "datum.previous_trials == null ? null : datum.previous_trials * (1 + datum.target_change_pct / 100)"
+     }
+    ]
+   },
+   "note": "New interventional cancer trials with a Finnish site; tick: the year before plus the 10 % target"
+  },
+  "01a1dd3f-b9e4-7468-9e8d-3ebfbdac200a": {
+   "operator_id": "op_c87909d25caf4a480bec441b2688301a",
+   "inputs": {},
+   "type": "chart",
+   "title": "Goal 4 · Trials per million against the Nordic level",
+   "spec": {
+    "mark": {
+     "type": "line",
+     "point": true
+    },
+    "encoding": {
+     "x": {
+      "axis": {
+       "labelAngle": 0
+      },
+      "type": "ordinal",
+      "field": "year",
+      "title": null
+     },
+     "y": {
+      "type": "quantitative",
+      "field": "per_million",
+      "title": "trials per million"
+     },
+     "color": {
+      "type": "nominal",
+      "field": "series",
+      "scale": {
+       "range": [
+        "#2563eb",
+        "#94a3b8"
+       ]
+      },
+      "title": null,
+      "legend": {
+       "orient": "top"
+      }
+     }
+    },
+    "transform": [
+     {
+      "as": [
+       "key",
+       "per_million"
+      ],
+      "fold": [
+       "finland_per_million",
+       "nordic_level_per_million"
+      ]
+     },
+     {
+      "as": "series",
+      "calculate": "datum.key == 'finland_per_million' ? 'Finland' : 'Nordic level'"
+     }
+    ]
+   },
+   "note": "New trials per million inhabitants: Finland against the mean of Sweden and Norway"
+  },
+  "01a1dd42-e2d5-72e1-98fc-238ec17a8edb": {
+   "operator_id": "op_df963593c4031b9e1f7d84accf5642bd",
+   "inputs": {},
+   "type": "chart",
+   "title": "Days from trigger to treatment, against the Nordic target",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "bar",
+       "color": "#f97316"
+      },
+      "encoding": {
+       "x": {
+        "type": "quantitative",
+        "field": "median_days",
+        "title": "median days, trigger to treatment"
+       }
+      }
+     },
+     {
+      "mark": {
+       "dx": 4,
+       "type": "text",
+       "align": "left"
+      },
+      "encoding": {
+       "x": {
+        "type": "quantitative",
+        "field": "median_days"
+       },
+       "text": {
+        "field": "median_days",
+        "format": ".0f"
+       }
+      }
+     },
+     {
+      "mark": {
+       "size": 14,
+       "type": "tick",
+       "color": "#0f172a",
+       "thickness": 3
+      },
+      "encoding": {
+       "x": {
+        "type": "quantitative",
+        "field": "nordic_target_days"
+       }
+      }
+     }
+    ],
+    "encoding": {
+     "y": {
+      "sort": "-x",
+      "type": "nominal",
+      "field": "county",
+      "title": null
+     }
+    }
+   },
+   "note": "Synthetic cases: median per county; tick: the Nordic standard time for its case mix"
+  },
+  "01a1dd42-e2d7-7027-b87f-3f20346ca068": {
+   "operator_id": "op_315f4f6be6d8b50f47d98854d843c108",
+   "inputs": {},
+   "type": "chart",
+   "title": "Lung: days per pathway step, against the Nordic standard",
+   "spec": {
+    "layer": [
+     {
+      "mark": "bar",
+      "encoding": {
+       "y": {
+        "type": "quantitative",
+        "field": "median_days",
+        "title": "median days"
+       },
+       "color": {
+        "value": "#94a3b8",
+        "condition": {
+         "test": "datum.median_days > datum.nordic_days",
+         "value": "#dc2626"
+        }
+       }
+      }
+     },
+     {
+      "mark": {
+       "dy": -6,
+       "type": "text"
+      },
+      "encoding": {
+       "y": {
+        "type": "quantitative",
+        "field": "median_days"
+       },
+       "text": {
+        "field": "median_days",
+        "format": ".0f"
+       }
+      }
+     },
+     {
+      "mark": {
+       "type": "tick",
+       "color": "#0f172a",
+       "thickness": 3
+      },
+      "encoding": {
+       "y": {
+        "type": "quantitative",
+        "field": "nordic_days"
+       }
+      }
+     }
+    ],
+    "encoding": {
+     "x": {
+      "axis": {
+       "labelAngle": -20
+      },
+      "type": "nominal",
+      "field": "step",
+      "title": null
+     }
+    }
+   },
+   "note": "Synthetic cases: median days per step; tick: the Nordic standard; red where a step takes longer"
+  },
+  "01a1dd43-5e87-7490-995d-a50145b73ddf": {
+   "operator_id": "op_1936d20e43ee40018405dce7eae7b3eb",
+   "inputs": {},
+   "type": "chart",
+   "title": "Days from trigger to treatment by month, against the Nordic target",
+   "spec": {
+    "mark": {
+     "type": "line",
+     "point": true
+    },
+    "encoding": {
+     "x": {
+      "type": "temporal",
+      "field": "month",
+      "title": null
+     },
+     "y": {
+      "type": "quantitative",
+      "field": "days",
+      "title": "median days"
+     },
+     "color": {
+      "type": "nominal",
+      "field": "series",
+      "scale": {
+       "range": [
+        "#7c3aed",
+        "#94a3b8"
+       ]
+      },
+      "title": null,
+      "legend": {
+       "orient": "top"
+      }
+     }
+    },
+    "transform": [
+     {
+      "as": [
+       "key",
+       "days"
+      ],
+      "fold": [
+       "median_days",
+       "nordic_target_days"
+      ]
+     },
+     {
+      "as": "series",
+      "calculate": "datum.key == 'median_days' ? 'Finland (synthetic cases)' : 'Nordic target'"
+     }
+    ]
+   },
+   "note": "Synthetic cases: median by month of first contact; grey: the Nordic target for that month's case mix"
+  },
+  "01a1d9b7-8df1-7388-9115-b98187d1b0fe": {
+   "operator_id": "op_250feca43dfed1b6acd1dbb66a236c08",
+   "inputs": {},
+   "type": "chart",
+   "title": "Coverage: counties with a value, per indicator and year",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "rect",
+       "cornerRadius": 2
+      },
+      "encoding": {
+       "x": {
+        "axis": {
+         "orient": "top",
+         "labelAngle": 0
+        },
+        "type": "ordinal",
+        "field": "year",
+        "title": null
+       },
+       "y": {
+        "axis": {
+         "labelLimit": 220
+        },
+        "sort": {
+         "op": "min",
+         "field": "ord"
+        },
+        "type": "nominal",
+        "field": "indicator",
+        "title": null
+       },
+       "color": {
+        "type": "quantitative",
+        "field": "counties",
+        "scale": {
+         "domain": [
+          0,
+          22
+         ]
+        },
+        "title": "Counties",
+        "legend": {
+         "orient": "bottom"
+        }
+       },
+       "tooltip": [
+        {
+         "field": "indicator",
+         "title": "Indicator"
+        },
+        {
+         "field": "year",
+         "title": "Year"
+        },
+        {
+         "field": "counties",
+         "title": "Counties"
+        }
+       ]
+      }
+     },
+     {
+      "mark": {
+       "type": "text",
+       "fontSize": 10
+      },
+      "encoding": {
+       "x": {
+        "type": "ordinal",
+        "field": "year"
+       },
+       "y": {
+        "sort": {
+         "op": "min",
+         "field": "ord"
+        },
+        "type": "nominal",
+        "field": "indicator"
+       },
+       "text": {
+        "type": "quantitative",
+        "field": "counties"
+       },
+       "color": {
+        "value": "#0b0b0b",
+        "condition": {
+         "test": "datum.counties >= 15",
+         "value": "#ffffff"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "note": ""
+  },
+  "01a1d9b7-8df6-7356-98fa-e3b3a280d041": {
+   "operator_id": "op_00c7105a384f2a4663fbbf2136af51c2",
+   "inputs": {},
+   "type": "chart",
+   "title": "Series breaks: county median vs previous year (outside 0.67–1.5 = suspect)",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "line",
+       "point": {
+        "size": 30
+       },
+       "opacity": 0.5,
+       "strokeWidth": 1.5
+      },
+      "encoding": {
+       "x": {
+        "axis": {
+         "labelAngle": 0
+        },
+        "type": "ordinal",
+        "field": "year",
+        "title": null
+       },
+       "y": {
+        "type": "quantitative",
+        "field": "ratio",
+        "scale": {
+         "type": "log"
+        },
+        "title": "Median / previous year (log)"
+       },
+       "color": {
+        "value": "#898781",
+        "condition": {
+         "test": "datum.suspected_break",
+         "value": "#e34948"
+        }
+       },
+       "detail": {
+        "field": "indicator"
+       },
+       "tooltip": [
+        {
+         "field": "indicator",
+         "title": "Indicator"
+        },
+        {
+         "field": "year",
+         "title": "Year"
+        },
+        {
+         "field": "county_median",
+         "title": "County median",
+         "format": ".1f"
+        },
+        {
+         "field": "ratio",
+         "title": "Ratio",
+         "format": ".2f"
+        }
+       ]
+      }
+     },
+     {
+      "mark": {
+       "size": 80,
+       "type": "point",
+       "color": "#e34948",
+       "filled": true
+      },
+      "encoding": {
+       "x": {
+        "type": "ordinal",
+        "field": "year"
+       },
+       "y": {
+        "type": "quantitative",
+        "field": "ratio",
+        "scale": {
+         "type": "log"
+        }
+       },
+       "tooltip": [
+        {
+         "field": "indicator",
+         "title": "Indicator"
+        },
+        {
+         "field": "year",
+         "title": "Year"
+        },
+        {
+         "field": "ratio",
+         "title": "Ratio",
+         "format": ".2f"
+        }
+       ]
+      },
+      "transform": [
+       {
+        "filter": "datum.suspected_break"
+       }
+      ]
+     },
+     {
+      "mark": {
+       "dx": 6,
+       "type": "text",
+       "align": "left",
+       "fontSize": 11
+      },
+      "encoding": {
+       "x": {
+        "type": "ordinal",
+        "field": "year"
+       },
+       "y": {
+        "type": "quantitative",
+        "field": "ratio",
+        "scale": {
+         "type": "log"
+        }
+       },
+       "text": {
+        "field": "indicator"
+       }
+      },
+      "transform": [
+       {
+        "filter": "datum.suspected_break"
+       }
+      ]
+     },
+     {
+      "mark": {
+       "type": "rule",
+       "strokeDash": [
+        4,
+        4
+       ]
+      },
+      "encoding": {
+       "y": {
+        "datum": 1.5
+       }
+      }
+     },
+     {
+      "mark": {
+       "type": "rule",
+       "strokeDash": [
+        4,
+        4
+       ]
+      },
+      "encoding": {
+       "y": {
+        "datum": 0.67
+       }
+      }
+     }
+    ]
+   },
+   "note": ""
+  },
+  "01a1d9b7-8df8-70bb-adb5-383a3047c0b0": {
+   "operator_id": "op_f9fb09477b65508fa484ae6c426097e9",
+   "inputs": {},
+   "type": "table",
+   "title": "Indicator profile at the latest year",
+   "spec": {
+    "labels": {
+     "skew": "Skew",
+     "year": "Year",
+     "counties": "Counties",
+     "indicator": "Indicator",
+     "iqr_outliers": "IQR outliers",
+     "distinct_values": "Distinct values",
+     "outlier_counties": "Outlying counties"
+    },
+    "columns": [
+     "indicator",
+     "year",
+     "counties",
+     "distinct_values",
+     "skew",
+     "iqr_outliers",
+     "outlier_counties"
+    ],
+    "decimals": 2
+   },
+   "note": ""
+  },
+  "01a1d9b9-0bd8-7705-bfaf-ae031132d248": {
+   "operator_id": "op_aa9747835407052cddeeedd1fafe819a",
+   "inputs": {},
+   "type": "chart",
+   "title": "Outlier-driven correlations: Pearson r vs Spearman ρ (|r − ρ| > 0.2)",
+   "spec": {
+    "layer": [
+     {
+      "mark": {
+       "type": "rule",
+       "strokeDash": [
+        2,
+        2
+       ]
+      },
+      "encoding": {
+       "x": {
+        "datum": 0
+       }
+      }
+     },
+     {
+      "mark": {
+       "type": "rule",
+       "opacity": 0.5,
+       "strokeWidth": 2
+      },
+      "encoding": {
+       "x": {
+        "type": "quantitative",
+        "field": "r"
+       },
+       "x2": {
+        "field": "rho"
+       }
+      }
+     },
+     {
+      "mark": {
+       "size": 70,
+       "type": "point",
+       "filled": true
+      },
+      "encoding": {
+       "x": {
+        "type": "quantitative",
+        "field": "value",
+        "scale": {
+         "domain": [
+          -1,
+          1
+         ]
+        },
+        "title": "Correlation"
+       },
+       "color": {
+        "type": "nominal",
+        "field": "statistic",
+        "title": null,
+        "legend": {
+         "orient": "bottom"
+        }
+       },
+       "tooltip": [
+        {
+         "field": "pair",
+         "title": "Pair"
+        },
+        {
+         "field": "statistic",
+         "title": "Statistic"
+        },
+        {
+         "field": "value",
+         "title": "Value",
+         "format": ".2f"
+        }
+       ]
+      }
+     }
+    ],
+    "encoding": {
+     "y": {
+      "axis": {
+       "labelLimit": 320
+      },
+      "sort": {
+       "op": "max",
+       "field": "divergence",
+       "order": "descending"
+      },
+      "type": "nominal",
+      "field": "pair",
+      "title": null
+     }
+    },
+    "transform": [
+     {
+      "as": [
+       "measure",
+       "value"
+      ],
+      "fold": [
+       "r",
+       "rho"
+      ]
+     },
+     {
+      "as": "statistic",
+      "calculate": "datum.measure === 'r' ? 'Pearson r' : 'Spearman ρ'"
+     }
+    ]
+   },
+   "note": ""
+  }
+ },
+ "operators": [
+  {
+   "key": "op_5c4153dc9a409e1f93fc75725062e02f",
+   "kind": "source",
+   "source": "01a1d932-da89-70f1-999a-fe2cce26c61a"
+  },
+  {
+   "key": "op_0d47cf61241f47ba78dd7553f9a6b800",
+   "kind": "transform",
+   "sql": "-- The strategy's four objectives and their targets, as page 5 of the PDF states them: one\n-- row per target, in the strategy's words (footnote marks dropped).\nWITH lines AS (\n  SELECT i, trim(l) AS l\n  FROM (SELECT unnest(string_split(text, chr(10))) AS l, generate_subscripts(string_split(text, chr(10)), 1) AS i FROM input_0 WHERE page = 5)\n),\nheads AS (\n  SELECT i, l, CASE l\n    WHEN 'Strengthening participation and developing human-centred services' THEN 1\n    WHEN 'Reducing cancer burden through prevention and early detection' THEN 2\n    WHEN 'Ensuring equal and effective cancer care' THEN 3\n    WHEN 'Staying at the forefront in a changing environment' THEN 4\n    WHEN 'Equality' THEN 5 END AS g\n  FROM lines\n),\ntagged AS (\n  SELECT i, l, g IS NOT NULL AS is_head,\n    max(g) OVER (ORDER BY i ROWS UNBOUNDED PRECEDING) AS goal,\n    sum(CASE WHEN starts_with(l, '•') THEN 1 ELSE 0 END) OVER (ORDER BY i ROWS UNBOUNDED PRECEDING) AS bullet\n  FROM heads\n),\ntitles AS (SELECT g AS goal, l AS title FROM heads WHERE g BETWEEN 1 AND 4),\ngrouped AS (\n  SELECT goal, bullet, string_agg(l, ' ' ORDER BY i) AS target\n  FROM tagged WHERE goal BETWEEN 1 AND 4 AND NOT is_head AND bullet > 0\n  GROUP BY goal, bullet\n)\nSELECT g.goal, row_number() OVER (PARTITION BY g.goal ORDER BY g.bullet) AS n, t.title,\n  regexp_replace(regexp_replace(g.target, '^•\\s*', ''), '\\*+$', '') AS target\nFROM grouped g JOIN titles t USING (goal)\nORDER BY g.goal, n",
+   "inputs": [
+    "op_5c4153dc9a409e1f93fc75725062e02f"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_985820435fbe402581666abcdfd4b84b",
+   "kind": "source",
+   "source": "01a1d9ef-d975-71b4-83b8-2830893a3fc8"
+  },
+  {
+   "key": "op_5484e7f4daf7dfa0c879c353f33ad478",
+   "kind": "transform",
+   "sql": "-- Tays Cancer Centre's Net Promoter Score as published (autumn 2023), against the strategy's target NPS above 80\nSELECT unit, period, nps, responses, 80 AS target_nps FROM input_0",
+   "inputs": [
+    "op_985820435fbe402581666abcdfd4b84b"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_89fa26627e3051a71e8854954cb68a2b",
+   "kind": "source",
+   "source": "01a1d999-ae04-753e-a87c-d42e5378c5b9"
+  },
+  {
+   "key": "op_e04fc3c084d7810f5721263bb32368d3",
+   "kind": "source",
+   "source": "01a1d999-ae10-722b-8954-81f320c59045"
+  },
+  {
+   "key": "op_7a7ca1e9e931ab6134c79829c941a1b8",
+   "kind": "source",
+   "source": "01a1d999-ae17-7761-acdd-09b1050a8493"
+  },
+  {
+   "key": "op_d977edffb07e60df05932b3b8619dbcc",
+   "kind": "source",
+   "source": "01a1d999-ae1c-71b5-9082-7894cb3f6895"
+  },
+  {
+   "key": "op_b7df756033059f5d19a7dfd0000cdc17",
+   "kind": "source",
+   "source": "01a1d999-ae22-72fd-a8d7-ef3b4b87c033"
+  },
+  {
+   "key": "op_1545ef8a5608ec4dff6bd1817cee2d6f",
+   "kind": "source",
+   "source": "01a1d999-ae27-710f-a3d0-6400c3fafcdf"
+  },
+  {
+   "key": "op_bab929291f3b28af942d57a006c732b6",
+   "kind": "source",
+   "source": "01a1d999-ae2c-72d1-8300-3afe0b378725"
+  },
+  {
+   "key": "op_401a40296baf6425c4febed1be4e8668",
+   "kind": "source",
+   "source": "01a1d999-ae2f-75f9-93f0-af04d10498eb"
+  },
+  {
+   "key": "op_05c77411607a983abbab45d9c2532b85",
+   "kind": "source",
+   "source": "01a1d999-ae34-7767-8613-a361c79a501a"
+  },
+  {
+   "key": "op_92dcc2ee1f1c85366e3ac0cf7c00a9b4",
+   "kind": "source",
+   "source": "01a1d999-ae39-7470-9bfc-3993d928bf00"
+  },
+  {
+   "key": "op_b9f4d6aef35b3134ef2707f591121c54",
+   "kind": "source",
+   "source": "01a1d999-ae3d-7424-8a97-a5ce831e882f"
+  },
+  {
+   "key": "op_54bb5989bb3189b8580efc3af174229d",
+   "kind": "source",
+   "source": "01a1d999-ae43-7232-b2e2-6d7900fc4549"
+  },
+  {
+   "key": "op_eafe9fe256451889aca1e267db6f1652",
+   "kind": "source",
+   "source": "01a1d999-ae48-7119-a574-225881be6c7d"
+  },
+  {
+   "key": "op_dd056604229201381d4b255f50cff8e4",
+   "kind": "source",
+   "source": "01a1d999-ae4c-7186-b1ee-99f66e05128f"
+  },
+  {
+   "key": "op_084f5668aefe10ca6db86eff5913b24c",
+   "kind": "source",
+   "source": "01a1d999-ae52-755d-97c7-d243df156850"
+  },
+  {
+   "key": "op_57930e47f736ed7c808d1b5dd2f99516",
+   "kind": "source",
+   "source": "01a1d999-ae59-77e7-ae6d-70332db098d5"
+  },
+  {
+   "key": "op_907bc59c7c24831116671b5899c28a4b",
+   "kind": "source",
+   "source": "01a1d999-ae5f-72f0-9a4a-12cebddc875e"
+  },
+  {
+   "key": "op_487cf64d22567354d299d864e710e663",
+   "kind": "source",
+   "source": "01a1d999-ae67-772c-8b99-64526a8a038b"
+  },
+  {
+   "key": "op_b8af4dd4c849301c8979fdc0da0aea64",
+   "kind": "source",
+   "source": "01a1d999-ae6e-7362-a80c-98c41b719ca8"
+  },
+  {
+   "key": "op_e379a7325f77cc8d246fb868e403bc9d",
+   "kind": "source",
+   "source": "01a1d999-ae75-704b-93f1-2e919c5723e1"
+  },
+  {
+   "key": "op_2f17556105deaa596855ebbc6c67a381",
+   "kind": "source",
+   "source": "01a1d999-ae7c-72bc-9e92-25eb8f85f952"
+  },
+  {
+   "key": "op_81fddb5a968d56532ba980137c90e23d",
+   "kind": "source",
+   "source": "01a1d906-e289-702d-8f30-fdafa46021f5"
+  },
+  {
+   "key": "op_f8e62d1d9ac992b762f024c3e3fcac1a",
+   "kind": "source",
+   "source": "01a1d906-e2cd-73c4-a6ec-950aecacee65"
+  },
+  {
+   "key": "op_b415b888fae9f28f974ea2076341e36d",
+   "kind": "source",
+   "source": "01a1d906-e30b-7243-a315-6a56c09fb3b7"
+  },
+  {
+   "key": "op_0e70684352bc60799164d0d1d251d118",
+   "kind": "source",
+   "source": "01a1d813-2c7a-765d-955c-a11f1335abf5"
+  },
+  {
+   "key": "op_ec4258b52a83b2a77441e08799fe5d38",
+   "kind": "transform",
+   "sql": "-- County indicator panel: every Sotkanet indicator the goal dashboards use, one row per indicator, region (23 wellbeing services counties and the whole country) and year.\n-- better: 1 = higher is better, -1 = lower is better, 0 = neither (context). goal: G1-G4 = the strategy's objectives, EQ = the cross-cutting equality goal.\nWITH raw AS (\n  SELECT indicator, region, year, value FROM input_0 UNION ALL\n  SELECT indicator, region, year, value FROM input_1 UNION ALL\n  SELECT indicator, region, year, value FROM input_2 UNION ALL\n  SELECT indicator, region, year, value FROM input_3 UNION ALL\n  SELECT indicator, region, year, value FROM input_4 UNION ALL\n  SELECT indicator, region, year, value FROM input_5 UNION ALL\n  SELECT indicator, region, year, value FROM input_6 UNION ALL\n  SELECT indicator, region, year, value FROM input_7 UNION ALL\n  SELECT indicator, region, year, value FROM input_8 UNION ALL\n  SELECT indicator, region, year, value FROM input_9 UNION ALL\n  SELECT indicator, region, year, value FROM input_10 UNION ALL\n  SELECT indicator, region, year, value FROM input_11 UNION ALL\n  SELECT indicator, region, year, value FROM input_12 UNION ALL\n  SELECT indicator, region, year, value FROM input_13 UNION ALL\n  SELECT indicator, region, year, value FROM input_14 UNION ALL\n  SELECT indicator, region, year, value FROM input_15 UNION ALL\n  SELECT indicator, region, year, value FROM input_16 UNION ALL\n  SELECT indicator, region, year, value FROM input_17 UNION ALL\n  SELECT indicator, region, year, value FROM input_18 UNION ALL\n  SELECT indicator, region, year, value FROM input_19 UNION ALL\n  SELECT indicator, region, year, value FROM input_20 UNION ALL\n  SELECT indicator, region, year, value FROM input_21 UNION ALL\n  SELECT indicator, region, year, value FROM input_22 UNION ALL\n  SELECT indicator, region, year, value FROM input_23\n),\nmeta(indicator, ord, key, label, unit, better, goal) AS (VALUES\n  (4934, 1, 'enough_time', 'Sufficient time at last health visit', '%', 1, 'G1'),\n  (4909, 2, 'unmet_doctor', 'Insufficient doctor services', '%', -1, 'G1'),\n  (5385, 3, 'fees_rii', 'Fees limit care, education RII', 'RII', -1, 'G1'),\n  (3253, 4, 'discrim_low_edu', 'Discrimination in care, low education', '%', -1, 'G1'),\n  (3255, 5, 'discrim_high_edu', 'Discrimination in care, high education', '%', -1, 'G1'),\n  (3621, 6, 'screen_breast', 'Breast screening participation', '%', 1, 'G2'),\n  (3620, 7, 'screen_cervical', 'Cervical screening participation', '%', 1, 'G2'),\n  (6103, 8, 'screen_colorectal', 'Colorectal screening participation', '%', 1, 'G2'),\n  (4404, 9, 'smokers', 'Daily smokers', '%', -1, 'G2'),\n  (4408, 10, 'smokers_low_edu', 'Daily smokers, low education', '%', -1, 'G2'),\n  (4410, 11, 'smokers_high_edu', 'Daily smokers, high education', '%', -1, 'G2'),\n  (4459, 12, 'obesity', 'Obesity (BMI 30+)', '%', -1, 'G2'),\n  (5527, 13, 'inactive', 'Insufficient physical activity', '%', -1, 'G2'),\n  (5643, 14, 'cancer_index', 'Cancer morbidity index (FI = 100)', 'index', -1, 'G2'),\n  (3625, 15, 'surv_breast', 'Breast cancer 5-year survival', '%', 1, 'G3'),\n  (3626, 16, 'surv_cervical', 'Cervical cancer 5-year survival', '%', 1, 'G3'),\n  (3627, 17, 'surv_bowel', 'Bowel cancer 5-year survival', '%', 1, 'G3'),\n  (5033, 18, 'late_referrals', 'Referrals processed after 21 days', '%', -1, 'G3'),\n  (5093, 19, 'cancer_medicine', 'Cancer medicine refunds (age-std.)', '%', 0, 'G3'),\n  (2475, 20, 'oncology_visits', 'Oncology and radiotherapy visits', 'visits', 0, 'G4'),\n  (180, 21, 'education', 'Educational level', 'index', 1, 'EQ'),\n  (181, 22, 'unemployment', 'Unemployment', '%', -1, 'EQ'),\n  (3126, 23, 'gini', 'Income inequality (Gini)', 'index', -1, 'EQ'),\n  (2456, 24, 'occ_health', 'Occupational health visits per 1000', 'per 1000', 0, 'EQ')\n)\nSELECT m.goal, m.ord, m.key, m.label, m.unit, m.better,\n       CASE r.category WHEN 'MAA' THEN 'FI' ELSE r.code END AS county_code,\n       CASE r.category WHEN 'MAA' THEN 'Whole country' ELSE replace(r.name, ' wellbeing services county', '') END AS name,\n       raw.year, make_date(raw.year, 1, 1) AS period_start, make_date(raw.year, 12, 31) AS period_end, raw.value\nFROM raw\nJOIN meta AS m USING (indicator)\nJOIN input_24 AS r ON r.sotkanet_id = raw.region AND r.category IN ('HYVINVOINTIALUE', 'MAA')\nWHERE raw.value IS NOT NULL",
+   "inputs": [
+    "op_89fa26627e3051a71e8854954cb68a2b",
+    "op_e04fc3c084d7810f5721263bb32368d3",
+    "op_7a7ca1e9e931ab6134c79829c941a1b8",
+    "op_d977edffb07e60df05932b3b8619dbcc",
+    "op_b7df756033059f5d19a7dfd0000cdc17",
+    "op_1545ef8a5608ec4dff6bd1817cee2d6f",
+    "op_bab929291f3b28af942d57a006c732b6",
+    "op_401a40296baf6425c4febed1be4e8668",
+    "op_05c77411607a983abbab45d9c2532b85",
+    "op_92dcc2ee1f1c85366e3ac0cf7c00a9b4",
+    "op_b9f4d6aef35b3134ef2707f591121c54",
+    "op_54bb5989bb3189b8580efc3af174229d",
+    "op_eafe9fe256451889aca1e267db6f1652",
+    "op_dd056604229201381d4b255f50cff8e4",
+    "op_084f5668aefe10ca6db86eff5913b24c",
+    "op_57930e47f736ed7c808d1b5dd2f99516",
+    "op_907bc59c7c24831116671b5899c28a4b",
+    "op_487cf64d22567354d299d864e710e663",
+    "op_b8af4dd4c849301c8979fdc0da0aea64",
+    "op_e379a7325f77cc8d246fb868e403bc9d",
+    "op_2f17556105deaa596855ebbc6c67a381",
+    "op_81fddb5a968d56532ba980137c90e23d",
+    "op_f8e62d1d9ac992b762f024c3e3fcac1a",
+    "op_b415b888fae9f28f974ea2076341e36d",
+    "op_0e70684352bc60799164d0d1d251d118"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": "year"
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "value",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_32b12deb02fd90117a57e2094fe8afb5",
+   "kind": "transform",
+   "sql": "-- Whole country: share who had sufficient time at their last health care visit, per survey year, with the previous survey\nSELECT year, period_start, period_end, value AS enough_time_pct, lag(value) OVER (ORDER BY year) AS previous_pct\nFROM input_0 WHERE key = 'enough_time' AND county_code = 'FI'",
+   "inputs": [
+    "op_ec4258b52a83b2a77441e08799fe5d38"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": "year"
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "enough_time_pct",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_4bfe59d848c77468e2d6fda15a565bcc",
+   "kind": "transform",
+   "sql": "-- Wellbeing services counties where all three screening programmes reach the strategy's 80 % participation, per year with data for all three\nWITH s AS (\n  SELECT county_code, year, count(*) AS programmes, min(value) AS lowest\n  FROM input_0 WHERE key LIKE 'screen_%' AND county_code NOT IN ('FI', '91') GROUP BY county_code, year\n)\nSELECT year, make_date(year, 1, 1) AS period_start, make_date(year, 12, 31) AS period_end,\n       count(*) FILTER (WHERE lowest >= 80) AS counties_all_at_target, count(*) AS counties\nFROM s WHERE programmes = 3 GROUP BY year",
+   "inputs": [
+    "op_ec4258b52a83b2a77441e08799fe5d38"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": "year"
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "counties_all_at_target",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_64655342c690ba2343ed106c3008c9e7",
+   "kind": "transform",
+   "sql": "-- Participation in the three screening programmes per county, latest year of each programme, against the 80 % target\nWITH latest AS (SELECT key, max(year) AS year FROM input_0 WHERE key LIKE 'screen_%' GROUP BY key)\nSELECT replace(p.label, ' screening participation', '') AS programme, p.name AS county, p.year,\n       p.value AS participation_pct, p.value >= 80 AS meets_target,\n       min(p.value) OVER (PARTITION BY p.county_code) AS county_lowest\nFROM input_0 AS p JOIN latest USING (key, year)\nWHERE p.county_code NOT IN ('FI', '91')",
+   "inputs": [
+    "op_ec4258b52a83b2a77441e08799fe5d38"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_fb8a1cf66cd4d1dc0b98c17eb02ce681",
+   "kind": "source",
+   "source": "01a1d7d3-47b0-71db-ae33-bb43396e9bb3"
+  },
+  {
+   "key": "op_12f6c42f28539da39af93c685e8380aa",
+   "kind": "transform",
+   "sql": "-- Cancer deaths in the whole country against the strategy's target of 10% fewer than 13,300 a year\nWITH deaths AS (\n  SELECT 2022 AS year, deaths_2022 AS deaths FROM input_0\n  WHERE county = 'WHOLE COUNTRY' AND cause LIKE '04-21 %'\n  UNION ALL\n  SELECT 2023, deaths_2023 FROM input_0 WHERE county = 'WHOLE COUNTRY' AND cause LIKE '04-21 %'\n  UNION ALL\n  SELECT 2024, deaths_2024 FROM input_0 WHERE county = 'WHOLE COUNTRY' AND cause LIKE '04-21 %'\n)\nSELECT\n  year,\n  make_date(year, 1, 1) AS period_start,\n  make_date(year, 12, 31) AS period_end,\n  deaths,\n  11970 AS target_deaths,\n  deaths - 11970 AS above_target\nFROM deaths\nORDER BY year",
+   "inputs": [
+    "op_fb8a1cf66cd4d1dc0b98c17eb02ce681"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": "year"
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "deaths",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     },
+     {
+      "value": "above_target",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_768fc00ee6d8db6ff14d15b63fe3ee28",
+   "kind": "source",
+   "source": "01a1d906-e246-77a8-b9f6-7a7301ab1f7b"
+  },
+  {
+   "key": "op_bd23d443a9d19579f83f3ddbd40ad3cd",
+   "kind": "transform",
+   "sql": "-- Finland against the Nordic level, the average of Sweden and Norway\nWITH s AS (\n  SELECT\n    CASE cancer_code WHEN 160 THEN 'Lung' WHEN 130 THEN 'Pancreas' WHEN 110 THEN 'Liver' END AS cancer,\n    CASE sex WHEN 1 THEN 'Men' ELSE 'Women' END AS sex,\n    country, period, period_start, period_end, survival\n  FROM input_0\n)\nSELECT\n  cancer, sex, period, period_start, period_end,\n  max(survival) FILTER (WHERE country = 'Finland') AS finland,\n  round(avg(survival) FILTER (WHERE country IN ('Sweden', 'Norway')), 1) AS nordic_level,\n  round(avg(survival) FILTER (WHERE country IN ('Sweden', 'Norway'))\n    - max(survival) FILTER (WHERE country = 'Finland'), 1) AS gap_pp,\n  CASE cancer WHEN 'Pancreas' THEN 6 ELSE 14 END AS strategy_increase_pp\nFROM s\nGROUP BY cancer, sex, period, period_start, period_end\nHAVING count(*) FILTER (WHERE country IN ('Sweden', 'Norway')) = 2\n   AND max(survival) FILTER (WHERE country = 'Finland') IS NOT NULL\nORDER BY cancer, sex, period_start",
+   "inputs": [
+    "op_768fc00ee6d8db6ff14d15b63fe3ee28"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": null
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "gap_pp",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     },
+     {
+      "value": "finland",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     },
+     {
+      "value": "nordic_level",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_2ba2332d30a9b86812c89727de46c4da",
+   "kind": "transform",
+   "sql": "-- Latest five-year window: Finland, the Nordic level, the gap and the strategy's 2035 target\nSELECT\n  cancer, sex, period, period_start, period_end,\n  finland AS finland_pct,\n  nordic_level AS nordic_level_pct,\n  gap_pp,\n  strategy_increase_pp,\n  finland + strategy_increase_pp AS target_2035_pct\nFROM input_0\nWHERE period_end = (SELECT max(period_end) FROM input_0)\nORDER BY gap_pp DESC",
+   "inputs": [
+    "op_bd23d443a9d19579f83f3ddbd40ad3cd"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": null
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "gap_pp",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_4b7bce3e6267b143abc8a0299c8c781c",
+   "kind": "transform",
+   "sql": "-- Finland and the Nordic level per cancer and window, men and women averaged, for a chart\nSELECT cancer, period_start, period_end, 'Finland' AS series, round(avg(finland), 1) AS survival\nFROM input_0 GROUP BY cancer, period_start, period_end HAVING count(*) = 2\nUNION ALL\nSELECT cancer, period_start, period_end, 'Nordic level (Sweden, Norway)', round(avg(nordic_level), 1)\nFROM input_0 GROUP BY cancer, period_start, period_end HAVING count(*) = 2\nORDER BY cancer, series, period_start",
+   "inputs": [
+    "op_bd23d443a9d19579f83f3ddbd40ad3cd"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": null
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "survival",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_c38b429cf4221b214e862f5fcbb1fa61",
+   "kind": "source",
+   "source": "01a1dd0c-8e70-74af-9328-bfe43e1cbca1"
+  },
+  {
+   "key": "op_0a9e1dcca222d610538d6d164ee0b4ea",
+   "kind": "source",
+   "source": "01a1dd0c-8e00-700e-b007-9f9385039953"
+  },
+  {
+   "key": "op_df963593c4031b9e1f7d84accf5642bd",
+   "kind": "transform",
+   "sql": "-- Days from the pathway's trigger to treatment per county, against the Nordic target for its\n-- case mix (synthetic cases). A case's target is its days to treatment less how late its\n-- treatment start was against that deadline (negative: early).\nWITH c AS (\n  SELECT key, county,\n    coalesce(days_contact_to_physician, 0) + coalesce(days_physician_to_imaging, 0)\n    + coalesce(days_imaging_to_referral, 0) + coalesce(days_referral_to_specialist, 0)\n    + coalesce(days_specialist_to_workup, 0) + coalesce(days_workup_to_treatment, 0) AS days_from_contact\n  FROM input_1\n),\nr AS (\n  SELECT key, patient_pathway_clock_start AS clock_start, patient_pathway_treatment_start_by AS late\n  FROM input_0 WHERE patient_pathway_treatment_start_status IN ('met', 'late')\n)\nSELECT county, count(*) AS cases,\n  median(days_from_contact - clock_start) AS median_days,\n  median(days_from_contact - clock_start - late) AS nordic_target_days\nFROM r JOIN c USING (key)\nGROUP BY county ORDER BY median_days DESC",
+   "inputs": [
+    "op_c38b429cf4221b214e862f5fcbb1fa61",
+    "op_0a9e1dcca222d610538d6d164ee0b4ea"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_030ef867a0039035588b70a8fd9bdb80",
+   "kind": "source",
+   "source": "01a1d99a-0675-7519-a35e-72827ee2893e"
+  },
+  {
+   "key": "op_9207eb842dad246213ca0de0048dd7fd",
+   "kind": "source",
+   "source": "01a1d99a-0682-71de-9fb8-45782499b3fb"
+  },
+  {
+   "key": "op_30de69cd639a512766a28e9d34225332",
+   "kind": "source",
+   "source": "01a1d99a-068a-7786-8fa2-faeab2992aa5"
+  },
+  {
+   "key": "op_326b00bc57d2a638a90325a27100f9ed",
+   "kind": "source",
+   "source": "01a1d99a-0691-7599-8b56-e9a61e886234"
+  },
+  {
+   "key": "op_54367b5e2a0a37b44b5356bc645b4953",
+   "kind": "transform",
+   "sql": "-- Interventional cancer trials with a site in each country, one row per trial and country, by start year.\n-- A multinational trial counts once for every country it has a site in.\nWITH t AS (\n  SELECT 'Finland' AS country, * FROM input_0 UNION ALL\n  SELECT 'Sweden', * FROM input_1 UNION ALL\n  SELECT 'Norway', * FROM input_2 UNION ALL\n  SELECT 'Denmark', * FROM input_3\n)\nSELECT country, nct_id, CAST(left(start_date, 4) AS INTEGER) AS start_year,\n       make_date(CAST(left(start_date, 4) AS INTEGER), 1, 1) AS period_start,\n       make_date(CAST(left(start_date, 4) AS INTEGER), 12, 31) AS period_end,\n       status, sponsor_class = 'INDUSTRY' AS industry_led,\n       CAST(phases AS VARCHAR) LIKE '%PHASE1%' AS early_phase\nFROM t WHERE start_date IS NOT NULL",
+   "inputs": [
+    "op_030ef867a0039035588b70a8fd9bdb80",
+    "op_9207eb842dad246213ca0de0048dd7fd",
+    "op_30de69cd639a512766a28e9d34225332",
+    "op_326b00bc57d2a638a90325a27100f9ed"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": "year"
+    },
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_f19452e7f6af813fc533783ea702bd3d",
+   "kind": "transform",
+   "sql": "-- Finland: new interventional cancer trials per start year, complete years only, with the change on the year before and the strategy's +10 % a year\nWITH y AS (\n  SELECT start_year, count(*) AS trials FROM input_0\n  WHERE country = 'Finland' AND start_year < year(current_date) GROUP BY start_year\n)\nSELECT start_year AS year, make_date(start_year, 1, 1) AS period_start, make_date(start_year, 12, 31) AS period_end,\n       trials, lag(trials) OVER (ORDER BY start_year) AS previous_trials,\n       round(100.0 * (trials / lag(trials) OVER (ORDER BY start_year) - 1), 1) AS change_pct,\n       10 AS target_change_pct\nFROM y",
+   "inputs": [
+    "op_54367b5e2a0a37b44b5356bc645b4953"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": "year"
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "trials",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_c87909d25caf4a480bec441b2688301a",
+   "kind": "transform",
+   "sql": "-- Finland's new cancer trials per million inhabitants against the Nordic level (the strategy's mean of Sweden and Norway), per complete start year.\n-- Populations: approximate 2024 figures in millions, held constant.\nWITH pop(country, million) AS (VALUES ('Finland', 5.60), ('Sweden', 10.55), ('Norway', 5.55)),\npc AS (\n  SELECT country, start_year, count(*) / million AS per_million\n  FROM input_0 JOIN pop USING (country) WHERE start_year < year(current_date)\n  GROUP BY country, start_year, million\n)\nSELECT start_year AS year, make_date(start_year, 1, 1) AS period_start, make_date(start_year, 12, 31) AS period_end,\n       round(max(per_million) FILTER (WHERE country = 'Finland'), 1) AS finland_per_million,\n       round(avg(per_million) FILTER (WHERE country IN ('Sweden', 'Norway')), 1) AS nordic_level_per_million\nFROM pc GROUP BY start_year",
+   "inputs": [
+    "op_54367b5e2a0a37b44b5356bc645b4953"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": "year"
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "finland_per_million",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_315f4f6be6d8b50f47d98854d843c108",
+   "kind": "transform",
+   "sql": "-- Lung cancer pathways (synthetic cases): median days per step against the Nordic standard\n-- time of that step, as the patient pathway model compiles the Danish, Norwegian and Swedish\n-- standards (work-up to treatment: surgery).\nWITH t(step, nordic_days) AS (\n  VALUES ('days_contact_to_physician', 7), ('days_physician_to_imaging', 6),\n    ('days_imaging_to_referral', 4), ('days_referral_to_specialist', 6),\n    ('days_specialist_to_workup', 22), ('days_workup_to_treatment', 14)\n),\nd AS (\n  UNPIVOT (SELECT * FROM input_0 WHERE site = 'lung')\n  ON days_contact_to_physician, days_physician_to_imaging, days_imaging_to_referral,\n    days_referral_to_specialist, days_specialist_to_workup, days_workup_to_treatment\n  INTO NAME step VALUE days\n)\nSELECT CASE step\n    WHEN 'days_contact_to_physician' THEN '1 Contact to physician'\n    WHEN 'days_physician_to_imaging' THEN '2 Physician to imaging'\n    WHEN 'days_imaging_to_referral' THEN '3 Imaging to referral'\n    WHEN 'days_referral_to_specialist' THEN '4 Referral to specialist'\n    WHEN 'days_specialist_to_workup' THEN '5 Specialist to work-up'\n    ELSE '6 Work-up to treatment' END AS step,\n  median(days) AS median_days, any_value(nordic_days) AS nordic_days\nFROM d JOIN t USING (step)\nGROUP BY 1 ORDER BY 1",
+   "inputs": [
+    "op_0a9e1dcca222d610538d6d164ee0b4ea"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_1936d20e43ee40018405dce7eae7b3eb",
+   "kind": "transform",
+   "sql": "-- Days from the pathway's trigger to treatment by month of first contact, against the\n-- Nordic target for that month's case mix (synthetic cases).\nWITH c AS (\n  SELECT key, date_trunc('month', CAST(first_contact AS DATE)) AS month,\n    coalesce(days_contact_to_physician, 0) + coalesce(days_physician_to_imaging, 0)\n    + coalesce(days_imaging_to_referral, 0) + coalesce(days_referral_to_specialist, 0)\n    + coalesce(days_specialist_to_workup, 0) + coalesce(days_workup_to_treatment, 0) AS days_from_contact\n  FROM input_1\n),\nr AS (\n  SELECT key, patient_pathway_clock_start AS clock_start, patient_pathway_treatment_start_by AS late\n  FROM input_0 WHERE patient_pathway_treatment_start_status IN ('met', 'late')\n)\nSELECT month, count(*) AS cases,\n  median(days_from_contact - clock_start) AS median_days,\n  median(days_from_contact - clock_start - late) AS nordic_target_days\nFROM r JOIN c USING (key)\nGROUP BY month ORDER BY month",
+   "inputs": [
+    "op_c38b429cf4221b214e862f5fcbb1fa61",
+    "op_0a9e1dcca222d610538d6d164ee0b4ea"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_250feca43dfed1b6acd1dbb66a236c08",
+   "kind": "transform",
+   "sql": "-- Coverage: how many of the 22 mainland wellbeing services counties have a value, per indicator and year\nSELECT label AS indicator, ord, year, count(*) AS counties\nFROM input_0 WHERE county_code NOT IN ('FI', '91') GROUP BY label, ord, year",
+   "inputs": [
+    "op_ec4258b52a83b2a77441e08799fe5d38"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_00c7105a384f2a4663fbbf2136af51c2",
+   "kind": "transform",
+   "sql": "-- Series-break check: the county median of each indicator against its previous year with data (ratio). Above 1.5 or below 0.67 suggests a definition or unit change.\nWITH m AS (\n  SELECT key, label, year, median(value) AS med FROM input_0\n  WHERE county_code NOT IN ('FI', '91') GROUP BY key, label, year\n)\nSELECT label AS indicator, year, make_date(year, 1, 1) AS period_start, make_date(year, 12, 31) AS period_end,\n       med AS county_median, round(med / lag(med) OVER (PARTITION BY key ORDER BY year), 2) AS ratio,\n       coalesce(med / lag(med) OVER (PARTITION BY key ORDER BY year) NOT BETWEEN 0.67 AND 1.5, false) AS suspected_break\nFROM m",
+   "inputs": [
+    "op_ec4258b52a83b2a77441e08799fe5d38"
+   ],
+   "roles": {
+    "time": {
+     "start": "period_start",
+     "end": "period_end",
+     "grain": "year"
+    },
+    "geo": null,
+    "measures": [
+     {
+      "value": "ratio",
+      "lower": null,
+      "upper": null,
+      "suppressed": null,
+      "coverage": null
+     }
+    ]
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_f9fb09477b65508fa484ae6c426097e9",
+   "kind": "transform",
+   "sql": "-- Profile per indicator over the 22 mainland counties at its latest year: resolution (distinct values), skewness, and IQR outliers (beyond 1.5 IQR) with the counties concerned\nWITH latest AS (SELECT key, max(year) AS year FROM input_0 WHERE county_code NOT IN ('FI', '91') GROUP BY key),\nv AS (\n  SELECT p.key, p.label, p.ord, p.name, p.year, p.value\n  FROM input_0 AS p JOIN latest USING (key, year) WHERE p.county_code NOT IN ('FI', '91')\n),\nq AS (\n  SELECT key, quantile_cont(value, 0.25) AS q1, quantile_cont(value, 0.75) AS q3 FROM v GROUP BY key\n)\nSELECT v.label AS indicator, v.ord, max(v.year) AS year, count(*) AS counties,\n       count(DISTINCT v.value) AS distinct_values, round(skewness(v.value), 2) AS skew,\n       count(*) FILTER (WHERE v.value < q1 - 1.5 * (q3 - q1) OR v.value > q3 + 1.5 * (q3 - q1)) AS iqr_outliers,\n       coalesce(string_agg(v.name, ', ') FILTER (WHERE v.value < q1 - 1.5 * (q3 - q1) OR v.value > q3 + 1.5 * (q3 - q1)), '') AS outlier_counties\nFROM v JOIN q USING (key)\nGROUP BY v.label, v.ord ORDER BY v.ord",
+   "inputs": [
+    "op_ec4258b52a83b2a77441e08799fe5d38"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_ef179c320ac95ce737fe2e79d8b82952",
+   "kind": "transform",
+   "sql": "-- Pairwise correlation of county indicators across the 22 mainland wellbeing services counties (Aland and the whole country left out), each indicator at its latest year.\n-- r: Pearson, with a 95 % interval from Fisher's z. rho: Spearman, the Pearson r of the ranks.\n-- p: two-sided, from Fisher's z (normal approximation; erfc after Abramowitz and Stegun 7.1.26). q: Benjamini-Hochberg adjusted p over all pairs.\n-- These are ecological correlations between counties, not effects on individuals.\nWITH latest AS (\n  SELECT key, max(year) AS year FROM input_0 WHERE county_code NOT IN ('FI', '91') GROUP BY key\n),\nx AS (\n  SELECT p.key, p.label, p.ord, p.goal, p.county_code, p.value,\n         rank() OVER (PARTITION BY p.key ORDER BY p.value) AS rk\n  FROM input_0 AS p JOIN latest USING (key, year)\n  WHERE p.county_code NOT IN ('FI', '91')\n    AND p.key NOT IN ('oncology_visits', 'smokers_low_edu', 'smokers_high_edu', 'discrim_high_edu')\n),\npairs AS (\n  SELECT a.key AS key_a, a.label AS label_a, a.ord AS ord_a, a.goal AS goal_a,\n         b.key AS key_b, b.label AS label_b, b.ord AS ord_b, b.goal AS goal_b,\n         count(*) AS n, corr(a.value, b.value) AS r, corr(a.rk, b.rk) AS rho\n  FROM x AS a JOIN x AS b ON a.county_code = b.county_code AND a.ord < b.ord\n  GROUP BY ALL\n  HAVING count(*) >= 10\n),\nz AS (\n  SELECT *, 0.5 * ln((1 + r) / (1 - r)) AS fz, 1 / sqrt(n - 3) AS se FROM pairs\n),\nt AS (\n  SELECT *, abs(fz) / se / sqrt(2) AS u, 1 / (1 + 0.3275911 * abs(fz) / se / sqrt(2)) AS tt FROM z\n),\npv AS (\n  SELECT *, (0.254829592 * tt - 0.284496736 * pow(tt, 2) + 1.421413741 * pow(tt, 3)\n             - 1.453152027 * pow(tt, 4) + 1.061405429 * pow(tt, 5)) * exp(-u * u) AS p_value\n  FROM t\n),\nbh AS (\n  SELECT *, row_number() OVER (ORDER BY p_value) AS i, count(*) OVER () AS m FROM pv\n)\nSELECT key_a, label_a, ord_a, goal_a, key_b, label_b, ord_b, goal_b, n,\n       round(r, 3) AS r, round(rho, 3) AS rho,\n       round(tanh(fz - 1.96 * se), 3) AS r_lower, round(tanh(fz + 1.96 * se), 3) AS r_upper,\n       p_value,\n       least(1, min(p_value * m / i) OVER (ORDER BY p_value DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) AS q_value,\n       abs(r) AS strength,\n       CASE WHEN r >= 0 THEN 'positive' ELSE 'negative' END AS direction\nFROM bh",
+   "inputs": [
+    "op_ec4258b52a83b2a77441e08799fe5d38"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  },
+  {
+   "key": "op_aa9747835407052cddeeedd1fafe819a",
+   "kind": "transform",
+   "sql": "-- Every pair where Pearson r and Spearman rho disagree by more than 0.2: the linear correlation leans on a few counties, so rho is the safer reading\nSELECT label_a || ' × ' || label_b AS pair, r, rho, round(abs(r - rho), 2) AS divergence\nFROM input_0 WHERE abs(r - rho) > 0.2 ORDER BY abs(r - rho) DESC",
+   "inputs": [
+    "op_ef179c320ac95ce737fe2e79d8b82952"
+   ],
+   "roles": {
+    "time": null,
+    "geo": null,
+    "measures": []
+   },
+   "materialize": false
+  }
+ ],
+ "sources": {
+  "01a1d932-da89-70f1-999a-fe2cce26c61a": {
+   "name": "National Cancer Strategy 2026–2035 (PDF)",
+   "access_kind": "document",
+   "address": "https://stm.fi/documents/1271139/1329769/National_Cancer_Strategy_2026-2035_Finland.pdf/a29aa994-91bb-2bcd-e90e-a3d3fde32b90?t=1770968783502",
+   "format": "pdf",
+   "options": {
+    "extract": "pages"
+   },
+   "freshness": {
+    "kind": "ttl",
+    "ttl_seconds": 2592000,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "page",
+      "type": "integer",
+      "nullable": false
+     },
+     {
+      "name": "text",
+      "type": "text",
+      "nullable": false
+     }
+    ],
+    "roles": {
+     "time": null,
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d9ef-d975-71b4-83b8-2830893a3fc8": {
+   "name": "Tays Cancer Centre patient NPS (web, extract)",
+   "access_kind": "web",
+   "address": "https://tays-cancer-centre.fi/en/in-tays-cancer-centre-treatment-relies-on-a-unique-cancer-team-model-and-a-strong-patient-oriented-approach/",
+   "format": "html",
+   "options": {
+    "operation": "extract",
+    "instruction": "Read the Net Promoter Score (NPS) of Tays Cancer Centre stated in the article: one row with the unit, the period it refers to, the NPS value as a number, and the number of feedback responses."
+   },
+   "freshness": {
+    "kind": "ttl",
+    "ttl_seconds": 2592000,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "unit",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "period",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "nps",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "responses",
+      "type": "integer",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": null,
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": {
+    "publisher": "Tays Cancer Centre (Pirkanmaa wellbeing services county)",
+    "licence": "unknown",
+    "landing_page": "https://tays-cancer-centre.fi",
+    "found_by": null,
+    "extracted_by_model": true,
+    "note": "Found through a Context.dev web search for NPS in Finnish cancer care; figure checked against the page"
+   }
+  },
+  "01a1d999-ae04-753e-a87c-d42e5378c5b9": {
+   "name": "Breast cancer screening participation, 2018–2025 (Sotkanet 3621)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=3621&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/3621",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae10-722b-8954-81f320c59045": {
+   "name": "Cervical cancer screening participation (Sotkanet 3620)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=3620&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/3620",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae17-7761-acdd-09b1050a8493": {
+   "name": "Colorectal cancer screening participation (Sotkanet 6103)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=6103&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/6103",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae1c-71b5-9082-7894cb3f6895": {
+   "name": "Daily smokers (Sotkanet 4404)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=4404&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/4404",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae22-72fd-a8d7-ef3b4b87c033": {
+   "name": "Daily smokers, low-level education (Sotkanet 4408)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=4408&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/4408",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae27-710f-a3d0-6400c3fafcdf": {
+   "name": "Daily smokers, high-level education (Sotkanet 4410)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=4410&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/4410",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae2c-72d1-8300-3afe0b378725": {
+   "name": "Obesity, BMI 30 or more (Sotkanet 4459)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=4459&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/4459",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae2f-75f9-93f0-af04d10498eb": {
+   "name": "Insufficient physical activity (Sotkanet 5527)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=5527&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/5527",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae34-7767-8613-a361c79a501a": {
+   "name": "Cancer index, age-standardised (Sotkanet 5643)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=5643&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/5643",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae39-7470-9bfc-3993d928bf00": {
+   "name": "Five-year survival of bowel cancer by county (Sotkanet 3627)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=3627&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/3627",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae3d-7424-8a97-a5ce831e882f": {
+   "name": "Special refunds on cancer medicines, age-standardised (Sotkanet 5093)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=5093&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/5093",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae43-7232-b2e2-6d7900fc4549": {
+   "name": "Sufficient appointment time at the last health care visit (Sotkanet 4934)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=4934&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/4934",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae48-7119-a574-225881be6c7d": {
+   "name": "Insufficient doctor's appointment services (Sotkanet 4909)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=4909&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/4909",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae4c-7186-b1ee-99f66e05128f": {
+   "name": "Effect of customer fees on access to care, inequality by education, RII (Sotkanet 5385)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=5385&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/5385",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae52-755d-97c7-d243df156850": {
+   "name": "Discrimination in social or health care, low-level education (Sotkanet 3253)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=3253&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/3253",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae59-77e7-ae6d-70332db098d5": {
+   "name": "Discrimination in social or health care, high-level education (Sotkanet 3255)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=3255&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/3255",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae5f-72f0-9a4a-12cebddc875e": {
+   "name": "Measure of educational level (Sotkanet 180)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=180&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/180",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae67-772c-8b99-64526a8a038b": {
+   "name": "Unemployment rate (Sotkanet 181)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=181&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/181",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae6e-7362-a80c-98c41b719ca8": {
+   "name": "Gini coefficient of disposable income (Sotkanet 3126)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=3126&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/3126",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae75-704b-93f1-2e919c5723e1": {
+   "name": "Occupational health care visits per 1000 aged 15–64 (Sotkanet 2456)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=2456&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/2456",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d999-ae7c-72bc-9e92-25eb8f85f952": {
+   "name": "Oncology and radiotherapy outpatient visits (Sotkanet 2475)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=2475&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/2475",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d906-e289-702d-8f30-fdafa46021f5": {
+   "name": "Five-year survival of breast cancer by county (Sotkanet 3625)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=3625&years=2015&years=2016&years=2017&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/3625",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d906-e2cd-73c4-a6ec-950aecacee65": {
+   "name": "Five-year survival of cervical cancer by county (Sotkanet 3626)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=3626&years=2015&years=2016&years=2017&years=2018&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/3626",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d906-e30b-7243-a315-6a56c09fb3b7": {
+   "name": "Specialist referrals processed after more than 21 days, by county (Sotkanet 5033)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/json?indicator=5033&years=2019&years=2020&years=2021&years=2022&years=2023&years=2024&years=2025&genders=total",
+   "format": "json",
+   "options": {
+    "probe": {
+     "url": "https://sotkanet.fi/rest/1.1/indicators/5033",
+     "field": "data-updated"
+    },
+    "fields": {
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "count": {
+      "path": "absValue",
+      "type": "integer"
+     },
+     "value": {
+      "path": "value",
+      "type": "number"
+     },
+     "gender": {
+      "path": "gender",
+      "type": "text"
+     },
+     "region": {
+      "path": "region",
+      "type": "integer"
+     },
+     "indicator": {
+      "path": "indicator",
+      "type": "integer"
+     }
+    },
+    "period": {
+     "column": "year"
+    }
+   },
+   "freshness": {
+    "kind": "probe",
+    "ttl_seconds": 86400,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "indicator",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "region",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "gender",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "value",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "count",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": "year"
+     },
+     "geo": {
+      "code": "region",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": [
+      {
+       "value": "value",
+       "lower": null,
+       "upper": null,
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d813-2c7a-765d-955c-a11f1335abf5": {
+   "name": "Regions and their codes (Sotkanet)",
+   "access_kind": "url",
+   "address": "https://sotkanet.fi/rest/1.1/regions",
+   "format": "json",
+   "options": {
+    "fields": {
+     "code": {
+      "path": "code",
+      "type": "text"
+     },
+     "name": {
+      "path": "title.en",
+      "type": "text"
+     },
+     "name_fi": {
+      "path": "title.fi",
+      "type": "text"
+     },
+     "category": {
+      "path": "category",
+      "type": "text"
+     },
+     "member_of": {
+      "path": "memberOf",
+      "type": "json"
+     },
+     "sotkanet_id": {
+      "path": "id",
+      "type": "integer"
+     }
+    }
+   },
+   "freshness": {
+    "kind": "ttl",
+    "ttl_seconds": 2592000,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "sotkanet_id",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "category",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "code",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "name",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "name_fi",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "member_of",
+      "type": "text",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": null,
+     "geo": {
+      "code": "sotkanet_id",
+      "system": "sotkanet",
+      "level": "mixed"
+     },
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d7d3-47b0-71db-ae33-bb43396e9bb3": {
+   "name": "Cancer deaths by wellbeing services county (Statistics Finland 13u5)",
+   "access_kind": "request",
+   "address": "https://pxdata.stat.fi/PxWeb/api/v1/en/StatFin/ksyyt/13u5.px",
+   "format": "csv",
+   "options": {
+    "csv": {
+     "columns": [
+      "county",
+      "cause",
+      "deaths_2022",
+      "death_rate_2022",
+      "deaths_2023",
+      "death_rate_2023",
+      "deaths_2024",
+      "death_rate_2024"
+     ],
+     "null_values": [
+      "..",
+      "."
+     ]
+    },
+    "body": {
+     "query": [
+      {
+       "code": "alue_23_20260101",
+       "selection": {
+        "filter": "all",
+        "values": [
+         "*"
+        ]
+       }
+      },
+      {
+       "code": "kuolinsyyt_1_20210101",
+       "selection": {
+        "filter": "item",
+        "values": [
+         "04-21",
+         "09",
+         "10",
+         "11"
+        ]
+       }
+      },
+      {
+       "code": "timeperiod_y",
+       "selection": {
+        "filter": "item",
+        "values": [
+         "2022",
+         "2023",
+         "2024"
+        ]
+       }
+      },
+      {
+       "code": "contentscode",
+       "selection": {
+        "filter": "item",
+        "values": [
+         "ksyylkm",
+         "ksyycdr"
+        ]
+       }
+      }
+     ],
+     "response": {
+      "format": "csv"
+     }
+    },
+    "method": "POST"
+   },
+   "freshness": {
+    "kind": "ttl",
+    "ttl_seconds": 604800,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "county",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "cause",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "deaths_2022",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "death_rate_2022",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "deaths_2023",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "death_rate_2023",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "deaths_2024",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "death_rate_2024",
+      "type": "number",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": null,
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d906-e246-77a8-b9f6-7a7301ab1f7b": {
+   "name": "Five-year survival of lung, pancreas and liver cancer, Nordic countries (NORDCAN)",
+   "access_kind": "url",
+   "address": "https://canapi.iarc.who.int/api/nordcan/v2/961/survival/population/5/1_2/208_246_578_752/110_130_160/?&surv_period=5&age_surv=0&year_start=1967&year_end=2024",
+   "format": "json",
+   "options": {
+    "rows": "dataset",
+    "fields": {
+     "sex": {
+      "path": "sex",
+      "type": "integer"
+     },
+     "year": {
+      "path": "year",
+      "type": "integer"
+     },
+     "period": {
+      "path": "period",
+      "type": "text"
+     },
+     "country": {
+      "path": "label",
+      "type": "text"
+     },
+     "survival": {
+      "path": "survival.value",
+      "type": "number"
+     },
+     "cancer_code": {
+      "path": "cancer",
+      "type": "integer"
+     },
+     "country_code": {
+      "path": "country",
+      "type": "integer"
+     },
+     "survival_lower": {
+      "path": "survival.lowCI",
+      "type": "number"
+     },
+     "survival_upper": {
+      "path": "survival.upCI",
+      "type": "number"
+     }
+    },
+    "period": {
+     "column": "period"
+    }
+   },
+   "freshness": {
+    "kind": "ttl",
+    "ttl_seconds": 2592000,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "country",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "country_code",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "cancer_code",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "sex",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "period",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "year",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "survival",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "survival_lower",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "survival_upper",
+      "type": "number",
+      "nullable": true
+     },
+     {
+      "name": "period_start",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "period_end",
+      "type": "date",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "period_start",
+      "end": "period_end",
+      "grain": null
+     },
+     "geo": {
+      "code": "country_code",
+      "system": "iso3166_numeric",
+      "level": "country"
+     },
+     "measures": [
+      {
+       "value": "survival",
+       "lower": "survival_lower",
+       "upper": "survival_upper",
+       "suppressed": null,
+       "coverage": null
+      }
+     ]
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1dd0c-8e70-74af-9328-bfe43e1cbca1": {
+   "name": "Suspected cancer pathway cases (results, synthetic)",
+   "access_kind": "cases",
+   "address": "01a1dcec-d5fd-730c-9672-c5170e1873fe",
+   "format": "parquet",
+   "options": {
+    "table": "results"
+   },
+   "freshness": {
+    "kind": "push",
+    "ttl_seconds": null,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "key",
+      "type": "text",
+      "nullable": false
+     },
+     {
+      "name": "model_id",
+      "type": "text",
+      "nullable": false
+     },
+     {
+      "name": "model",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "version",
+      "type": "integer",
+      "nullable": false
+     },
+     {
+      "name": "case_revision",
+      "type": "integer",
+      "nullable": false
+     },
+     {
+      "name": "trigger",
+      "type": "text",
+      "nullable": false
+     },
+     {
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": false
+     },
+     {
+      "name": "summary",
+      "type": "text",
+      "nullable": false
+     },
+     {
+      "name": "status",
+      "type": "text",
+      "nullable": false
+     },
+     {
+      "name": "open",
+      "type": "boolean",
+      "nullable": false
+     },
+     {
+      "name": "overdue_by",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "due_in",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_trigger",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_clock_start",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_days_behind",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_survival_now",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_survival_on_target",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_imaging_after_suspicion_status",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_imaging_after_suspicion_by",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_first_specialist_visit_status",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_first_specialist_visit_by",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_work_up_complete_status",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_work_up_complete_by",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_treatment_start_status",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "patient_pathway_treatment_start_by",
+      "type": "integer",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "created_at",
+      "end": "created_at",
+      "grain": null
+     },
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1dd0c-8e00-700e-b007-9f9385039953": {
+   "name": "Suspected cancer pathway cases (cases, synthetic)",
+   "access_kind": "cases",
+   "address": "01a1dcec-d5fd-730c-9672-c5170e1873fe",
+   "format": "parquet",
+   "options": {
+    "table": "cases"
+   },
+   "freshness": {
+    "kind": "push",
+    "ttl_seconds": null,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "key",
+      "type": "text",
+      "nullable": false
+     },
+     {
+      "name": "revision",
+      "type": "integer",
+      "nullable": false
+     },
+     {
+      "name": "created_at",
+      "type": "timestamp",
+      "nullable": false
+     },
+     {
+      "name": "updated_at",
+      "type": "timestamp",
+      "nullable": false
+     },
+     {
+      "name": "site",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "sex",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "age_band",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "education",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "route",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "stage",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "intent",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "modality",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "presentation",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "days_symptoms_to_contact",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "days_contact_to_physician",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "days_physician_to_imaging",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "days_imaging_to_referral",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "days_referral_to_specialist",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "days_specialist_to_workup",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "days_workup_to_treatment",
+      "type": "integer",
+      "nullable": true
+     },
+     {
+      "name": "treatment_started",
+      "type": "boolean",
+      "nullable": true
+     },
+     {
+      "name": "county",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "first_contact",
+      "type": "date",
+      "nullable": true
+     },
+     {
+      "name": "referred_by",
+      "type": "text",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": {
+      "start": "updated_at",
+      "end": "updated_at",
+      "grain": null
+     },
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d99a-0675-7519-a35e-72827ee2893e": {
+   "name": "Interventional cancer trials with a site in Finland, started 2019 or later (ClinicalTrials.gov)",
+   "access_kind": "url",
+   "address": "https://clinicaltrials.gov/api/v2/studies?query.cond=cancer&query.locn=Finland&filter.advanced=AREA%5BStudyType%5DINTERVENTIONAL%20AND%20AREA%5BStartDate%5DRANGE%5B2019-01-01,MAX%5D&pageSize=1000&fields=NCTId,StartDate,Phase,OverallStatus,LeadSponsorClass",
+   "format": "json",
+   "options": {
+    "rows": "studies",
+    "fields": {
+     "nct_id": {
+      "path": "protocolSection.identificationModule.nctId",
+      "type": "text"
+     },
+     "phases": {
+      "path": "protocolSection.designModule.phases",
+      "type": "json"
+     },
+     "status": {
+      "path": "protocolSection.statusModule.overallStatus",
+      "type": "text"
+     },
+     "start_date": {
+      "path": "protocolSection.statusModule.startDateStruct.date",
+      "type": "text"
+     },
+     "sponsor_class": {
+      "path": "protocolSection.sponsorCollaboratorsModule.leadSponsor.class",
+      "type": "text"
+     }
+    }
+   },
+   "freshness": {
+    "kind": "ttl",
+    "ttl_seconds": 604800,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "nct_id",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "start_date",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "status",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "sponsor_class",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "phases",
+      "type": "json",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": null,
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d99a-0682-71de-9fb8-45782499b3fb": {
+   "name": "Interventional cancer trials with a site in Sweden, started 2019 or later (ClinicalTrials.gov)",
+   "access_kind": "url",
+   "address": "https://clinicaltrials.gov/api/v2/studies?query.cond=cancer&query.locn=Sweden&filter.advanced=AREA%5BStudyType%5DINTERVENTIONAL%20AND%20AREA%5BStartDate%5DRANGE%5B2019-01-01,MAX%5D&pageSize=1000&fields=NCTId,StartDate,Phase,OverallStatus,LeadSponsorClass",
+   "format": "json",
+   "options": {
+    "rows": "studies",
+    "fields": {
+     "nct_id": {
+      "path": "protocolSection.identificationModule.nctId",
+      "type": "text"
+     },
+     "phases": {
+      "path": "protocolSection.designModule.phases",
+      "type": "json"
+     },
+     "status": {
+      "path": "protocolSection.statusModule.overallStatus",
+      "type": "text"
+     },
+     "start_date": {
+      "path": "protocolSection.statusModule.startDateStruct.date",
+      "type": "text"
+     },
+     "sponsor_class": {
+      "path": "protocolSection.sponsorCollaboratorsModule.leadSponsor.class",
+      "type": "text"
+     }
+    }
+   },
+   "freshness": {
+    "kind": "ttl",
+    "ttl_seconds": 604800,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "nct_id",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "start_date",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "status",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "sponsor_class",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "phases",
+      "type": "json",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": null,
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d99a-068a-7786-8fa2-faeab2992aa5": {
+   "name": "Interventional cancer trials with a site in Norway, started 2019 or later (ClinicalTrials.gov)",
+   "access_kind": "url",
+   "address": "https://clinicaltrials.gov/api/v2/studies?query.cond=cancer&query.locn=Norway&filter.advanced=AREA%5BStudyType%5DINTERVENTIONAL%20AND%20AREA%5BStartDate%5DRANGE%5B2019-01-01,MAX%5D&pageSize=1000&fields=NCTId,StartDate,Phase,OverallStatus,LeadSponsorClass",
+   "format": "json",
+   "options": {
+    "rows": "studies",
+    "fields": {
+     "nct_id": {
+      "path": "protocolSection.identificationModule.nctId",
+      "type": "text"
+     },
+     "phases": {
+      "path": "protocolSection.designModule.phases",
+      "type": "json"
+     },
+     "status": {
+      "path": "protocolSection.statusModule.overallStatus",
+      "type": "text"
+     },
+     "start_date": {
+      "path": "protocolSection.statusModule.startDateStruct.date",
+      "type": "text"
+     },
+     "sponsor_class": {
+      "path": "protocolSection.sponsorCollaboratorsModule.leadSponsor.class",
+      "type": "text"
+     }
+    }
+   },
+   "freshness": {
+    "kind": "ttl",
+    "ttl_seconds": 604800,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "nct_id",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "start_date",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "status",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "sponsor_class",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "phases",
+      "type": "json",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": null,
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": null
+  },
+  "01a1d99a-0691-7599-8b56-e9a61e886234": {
+   "name": "Interventional cancer trials with a site in Denmark, started 2019 or later (ClinicalTrials.gov)",
+   "access_kind": "url",
+   "address": "https://clinicaltrials.gov/api/v2/studies?query.cond=cancer&query.locn=Denmark&filter.advanced=AREA%5BStudyType%5DINTERVENTIONAL%20AND%20AREA%5BStartDate%5DRANGE%5B2019-01-01,MAX%5D&pageSize=1000&fields=NCTId,StartDate,Phase,OverallStatus,LeadSponsorClass",
+   "format": "json",
+   "options": {
+    "rows": "studies",
+    "fields": {
+     "nct_id": {
+      "path": "protocolSection.identificationModule.nctId",
+      "type": "text"
+     },
+     "phases": {
+      "path": "protocolSection.designModule.phases",
+      "type": "json"
+     },
+     "status": {
+      "path": "protocolSection.statusModule.overallStatus",
+      "type": "text"
+     },
+     "start_date": {
+      "path": "protocolSection.statusModule.startDateStruct.date",
+      "type": "text"
+     },
+     "sponsor_class": {
+      "path": "protocolSection.sponsorCollaboratorsModule.leadSponsor.class",
+      "type": "text"
+     }
+    }
+   },
+   "freshness": {
+    "kind": "ttl",
+    "ttl_seconds": 604800,
+    "latest_period_ttl_seconds": null
+   },
+   "declared_schema": {
+    "kind": "table",
+    "columns": [
+     {
+      "name": "nct_id",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "start_date",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "status",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "sponsor_class",
+      "type": "text",
+      "nullable": true
+     },
+     {
+      "name": "phases",
+      "type": "json",
+      "nullable": true
+     }
+    ],
+    "roles": {
+     "time": null,
+     "geo": null,
+     "measures": []
+    },
+    "derived": false
+   },
+   "provenance": null
+  }
+ },
+ "case_types": {
+  "01a1dcec-d5fd-730c-9672-c5170e1873fe": "Suspected cancer pathway"
+ }
+}

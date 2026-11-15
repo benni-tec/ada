@@ -91,7 +91,7 @@ async def list_reports(
 async def reorder_reports(
     project_id: Id, body: Order, service: FromDishka[ReportService]
 ) -> Sequence[Report]:
-    """Put the project's reports in a new order, as the sidebar lists them."""
+    """Pin these reports in this order and unpin the rest, as the sidebar lists them."""
     return await service.reorder(project_id, body.ids)
 
 

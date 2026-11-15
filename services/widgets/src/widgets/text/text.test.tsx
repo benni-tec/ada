@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import type { WidgetData } from '@/lib/types'
@@ -195,5 +195,20 @@ test('a click on a value asks the page to open that input’s pipeline', async (
   show('Gap {{gap.gap[county=Kainuu]}}')
 
   ;(await screen.findByRole('button', { name: /13.26/ })).click()
+  expect(parent.postMessage).toHaveBeenCalledWith({ type: 'ada:open-pipeline', input: 'gap' }, '*')
+})
+
+test('a value is a button in the text’s own line: it takes focus and opens its pipeline on Enter', async () => {
+  serve()
+  window.location.hash = '#widget=w1&run=r1'
+  const parent = { postMessage: vi.fn() }
+  Object.defineProperty(window, 'parent', { value: parent, configurable: true })
+  show('Gap {{gap.gap[county=Kainuu]}}')
+
+  const value = await screen.findByRole('button', { name: /13.26/ })
+  // A span, so that a value that wraps is underlined line by line.
+  expect(value.tagName).toBe('SPAN')
+  expect(value).toHaveAttribute('tabindex', '0')
+  fireEvent.keyDown(value, { key: 'Enter' })
   expect(parent.postMessage).toHaveBeenCalledWith({ type: 'ada:open-pipeline', input: 'gap' }, '*')
 })

@@ -188,7 +188,7 @@ function RuleRow({ projectId, rule, alerts }: { projectId: Id; rule: AlertRule; 
     {shown && alerts.length > 0 && (
       <TableRow className="hover:bg-transparent">
         <TableCell colSpan={7} id={alertsId} className="bg-muted/30 py-2 pl-12 whitespace-normal">
-          <AlertTable views={alerts} label={`Alerts of ${rule.name}`} />
+          <AlertTable views={alerts} keyColumns={rule.key_columns} label={`Alerts of ${rule.name}`} />
         </TableCell>
       </TableRow>
     )}

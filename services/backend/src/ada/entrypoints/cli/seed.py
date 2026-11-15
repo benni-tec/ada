@@ -45,6 +45,7 @@ from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
+from ada.entrypoints.cli.curated import seed_cases, seed_curated
 
 DEMO_PROJECT = "Nordic cancer care"
 DEMO_SESSION = "Screening participation and lung cancer survival"
@@ -157,14 +158,18 @@ async def seed_demo(container: AsyncContainer, refresh: bool = False) -> Id:
     # Its own unit of work: the sources are committed before anything is built on them.
     async with container() as request:
         demo = await _demo(request, project_id, sources)
+    # The curated dashboards and the cases they read (curated.py).
+    case_types = await seed_cases(container, project_id, SEED)
+    curated = await seed_curated(container, project_id, case_types, SEED)
 
     if refresh:
         fetched = await _fetch(container, demo)
         # Queued after everything above has committed, so the worker finds it.
         dispatcher = await container.get(TaskDispatcher)
-        others = [source for source in sources.values() if source.id not in fetched]
-        for source in others:
-            await dispatcher.refresh_source(source.id, force=True)
+        others = [source.id for source in sources.values() if source.id not in fetched]
+        others += [id for id in curated if id not in fetched]
+        for source_id in others:
+            await dispatcher.refresh_source(source_id, force=True)
         print(f"Queued a refresh of {len(others)} more sources; the worker fetches them.")
     return project_id
 

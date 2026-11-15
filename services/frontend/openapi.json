@@ -1480,17 +1480,35 @@
       },
       "DashboardChange": {
         "additionalProperties": false,
+        "description": "Fields left out stay as they are.",
         "properties": {
           "default_time_range": {
-            "$ref": "#/components/schemas/TimeRange"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "expected_revision": {
             "title": "Expected Revision",
             "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           }
         },
         "required": [
-          "default_time_range",
           "expected_revision"
         ],
         "title": "DashboardChange",
@@ -4092,7 +4110,7 @@
       },
       "Order": {
         "additionalProperties": false,
-        "description": "A new order of a project's dashboards or reports: every id of them, once.",
+        "description": "The pinned dashboards or reports of a project, in order; the rest are unpinned.",
         "properties": {
           "ids": {
             "items": {
@@ -7750,7 +7768,7 @@
         ]
       },
       "patch": {
-        "description": "Set the range shown until a viewer changes it.",
+        "description": "Rename the dashboard, or set the range shown until a viewer changes it.",
         "operationId": "change_dashboard_api_dashboards__dashboard_id__patch",
         "parameters": [
           {
@@ -9413,7 +9431,7 @@
     },
     "/api/projects/{project_id}/dashboards/order": {
       "put": {
-        "description": "Put the project's dashboards in a new order, as the sidebar lists them.",
+        "description": "Pin these dashboards in this order and unpin the rest, as the sidebar lists them.",
         "operationId": "reorder_dashboards_api_projects__project_id__dashboards_order_put",
         "parameters": [
           {
@@ -10161,7 +10179,7 @@
     },
     "/api/projects/{project_id}/reports/order": {
       "put": {
-        "description": "Put the project's reports in a new order, as the sidebar lists them.",
+        "description": "Pin these reports in this order and unpin the rest, as the sidebar lists them.",
         "operationId": "reorder_reports_api_projects__project_id__reports_order_put",
         "parameters": [
           {

@@ -154,10 +154,10 @@ def _in_position_order[M: Dashboard | Report](records: list[M]) -> list[M]:
 def _set_positions[M: Dashboard | Report](
     records: dict[Id, M], project_id: Id, ids: Sequence[Id]
 ) -> None:
-    for position, id in enumerate(ids):
-        record = records.get(id)
-        if record is not None and record.project_id == project_id:
-            records[id] = record.model_copy(update={"position": position})
+    order = {id: position for position, id in enumerate(ids)}
+    for id, record in list(records.items()):
+        if record.project_id == project_id:
+            records[id] = record.model_copy(update={"position": order.get(id)})
 
 
 class MemoryProjectRepository(ProjectRepository):

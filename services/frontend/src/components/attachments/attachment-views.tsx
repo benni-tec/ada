@@ -147,7 +147,7 @@ function AlertRuleView({ projectId, ruleId }: { projectId: Id; ruleId: Id }) {
             {active > 0 ? `${active} active` : 'None active'}
             {alerts.length > active && `, ${alerts.length - active} ended`}
           </p>
-          <AlertTable views={alerts} label={`Alerts of ${rule.data.name}`} />
+          <AlertTable views={alerts} keyColumns={rule.data.key_columns} label={`Alerts of ${rule.data.name}`} />
         </div>
       )}
     </div>

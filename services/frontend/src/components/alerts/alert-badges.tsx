@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { dashboardAlertsQuery, type Id } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-import { countBySeverity, countsText, keyText, severityPillClasses, worstActive } from './labels'
+import { countBySeverity, countsText, keyText, mostSevereFirst, severityPillClasses, worstActive } from './labels'
 import { SeverityBadge } from './severity'
 
 /**
@@ -21,7 +21,8 @@ import { SeverityBadge } from './severity'
 export function AlertBadges({ projectId, dashboardId }: { projectId: Id; dashboardId: Id }) {
   const { data } = useQuery(dashboardAlertsQuery(dashboardId))
   if (!data) return null
-  const active = data.filter((view) => view.alert.state === 'firing')
+  // The most severe first: a critical alert is never buried under warnings.
+  const active = mostSevereFirst(data.filter((view) => view.alert.state === 'firing'))
   const worst = worstActive(data)
   const label =
     active.length === 0

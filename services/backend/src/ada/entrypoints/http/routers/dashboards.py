@@ -45,7 +45,10 @@ class Pin(Request):
 
 
 class DashboardChange(Request):
-    default_time_range: TimeRange
+    """Fields left out stay as they are."""
+
+    name: str | None = None
+    default_time_range: TimeRange | None = None
     expected_revision: int
 
 
@@ -69,7 +72,7 @@ async def list_dashboards(
 async def reorder_dashboards(
     project_id: Id, body: Order, service: FromDishka[DashboardService]
 ) -> Sequence[Dashboard]:
-    """Put the project's dashboards in a new order, as the sidebar lists them."""
+    """Pin these dashboards in this order and unpin the rest, as the sidebar lists them."""
     return await service.reorder(project_id, body.ids)
 
 
@@ -89,10 +92,12 @@ async def get_dashboard(dashboard_id: Id, service: FromDishka[DashboardService])
 async def change_dashboard(
     dashboard_id: Id, body: DashboardChange, service: FromDishka[DashboardService]
 ) -> DashboardView:
-    """Set the range shown until a viewer changes it."""
-    await service.set_default_time_range(
-        dashboard_id, body.default_time_range, body.expected_revision
-    )
+    """Rename the dashboard, or set the range shown until a viewer changes it."""
+    revision = body.expected_revision
+    if body.name is not None:
+        revision = (await service.rename(dashboard_id, body.name, revision)).revision
+    if body.default_time_range is not None:
+        await service.set_default_time_range(dashboard_id, body.default_time_range, revision)
     return await _view(service, dashboard_id)
 
 

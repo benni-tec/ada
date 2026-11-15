@@ -173,6 +173,14 @@ class Dashboards(DashboardService):
         )
         return copy
 
+    async def rename(self, id: Id, name: str, expected_revision: int) -> Dashboard:
+        dashboard = await self.dashboards.get(id)
+        saved = await self.dashboards.update(
+            dashboard.model_copy(update={"name": _name(name)}), expected_revision
+        )
+        await self._announce(saved, saved.current_version_id)
+        return saved
+
     async def set_default_time_range(
         self, id: Id, time_range: TimeRange, expected_revision: int
     ) -> Dashboard:

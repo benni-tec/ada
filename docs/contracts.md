@@ -132,7 +132,7 @@ What ordering the sidebar added to them (see REST):
 
 | Where | Change |
 | --- | --- |
-| `core/models/dashboards.py`, `core/models/reports.py` | `Dashboard.position`, `Report.position` (`int \| None`; None, new, after the placed ones), outside the revision |
+| `core/models/dashboards.py`, `core/models/reports.py` | `Dashboard.position`, `Report.position` (`int \| None`): the place among the pinned ones, None when not pinned; outside the revision |
 | `core/ports/repositories.py` | `DashboardRepository.reorder`, `ReportRepository.reorder`; both `list`s in that order |
 | `core/services/ports/dashboards.py`, `reports.py` | `reorder(project_id, ids)` |
 | `core/models/events.py` | `project.order_changed` |
@@ -1200,8 +1200,9 @@ reject unknown fields. Writes to mutable records carry `expected_revision` in th
 | `PATCH /widgets/{id}` | `{title?, note?, type?, spec?}`: change in place (a spec replaces the old one whole and is checked); announced with `widget.updated` |
 | `GET /widget-bundles/{type}.html` | A built widget (see Widgets) |
 | `GET /projects/{id}/events` | The live stream |
-| `GET /projects/{id}/dashboards`, `POST /projects/{id}/dashboards {name}` | List in the order people gave them, new ones last (oldest first); create |
-| `PUT /projects/{id}/dashboards/order {ids}`, `PUT /projects/{id}/reports/order {ids}` | Put every dashboard or report of the project in this order (each id once, else 422); answers the list. Changes no revision and adds no version; publishes `project.order_changed` |
+| `GET /projects/{id}/dashboards`, `POST /projects/{id}/dashboards {name}` | List: the pinned in their order, then the others oldest first; create |
+| `PATCH /dashboards/{id} {expected_revision, name?, default_time_range?}` | Rename, or set the range shown until a viewer changes it; fields left out stay |
+| `PUT /projects/{id}/dashboards/order {ids}`, `PUT /projects/{id}/reports/order {ids}` | Pin these dashboards or reports in this order and unpin the rest (each id once and the project's own, else 422); answers the list: the pinned first, then the others oldest first. Changes no revision and adds no version; publishes `project.order_changed`. Only people pin: no MCP tool does |
 | `GET /dashboards/{id}` | `DashboardView {dashboard, version}`: what it points at, with the revision for the next write |
 | `PATCH /dashboards/{id} {default_time_range, expected_revision}` | Set the default range; `DashboardView` |
 | `PUT /dashboards/{id}/slots {slots, expected_revision}` | Replace the slots (the grid's drag and resize save the full list); a widget new to the dashboard is copied (see Dashboards); adds a version; `DashboardView` |
@@ -1617,12 +1618,15 @@ receives data from an agent; it asks the server for the output of its operator.
   (with a new session dialog), Dashboards (a new dashboard dialog) and Reports (a link to
   `/reports/new`), each a collapsible item listing its items; research sessions are nested
   under the session that delegated them, labelled "research". Data sources are not in the
-  sidebar: they are in Settings. Sessions newest first. Dashboards and reports in the
-  order people gave them, new ones last (`components/sortable-list.tsx`, dnd-kit): drag
-  an item, or focus its link, press Space, move it with the arrow keys and press Space to
-  drop it (Escape cancels; Enter still follows the link). The list changes at once and is
-  saved with `PUT .../order`; a refusal brings the old order back with the reason. The
-  click that ends a pointer drag is swallowed, not followed. The footer holds
+  sidebar: they are in Settings. Sessions newest first. Dashboards and reports: the
+  pinned ones first, in the order people dragged them into, then a thin rule and the
+  others in creation order, which never moves (a new one joins them). Each item has a pin
+  button at its right (a filled pin when pinned, else on hover: "Pin <name>", "Unpin
+  <name>"). Pinned items move (`components/sortable-list.tsx`, dnd-kit): drag one, or focus
+  its link, press Space, move it with the arrow keys and press Space to drop it (Escape
+  cancels; Enter still follows the link). Pinning, unpinning and moving change the list at
+  once and save with `PUT .../order`; a refusal brings the old list back with the reason.
+  The click that ends a pointer drag is swallowed, not followed. The footer holds
   Settings (a gear), a link to the current page with `?settings=models`, marked
   (`data-active`) while the settings are open.
   The current item is marked (`data-active`, and the router's `aria-current="page"`).
@@ -1984,6 +1988,17 @@ older seed registered differently is registered anew, the old one kept under a d
 `--refresh` fetches what the demo shows in the command's own process (a handful of
 requests), generates the report "Screening participation report" once, checks the rule,
 and queues the remaining sources for the worker.
+
+It then replays the curated dashboards (`entrypoints/cli/curated.py`) from the fixture
+`entrypoints/cli/demo.json`: "National Cancer Strategy 2026–2035" (the four goals with
+their alert rules), "Pathway times by county (synthetic)" and "Data quality: county
+indicators", with every widget, operator (in dependency order) and data source behind them;
+the first two are pinned. Before them come the patient pathway model, its "Suspected
+cancer pathway" case type and 300 synthetic cases (`entrypoints/cli/synthetic.py`, seed 1),
+which the cases sources read. Dashboards that exist are skipped and sources of the same
+name and address reused, so seeding again adds nothing; with `--refresh` the new sources
+are queued for the worker. `scripts/export_demo.py --project <id>` writes the fixture from
+a running instance after the dashboards change there.
 
 ## Known issues, for the next wave
 

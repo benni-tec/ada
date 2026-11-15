@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
-import { Check, ChevronRight, ChevronsUpDown, LayoutGrid, Plus } from 'lucide-react'
+import { Check, ChevronRight, ChevronsUpDown, LayoutGrid, Pin, Plus } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -50,6 +50,7 @@ import {
 import { severityPillClasses, worstActive } from '@/components/alerts/labels'
 import { pageTypes, type PageTypeName } from '@/lib/page-types'
 import { defaultSettingsSection, withSettings } from '@/lib/settings-sections'
+import { cn } from '@/lib/utils'
 
 import { CreateDialog } from './create-dialog'
 import { Hint } from './icon-action'
@@ -215,45 +216,125 @@ function Empty({ children }: { children: ReactNode }) {
   return <li className="px-2 py-1 text-xs text-sidebar-foreground/60">{children}</li>
 }
 
-/** One item of a type, as a link; one that can be moved gets its list's `sort` props. */
+/** One item of a type, as a link; one that can be moved gets its list's `sort` props, and
+ * `action` sits at its right (the pin). */
 function Item({
   active,
   sort,
+  action,
   children,
 }: {
   active?: boolean
   sort?: { item: SortItem; handle: SortHandle }
+  action?: ReactNode
   children: ReactNode
 }) {
   return (
     <SidebarMenuSubItem {...sort?.item}>
-      <SidebarMenuSubButton asChild isActive={active} {...sort?.handle}>
+      <SidebarMenuSubButton asChild isActive={active} className={action ? 'pr-8' : undefined} {...sort?.handle}>
         {children}
       </SidebarMenuSubButton>
+      {action}
     </SidebarMenuSubItem>
   )
 }
 
-/** A list people put in their own order: it changes at once here, and stays if the
- * server agrees; otherwise the list comes back as it was, with the reason. */
-function useReorder<T extends { id: string }>(queryKey: QueryKey, reorder: (ids: Id[]) => Promise<T[]>) {
+type Pinnable = { id: string; name: string; created_at: string; position?: number | null }
+
+/** The list after pinning `ids` in that order: those first, the rest in creation order. */
+function pinnedFirst<T extends Pinnable>(items: readonly T[], ids: readonly Id[]): T[] {
+  const pinned = ids.flatMap((id, position) => {
+    const item = items.find((candidate) => candidate.id === id)
+    return item ? [{ ...item, position }] : []
+  })
+  const rest = items
+    .filter((item) => !ids.includes(item.id))
+    .map((item) => ({ ...item, position: null }))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
+  return [...pinned, ...rest]
+}
+
+/** Pinning, unpinning or moving a pinned item: the list changes at once here, and stays if
+ * the server agrees; otherwise it comes back as it was, with the reason. */
+function usePinned<T extends Pinnable>(queryKey: QueryKey, pin: (ids: Id[]) => Promise<T[]>) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: reorder,
+    mutationFn: pin,
     onMutate: async (ids) => {
       await queryClient.cancelQueries({ queryKey })
-      queryClient.setQueryData<T[]>(queryKey, (items) =>
-        items ? ids.map((id) => items.find((item) => item.id === id)).filter((item) => item !== undefined) : items,
-      )
+      queryClient.setQueryData<T[]>(queryKey, (items) => (items ? pinnedFirst(items, ids) : items))
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   })
 }
 
+/**
+ * A type's items: the pinned ones first, in the order people dragged them into, then the
+ * others in creation order. Only people change it, by pinning and moving; a new item comes
+ * in among the unpinned ones and moves nothing.
+ */
+function PinnedItems<T extends Pinnable>({
+  items,
+  activeId,
+  pin,
+  link,
+}: {
+  items: readonly T[]
+  activeId: string | undefined
+  pin: (ids: Id[]) => void
+  link: (item: T) => ReactNode
+}) {
+  const pinned = items.filter((item) => item.position != null)
+  const rest = items.filter((item) => item.position == null)
+  const ids = pinned.map((item) => item.id)
+  return (
+    <>
+      <SortableList items={pinned} label={(item) => item.name} onReorder={pin}>
+        {(item, sort) => (
+          <Item
+            active={item.id === activeId}
+            sort={sort}
+            action={<PinButton pinned name={item.name} onClick={() => pin(ids.filter((id) => id !== item.id))} />}
+          >
+            {link(item)}
+          </Item>
+        )}
+      </SortableList>
+      {pinned.length > 0 && rest.length > 0 && <li role="separator" className="mx-2 my-1 h-px bg-sidebar-border" />}
+      {rest.map((item) => (
+        <Item key={item.id} active={item.id === activeId} action={<PinButton pinned={false} name={item.name} onClick={() => pin([...ids, item.id])} />}>
+          {link(item)}
+        </Item>
+      ))}
+    </>
+  )
+}
+
+/** Pins an item, or unpins it: a filled pin on a pinned one, a pin on hover otherwise. */
+function PinButton({ pinned, name, onClick }: { pinned: boolean; name: string; onClick: () => void }) {
+  const label = pinned ? `Unpin ${name}` : `Pin ${name}`
+  return (
+    <Hint label={pinned ? 'Unpin' : 'Pin to the top'}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={pinned}
+        onClick={onClick}
+        className={cn(
+          'absolute top-1/2 right-1 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-sidebar-foreground/60 outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+          pinned ? 'opacity-100' : 'opacity-0 group-hover/menu-sub-item:opacity-100 group-focus-within/menu-sub-item:opacity-100',
+        )}
+      >
+        <Pin aria-hidden="true" className={cn('size-3.5', pinned && 'fill-current')} />
+      </button>
+    </Hint>
+  )
+}
+
 function ReorderFailed({ error }: { error: unknown }) {
   return (
     <li role="alert" className="px-2 py-1 text-xs text-red-700 dark:text-red-400">
-      Could not move it: {errorMessage(error)}
+      Could not pin or move it: {errorMessage(error)}
     </li>
   )
 }
@@ -346,7 +427,7 @@ function Dashboards({ projectId }: { projectId: Id }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { data: dashboards } = useQuery(dashboardsQuery(projectId))
-  const reorder = useReorder(dashboardKeys.list(projectId), (ids) => reorderDashboards(projectId, ids))
+  const pin = usePinned(dashboardKeys.list(projectId), (ids) => reorderDashboards(projectId, ids))
   return (
     <Group
       type="dashboard"
@@ -376,25 +457,25 @@ function Dashboards({ projectId }: { projectId: Id }) {
       }
     >
       {dashboards?.length === 0 && <Empty>No dashboards yet.</Empty>}
-      <SortableList items={dashboards ?? []} label={(dashboard) => dashboard.name} onReorder={(ids) => reorder.mutate(ids)}>
-        {(dashboard, sort) => (
-          <Item active={dashboard.id === dashboardId} sort={sort}>
-            <Link to="/projects/$projectId/dashboards/$dashboardId" params={{ projectId, dashboardId: dashboard.id }}>
-              <span>{dashboard.name}</span>
-            </Link>
-          </Item>
+      <PinnedItems
+        items={dashboards ?? []}
+        activeId={dashboardId}
+        pin={(ids) => pin.mutate(ids)}
+        link={(dashboard) => (
+          <Link to="/projects/$projectId/dashboards/$dashboardId" params={{ projectId, dashboardId: dashboard.id }}>
+            <span>{dashboard.name}</span>
+          </Link>
         )}
-      </SortableList>
-      {reorder.isError && <ReorderFailed error={reorder.error} />}
+      />
+      {pin.isError && <ReorderFailed error={pin.error} />}
     </Group>
   )
 }
 
 function Reports({ projectId }: { projectId: Id }) {
   const { reportId } = useParams({ strict: false })
-  // In the order people gave them; new ones last.
   const { data: reports } = useQuery(reportsQuery(projectId))
-  const reorder = useReorder(reportKeys.reports(projectId), (ids) => reorderReports(projectId, ids))
+  const pin = usePinned(reportKeys.reports(projectId), (ids) => reorderReports(projectId, ids))
   return (
     <Group
       type="report"
@@ -410,16 +491,17 @@ function Reports({ projectId }: { projectId: Id }) {
       }
     >
       {reports?.length === 0 && <Empty>No reports yet.</Empty>}
-      <SortableList items={reports ?? []} label={(report) => report.name} onReorder={(ids) => reorder.mutate(ids)}>
-        {(report, sort) => (
-          <Item active={report.id === reportId} sort={sort}>
-            <Link to="/projects/$projectId/reports/$reportId" params={{ projectId, reportId: report.id }}>
-              <span>{report.name}</span>
-            </Link>
-          </Item>
+      <PinnedItems
+        items={reports ?? []}
+        activeId={reportId}
+        pin={(ids) => pin.mutate(ids)}
+        link={(report) => (
+          <Link to="/projects/$projectId/reports/$reportId" params={{ projectId, reportId: report.id }}>
+            <span>{report.name}</span>
+          </Link>
         )}
-      </SortableList>
-      {reorder.isError && <ReorderFailed error={reorder.error} />}
+      />
+      {pin.isError && <ReorderFailed error={pin.error} />}
     </Group>
   )
 }

@@ -228,7 +228,7 @@ export interface paths {
         head?: never;
         /**
          * Change Dashboard
-         * @description Set the range shown until a viewer changes it.
+         * @description Rename the dashboard, or set the range shown until a viewer changes it.
          */
         patch: operations["change_dashboard_api_dashboards__dashboard_id__patch"];
         trace?: never;
@@ -803,7 +803,7 @@ export interface paths {
         get?: never;
         /**
          * Reorder Dashboards
-         * @description Put the project's dashboards in a new order, as the sidebar lists them.
+         * @description Pin these dashboards in this order and unpin the rest, as the sidebar lists them.
          */
         put: operations["reorder_dashboards_api_projects__project_id__dashboards_order_put"];
         post?: never;
@@ -1027,7 +1027,7 @@ export interface paths {
         get?: never;
         /**
          * Reorder Reports
-         * @description Put the project's reports in a new order, as the sidebar lists them.
+         * @description Pin these reports in this order and unpin the rest, as the sidebar lists them.
          */
         put: operations["reorder_reports_api_projects__project_id__reports_order_put"];
         post?: never;
@@ -2502,11 +2502,16 @@ export interface components {
              */
             revision: number;
         };
-        /** DashboardChange */
+        /**
+         * DashboardChange
+         * @description Fields left out stay as they are.
+         */
         DashboardChange: {
-            default_time_range: components["schemas"]["TimeRange"];
+            default_time_range?: components["schemas"]["TimeRange"] | null;
             /** Expected Revision */
             expected_revision: number;
+            /** Name */
+            name?: string | null;
         };
         /**
          * DashboardContext
@@ -3518,7 +3523,7 @@ export interface components {
         OperatorKind: "source" | "history" | "extract" | "input" | "transform" | "statistic" | "agent";
         /**
          * Order
-         * @description A new order of a project's dashboards or reports: every id of them, once.
+         * @description The pinned dashboards or reports of a project, in order; the rest are unpinned.
          */
         Order: {
             /** Ids */

@@ -15,13 +15,16 @@ import { keyText, severityTextClasses } from './labels'
 /** What the people reading it call an alert's state: it is active, or it has ended. */
 const stateText = (view: AlertView) => (view.alert.state === 'firing' ? 'Active' : 'Ended')
 
-/** A rule's alerts, one row per key it raised one for; each opens the data behind it. */
-export function AlertTable({ views, label }: { views: AlertView[]; label: string }) {
+/** A rule's alerts, one row per key it raised one for, a column per key column (none for a
+ * rule over all rows); each opens the data behind it. */
+export function AlertTable({ views, keyColumns, label }: { views: AlertView[]; keyColumns: readonly string[]; label: string }) {
   return (
     <Table aria-label={label}>
       <TableHeader>
         <TableRow>
-          <TableHead>Key</TableHead>
+          {keyColumns.map((column) => (
+            <TableHead key={column}>{column.replaceAll('_', ' ')}</TableHead>
+          ))}
           <TableHead>State</TableHead>
           <TableHead>When</TableHead>
           <TableHead>
@@ -31,14 +34,14 @@ export function AlertTable({ views, label }: { views: AlertView[]; label: string
       </TableHeader>
       <TableBody>
         {views.map((view) => (
-          <AlertRow key={view.alert.id} view={view} />
+          <AlertRow key={view.alert.id} view={view} keyColumns={keyColumns} />
         ))}
       </TableBody>
     </Table>
   )
 }
 
-function AlertRow({ view }: { view: AlertView }) {
+function AlertRow({ view, keyColumns }: { view: AlertView; keyColumns: readonly string[] }) {
   const { alert } = view
   const [open, setOpen] = useState(false)
   const rowsId = useId()
@@ -47,12 +50,14 @@ function AlertRow({ view }: { view: AlertView }) {
   return (
     <>
       <TableRow data-state={open ? 'selected' : undefined}>
-        <TableCell className="font-medium whitespace-normal">
-          {keyText(alert.key)}
-          <Deliveries projectId={alert.project_id} alertId={alert.id} />
-        </TableCell>
+        {keyColumns.map((column) => (
+          <TableCell key={column} className="font-medium whitespace-normal">
+            {alert.key[column] === null || alert.key[column] === undefined ? '–' : String(alert.key[column])}
+          </TableCell>
+        ))}
         <TableCell className={active ? severityTextClasses[view.rule.severity] : 'text-muted-foreground'}>
           {stateText(view)}
+          <Deliveries projectId={alert.project_id} alertId={alert.id} />
         </TableCell>
         <TableCell className="text-muted-foreground">
           {active ? 'Since ' : 'From '}
@@ -72,7 +77,7 @@ function AlertRow({ view }: { view: AlertView }) {
       </TableRow>
       {open && (
         <TableRow className="hover:bg-transparent">
-          <TableCell colSpan={4} id={rowsId} className="bg-muted/30 whitespace-normal">
+          <TableCell colSpan={keyColumns.length + 3} id={rowsId} className="bg-muted/30 whitespace-normal">
             <AlertRows view={view} />
           </TableCell>
         </TableRow>

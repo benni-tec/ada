@@ -156,10 +156,12 @@ test('one card per dashboard, its rules in a table, each opening to its alerts a
   // A rule with an active alert starts open: its alerts, a table in its row.
   expect(within(ruleRow).getByRole('button', { name: 'Hide its alerts' })).toHaveAttribute('aria-expanded', 'true')
   const alerts = within(section).getByRole('table', { name: 'Alerts of Coverage below target' })
-  const [, active, ended] = within(alerts).getAllByRole('row')
-  expect(active).toHaveTextContent('region: north')
+  const [head, active, ended] = within(alerts).getAllByRole('row')
+  // A column per key column, its value in each row.
+  expect(within(head).getAllByRole('columnheader')[0]).toHaveTextContent('region')
+  expect(within(active).getAllByRole('cell')[0]).toHaveTextContent(/^north$/)
   expect(active).toHaveTextContent('Active')
-  expect(ended).toHaveTextContent('region: south')
+  expect(within(ended).getAllByRole('cell')[0]).toHaveTextContent(/^south$/)
   expect(ended).toHaveTextContent('Ended')
 
   // The rows of its key in the run that showed it, with the history the time functions read.
