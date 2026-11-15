@@ -1124,7 +1124,8 @@ or `create_trial_matcher`; a new spec of the same kind is a new version (`add_ve
 `ada seed-trials` puts one in the "Nordic cancer trials" project, running on every save of a
 case of its type ("Cancer trial candidate" unless the project already had a type that covers
 it; the agent instructions name the type it is on), and its agent answers patient questions
-through it. A reseed turns its runs on save back on.
+through it. A reseed puts a matcher taken off its case type back on one
+(`attach_default_case_type`) and turns its runs on save back on.
 
 Nothing in cases assumes a use case. A model **kind**
 (`core/services/statistical_models/kinds.py`, `KINDS`) says which fields it reads, runs on a

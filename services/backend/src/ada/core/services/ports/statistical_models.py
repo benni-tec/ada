@@ -42,6 +42,11 @@ class StatisticalModelService(Protocol):
         Invalid when the case type does not cover what the latest version needs."""
         ...
 
+    async def attach_default_case_type(self, model_id: Id, actor: Actor) -> StatisticalModel:
+        """Put a model on the case type it would have been created on (a type that covers
+        it, else its kind's default, created), running on every save."""
+        ...
+
     async def create_pathway_model(
         self, project_id: Id, actor: Actor, parameters: OperatorId | None = None
     ) -> ModelVersion:

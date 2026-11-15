@@ -149,6 +149,12 @@ class StatisticalModels(StatisticalModelService):
         await self.models.update(changed)
         return changed
 
+    async def attach_default_case_type(self, model_id: Id, actor: Actor) -> StatisticalModel:
+        model = await self.models.get(model_id)
+        version = await self.models.version(model.id, model.latest_version)
+        case_type = await self._default_case_type(model.project_id, model.kind, version, actor)
+        return await self.set_case_type(model.id, case_type.id, True)
+
     async def _check_covered(self, model: StatisticalModel, version: ModelVersion) -> None:
         """Invalid unless the model's case type, if it has one, covers what it needs."""
         if model.case_type_id is None:

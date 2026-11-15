@@ -141,8 +141,8 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
 async def create_matcher(request: AsyncContainer, project_id: Id, steps: TrialSteps) -> str:
     """The project's trial matcher, running on every save of a case of its case type and
     reading case_trials and county_cities when it runs; the case type's name. A reseed that
-    rebuilt those steps gives the matcher a new version reading the new ones, and turns its
-    runs on save back on."""
+    rebuilt those steps gives the matcher a new version reading the new ones, and puts it
+    back on a case type and its runs on save back on."""
     models = await request.get(StatisticalModelService)
     cases = await request.get(CaseService)
     spec = TrialMatcherSpec(
@@ -161,10 +161,13 @@ async def create_matcher(request: AsyncContainer, project_id: Id, steps: TrialSt
             current.county_operator_id,
         ) != (spec.operator_id, spec.county_operator_id):
             await models.add_version(matcher.id, spec, SEED)
-        if matcher.case_type_id is not None and not matcher.auto_run:
+        # The instructions promise a result on every save: a matcher taken off its case
+        # type goes back on one, and one that stopped running on save runs again.
+        if matcher.case_type_id is None:
+            matcher = await models.attach_default_case_type(matcher.id, SEED)
+        elif not matcher.auto_run:
             matcher = await models.set_case_type(matcher.id, matcher.case_type_id, True)
-    if matcher.case_type_id is None:
-        return CASE_TYPE
+    assert matcher.case_type_id is not None
     return (await cases.get_type(matcher.case_type_id)).name
 
 

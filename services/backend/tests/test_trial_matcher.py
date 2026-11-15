@@ -266,3 +266,11 @@ def test_the_nearest_site_is_read_as_one_record() -> None:
     [row] = relation.fetchall()
     site = dict(zip(relation.columns, row, strict=True))["helsinki_site"]
     assert site == {"facility": None, "city": "Espoo", "country": "Finland", "km": 5.0}
+
+
+async def test_a_matcher_taken_off_its_case_type_goes_back_on_it_running_on_save() -> None:
+    world = World()
+    _, model = await world.matcher()
+    await world.models.set_case_type(model.id, None, False)
+    back = await world.models.attach_default_case_type(model.id, ACTOR)
+    assert (back.case_type_id, back.auto_run) == (model.case_type_id, True)
