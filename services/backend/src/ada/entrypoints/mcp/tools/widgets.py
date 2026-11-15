@@ -96,7 +96,8 @@ def register(mcp: FastMCP, inject: Inject) -> None:
           `data.main` is the widget's own operator and `data.inputs[name]` each input
           ("main" too): {columns: [{name, type}], rows: [{column: value}] (dates as ISO
           strings), roles (the output's time, geo and measure roles), truncated (more than
-          5,000 rows)}; and `data.run_id`, `data.is_scenario`, `data.is_stale`.
+          5,000 rows)}; and `data.run_id`, `data.is_stale`, and `data.is_scenario` (the
+          run binds an input slot; the name is historical).
           `ada.theme` ("light" or "dark"), `ada.colors` {foreground, muted, background,
           border, accent, positive, negative, warning, series: 8 colours}, `ada.size`
           {width, height}, `ada.format.number(value, {format, decimals})` and
@@ -168,7 +169,7 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         shown), and a map needs a geography role and its outlines. Declare roles on the
         transform (`add_transform`) or pick another type.
 
-        A widget marks simulated and outdated data by itself.
+        A widget marks outdated (stale) data by itself.
 
         `inputs` names further operators of the project the widget reads besides its own,
         e.g. {"targets": "<operator id>"}: lowercase names (letters, digits, _), at most 8;
@@ -250,9 +251,10 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         input: str = MAIN_INPUT,
     ) -> WidgetData:
         """The data a widget shows: one input's output in a run ("main", its own operator,
-        unless `input` names another), with what the columns mean and whether the numbers
-        are simulated or stale. Called by the widget, not by the model. Without `run_id` a
-        new run is started; read further inputs with the `run_id` of the first answer."""
+        unless `input` names another), with what the columns mean, whether they are stale
+        and whether the run binds inputs. Called by the widget, not by the model. Without
+        `run_id` a new run is started; read further inputs with the `run_id` of the first
+        answer."""
         return await widgets.data(widget_id, run_id, limit, input)
 
     @mcp.tool

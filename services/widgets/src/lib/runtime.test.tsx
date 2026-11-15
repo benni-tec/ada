@@ -89,16 +89,24 @@ test('a custom widget lists each source once, with the fetch time any input know
   expect(sources).toHaveTextContent(/fetched .*2026/)
 })
 
-test('marks simulated and stale data', async () => {
+test('marks stale data, but not a run that binds inputs', async () => {
   serve({ data: coverage({ is_scenario: true, is_stale: true }) })
   show()
 
   expect(await screen.findByText('6 rows, 1 measures')).toBeInTheDocument()
   const flags = screen.getByRole('list', { name: 'Data warnings' })
   expect(within(flags).getAllByRole('listitem').map((flag) => flag.textContent)).toEqual([
-    expect.stringContaining('Scenario: simulated numbers'),
-    expect.stringContaining('Stale'),
+    'Stale: last good data, a refresh failed',
   ])
+  expect(screen.queryByText(/scenario|simulated/i)).not.toBeInTheDocument()
+})
+
+test('shows no warnings for a run that only binds inputs', async () => {
+  serve({ data: coverage({ is_scenario: true }) })
+  show()
+
+  expect(await screen.findByText('6 rows, 1 measures')).toBeInTheDocument()
+  expect(screen.queryByRole('list', { name: 'Data warnings' })).not.toBeInTheDocument()
 })
 
 test('shows the server error, or that the address names no widget', async () => {

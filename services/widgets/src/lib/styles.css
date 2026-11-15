@@ -11,8 +11,6 @@
   --grid: #e5e4e0;
   --surface: #fcfcfb;
   --error: #b42318;
-  --scenario-bg: #ede9fe;
-  --scenario-fg: #4c1d95;
   --stale-bg: #fef3c7;
   --stale-fg: #78350f;
   /* Categorical slots in fixed order, validated for colour-vision deficiency. */
@@ -51,8 +49,6 @@
     --grid: #33332f;
     --surface: #1a1a19;
     --error: #f97066;
-    --scenario-bg: #2e1065;
-    --scenario-fg: #ddd6fe;
     --stale-bg: #451a03;
     --stale-fg: #fde68a;
     --series-1: #3987e5;
@@ -80,8 +76,6 @@
   --grid: #33332f;
   --surface: #1a1a19;
   --error: #f97066;
-  --scenario-bg: #2e1065;
-  --scenario-fg: #ddd6fe;
   --stale-bg: #451a03;
   --stale-fg: #fde68a;
   --series-1: #3987e5;
@@ -152,13 +146,6 @@ body,
   gap: 8px;
 }
 
-/* A scenario is outlined as a whole, not only labelled, so a glance at a crowded page
-   still tells it apart. */
-.ada-widget[data-scenario] {
-  outline: 2px dashed var(--scenario-fg);
-  outline-offset: -2px;
-}
-
 /* What does not fit scrolls here, never over the sources below: a chart with a height of
    its own (a heatmap's rows, a composed view) or a crowded value. */
 .ada-body {
@@ -198,11 +185,6 @@ body,
   padding: 2px 10px;
   font-size: 12px;
   font-weight: 600;
-}
-
-.ada-flag-scenario {
-  background: var(--scenario-bg);
-  color: var(--scenario-fg);
 }
 
 .ada-flag-stale {

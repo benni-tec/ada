@@ -40,7 +40,8 @@ class Run(DomainModel):
     id: Id
     project_id: Id
     time_range: TimeRange = TimeRange()
-    # Input slot name to the operator bound to it. Non-empty bindings make a scenario.
+    # Input slot name to the operator bound to it. Binding a slot to another operator
+    # composes pipelines into a DAG: whatever reads the slot reads that operator instead.
     bindings: dict[str, OperatorId] = {}
     # Materializing operator to the snapshot this run uses.
     snapshots: dict[OperatorId, Id] = {}
@@ -49,4 +50,7 @@ class Run(DomainModel):
 
     @property
     def is_scenario(self) -> bool:
+        """The run binds at least one input slot. The name is historical (from a dropped
+        scenarios plan) and kept for API compatibility; it does not mean the numbers are
+        simulated."""
         return bool(self.bindings)

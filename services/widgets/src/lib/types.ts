@@ -58,7 +58,10 @@ export type WidgetData = {
   columns: Column[]
   rows: unknown[][]
   truncated: boolean
+  /** The run binds at least one input slot to another operator (a pipeline composed into a
+   * DAG). The name is historical: widgets do not mark it. */
   is_scenario: boolean
+  /** A source behind the rows could not be refreshed: these are its last good data. */
   is_stale: boolean
   /** The sources behind the rows, as the run read them. */
   sources?: WidgetSource[]
