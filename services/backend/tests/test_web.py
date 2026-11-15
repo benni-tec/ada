@@ -1095,3 +1095,10 @@ async def test_watch_mcp_rejects_other_intervals(
             check_every="weekly",
         )
     assert len(explorer.calls) == before
+
+
+def test_original_html_tables_close_omitted_cell_and_row_tags() -> None:
+    from ada.adapters.sources.context_dev import html_tables
+
+    rows = html_tables("<table><tr><th>Name<th>Free<tr><td>A<td>4<tr><td>B<td>0</table>")
+    assert [cells for *_, cells in rows] == [["Name", "Free"], ["A", "4"], ["B", "0"]]

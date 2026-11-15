@@ -165,27 +165,41 @@ class _Tables(HTMLParser):
             self.depth += 1
         if self.depth != 1:
             return
-        if tag == "tr":
-            self.cells = []
+        # HTML lets </td>, </th> and </tr> be omitted: the next cell or row closes them.
+        if tag in ("tr", "thead", "tbody", "tfoot"):
+            self._end_row()
+            if tag == "tr":
+                self.cells = []
         elif tag in ("td", "th") and self.cells is not None:
+            self._end_cell()
             self.cell = []
         elif tag == "br" and self.cell is not None:
             self.cell.append(" ")
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "table":
+            if self.depth == 1:
+                self._end_row()
             self.depth = max(0, self.depth - 1)
             return
         if self.depth != 1:
             return
-        if tag in ("td", "th") and self.cell is not None and self.cells is not None:
+        if tag in ("td", "th"):
+            self._end_cell()
+        elif tag in ("tr", "thead", "tbody", "tfoot"):
+            self._end_row()
+
+    def _end_cell(self) -> None:
+        if self.cell is not None and self.cells is not None:
             self.cells.append(" ".join("".join(self.cell).split()))
-            self.cell = None
-        elif tag == "tr" and self.cells is not None:
-            if self.cells:
-                self.row += 1
-                self.rows.append((1, self.table, self.row, self.cells))
-            self.cells = None
+        self.cell = None
+
+    def _end_row(self) -> None:
+        self._end_cell()
+        if self.cells:
+            self.row += 1
+            self.rows.append((1, self.table, self.row, self.cells))
+        self.cells = None
 
     def handle_data(self, data: str) -> None:
         if self.depth == 1 and self.cell is not None:
