@@ -11,6 +11,7 @@ from ada.config import Settings
 from ada.core.ports.secrets import SecretBox
 from ada.discovery import modules
 from ada.entrypoints.http import errors, routers
+from ada.entrypoints.http.demo_guard import DemoGuard
 from ada.entrypoints.mcp.server import McpPathMiddleware, create_mcp
 
 
@@ -45,6 +46,10 @@ def create_app(settings: Settings | None = None, *providers: Provider) -> FastAP
     app.include_router(api)
     app.mount("/mcp", mcp_app)
     app.add_middleware(McpPathMiddleware)
+    if settings.demo_protected_projects:
+        app.add_middleware(
+            DemoGuard, container=container, protected=settings.demo_protected_projects
+        )
     setup_dishka(container, app)
     # Outside the container's middleware, so a failed request rolls back (see errors.py).
     errors.install(app)

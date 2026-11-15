@@ -58,16 +58,11 @@ map $demo_route $demo_limit_detail {
 }
 map "$request_method:$uri" $demo_mutation {
     default 0;
-    ~^[^:]+:/api/hooks/ 0;
-    ~^DELETE:/api/sessions/[^/]+/attachments/[^/]+/?$ 0;
-    ~^(PUT|PATCH|DELETE): 1;
-    ~^POST:/api/dashboards/[^/]+/(pins|alert-rules|reports)/?$ 1;
-    ~^POST:/api/reports/[^/]+/versions/?$ 1;
     ~^POST:/api/alert-rules/[^/]+/(test|check)/?$ 1;
-    ~^POST:/api/projects/[^/]+/sources/watch/?$ 1;
-    ~^POST:/api/sources/[^/]+/(refresh|watch)/?$ 1;
-    ~^POST:/api/widgets/[^/]+/(review|render)/?$ 1;
-    ~^POST:/api/models/[^/]+/(refresh|versions)/?$ 1;
+}
+map $demo_visitor $demo_visitor_header {
+    default "";
+    1 1;
 }
 map "$demo_visitor:$uri" $demo_private {
     default "";
@@ -104,7 +99,7 @@ server {
     location @demo_forbidden {
         default_type application/json;
         if ($demo_private) { return 403 '{"detail":"$demo_private"}'; }
-        return 403 '{"detail":"The public demo can create new things but not change existing ones."}';
+        return 403 '{"detail":"Alert tests are off on the public demo."}';
     }
     location @demo_limit {
         default_type application/json;
@@ -123,6 +118,8 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    # The backend refuses visitor changes to the team demo projects; empty for the team, so not sent.
+    proxy_set_header X-Ada-Visitor $demo_visitor_header;
 
     # Live updates for the frontend: a project's server-sent event stream, which stays open.
     # The backend sends a comment every 15 seconds, so the read timeout only ends streams

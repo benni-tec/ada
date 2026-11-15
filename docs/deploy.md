@@ -16,7 +16,8 @@ ada runs on one Verda VM that it shares with another project, "Tell me when". Pu
   `https://ada.95-133-254-42.sslip.io` to `ada-gateway:80` over the external Docker network
   `edge`. ada publishes no host ports: the override removes the PostgreSQL, Valkey and gateway
   ones, because Docker bypasses the host firewall.
-  The public demo guard locks settings, MCP and edits, and rate-limits visitor POSTs.
+  The public demo guard locks settings and MCP for visitors and rate-limits their POSTs. The backend refuses
+  visitor changes to the projects listed in `DEMO_PROTECTED_PROJECTS` (comma-separated ids, in `.env.local`).
   Before the first deploy including the guard, generate a token with `openssl rand -hex 24`
   and save it as `DEMO_TOKEN=<token>` in `/opt/ada/.env` (required for deployment).
   Tokens must contain only `[A-Za-z0-9]`. Keep the token private.

@@ -7,7 +7,7 @@ cleanup() { docker rm -f "$name-on" "$name-off" "$name-stub" >/dev/null 2>&1 || 
 trap cleanup EXIT
 docker build -q -t "$name" -f services/gateway/Dockerfile . >/dev/null
 docker network create "$name" >/dev/null
-printf "server { listen 8000; listen 5173; location / { return 200 'ok'; } }\n" > "$tmp/stub.conf"
+printf "server { listen 8000; listen 5173; location / { return 200 'v=\$http_x_ada_visitor'; } }\n" > "$tmp/stub.conf"
 docker run -d --name "$name-stub" --network "$name" --network-alias backend --network-alias frontend -v "$tmp/stub.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.30.6-alpine >/dev/null
 for mode in on off; do
     token=testonly
@@ -34,8 +34,10 @@ request 200 GET /api/health/live
 request 403 GET /api/settings/agent
 grep -q 'Settings are locked on the public demo.' "$tmp/body"
 request 403 POST /mcp
-request 403 PATCH /api/dashboards/x
-for path in dashboards/x/pins dashboards/x/alert-rules dashboards/x/reports reports/x/versions alert-rules/x/test alert-rules/x/check sources/x/watch sources/x/refresh projects/x/sources/watch widgets/x/render widgets/x/review models/x/refresh models/x/versions; do request 403 POST "/api/$path"; done
+request 200 PATCH /api/dashboards/x -H 'X-Ada-Visitor: 0'
+grep -qx 'v=1' "$tmp/body"
+for path in alert-rules/x/test alert-rules/x/check; do request 403 POST "/api/$path"; done
+for path in dashboards/x/pins reports/x/versions sources/x/refresh widgets/x/review; do request 200 POST "/api/$path"; done
 request 200 POST /api/projects
 request 200 DELETE /api/sessions/s/attachments/a
 for _ in {1..40}; do request 200 POST /api/hooks/context/x; done
@@ -55,7 +57,8 @@ grep -qi '^Location: .*/' "$tmp/headers"
 request 200 GET /team/wrong
 for cookie in wrong TESTONLY ''; do request 403 GET /api/settings/agent -H "Cookie: ada_team=$cookie"; done
 request 200 GET /api/settings/agent -H 'Cookie: ada_team=testonly'
-request 200 PATCH /api/dashboards/x -H 'Cookie: ada_team=testonly'
+request 200 PATCH /api/dashboards/x -H 'Cookie: ada_team=testonly' -H 'X-Ada-Visitor: 1'
+grep -qx 'v=' "$tmp/body"
 for _ in {1..30}; do request 200 POST /api/sessions/s/messages -H 'Cookie: ada_team=testonly'; done
 port=$off
 request 200 GET /api/settings/agent
