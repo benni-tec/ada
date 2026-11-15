@@ -3,7 +3,7 @@ import { useState, type KeyboardEvent } from 'react'
 import { formatNumber } from '@/lib/columns'
 import type { Loaded } from '@/lib/runtime'
 
-import { binLabel, buildMap, CLASSES, type MapModel, type Region } from './model'
+import { binLabel, buildMap, CLASSES, placeLabels, shortNames, type Label, type MapModel, type Region } from './model'
 
 // Hand-written SVG, like the line chart: the outlines come with the data, so drawing them
 // is one path per region, and a map library would add far more to every bundle than it
@@ -65,6 +65,12 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
     })
   }
   const region = active === null ? null : drawn[active]
+  // Labels in the map's own units, so they scale with it: on paper there is no tooltip.
+  const size = Math.max(model.box[2], model.box[3]) / 46
+  const short = shortNames(drawn.map((r) => r.name))
+  const texts = new Map(drawn.map((r, index) => [r.code, [short[index], ...(r.value === null ? [] : [formatNumber(r.value)])]]))
+  const labels = placeLabels(drawn, texts, size)
+  const keyed = labels.filter((label): label is Extract<Label, { number: number }> => 'number' in label)
   const description = `Map of ${model.value} by region, ${drawn.length} regions${
     model.period ? `, ${model.period}` : ''
   }. Use the arrow keys to read each region.`
@@ -73,7 +79,8 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
     <>
       <div className="ada-map">
         <svg
-          viewBox={model.box.join(' ')}
+          // A margin round the outlines, for labels and moved numbers at the edge.
+          viewBox={[model.box[0] - size * 2, model.box[1] - size * 2, model.box[2] + size * 4, model.box[3] + size * 4].join(' ')}
           preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label={title ? `${title}: ${description}` : description}
@@ -102,6 +109,39 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
           ))}
           {/* Drawn last, so its outline is not hidden under a neighbour's. */}
           {region && <path d={region.path} className="ada-region-outline" aria-hidden="true" />}
+          {/* Colours as attributes, not classes: a picture of the widget (a report's PDF)
+              keeps attributes but loses what a class gives. */}
+          <g
+            className="ada-map-labels"
+            aria-hidden="true"
+            fontSize={size}
+            fontWeight={500}
+            fill="var(--text-primary)"
+            stroke="var(--surface)"
+            strokeWidth={size / 6}
+            strokeLinejoin="round"
+            paintOrder="stroke"
+          >
+            {labels.map((label) =>
+              'number' in label ? (
+                <g key={label.code}>
+                  {label.from && <line x1={label.from[0]} y1={label.from[1]} x2={label.x} y2={label.y} stroke="var(--text-secondary)" strokeWidth={size / 10} />}
+                  <circle cx={label.x} cy={label.y} r={size * 0.62} fill="var(--surface)" stroke="var(--text-secondary)" strokeWidth={size / 10} />
+                  <text x={label.x} y={label.y} dy="0.35em" textAnchor="middle" fontSize={size * 0.8} stroke="none">
+                    {label.number}
+                  </text>
+                </g>
+              ) : (
+                <text key={label.code} x={label.x} y={label.y - ((label.lines.length - 1) * size * 1.15) / 2} textAnchor="middle">
+                  {label.lines.map((line, index) => (
+                    <tspan key={index} x={label.x} dy={index === 0 ? '0.35em' : '1.15em'} fontWeight={index ? 400 : undefined}>
+                      {line}
+                    </tspan>
+                  ))}
+                </text>
+              ),
+            )}
+          </g>
         </svg>
         {region && (
           <div className="ada-tooltip ada-map-tooltip" role="status">
@@ -114,6 +154,15 @@ function Choropleth({ model, title }: { model: MapModel; title: string }) {
         )}
       </div>
       <Legend model={model} />
+      {keyed.length > 0 && (
+        <ol className="ada-map-key" aria-hidden="true">
+          {keyed.map((label) => (
+            <li key={label.code}>
+              <span className="ada-map-key-number">{label.number}</span> {(texts.get(label.code) ?? []).join(' ')}
+            </li>
+          ))}
+        </ol>
+      )}
       {/* Hidden by its wrapper: a table keeps its full height whatever it is told. */}
       <div className="sr-only">
         <table>

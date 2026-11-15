@@ -100,7 +100,7 @@ export function ReportDocument({ report, version, sources: unordered, origin, dr
           <Text style={styles.facts}>
             Version {version.version} · data period {describeTimeRange(version.time_range)} · made {made.toLocaleDateString()}
           </Text>
-          <Text style={styles.facts}>Frozen at run {version.run_id}: every figure below comes from it.</Text>
+          <Text style={styles.facts}>Run {version.run_id}</Text>
         </View>
         {blocks.map((block, index) => (
           <BlockPdf key={index} block={block} depth={0} drawn={drawn} sources={sources} />
@@ -110,7 +110,6 @@ export function ReportDocument({ report, version, sources: unordered, origin, dr
             run, with its pipeline and sources. */}
         <View style={styles.inAda} wrap={false}>
           <Text style={styles.calloutLabel}>In ADA</Text>
-          <Text>This version, with every widget's pipeline and sources, is at</Text>
           <Link src={reportUrl(origin, report, version)} style={styles.link}>
             {reportUrl(origin, report, version)}
           </Link>
@@ -186,7 +185,7 @@ const MAX_PICTURE_HEIGHT = 520
 
 function WidgetPdf({ id, caption, drawn, sources }: { id: Id; caption: string } & Context) {
   const entry = drawn.get(id)
-  if (!entry) return <Text style={styles.missing}>A widget of this report could not be loaded.</Text>
+  if (!entry) return <Text style={styles.missing}>Widget not available</Text>
   const { widget, snapshot, error } = entry
   const title = widget.title || 'Untitled widget'
   // A widget that drew nothing has no size to scale: no picture then.
@@ -200,7 +199,7 @@ function WidgetPdf({ id, caption, drawn, sources }: { id: Id; caption: string } 
           <Image src={drawnPicture.image} style={[styles.picture, { height }]} />
         ) : (
           <Text style={styles.missing}>
-            “{title}” could not be drawn here{error ? ` (${error})` : ''}. It is in the report in ADA, linked above.
+            {title}: not drawn{error ? ` (${error})` : ''}
           </Text>
         )}
         <View style={styles.widgetFooter}>
