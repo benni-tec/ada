@@ -133,7 +133,9 @@ function describe(placeholder: Placeholder, resolved: Resolved, result: InputRes
   return lines.filter(Boolean).join('\n')
 }
 
-/** A value, or "no value": a button to the input's pipeline, or plain inside a link. */
+/** A value, or "no value": a button to the input's pipeline, or plain inside a link. The
+ * button is a span: a <button> is one box, so a value that wraps would be underlined only
+ * under its last line, where a span wraps, and is underlined, like the text around it. */
 function Value({
   placeholder,
   result,
@@ -169,11 +171,22 @@ function Value({
       </span>
     )
   }
+  const open = () => openPipeline(placeholder.input)
   return (
-    <button type="button" {...props} onClick={() => openPipeline(placeholder.input)}>
+    <span
+      {...props}
+      role="button"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        open()
+      }}
+    >
       {content}
       {flags}
-    </button>
+    </span>
   )
 }
 

@@ -667,24 +667,20 @@ body,
 }
 
 /* A figure stays on one line; a text value (a target, a name) wraps like the text around it,
-   its first line on the line it starts (a list's bullet beside it). */
+   underlined line by line. */
 .ada-placeholder[data-numeric] {
   white-space: nowrap;
 }
 
-button.ada-placeholder:not([data-numeric]) {
-  vertical-align: top;
-}
-
-button.ada-placeholder {
+.ada-placeholder:is(button, [role='button']) {
   cursor: pointer;
 }
 
-button.ada-placeholder:hover {
+.ada-placeholder:is(button, [role='button']):hover {
   border-bottom-style: solid;
 }
 
-button.ada-placeholder:focus-visible {
+.ada-placeholder:is(button, [role='button']):focus-visible {
   outline: 2px solid var(--series-1);
   outline-offset: 1px;
 }
