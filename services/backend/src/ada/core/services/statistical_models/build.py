@@ -281,8 +281,8 @@ def _validation(spec: ModelSpec) -> list[ValidationCheck]:
                     note=(
                         "Ratio of cumulative excess hazards, basic vs high education: "
                         f"observed in {source.source if source else 'the comparison'} "
-                        f"({basic:.3f} vs {high:.3f} 5-year cause-specific survival) against the direct HR "
-                        f"of {direct.provenance.source}"
+                        f"({basic:.3f} vs {high:.3f} 5-year cause-specific survival) "
+                        f"against the direct HR of {direct.provenance.source}"
                     ),
                 )
             )
