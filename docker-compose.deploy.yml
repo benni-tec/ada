@@ -16,6 +16,8 @@ services:
     ports: !reset []
 
   gateway:
+    environment:
+      DEMO_TOKEN: ${DEMO_TOKEN:?Set DEMO_TOKEN in /opt/ada/.env before deploying}
     ports: !reset []
     networks:
       default:
