@@ -477,10 +477,12 @@ test('a session started from the dashboard has it attached beside the conversati
   act(() => emit('dashboard.changed', { dashboard_id: 'd1', version_id: 'v3' }))
   await waitFor(() => expect(within(panel).getAllByRole('listitem')).toHaveLength(4))
 
-  // The × detaches it, and the half says nothing is attached.
+  // The × detaches it: the pane closes, and opened again says nothing is attached.
   fireEvent.click(within(bar).getByRole('button', { name: 'Detach Screening overview' }))
-  expect(await within(panel).findByText(/Nothing is attached/)).toBeInTheDocument()
+  const reopen = await within(panel).findByRole('button', { name: 'Open the attachments' })
   expect(within(panel).queryByRole('list', { name: 'Dashboard widgets' })).not.toBeInTheDocument()
+  fireEvent.click(reopen)
+  expect(await within(panel).findByText(/Nothing is attached/)).toBeInTheDocument()
   expect(calls).toEqual([
     ['create', { title: 'Questions about Screening overview', origin_dashboard_id: 'd1' }],
     ['attach', { kind: 'dashboard', ref: 'd1' }],

@@ -19,7 +19,7 @@ An MCP server for traceable data analysis: an agent builds pipelines from data s
 | Two outputs: live monitoring dashboards, and reports frozen at a run | Settled |
 | Reports are versioned with semantic versions under one name | Settled; what each level means is proposed |
 | Time ranges are a first-class concept | Settled |
-| Input operators make sources swappable, which gives simulation and templates | Settled |
+| Input operators compose pipelines into a DAG and make sources swappable, which gives templates | Settled |
 | Recommendations come from an agent operator and are shown by a widget | Settled |
 | Alerts are defined on pipelines, not on widgets | Settled; the condition is a formula tree in the rule |
 | Definitions in a relational database, analysis data in DuckDB | Proposed |
@@ -157,19 +157,18 @@ A run is one execution of a pipeline for a given set of parameters, and its run 
 - **Run id plus operator id is an address.** Together they name any intermediate result, which is what a link back to the platform opens.
 - **Reports pin a run; dashboards follow the latest one.**
 
-### Input operators and simulation
+### Input operators
 
-An Input operator is a named, typed slot in a pipeline that is bound to another pipeline, and swapping that binding is how simulation works.
+An Input operator is a named, typed slot in a pipeline that is bound to another pipeline: inputs are how pipelines are composed into a DAG.
 
 - **What it declares.** A name and a schema: columns, types, time column and grain. Anything bound to it must match, and the check happens at bind time.
 - **What it binds to.** Any pipeline, from a single source to a long chain. The Input itself is pass-through.
 - **Bindings are run parameters.** A run is defined by its time range plus its bindings, so the same reuse and invalidation rules cover both.
-- **A scenario is a set of bindings.** Example: bind the screening input to "actual data, with Helsinki raised to the 80% target". The scenario pipeline can wrap the real one, so it only states the change.
 - **Templates need no extra concept.** A pipeline with Inputs is a template; binding them instantiates it.
-- **Simulated results are marked.** Any operator downstream of a non-default binding carries a scenario flag, and every widget shows it. A simulated number must never pass for a measured one.
-- **Comparison is composition.** A pipeline can use the same sub-pipeline twice with different bindings, which gives baseline against scenario in one widget.
+- **Bound inputs are not marked.** A run that binds an input reports it (`is_scenario`, a historical name), but widgets do not show it: binding composes pipelines and says nothing about whether the numbers are measured. Scenarios as what-ifs were planned and abandoned (2026-11-15) in favour of cases and models.
+- **Comparison is composition.** A pipeline can use the same sub-pipeline twice with different bindings, which compares the two in one widget.
 
-Place Inputs only where a swap is wanted. Elsewhere a source stays a plain operator.
+Place Inputs only where a pipeline is meant to be composed or swapped. Elsewhere a source stays a plain operator.
 
 ### Agent operators
 
@@ -371,7 +370,7 @@ Yes for the core, and it exposed three gaps in the model. Live monitoring is onl
 | Materializing with snapshots | Statistics get revised and one source has a preliminary year | Supported |
 | Probing before refetching | Sotkanet indicators carry a data-updated date | Supported |
 | Time as a first-class concept | Annual, quarterly, three-year and five-year periods, ending in different years | Supported, with a gap |
-| Simulation through Inputs | "Every county at the 80% screening target" is a natural scenario | Supported |
+| Composition through Inputs | A pipeline built from other pipelines, swappable per run | Supported |
 | Agent operator for recommendations | The findings need judgement: an education gap, a Nordic gap, two unmeasurable targets | Supported |
 | Dashboards and alerts | Almost everything is annual, so a rule fires at most once a year | Weakly tested |
 
@@ -455,7 +454,7 @@ An alert is a rule on a pipeline's output, evaluated on the rule's own check int
 - **Actions.** Notify, call a webhook, or generate a report from a template with the triggering run pinned.
 - **Display.** Alerts live in their own feed and as badges on dashboards. A map or table of the same pipeline is an ordinary widget.
 - **Trace.** Every alert event carries its run id, so it opens the exact data that triggered it.
-- **Simulation.** A rule can be evaluated on a scenario run without notifying anyone, to answer "would this have fired?".
+- **Dry runs.** A rule can be evaluated on a run with other bindings without notifying anyone, to answer "would this have fired?".
 - **Data-quality alerts.** A failed refresh, a schema change or a stale source uses the same mechanism.
 
 ### Rules and alert pipelines

@@ -5,7 +5,7 @@ so services can be built and tested before the database repositories exist, and 
 anything above the ports need no database. Nothing here survives a restart.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
 
@@ -20,6 +20,7 @@ from ada.core.models.agents import (
 from ada.core.models.alerts import Alert, AlertRule, AlertState
 from ada.core.models.attachments import Attachment, AttachmentKind
 from ada.core.models.base import UNCHANGED, Change, DomainModel, Id, JsonObject
+from ada.core.models.cases import Case, CaseEvent, CaseResult, CaseType
 from ada.core.models.dashboards import Dashboard, DashboardVersion
 from ada.core.models.errors import Conflict, NotFound
 from ada.core.models.judges import JudgeDefaults, JudgeKind, JudgeOverride, Verdict
@@ -29,6 +30,7 @@ from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionAgent, SessionEntry
 from ada.core.models.sources import CheckEvery, DataSource, FreshnessPolicy
+from ada.core.models.statistical_models import ModelVersion, StatisticalModel
 from ada.core.models.widgets import Widget
 from ada.core.ports.agents import ResearchCalls, TurnProgress
 from ada.core.ports.repositories import (
@@ -37,6 +39,7 @@ from ada.core.ports.repositories import (
     AlertRepository,
     AlertRuleRepository,
     AttachmentRepository,
+    CaseRepository,
     DashboardRepository,
     DataSourceRepository,
     JudgeSettingsRepository,
@@ -48,6 +51,7 @@ from ada.core.ports.repositories import (
     RunRepository,
     SessionRepository,
     SnapshotRepository,
+    StatisticalModelRepository,
     TemplateRepository,
     WidgetRepository,
 )
@@ -101,6 +105,12 @@ class MemoryStore:
             kind: JudgeDefaults(kind=kind, revision=1) for kind in JudgeKind
         }
         self.judge_overrides: dict[tuple[Id, JudgeKind], JudgeOverride] = {}
+        self.statistical_models: dict[Id, StatisticalModel] = {}
+        self.model_versions: dict[tuple[Id, int], ModelVersion] = {}
+        self.case_types: dict[Id, CaseType] = {}
+        self.cases: dict[Id, Case] = {}
+        self.case_events: list[CaseEvent] = []
+        self.case_results: list[CaseResult] = []
 
     def forget_model(self, key: tuple[Id, str]) -> None:
         """Remove a model and clear the selections naming it, as ON DELETE SET NULL does."""
@@ -864,3 +874,104 @@ class MemoryJudgeSettingsRepository(JudgeSettingsRepository):
         except NotFound:
             return record.model_copy(update={"model_id": None})
         return record
+
+
+class MemoryStatisticalModelRepository(StatisticalModelRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def get(self, id: Id) -> StatisticalModel:
+        return _get(self.store.statistical_models, "statistical model", id)
+
+    async def list(self, project_id: Id) -> Sequence[StatisticalModel]:
+        return [m for m in self.store.statistical_models.values() if m.project_id == project_id]
+
+    async def add(self, model: StatisticalModel) -> None:
+        _get(self.store.projects, "project", model.project_id)
+        self.store.statistical_models[model.id] = model
+
+    async def update(self, model: StatisticalModel) -> None:
+        _get(self.store.statistical_models, "statistical model", model.id)
+        self.store.statistical_models[model.id] = model
+
+    async def add_version(self, version: ModelVersion) -> None:
+        model = _get(self.store.statistical_models, "statistical model", version.model_id)
+        if version.version <= model.latest_version:
+            raise Conflict(
+                "statistical model", version.model_id, version.version - 1, model.latest_version
+            )
+        self.store.model_versions[(version.model_id, version.version)] = version
+        self.store.statistical_models[model.id] = model.model_copy(
+            update={
+                "latest_version": max(model.latest_version, version.version),
+                "updated_at": version.created_at,
+            }
+        )
+
+    async def version(self, model_id: Id, number: int) -> ModelVersion:
+        return _get(self.store.model_versions, "model version", (model_id, number))
+
+
+class MemoryCaseRepository(CaseRepository):
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def add_type(self, case_type: CaseType) -> None:
+        _get(self.store.projects, "project", case_type.project_id)
+        self.store.case_types[case_type.id] = case_type
+
+    async def get_type(self, id: Id) -> CaseType:
+        return _get(self.store.case_types, "case type", id)
+
+    async def list_types(self, project_id: Id) -> Sequence[CaseType]:
+        return [t for t in self.store.case_types.values() if t.project_id == project_id]
+
+    async def update_type(self, case_type: CaseType) -> None:
+        _get(self.store.case_types, "case type", case_type.id)
+        self.store.case_types[case_type.id] = case_type
+
+    async def find(self, case_type_id: Id, key: str) -> Case | None:
+        return next(
+            (
+                c
+                for c in self.store.cases.values()
+                if c.case_type_id == case_type_id and c.key == key
+            ),
+            None,
+        )
+
+    async def list(self, case_type_id: Id) -> Sequence[Case]:
+        return [c for c in self.store.cases.values() if c.case_type_id == case_type_id]
+
+    async def count(self, case_type_id: Id) -> int:
+        return len(await self.list(case_type_id))
+
+    async def add(self, case: Case) -> None:
+        _get(self.store.case_types, "case type", case.case_type_id)
+        self.store.cases[case.id] = case
+
+    async def update(self, case: Case) -> None:
+        _get(self.store.cases, "case", case.id)
+        self.store.cases[case.id] = case
+
+    async def add_events(self, events: Sequence[CaseEvent]) -> None:
+        self.store.case_events.extend(events)
+
+    async def events(self, case_id: Id) -> Sequence[CaseEvent]:
+        return [e for e in self.store.case_events if e.case_id == case_id]
+
+    async def add_result(self, result: CaseResult) -> None:
+        self.store.case_results.append(result)
+
+    async def results(self, case_id: Id) -> Sequence[CaseResult]:
+        return [r for r in reversed(self.store.case_results) if r.case_id == case_id]
+
+    async def latest_results(self, model_id: Id) -> Mapping[Id, CaseResult]:
+        return {r.case_id: r for r in self.store.case_results if r.model_id == model_id}
+
+    async def result_counts(self, model_id: Id) -> Mapping[Id, int]:
+        counts: dict[Id, int] = {}
+        for r in self.store.case_results:
+            if r.model_id == model_id:
+                counts[r.case_id] = counts.get(r.case_id, 0) + 1
+        return counts

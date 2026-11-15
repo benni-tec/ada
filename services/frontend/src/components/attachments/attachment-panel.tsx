@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { PanelRightClose, PanelRightOpen, X } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 
 import { Hint, IconButton } from '@/components/icon-action'
 import { ErrorNotice, Loading } from '@/components/notices'
@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils'
 import { AttachChooser } from './attach-chooser'
 import { AttachmentView } from './attachment-views'
 import { attachmentKinds, attachmentTitle } from './kinds'
+import { usePaneWidth } from './pane-width'
+import { ResizeHandle } from './resize-handle'
 
 const tabStorageKey = (sessionId: Id) => `ada-session-tab:${sessionId}`
 
@@ -42,6 +44,10 @@ const onBar =
  * bar, one view at a time. The last tab open is remembered per session. The live stream
  * refetches the list (`session.attachment_added`, `session.attachment_removed`), and an
  * attachment an agent added becomes the open tab, so the person sees what it brought.
+ *
+ * The pane is open while something is attached and closed while nothing is: it closes
+ * when the last attachment goes and opens when one arrives. The person may close or open
+ * it either way, empty too. Its width is dragged at its left edge, remembered per browser.
  */
 export function AttachmentPanel({ projectId, sessionId }: { projectId: Id; sessionId: Id }) {
   const queryClient = useQueryClient()
@@ -49,6 +55,9 @@ export function AttachmentPanel({ projectId, sessionId }: { projectId: Id; sessi
   const list = attachments.data
   const [picked, setPicked] = useState<Id | null>(() => rememberedTab(sessionId))
 
+  // Whether the pane is open: until something changes it, while anything is attached (or
+  // the list cannot be read, so that it says why).
+  const [chosenOpen, setOpen] = useState<boolean>()
   // What the list held when last seen: one that appears since, added by an agent, opens.
   // The first list seen opens nothing by itself.
   const [seen, setSeen] = useState<Attachment[]>()
@@ -57,9 +66,25 @@ export function AttachmentPanel({ projectId, sessionId }: { projectId: Id; sessi
       const before = new Set(seen.map((attachment) => attachment.id))
       const brought = list.findLast((attachment) => !before.has(attachment.id) && attachment.actor.kind !== 'user')
       if (brought) setPicked(brought.id)
+      // Something new opens the pane; the last one going closes it.
+      if (list.some((attachment) => !before.has(attachment.id))) setOpen(true)
+      else if (seen.length > 0 && list.length === 0) setOpen(false)
     }
     setSeen(list)
   }
+  const open = chosenOpen ?? (attachments.isError || (list !== undefined && list.length > 0))
+  const [width, setWidth] = usePaneWidth()
+  // The toggle the person pressed is replaced by the other one: the focus moves to it.
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const toggled = useRef(false)
+  const toggle = (next: boolean) => {
+    toggled.current = true
+    setOpen(next)
+  }
+  useEffect(() => {
+    if (toggled.current) toggleRef.current?.focus()
+    toggled.current = false
+  }, [open])
   const shown = list?.find((attachment) => attachment.id === picked) ?? list?.at(-1)
   const shownId = shown?.id
   useEffect(() => {
@@ -79,8 +104,13 @@ export function AttachmentPanel({ projectId, sessionId }: { projectId: Id; sessi
       setList((current) => current.filter((other) => other.id !== attachment.id))
       void queryClient.invalidateQueries({ queryKey: attachmentKeys.list(sessionId) })
     },
+    onError: () => {
+      toggled.current = false
+    },
   })
   const onDetach = (attachment: Attachment) => {
+    // Detaching the last one closes the pane: the focus goes to the toggle that opens it.
+    toggled.current = list?.length === 1
     // The open tab goes: its neighbour opens, the one before it if there is one.
     if (list && attachment.id === shown?.id) {
       const index = list.indexOf(attachment)
@@ -90,6 +120,7 @@ export function AttachmentPanel({ projectId, sessionId }: { projectId: Id; sessi
   }
 
   const panelId = useId()
+  const paneId = useId()
   const empty = list?.length === 0
   const chooser = (onBarToo: boolean) => (
     <AttachChooser
@@ -104,15 +135,63 @@ export function AttachmentPanel({ projectId, sessionId }: { projectId: Id; sessi
     />
   )
 
+  if (!open)
+    return (
+      <aside
+        id={paneId}
+        aria-label="Attachments"
+        // Closed: the bar's colour, a line under the chat or a strip at the page's right.
+        className="flex h-10 shrink-0 items-center gap-2 border-t bg-black px-1.5 text-white lg:h-auto lg:w-10 lg:flex-col lg:border-t-0 lg:border-l lg:px-0 lg:py-1.5 dark:bg-white dark:text-black"
+      >
+        <IconButton
+          ref={toggleRef}
+          label="Open the attachments"
+          side="left"
+          aria-expanded={false}
+          aria-controls={paneId}
+          onClick={() => toggle(true)}
+          className={onBar}
+        >
+          <PanelRightOpen />
+        </IconButton>
+        <span className="text-xs font-medium tracking-wide text-white/70 uppercase lg:sr-only dark:text-black/60">
+          Attachments
+        </span>
+        {list && list.length > 0 && (
+          <span className="text-xs text-white/70 tabular-nums dark:text-black/60">
+            <span className="sr-only">Attached: </span>
+            {list.length}
+          </span>
+        )}
+      </aside>
+    )
+
+  const close = (
+    <IconButton
+      ref={toggleRef}
+      label="Close the attachments"
+      side="bottom"
+      aria-expanded={true}
+      aria-controls={paneId}
+      onClick={() => toggle(false)}
+      className={onBar}
+    >
+      <PanelRightClose />
+    </IconButton>
+  )
+
   return (
     <aside
+      id={paneId}
       aria-label="Attachments"
+      style={{ '--attachments-width': `${width}%` } as CSSProperties}
       className={cn(
-        'flex min-h-0 min-w-0 flex-col border-t lg:flex-1 lg:border-t-0 lg:border-l',
+        'relative flex min-h-0 min-w-0 flex-col border-t lg:w-(--attachments-width) lg:flex-none lg:border-t-0 lg:border-l',
         // Stacked under the chat on a narrow screen, an empty half takes only its line.
         empty ? 'shrink-0' : 'flex-1',
       )}
     >
+      <ResizeHandle width={width} onResize={setWidth} controls={paneId} />
       <header className="flex h-10 shrink-0 items-stretch bg-black text-white dark:bg-white dark:text-black">
         {list && list.length > 0 ? (
           <Tabs
@@ -128,7 +207,10 @@ export function AttachmentPanel({ projectId, sessionId }: { projectId: Id; sessi
             Attachments
           </span>
         )}
-        {!empty && <div className="flex shrink-0 items-center px-1.5">{chooser(true)}</div>}
+        <div className="flex shrink-0 items-center gap-0.5 px-1.5">
+          {!empty && chooser(true)}
+          {close}
+        </div>
       </header>
       {remove.error && (
         <div className="border-b px-4 py-2">

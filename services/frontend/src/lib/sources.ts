@@ -6,6 +6,7 @@ export const accessLabels: Record<AccessKind, string> = {
   browser: 'Browser',
   document: 'Document',
   web: 'Web page',
+  cases: 'Cases',
 }
 
 export const formatLabels: Record<DataFormat, string> = {

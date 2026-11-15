@@ -22,6 +22,8 @@ export type Data = {
   /** Every input by name, "main" included. */
   inputs: Record<string, Dataset>
   run_id: string
+  /** The run binds at least one input slot to another operator, composing pipelines into a
+   * DAG. The name is historical; it is still passed because existing code may read it. */
   is_scenario: boolean
   is_stale: boolean
 }

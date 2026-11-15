@@ -62,7 +62,8 @@ class WidgetData(DomainModel):
     rows: tuple[tuple[object, ...], ...]
     # More rows exist than were returned.
     truncated: bool = False
-    # The run has input bindings, so these are simulated numbers.
+    # The run binds at least one input slot to another operator (pipelines composed into
+    # a DAG). The name is historical; widgets do not mark it.
     is_scenario: bool = False
     # A source behind this could not be refreshed; the data is the last good snapshot.
     is_stale: bool = False

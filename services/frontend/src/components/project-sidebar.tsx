@@ -89,6 +89,11 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
               <Sessions projectId={projectId} />
               <Dashboards projectId={projectId} />
               <Reports projectId={projectId} />
+              {/* Cases and the models that run on them. */}
+              <Group type="pathway" label="Pathways">
+                <PageLink to="/projects/$projectId/cases" projectId={projectId} type="case" label="Cases" />
+                <PageLink to="/projects/$projectId/models" projectId={projectId} type="model" label="Models" />
+              </Group>
             </SidebarMenu>
           </SidebarGroup>
         </nav>
@@ -441,6 +446,31 @@ function Alerts({ projectId }: { projectId: Id }) {
         </SidebarMenuBadge>
       )}
     </SidebarMenuItem>
+  )
+}
+
+/** One page of the project, as a link that is marked while one is on it or below it. */
+function PageLink({
+  to,
+  projectId,
+  type,
+  label,
+}: {
+  to: '/projects/$projectId/cases' | '/projects/$projectId/models'
+  projectId: Id
+  type: PageTypeName
+  label: string
+}) {
+  const Icon = pageTypes[type].icon
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild>
+        <Link to={to} params={{ projectId }} activeProps={{ 'data-active': true }}>
+          <Icon aria-hidden="true" />
+          <span>{label}</span>
+        </Link>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
   )
 }
 

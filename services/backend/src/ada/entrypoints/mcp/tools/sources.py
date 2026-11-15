@@ -90,6 +90,17 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         the publisher, the licence ("unknown", with the reason in `note`, when it cannot be
         established), the landing page and `found_by` (the web search and scope that led
         to it); model-extracted operations set `extracted_by_model` themselves.
+        For a project's cases use access_kind "cases" with the case type's id as the
+        address (read inside ADA, no network; the format is set to "parquet");
+        `options.table` "cases" (default: key, revision, created_at, updated_at and every
+        field of the case type, an enum_list as comma-joined text, a day_map one integer
+        column per step named `<field>_<step>`), "events" (key, field, step, days,
+        recorded_at) or "results" (key, model_id, model, version, case_revision, trigger,
+        created_at, summary, status and each model's figures prefixed by its kind, e.g.
+        `patient_pathway_days_behind`). The columns and a time role (updated_at,
+        recorded_at, created_at) are declared for you; roles you declare, such as a geo
+        role on a county field, are kept. Its freshness is "push": saving a case refreshes
+        it.
 
         Registering does not fetch anything: call refresh_source to load the data (with
         `wait` to have it at once), then add_source_operator to start a pipeline from it,

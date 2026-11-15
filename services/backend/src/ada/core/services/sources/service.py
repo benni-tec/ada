@@ -8,6 +8,7 @@ from uuid import uuid7
 from ada.core.models.actors import PLATFORM
 from ada.core.models.analysis import Query
 from ada.core.models.base import Id, JsonObject
+from ada.core.models.cases import case_type_address
 from ada.core.models.errors import Invalid, NotConfigured
 from ada.core.models.events import Event, EventType
 from ada.core.models.operators import Operator, OperatorId, OperatorKind, operator_identity
@@ -33,10 +34,12 @@ from ada.core.models.web import watching_not_configured
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import (
+    CaseRepository,
     DataSourceRepository,
     OperatorRepository,
     ProjectRepository,
     SnapshotRepository,
+    StatisticalModelRepository,
 )
 from ada.core.ports.secrets import SecretBox, SecretUnreadable
 from ada.core.ports.sources import SourceCheckLog, SourceLocks, SourceReader, SourceReaders
@@ -47,6 +50,7 @@ from ada.core.services.pipelines.schemas import check_unique
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.schema.roles import check_roles
 from ada.core.services.schema.time import period_key, periods
+from ada.core.services.sources.cases import CASES_FRESHNESS, case_schema, check_cases
 from ada.core.services.sources.freshness import check_policy, is_due, wants_check
 from ada.core.services.sources.pushdown import (
     PushdownOptions,
@@ -96,6 +100,8 @@ class DataSources(SourceService):
         explorer: WebExplorer,
         secrets: SecretBox,
         public_url: str | None,
+        cases: CaseRepository | None = None,
+        statistical: StatisticalModelRepository | None = None,
     ) -> None:
         self.projects = projects
         self.sources = sources
@@ -111,6 +117,9 @@ class DataSources(SourceService):
         self.secrets = secrets
         # Where the page monitor service can reach this platform; None disables watching.
         self.public_url = public_url
+        # What cases sources are declared from; without them none can be registered.
+        self.cases = cases
+        self.statistical = statistical
 
     async def register(
         self,
@@ -133,6 +142,17 @@ class DataSources(SourceService):
             declared_schema = _document_schema(options or {}, declared_schema)
         elif access_kind is AccessKind.WEB:
             declared_schema = web_schema(options or {}, declared_schema)
+        elif access_kind is AccessKind.CASES:
+            if self.cases is None or self.statistical is None:
+                raise Invalid("Cases sources are not available here")
+            declared_schema = await case_schema(
+                self.cases, self.statistical, project_id, address, options or {}, declared_schema
+            )
+            # Read as typed rows, kept fresh by every save; the address in one spelling,
+            # so a save finds its sources.
+            format = DataFormat.PARQUET
+            freshness = freshness or CASES_FRESHNESS
+            address = str(case_type_address(address))
         source = DataSource(
             id=uuid7(),
             project_id=project_id,
@@ -213,6 +233,7 @@ class DataSources(SourceService):
                 "provenance": _provenance(updated.access_kind, updated.options, updated.provenance)
             }
         )
+        check_cases(updated, before=source)
         _check(updated)
         return await self.sources.update(updated, expected_revision)
 
@@ -614,6 +635,7 @@ def _check(source: DataSource) -> None:
     shape_options(source.options)
     _check_document(source)
     check_web(source)
+    check_cases(source)
     declared = source.declared_schema
     if declared is not None and declared.columns:
         check_unique(declared.columns)

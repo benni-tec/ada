@@ -209,3 +209,6 @@ keeps the old one's severity, interval, data-age limit, alert pipeline and on/of
 URLs supplied this way need no known sponsor URL pattern. Registration does not
 scrape; refresh the returned source separately. `--refresh` includes these added
 pages in its paced web loop and credit estimate.
+
+The trial matcher model (`trial_matcher`, docs/contracts.md "Cases") reads `case_trials`:
+`create_trial_matcher` with that operator puts a matcher on the project's cancer case type.

@@ -14,11 +14,16 @@ import { Route as ProjectsProjectIdRouteRouteImport } from './routes/projects/$p
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
 import { Route as ProjectsProjectIdSettingsRouteImport } from './routes/projects/$projectId/settings'
 import { Route as ProjectsProjectIdAlertsIndexRouteImport } from './routes/projects/$projectId/alerts/index'
+import { Route as ProjectsProjectIdCasesIndexRouteImport } from './routes/projects/$projectId/cases/index'
+import { Route as ProjectsProjectIdCasesNewRouteImport } from './routes/projects/$projectId/cases/new'
 import { Route as ProjectsProjectIdDashboardsDashboardIdRouteImport } from './routes/projects/$projectId/dashboards/$dashboardId'
+import { Route as ProjectsProjectIdModelsIndexRouteImport } from './routes/projects/$projectId/models/index'
+import { Route as ProjectsProjectIdModelsModelIdRouteImport } from './routes/projects/$projectId/models/$modelId'
 import { Route as ProjectsProjectIdReportsReportIdRouteImport } from './routes/projects/$projectId/reports/$reportId'
 import { Route as ProjectsProjectIdReportsNewRouteImport } from './routes/projects/$projectId/reports/new'
 import { Route as ProjectsProjectIdSessionsSessionIdRouteImport } from './routes/projects/$projectId/sessions/$sessionId'
 import { Route as ProjectsProjectIdWidgetsWidgetIdRouteImport } from './routes/projects/$projectId/widgets/$widgetId'
+import { Route as ProjectsProjectIdCasesCaseTypeIdKeyRouteImport } from './routes/projects/$projectId/cases/$caseTypeId/$key'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -47,10 +52,34 @@ const ProjectsProjectIdAlertsIndexRoute =
     path: '/alerts/',
     getParentRoute: () => ProjectsProjectIdRouteRoute,
   } as any)
+const ProjectsProjectIdCasesIndexRoute =
+  ProjectsProjectIdCasesIndexRouteImport.update({
+    id: '/cases/',
+    path: '/cases/',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdCasesNewRoute =
+  ProjectsProjectIdCasesNewRouteImport.update({
+    id: '/cases/new',
+    path: '/cases/new',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
 const ProjectsProjectIdDashboardsDashboardIdRoute =
   ProjectsProjectIdDashboardsDashboardIdRouteImport.update({
     id: '/dashboards/$dashboardId',
     path: '/dashboards/$dashboardId',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdModelsIndexRoute =
+  ProjectsProjectIdModelsIndexRouteImport.update({
+    id: '/models/',
+    path: '/models/',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdModelsModelIdRoute =
+  ProjectsProjectIdModelsModelIdRouteImport.update({
+    id: '/models/$modelId',
+    path: '/models/$modelId',
     getParentRoute: () => ProjectsProjectIdRouteRoute,
   } as any)
 const ProjectsProjectIdReportsReportIdRoute =
@@ -77,29 +106,45 @@ const ProjectsProjectIdWidgetsWidgetIdRoute =
     path: '/widgets/$widgetId',
     getParentRoute: () => ProjectsProjectIdRouteRoute,
   } as any)
+const ProjectsProjectIdCasesCaseTypeIdKeyRoute =
+  ProjectsProjectIdCasesCaseTypeIdKeyRouteImport.update({
+    id: '/cases/$caseTypeId/$key',
+    path: '/cases/$caseTypeId/$key',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/cases/new': typeof ProjectsProjectIdCasesNewRoute
   '/projects/$projectId/dashboards/$dashboardId': typeof ProjectsProjectIdDashboardsDashboardIdRoute
+  '/projects/$projectId/models/$modelId': typeof ProjectsProjectIdModelsModelIdRoute
   '/projects/$projectId/reports/$reportId': typeof ProjectsProjectIdReportsReportIdRoute
   '/projects/$projectId/reports/new': typeof ProjectsProjectIdReportsNewRoute
   '/projects/$projectId/sessions/$sessionId': typeof ProjectsProjectIdSessionsSessionIdRoute
   '/projects/$projectId/widgets/$widgetId': typeof ProjectsProjectIdWidgetsWidgetIdRoute
   '/projects/$projectId/alerts/': typeof ProjectsProjectIdAlertsIndexRoute
+  '/projects/$projectId/cases/': typeof ProjectsProjectIdCasesIndexRoute
+  '/projects/$projectId/models/': typeof ProjectsProjectIdModelsIndexRoute
+  '/projects/$projectId/cases/$caseTypeId/$key': typeof ProjectsProjectIdCasesCaseTypeIdKeyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/cases/new': typeof ProjectsProjectIdCasesNewRoute
   '/projects/$projectId/dashboards/$dashboardId': typeof ProjectsProjectIdDashboardsDashboardIdRoute
+  '/projects/$projectId/models/$modelId': typeof ProjectsProjectIdModelsModelIdRoute
   '/projects/$projectId/reports/$reportId': typeof ProjectsProjectIdReportsReportIdRoute
   '/projects/$projectId/reports/new': typeof ProjectsProjectIdReportsNewRoute
   '/projects/$projectId/sessions/$sessionId': typeof ProjectsProjectIdSessionsSessionIdRoute
   '/projects/$projectId/widgets/$widgetId': typeof ProjectsProjectIdWidgetsWidgetIdRoute
   '/projects/$projectId/alerts': typeof ProjectsProjectIdAlertsIndexRoute
+  '/projects/$projectId/cases': typeof ProjectsProjectIdCasesIndexRoute
+  '/projects/$projectId/models': typeof ProjectsProjectIdModelsIndexRoute
+  '/projects/$projectId/cases/$caseTypeId/$key': typeof ProjectsProjectIdCasesCaseTypeIdKeyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -107,12 +152,17 @@ export interface FileRoutesById {
   '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/cases/new': typeof ProjectsProjectIdCasesNewRoute
   '/projects/$projectId/dashboards/$dashboardId': typeof ProjectsProjectIdDashboardsDashboardIdRoute
+  '/projects/$projectId/models/$modelId': typeof ProjectsProjectIdModelsModelIdRoute
   '/projects/$projectId/reports/$reportId': typeof ProjectsProjectIdReportsReportIdRoute
   '/projects/$projectId/reports/new': typeof ProjectsProjectIdReportsNewRoute
   '/projects/$projectId/sessions/$sessionId': typeof ProjectsProjectIdSessionsSessionIdRoute
   '/projects/$projectId/widgets/$widgetId': typeof ProjectsProjectIdWidgetsWidgetIdRoute
   '/projects/$projectId/alerts/': typeof ProjectsProjectIdAlertsIndexRoute
+  '/projects/$projectId/cases/': typeof ProjectsProjectIdCasesIndexRoute
+  '/projects/$projectId/models/': typeof ProjectsProjectIdModelsIndexRoute
+  '/projects/$projectId/cases/$caseTypeId/$key': typeof ProjectsProjectIdCasesCaseTypeIdKeyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -121,35 +171,50 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/'
+    | '/projects/$projectId/cases/new'
     | '/projects/$projectId/dashboards/$dashboardId'
+    | '/projects/$projectId/models/$modelId'
     | '/projects/$projectId/reports/$reportId'
     | '/projects/$projectId/reports/new'
     | '/projects/$projectId/sessions/$sessionId'
     | '/projects/$projectId/widgets/$widgetId'
     | '/projects/$projectId/alerts/'
+    | '/projects/$projectId/cases/'
+    | '/projects/$projectId/models/'
+    | '/projects/$projectId/cases/$caseTypeId/$key'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/projects/$projectId/settings'
     | '/projects/$projectId'
+    | '/projects/$projectId/cases/new'
     | '/projects/$projectId/dashboards/$dashboardId'
+    | '/projects/$projectId/models/$modelId'
     | '/projects/$projectId/reports/$reportId'
     | '/projects/$projectId/reports/new'
     | '/projects/$projectId/sessions/$sessionId'
     | '/projects/$projectId/widgets/$widgetId'
     | '/projects/$projectId/alerts'
+    | '/projects/$projectId/cases'
+    | '/projects/$projectId/models'
+    | '/projects/$projectId/cases/$caseTypeId/$key'
   id:
     | '__root__'
     | '/'
     | '/projects/$projectId'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/'
+    | '/projects/$projectId/cases/new'
     | '/projects/$projectId/dashboards/$dashboardId'
+    | '/projects/$projectId/models/$modelId'
     | '/projects/$projectId/reports/$reportId'
     | '/projects/$projectId/reports/new'
     | '/projects/$projectId/sessions/$sessionId'
     | '/projects/$projectId/widgets/$widgetId'
     | '/projects/$projectId/alerts/'
+    | '/projects/$projectId/cases/'
+    | '/projects/$projectId/models/'
+    | '/projects/$projectId/cases/$caseTypeId/$key'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -194,11 +259,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdAlertsIndexRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
+    '/projects/$projectId/cases/': {
+      id: '/projects/$projectId/cases/'
+      path: '/cases'
+      fullPath: '/projects/$projectId/cases/'
+      preLoaderRoute: typeof ProjectsProjectIdCasesIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/cases/new': {
+      id: '/projects/$projectId/cases/new'
+      path: '/cases/new'
+      fullPath: '/projects/$projectId/cases/new'
+      preLoaderRoute: typeof ProjectsProjectIdCasesNewRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
     '/projects/$projectId/dashboards/$dashboardId': {
       id: '/projects/$projectId/dashboards/$dashboardId'
       path: '/dashboards/$dashboardId'
       fullPath: '/projects/$projectId/dashboards/$dashboardId'
       preLoaderRoute: typeof ProjectsProjectIdDashboardsDashboardIdRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/models/': {
+      id: '/projects/$projectId/models/'
+      path: '/models'
+      fullPath: '/projects/$projectId/models/'
+      preLoaderRoute: typeof ProjectsProjectIdModelsIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/models/$modelId': {
+      id: '/projects/$projectId/models/$modelId'
+      path: '/models/$modelId'
+      fullPath: '/projects/$projectId/models/$modelId'
+      preLoaderRoute: typeof ProjectsProjectIdModelsModelIdRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
     '/projects/$projectId/reports/$reportId': {
@@ -229,26 +322,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdWidgetsWidgetIdRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
+    '/projects/$projectId/cases/$caseTypeId/$key': {
+      id: '/projects/$projectId/cases/$caseTypeId/$key'
+      path: '/cases/$caseTypeId/$key'
+      fullPath: '/projects/$projectId/cases/$caseTypeId/$key'
+      preLoaderRoute: typeof ProjectsProjectIdCasesCaseTypeIdKeyRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
   }
 }
 
 interface ProjectsProjectIdRouteRouteChildren {
   ProjectsProjectIdSettingsRoute: typeof ProjectsProjectIdSettingsRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
+  ProjectsProjectIdCasesNewRoute: typeof ProjectsProjectIdCasesNewRoute
   ProjectsProjectIdDashboardsDashboardIdRoute: typeof ProjectsProjectIdDashboardsDashboardIdRoute
+  ProjectsProjectIdModelsModelIdRoute: typeof ProjectsProjectIdModelsModelIdRoute
   ProjectsProjectIdReportsReportIdRoute: typeof ProjectsProjectIdReportsReportIdRoute
   ProjectsProjectIdReportsNewRoute: typeof ProjectsProjectIdReportsNewRoute
   ProjectsProjectIdSessionsSessionIdRoute: typeof ProjectsProjectIdSessionsSessionIdRoute
   ProjectsProjectIdWidgetsWidgetIdRoute: typeof ProjectsProjectIdWidgetsWidgetIdRoute
   ProjectsProjectIdAlertsIndexRoute: typeof ProjectsProjectIdAlertsIndexRoute
+  ProjectsProjectIdCasesIndexRoute: typeof ProjectsProjectIdCasesIndexRoute
+  ProjectsProjectIdModelsIndexRoute: typeof ProjectsProjectIdModelsIndexRoute
+  ProjectsProjectIdCasesCaseTypeIdKeyRoute: typeof ProjectsProjectIdCasesCaseTypeIdKeyRoute
 }
 
 const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
   {
     ProjectsProjectIdSettingsRoute: ProjectsProjectIdSettingsRoute,
     ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
+    ProjectsProjectIdCasesNewRoute: ProjectsProjectIdCasesNewRoute,
     ProjectsProjectIdDashboardsDashboardIdRoute:
       ProjectsProjectIdDashboardsDashboardIdRoute,
+    ProjectsProjectIdModelsModelIdRoute: ProjectsProjectIdModelsModelIdRoute,
     ProjectsProjectIdReportsReportIdRoute:
       ProjectsProjectIdReportsReportIdRoute,
     ProjectsProjectIdReportsNewRoute: ProjectsProjectIdReportsNewRoute,
@@ -257,6 +364,10 @@ const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
     ProjectsProjectIdWidgetsWidgetIdRoute:
       ProjectsProjectIdWidgetsWidgetIdRoute,
     ProjectsProjectIdAlertsIndexRoute: ProjectsProjectIdAlertsIndexRoute,
+    ProjectsProjectIdCasesIndexRoute: ProjectsProjectIdCasesIndexRoute,
+    ProjectsProjectIdModelsIndexRoute: ProjectsProjectIdModelsIndexRoute,
+    ProjectsProjectIdCasesCaseTypeIdKeyRoute:
+      ProjectsProjectIdCasesCaseTypeIdKeyRoute,
   }
 
 const ProjectsProjectIdRouteRouteWithChildren =

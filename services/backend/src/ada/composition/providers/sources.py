@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 
 from dishka import Provider, Scope, provide
 
+from ada.adapters.sources.cases import CaseSourceReader, CaseSourceReaders
 from ada.adapters.sources.files import LocalFileStore
 from ada.adapters.sources.http import HttpSourceReaders, create_client
 from ada.config import Settings
@@ -10,10 +11,12 @@ from ada.core.ports.agents import ResearchCalls
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.events import EventPublisher
 from ada.core.ports.repositories import (
+    CaseRepository,
     DataSourceRepository,
     OperatorRepository,
     ProjectRepository,
     SnapshotRepository,
+    StatisticalModelRepository,
 )
 from ada.core.ports.secrets import SecretBox
 from ada.core.ports.sources import FileStore, SourceCheckLog, SourceLocks, SourceReaders
@@ -78,13 +81,17 @@ class SourceProvider(Provider):
         explorer: WebExplorer,
         secrets: SecretBox,
         settings: Settings,
+        cases: CaseRepository,
+        statistical: StatisticalModelRepository,
     ) -> SourceService:
+        # Cases sources read this unit of work's repositories, so their reader is made here.
+        with_cases = CaseSourceReaders(readers, CaseSourceReader(cases, statistical, clock))
         return DataSources(
             projects,
             sources,
             operators,
             snapshots,
-            readers,
+            with_cases,
             checks,
             store,
             events,
@@ -93,6 +100,8 @@ class SourceProvider(Provider):
             explorer,
             secrets,
             settings.ada_public_url,
+            cases,
+            statistical,
         )
 
 

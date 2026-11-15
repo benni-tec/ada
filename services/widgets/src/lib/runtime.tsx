@@ -83,7 +83,7 @@ async function withInputs(loaded: Loaded, ctx: WidgetContext | null): Promise<Lo
 }
 
 /** Loads the widget named in the URL fragment and its data, shows loading and error
- * states, and marks scenario and stale data. Widget types render only the loaded case. */
+ * states, and marks stale data. Widget types render only the loaded case. */
 export function WidgetRuntime({ children }: { children: (loaded: Loaded) => ReactNode }) {
   const fragment = useFragment()
   const ctx = context()
@@ -134,7 +134,7 @@ export function WidgetRuntime({ children }: { children: (loaded: Loaded) => Reac
   }
   const { data } = result.loaded
   return (
-    <div className="ada-widget" data-scenario={data.is_scenario || undefined} data-stale={data.is_stale || undefined}>
+    <div className="ada-widget" data-stale={data.is_stale || undefined}>
       <Flags data={data} />
       <div className="ada-body">{children(result.loaded)}</div>
       <Sources sources={data.sources ?? []} stale={data.is_stale} />
@@ -142,34 +142,39 @@ export function WidgetRuntime({ children }: { children: (loaded: Loaded) => Reac
   )
 }
 
+// The sources a widget lists under itself; the pipeline, below the card, has them all.
+const SHOWN_SOURCES = 2
+
 /** Where the numbers came from and when they were fetched, under every widget, so no
- * number is shown without its source. */
+ * number is shown without its source: the first two, then for the rest one line with a
+ * light for how fresh all the sources are, which opens the pipeline (it lists every one),
+ * or, where the frame cannot open it, the whole list. */
 export function Sources({ sources, stale = false }: { sources: NonNullable<WidgetData['sources']>; stale?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   if (sources.length === 0) return null
-  const compact = sources.length > 3
+  const hidden = sources.length - SHOWN_SOURCES
   const pipeline = canOpenPipeline()
   return (
     <>
-      {compact && (
+      <SourceList sources={expanded ? sources : sources.slice(0, SHOWN_SOURCES)} />
+      {hidden > 0 && !expanded && (
         <SourceSummary sources={sources} stale={stale}>
           <button
             type="button"
             aria-expanded={pipeline ? undefined : expanded}
-            onClick={() => pipeline ? openPipeline(MAIN_INPUT) : setExpanded(!expanded)}
+            onClick={() => (pipeline ? openPipeline(MAIN_INPUT) : setExpanded(true))}
           >
-            {sources.length} sources
+            and {hidden} more: the Pipeline lists every source
           </button>
         </SourceSummary>
       )}
-      {(!compact || expanded) && <SourceList sources={sources} />}
     </>
   )
 }
 
 function SourceSummary({ sources, stale, children }: { sources: WidgetSource[]; stale: boolean; children: ReactNode }) {
   const now = useNow()
-  const times = sources.map((source) => source.fetched_at ? Date.parse(source.fetched_at) : NaN)
+  const times = sources.map((source) => (source.fetched_at ? Date.parse(source.fetched_at) : NaN))
   const missing = times.some((time) => !Number.isFinite(time))
   const oldest = Math.min(...times.filter(Number.isFinite))
   const old = now - oldest > 48 * 60 * 60 * 1000
@@ -185,7 +190,6 @@ function SourceSummary({ sources, stale, children }: { sources: WidgetSource[]; 
     <div className="ada-sources ada-sources-summary">
       <span className="ada-source-led" data-status={status} role="img" aria-label={label} title={label} />
       {children}
-      <span> · {Number.isFinite(oldest) ? <>oldest <Fetched at={new Date(oldest).toISOString()} /></> : 'fetch time not recorded'}</span>
     </div>
   )
 }
@@ -244,45 +248,29 @@ function ago(ms: number) {
   return hours < 24 ? `${hours} h ago` : `${Math.floor(hours / 24)} d ago`
 }
 
-const SCENARIO_TITLE = 'This run binds inputs to other pipelines'
 const STALE_TITLE = 'A source behind this could not be refreshed'
 
-/** A simulated or outdated number must never look like a measured, current one, so these
- * markers are always rendered, above the content, whatever the widget type. */
-export function Flags({ data }: { data: Pick<WidgetData, 'is_scenario' | 'is_stale'> }) {
-  if (!data.is_scenario && !data.is_stale) return null
+/** An outdated number must never look like a current one, so this marker is always
+ * rendered, above the content, whatever the widget type. Bound inputs (`is_scenario`) are
+ * not marked: they compose pipelines into a DAG and say nothing about the numbers. */
+export function Flags({ data }: { data: Pick<WidgetData, 'is_stale'> }) {
+  if (!data.is_stale) return null
   return (
     <ul className="ada-flags" aria-label="Data warnings">
-      {data.is_scenario && (
-        <li className="ada-flag ada-flag-scenario" title={SCENARIO_TITLE}>
-          Scenario: simulated numbers
-        </li>
-      )}
-      {data.is_stale && (
-        <li className="ada-flag ada-flag-stale" title={STALE_TITLE}>
-          Stale: last good data, a refresh failed
-        </li>
-      )}
+      <li className="ada-flag ada-flag-stale" title={STALE_TITLE}>
+        Stale: last good data, a refresh failed
+      </li>
     </ul>
   )
 }
 
-/** The same markers on one value, for a widget that shows values from several inputs
- * (the text widget): the value of a stale or simulated input says so where it stands. */
-export function ValueFlags({ data }: { data: Pick<WidgetData, 'is_scenario' | 'is_stale'> }) {
-  if (!data.is_scenario && !data.is_stale) return null
+/** The same marker on one value, for a widget that shows values from several inputs
+ * (the text widget): the value of a stale input says so where it stands. */
+export function ValueFlags({ data }: { data: Pick<WidgetData, 'is_stale'> }) {
+  if (!data.is_stale) return null
   return (
-    <>
-      {data.is_scenario && (
-        <span className="ada-flag ada-flag-inline ada-flag-scenario" title={SCENARIO_TITLE}>
-          scenario
-        </span>
-      )}
-      {data.is_stale && (
-        <span className="ada-flag ada-flag-inline ada-flag-stale" title={STALE_TITLE}>
-          stale
-        </span>
-      )}
-    </>
+    <span className="ada-flag ada-flag-inline ada-flag-stale" title={STALE_TITLE}>
+      stale
+    </span>
   )
 }
