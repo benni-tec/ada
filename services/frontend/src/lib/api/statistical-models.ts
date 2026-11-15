@@ -51,8 +51,10 @@ export const getModel = (id: Id) => unwrap(api.GET('/api/models/{model_id}', { p
 export const latestVersion = (id: Id) =>
   unwrap(api.GET('/api/models/{model_id}/versions/latest', { params: { path: { model_id: id } } }))
 
-export const evaluateModel = (id: Id, inputs: EvaluationInputs) =>
-  unwrap(api.POST('/api/models/{model_id}/evaluate', { params: { path: { model_id: id } }, body: { inputs } }))
+/** Evaluates `inputs` on the given version, so a newer version made elsewhere is not used
+ * silently; without one, the latest. */
+export const evaluateModel = (id: Id, inputs: EvaluationInputs, version?: number) =>
+  unwrap(api.POST('/api/models/{model_id}/evaluate', { params: { path: { model_id: id } }, body: { inputs, version } }))
 
 export const getPopulation = (id: Id) =>
   unwrap(api.GET('/api/models/{model_id}/population', { params: { path: { model_id: id } } }))

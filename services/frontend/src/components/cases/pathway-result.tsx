@@ -87,10 +87,10 @@ export function PathwayResult({ evaluation, summary }: { evaluation: Evaluation;
       </section>
 
       <section data-section="survival">
-        <Label>Alive at 5 years, of 100 with this profile</Label>
+        <Label>5-year relative survival, per 100</Label>
         <div className="flex flex-wrap items-center gap-5">
           <span className="text-3xl font-bold tabular-nums">{survival.now}</span>
-          <div role="img" aria-label={`${survival.now} of 100 alive at 5 years`} className="grid grid-cols-[repeat(20,8px)] gap-[3px]">
+          <div role="img" aria-label={`5-year relative survival ${survival.now} per 100`} className="grid grid-cols-[repeat(20,8px)] gap-[3px]">
             {Array.from({ length: 100 }, (_, i) => (
               <span key={i} className={`size-2 rounded-full ${i < survival.now ? 'bg-foreground opacity-75' : 'bg-border'}`} />
             ))}
@@ -100,7 +100,9 @@ export function PathwayResult({ evaluation, summary }: { evaluation: Evaluation;
             {survival.on_target === survival.now ? 'the same' : survival.on_target} if the rest is on target
           </span>
         </div>
-        <p className="mt-1.5 text-xs text-muted-foreground">Weaker evidence than the deadlines.</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Compared with people of the same age and sex without cancer. Weaker evidence than the deadlines.
+        </p>
       </section>
 
       <section data-section="support">
