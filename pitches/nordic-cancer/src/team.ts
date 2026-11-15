@@ -1,5 +1,9 @@
-// Who made ADA, for the credits. Check before rendering anything public.
-export const TEAM = ['Benjamin Meyer', 'Felix Wegener']
+// Who made it, for the credits. Check before rendering anything public.
+/** The team, as the credits name it. */
+export const TEAM = ['Benjamin Meyer', 'Felix Wegener', 'Paul Winkler', 'João Fernandes']
+
+/** Who holds the copyright: those who contributed to this project. */
+export const COPYRIGHT = ['Benjamin Meyer', 'Felix Wegener']
 
 export const EVENT = 'Junction 2026 · AstraZeneca challenge: Equal Care Across Finland'
 

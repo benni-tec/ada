@@ -5,6 +5,7 @@ import { s } from './frame'
 import { LowerThird } from './LowerThird'
 import { CHAT_FRAMES, ChatScene } from './scenes/ChatScene'
 import { Credits } from './scenes/Credits'
+import { FeedbackLoop, LOOP_FRAMES } from './scenes/FeedbackLoop'
 
 /** One line of big type, punched in. */
 function Punch({ children, sub }: { children: string; sub?: string }) {
@@ -48,40 +49,30 @@ function Planned({ title, shows }: { title: string; shows: string }) {
 
 type Section = { name: string; frames: number; scene: ReactNode }
 
-/** The pitch, three minutes, in order. Sections still planned show what they will be. */
+/** The pitch, three minutes, in the order of the story. Sections still planned show what
+ * they will be; cases, timelines and trials wait for their branches to reach main. */
 const SECTIONS: Section[] = [
-  { name: 'Deaths', frames: s(2.5), scene: <Punch sub="cancer deaths a year in Finland">13,300</Punch> },
-  { name: 'Unequal', frames: s(2.5), scene: <Punch sub="and survival depends on where you live">Not equal</Punch> },
-  { name: 'Goal 3', frames: s(3), scene: <Punch sub="National Cancer Strategy 2026–2035">Goal 3</Punch> },
-  {
-    name: 'Problem',
-    frames: s(16),
-    scene: (
-      <Planned
-        title="The data is there, the answers are not"
-        shows="Sotkanet, Statistics Finland, NORDCAN, the Cancer Registry's PDFs and the strategy itself fly in as cards; a spreadsheet chain no one can trace collapses."
-      />
-    ),
-  },
-  { name: 'Title', frames: s(3), scene: <Punch sub="traceable data analysis">ada</Punch> },
+  { name: 'Title', frames: s(4), scene: <Punch sub="Promoting better and equal cancer care">ada</Punch> },
+
+  // 1. The analysis: how ADA got and integrated the data.
   { name: 'Ask', frames: CHAT_FRAMES, scene: <ChatScene /> },
   {
-    name: 'Widget',
-    frames: s(13.5),
+    name: 'Sources',
+    frames: s(12),
     scene: (
       <Planned
-        title="The answer is a chart, not a sentence"
-        shows="The survival chart the agent made draws itself in the session (the real chart widget with NORDCAN rows): Finland against the Nordic level, the gap widening since 2005."
+        title="Open data, integrated in minutes"
+        shows="Sotkanet, Statistics Finland, NORDCAN, the National Cancer Strategy PDF and the Espoo handout come in as sources, each with its address, fetch time and licence; PDFs are read with Context.dev."
       />
     ),
   },
   {
     name: 'Trace',
-    frames: s(22),
+    frames: s(14),
     scene: (
       <Planned
-        title="Click a number, see where it came from"
-        shows="The pipeline dialog: chart, then the transform's SQL, then the NORDCAN snapshot with its fetch time and address. Every step can be inspected and re-run."
+        title="Every number traced to its source"
+        shows="The survival chart draws itself; a click opens its pipeline: the transform's SQL, then the NORDCAN snapshot it read."
       />
     ),
   },
@@ -92,56 +83,55 @@ const SECTIONS: Section[] = [
   },
   {
     name: 'Dashboard detail',
-    frames: s(19),
+    frames: s(10),
     scene: (
       <Planned
         title="Equal care, county by county"
-        shows="The Goal 3 dashboard's widgets one by one: breast screening by wellbeing services county on the map, referral delays, deaths against the 11,970 target."
+        shows="Breast screening by wellbeing services county on the map, referral delays, deaths against the 11,970 target."
       />
     ),
   },
+
+  // 2. What the registries cannot tell.
   {
-    name: 'Research',
-    frames: s(22),
+    name: 'Gaps',
+    frames: s(29),
     scene: (
       <Planned
-        title="It finds the data you do not have"
-        shows="The research agent searches the web, reads the strategy PDF and the Espoo handout, and registers each table as a source with its provenance."
+        title="Where the data runs out"
+        shows="The data-quality dashboard: counties with no figures, indicators years out of date, no time to treatment per patient or per county, the education gap only in reports. Goal 3 cannot be measured with what exists."
       />
     ),
   },
+
+  // 3. Cases fill the gap.
   {
-    name: 'Judges',
-    frames: s(16),
+    name: 'Cases',
+    frames: s(30),
     scene: (
       <Planned
-        title="A second model checks every figure"
-        shows="A text widget's sentence with a figure; the judge's badge turns green, or flags the number it cannot find in the data. Custom widget code is checked for data written into it."
+        title="Cases fill the gap"
+        shows="Pathways › Cases: a clinician records a cancer case in a form generated from the case type; its steps (referral, diagnosis, treatment start) land on a timeline."
       />
     ),
   },
+
+  // 4. What a case gives back: the patient's timeline and the trials it fits.
   {
-    name: 'Alerts',
-    frames: s(16),
+    name: 'Timeline and trials',
+    frames: s(35),
     scene: (
       <Planned
-        title="It keeps watching"
-        shows="A county drops below 80 % screening: the alert bell turns yellow, and the session the rule is attached to gets the alert."
+        title="A timeline for every patient, and the trials that fit"
+        shows="The case page: the patient's pathway against the target times, delays flagged. The trial matcher runs on the case and its result sheet lists the recruiting trials that fit, from ClinicalTrials.gov."
       />
     ),
   },
-  {
-    name: 'Impact',
-    frames: s(16),
-    scene: (
-      <Planned
-        title="From a dashboard to a decision"
-        shows="What it means for Goal 3: one place where THL, wellbeing services counties and AstraZeneca can see the same traceable numbers, and ask the next question."
-      />
-    ),
-  },
-  { name: 'Close', frames: s(3.5), scene: <Punch sub="equal care, measured">ada</Punch> },
-  { name: 'Credits', frames: s(12.5), scene: <Credits /> },
+
+  // 5. Why it lasts: the loop.
+  { name: 'Loop', frames: LOOP_FRAMES, scene: <FeedbackLoop /> },
+
+  { name: 'Credits', frames: s(13.5), scene: <Credits /> },
 ]
 
 export const PITCH_FRAMES = SECTIONS.reduce((total, section) => total + section.frames, 0)
