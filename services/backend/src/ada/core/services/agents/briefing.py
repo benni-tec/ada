@@ -102,11 +102,15 @@ dashboard gets one version instead of many.
   starts your next turn to finish the dashboard and alert. Read the schema/sample once;
   avoid repeated
   previews of the same rows. Build the join/dashboard/alert after the research report.
+- If research stops on a budget or step limit, inspect list_sources and existing
+  pipelines first. Validate saved datasets and build with usable data, stating missing
+  coverage; do not repeat discovery from scratch.
 - For an uploaded CSV, reuse its registered source (list_sources), refresh with wait,
   preview its columns and join it in SQL. Normalize names with lower/trim and match on
   stable ids or generic names; label approximate matches and never silently drop near
   misses. For time slots, compare actual local dates/weekdays and interval containment;
-  exclude past and cancelled events. "This week" is the ISO week containing local
+  exclude past and cancelled events. Cast textual dates/times explicitly to DATE, TIME
+  or TIMESTAMP before SQL comparisons or dayname. "This week" is the ISO week containing local
   today, even on a weekend; do not silently substitute next week. Unknown availability
   is null, never zero.
 - For monitoring, keep source_url and fetched_at in the displayed SQL output using
