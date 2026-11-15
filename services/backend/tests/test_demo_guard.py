@@ -37,15 +37,24 @@ def test_a_visitor_cannot_change_a_demo_project_but_their_own(demo: Demo) -> Non
     team = client.patch(f"/api/sessions/{session['id']}", json=rename)
 
     assert refused.status_code == 403
-    assert refused.json()["detail"].startswith("This is a team demo project.")
+    assert refused.json()["detail"].startswith("Demo projects are view-only")
     assert elsewhere.status_code == 200, elsewhere.text
     assert team.status_code == 200, team.text
 
 
-def test_a_visitor_may_still_chat_in_a_demo_project(demo: Demo) -> None:
-    client, session, _ = demo
-    path = f"/api/sessions/{session['id']}/messages"
+def test_a_visitor_cannot_chat_in_a_demo_project(demo: Demo) -> None:
+    client, session, own = demo
+    project = session["project_id"]
 
-    response = client.post(path, json={"text": "What changed?"}, headers=VISITOR)
+    message = client.post(
+        f"/api/sessions/{session['id']}/messages", json={"text": "Hi"}, headers=VISITOR
+    )
+    opened = client.post(
+        f"/api/projects/{project}/sessions", json={"title": "Ask"}, headers=VISITOR
+    )
+    mine = client.post(
+        f"/api/projects/{own['id']}/sessions", json={"title": "Ask"}, headers=VISITOR
+    )
 
-    assert response.status_code != 403
+    assert message.status_code == opened.status_code == 403
+    assert mine.status_code == 201, mine.text

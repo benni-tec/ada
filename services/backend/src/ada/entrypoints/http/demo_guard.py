@@ -9,19 +9,18 @@ from ada.core.ports.system import ProjectOwners
 
 WRITES = {"POST", "PUT", "PATCH", "DELETE"}
 UUIDS = re.compile(r"[0-9a-fA-F]{8}-?(?:[0-9a-fA-F]{4}-?){3}[0-9a-fA-F]{12}")
-# Chatting with the agent, what-if evaluations and runs stay open on the demo data.
+# Demo projects are view-only for visitors: no chat either, since the agent can change them.
+# What-if evaluations, runs and webhooks stay open.
 ALLOWED = re.compile(
     r"/api/(?:"
-    r"projects/[^/]+/(?:sessions|runs)"
-    r"|dashboards/[^/]+/(?:agent-session|runs)"
-    r"|sessions/[^/]+/(?:messages|research|analysis|attachments(?:/.*)?)"
-    r"|turns/[^/]+/cancel"
+    r"projects/[^/]+/runs"
+    r"|dashboards/[^/]+/runs"
     r"|models/[^/]+/evaluate"
     r"|case-types/[^/]+/cases/[^/]+/evaluate"
     r"|hooks/.*"
     r")/?"
 )
-REFUSAL = {"detail": "This is a team demo project. Create your own project to try editing."}
+REFUSAL = {"detail": "Demo projects are view-only: create your own project to try the agent."}
 
 
 class DemoGuard:
