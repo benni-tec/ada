@@ -8,7 +8,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from ada.core.ports.system import ProjectOwners
 
 WRITES = {"POST", "PUT", "PATCH", "DELETE"}
-UUIDS = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")
+UUIDS = re.compile(r"[0-9a-fA-F]{8}-?(?:[0-9a-fA-F]{4}-?){3}[0-9a-fA-F]{12}")
 # Chatting with the agent, what-if evaluations and runs stay open on the demo data.
 ALLOWED = re.compile(
     r"/api/(?:"
