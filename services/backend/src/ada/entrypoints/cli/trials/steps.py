@@ -3,9 +3,18 @@
 _UNION = " UNION ALL ".join(f"SELECT * FROM input_{i}" for i in range(4))
 _NORDIC = "('Finland', 'Sweden', 'Norway', 'Denmark')"
 
+CANCER_REGEX = (
+    r"cancer|neoplas|tumou?r|carcinom|lymphoma|leuka?emia|myeloma|sarcoma|melanoma|glioma|"
+    r"blastoma|mesothelioma|malignan|metasta|oncolog|myelodysplas|\bmds\b|myeloprolif|"
+    r"myelofibrosis|polycythemia|thrombocythemia|mastocytosis|macroglobulin|lymphoprolif|"
+    r"hodgkin|neuroendocrine|\bgist\b|thymoma|seminoma|germ cell|meningioma|chordoma|"
+    r"craniopharyngioma|pseudomyxoma|\bpdac\b|nsclc|\bsclc\b|hnscc|\bhcc\b|\bcrc\b|"
+    r"\bn?mibc\b|\bcll\b|\baml\b|\bcml\b"
+)
+
 CANCER_PATTERNS = {
     "lung": "lung|nsclc|sclc|bronch",
-    "pancreas": "pancrea",
+    "pancreas": "pancrea|\\bpdac\\b",
     "liver": "hepatocellular|\\bliver\\b|\\bhcc\\b|hepatic|cholangio|biliary",
     "breast": "breast",
     "colorectal": "colorectal|colon|rectal",
@@ -75,6 +84,7 @@ SELECT nct_id, title, overall_status,
     try_cast(last_update AS DATE) AS last_update,
     'https://clinicaltrials.gov/study/' || nct_id AS url
 FROM grouped
+WHERE regexp_matches(lower(conditions), '{CANCER_REGEX}')
 """
 """One CT.gov trial with eligibility preserved and cancer groups derived from conditions."""
 

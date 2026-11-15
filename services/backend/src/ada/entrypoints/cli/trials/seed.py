@@ -38,6 +38,16 @@ from ada.entrypoints.cli.trials.pages import (
 from ada.entrypoints.cli.trials.sources import CTGOV, CTIS, SOURCES
 
 PROJECT = "Nordic cancer trials"
+AGENT_INSTRUCTIONS = (
+    "Answer patient questions from case_trials. List only sites whose status is exactly "
+    "RECRUITING. Give each site's city and the km column for the patient's city when it is "
+    "Helsinki, Kuopio or Oulu, otherwise the nearest of the three, naming it. Quote each "
+    "trial's eligibility text as written, never shortened into a verdict. Never filter or "
+    "judge by age, sex, stage or any other eligibility criterion. Never say a patient "
+    "qualifies or is accepted. Do not rank by efficacy or make promises. Sort by distance "
+    "only. End every patient answer by saying to take the list to their oncologist, who "
+    "decides eligibility."
+)
 SESSION = "Nordic cancer trials"
 SEED = Actor(kind=ActorKind.SYSTEM, name="ada seed-trials")
 REFRESH_DELAY_SECONDS = 1
@@ -65,6 +75,7 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
         project = next((p for p in await projects.list() if p.name == PROJECT), None)
         if project is None:
             project = await projects.create(PROJECT)
+        await projects.update(project.id, project.revision, agent_instructions=AGENT_INSTRUCTIONS)
         registered = {s.name: s.id for s in await sources.list(project.id)}
         for source in SOURCES:
             if source.name not in registered:
