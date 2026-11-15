@@ -8,6 +8,7 @@ import { CASES_DATA_FRAMES, CasesDataScene } from './scenes/CasesDataScene'
 import { CHAT_FRAMES, ChatScene } from './scenes/ChatScene'
 import { Credits } from './scenes/Credits'
 import { FeedbackLoop, LOOP_FRAMES } from './scenes/FeedbackLoop'
+import { GOALS_FRAMES, GoalsScene } from './scenes/GoalsScene'
 import { SIDE_CHALLENGE_FRAMES, SideChallenges } from './scenes/SideChallenges'
 import { TitleCard } from './scenes/TitleCard'
 
@@ -57,7 +58,7 @@ type Section = { name: string; frames: number; scene: ReactNode }
  * then where their data comes from, then the cases as data, which closes the loop. */
 const SECTIONS: Section[] = [
   { name: 'Title', frames: s(3.5), scene: <TitleCard subtitle="Promoting better and equal cancer care" /> },
-  { name: 'No clock', frames: s(3.5), scene: <Punch sub="Finland has no trigger, no clock and no measurement">No clock</Punch> },
+  { name: 'No clock', frames: s(3), scene: <Punch sub="Finland has no trigger, no clock and no measurement">No clock</Punch> },
 
   // 1. The central tool: cases with models.
   { name: 'Cases', frames: CASES_FRAMES, scene: <CasesScene /> },
@@ -68,7 +69,7 @@ const SECTIONS: Section[] = [
   { name: 'Ask', frames: CHAT_FRAMES, scene: <ChatScene /> },
   {
     name: 'Sources',
-    frames: s(8),
+    frames: s(6),
     scene: (
       <Planned
         title="Open data, integrated in minutes"
@@ -76,36 +77,12 @@ const SECTIONS: Section[] = [
       />
     ),
   },
-  {
-    name: 'Trace',
-    frames: s(8),
-    scene: (
-      <Planned
-        title="Every number traced to its source"
-        shows="A chart draws itself; a click opens its pipeline: the transform's SQL, then the snapshot it read."
-      />
-    ),
-  },
-  {
-    name: 'Dashboard',
-    frames: s(4),
-    scene: <Screen src="dashboard-light.png" title="Goal 3 on one dashboard" line="Survival gap, mortality against target, screening by county" />,
-  },
-  {
-    name: 'Evidence',
-    frames: s(4),
-    scene: (
-      <Planned
-        title="The model's figures cite their papers"
-        shows="The pathway model's card: the Nordic standard times, Finnish education effects (Zai 2025) and delay effects (Hanna 2020), each with the passage it was read from."
-      />
-    ),
-  },
+  { name: 'Goals', frames: GOALS_FRAMES, scene: <GoalsScene /> },
 
   // 3. The gaps, and the cases that fill them.
   {
     name: 'Gaps',
-    frames: s(8),
+    frames: s(4),
     scene: (
       <Planned
         title="Where open data stops"

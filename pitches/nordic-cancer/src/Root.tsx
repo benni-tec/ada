@@ -7,6 +7,7 @@ import { Pitch, PITCH_FRAMES } from './Pitch'
 import { CASES_FRAMES, CasesScene, TRIALS_FRAMES, TrialsScene } from './scenes/CasesScene'
 import { CASES_DATA_FRAMES, CasesDataScene } from './scenes/CasesDataScene'
 import { CHAT_FRAMES, ChatScene } from './scenes/ChatScene'
+import { GOALS_FRAMES, GoalsScene } from './scenes/GoalsScene'
 
 export const Root = () => (
   <>
@@ -15,6 +16,7 @@ export const Root = () => (
     <Composition id="Chat" component={ChatScene} durationInFrames={CHAT_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT} />
     <Composition id="Cases" component={CasesScene} durationInFrames={CASES_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT} />
     <Composition id="CasesData" component={CasesDataScene} durationInFrames={CASES_DATA_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT} />
+    <Composition id="Goals" component={GoalsScene} durationInFrames={GOALS_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT} />
     <Composition id="Trials" component={TrialsScene} durationInFrames={TRIALS_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT} />
   </>
 )

@@ -25,9 +25,9 @@ const matcher = models.find((model) => model.kind === 'trial_matcher')!
 /** The steps the case has, in pathway order, revealed one at a time. */
 const DAYS = Object.entries((full.case.values.days ?? {}) as Record<string, number>)
 
-/** The case as the clinician has entered it by `frame`: one more step every 0.4 seconds. */
+/** The case as the clinician has entered it by `frame`: one more step every half second. */
 function caseAt(frame: number): CaseState {
-  const shown = Math.min(DAYS.length, Math.floor(frame / s(0.4)) + 1)
+  const shown = Math.min(DAYS.length, Math.floor(frame / s(0.5)) + 1)
   return { ...full, case: { ...full.case, values: { ...full.case.values, days: Object.fromEntries(DAYS.slice(0, shown)) } } }
 }
 
@@ -144,25 +144,25 @@ function CasePage({
   )
 }
 
-const SAVED = s(0.4) * DAYS.length + s(0.3)
-const SHEET = s(5)
+const SAVED = s(0.5) * DAYS.length + s(0.3)
+const SHEET = s(6)
 
 /** The pointer: along the steps as they are entered, to the result, a click on View result,
  * then the overdue deadline, the late step and the survival in the sheet. */
 const POINTER: Point[] = [
   { at: 0, x: 1500, y: 980 },
   { at: 10, x: 1110, y: 330 },
-  { at: 22, x: 1110, y: 372 },
-  { at: 34, x: 1110, y: 414 },
+  { at: 25, x: 1110, y: 372 },
+  { at: 40, x: 1110, y: 414 },
   { at: SAVED + 16, x: 1120, y: 878 },
   { at: SHEET - 10, x: 1560, y: 878 },
   { at: SHEET - 5, x: 1560, y: 878, click: true },
-  { at: s(6.5), x: 1800, y: 300 },
-  { at: s(11.5), x: 1222, y: 682 },
-  { at: s(17.5), x: 1150, y: 952 },
+  { at: s(7.8), x: 1800, y: 300 },
+  { at: s(14.5), x: 1222, y: 682 },
+  { at: s(21.5), x: 1150, y: 952 },
 ]
 
-export const CASES_FRAMES = s(26)
+export const CASES_FRAMES = s(33)
 
 /** The central tool: a case, the models that run on it, and what they give back. */
 export function CasesScene() {
@@ -170,35 +170,35 @@ export function CasesScene() {
   const { fps } = useVideoConfig()
   const sheetIn = spring({ frame: frame - SHEET, fps, config: { damping: 200 }, durationInFrames: 14 })
   // The part of the result the banner talks about; the rest dims.
-  const focus = frame < s(6) ? null : frame < s(11) ? 'deadlines' : frame < s(17) ? 'days' : 'survival'
+  const focus = frame < s(7) ? null : frame < s(13.5) ? 'deadlines' : frame < s(20.5) ? 'days' : 'survival'
   return (
     <AbsoluteFill className="bg-background text-foreground">
       <CasePage state={caseAt(frame)} pathwayRan={frame >= SAVED} matcherRan={false} sheet={frame >= SHEET ? pathway : null} sheetIn={sheetIn} focus={focus} />
       <Cursor path={POINTER} />
-      <Sequence durationInFrames={s(3)}>
-        <LowerThird title="A case: one patient's pathway" line="Entered step by step by the clinician (synthetic data)" exitAt={s(2.6)} />
+      <Sequence durationInFrames={s(3.6)}>
+        <LowerThird title="A case: one patient's pathway" line="Entered step by step by the clinician (synthetic data)" exitAt={s(3.2)} />
       </Sequence>
-      <Sequence from={s(3)} durationInFrames={s(2.4)}>
-        <LowerThird title="Models run on every save" line="The patient pathway model, from the Nordic standards" exitAt={s(2)} />
+      <Sequence from={s(3.6)} durationInFrames={s(2.8)}>
+        <LowerThird title="Models run on every save" line="The patient pathway model, from the Nordic standards" exitAt={s(2.4)} />
       </Sequence>
-      <Sequence from={s(5.6)} durationInFrames={s(5.2)}>
-        <LowerThird title="The clock Finland is missing" line="Imaging after suspicion: overdue by 2 days" accent="#f97316" exitAt={s(4.8)} />
+      <Sequence from={s(6.8)} durationInFrames={s(6.4)}>
+        <LowerThird title="The clock Finland is missing" line="Imaging after suspicion: overdue by 2 days" accent="#f97316" exitAt={s(6)} />
       </Sequence>
-      <Sequence from={s(11)} durationInFrames={s(5.8)}>
-        <LowerThird title="Where the days go" line="Each step against the Danish, Norwegian and Swedish targets" exitAt={s(5.4)} />
+      <Sequence from={s(13.5)} durationInFrames={s(6.8)}>
+        <LowerThird title="Where the days go" line="Each step against the Danish, Norwegian and Swedish targets" exitAt={s(6.4)} />
       </Sequence>
-      <Sequence from={s(17)}>
+      <Sequence from={s(20.6)}>
         <LowerThird title="Evidence a clinician can act on" line="Survival and delay effects, each with its published source" accent="#22c55e" />
       </Sequence>
     </AbsoluteFill>
   )
 }
 
-const EVALUATE = s(1)
-const MATCHED = s(1.5)
-const TRIALS_SHEET = s(1.9)
+const EVALUATE = s(1.2)
+const MATCHED = s(1.7)
+const TRIALS_SHEET = s(2.2)
 
-export const TRIALS_FRAMES = s(8)
+export const TRIALS_FRAMES = s(10.5)
 
 /** On request, the trial matcher: the recruiting Nordic trials the case could be discussed for. */
 export function TrialsScene() {
@@ -213,7 +213,8 @@ export function TrialsScene() {
           { at: 0, x: 1150, y: 952 },
           { at: EVALUATE - 4, x: 1575, y: 958 },
           { at: EVALUATE, x: 1575, y: 958, click: true },
-          { at: s(3.4), x: 1560, y: 330 },
+          { at: s(4), x: 1560, y: 330 },
+          { at: s(7), x: 1400, y: 610 },
         ]}
       />
       <LowerThird title="And the trials worth discussing" line={matcher.latest?.section.summary ?? ''} accent="#2563eb" />

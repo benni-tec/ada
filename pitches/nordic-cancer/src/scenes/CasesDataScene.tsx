@@ -10,13 +10,13 @@ const IMAGE = 'cases-dashboard.png'
 /** Camera stops: scale and offset of the screenshot, at frame `at`. */
 const CAMERA = [
   { at: 0, scale: 1, x: 0, y: 0 },
-  { at: s(3.4), scale: 1.04, x: -20, y: -10 },
+  { at: s(3.6), scale: 1.04, x: -20, y: -10 },
   // The county chart.
-  { at: s(4.2), scale: 1.45, x: -478, y: -540 },
-  { at: s(7.4), scale: 1.47, x: -486, y: -548 },
+  { at: s(4.5), scale: 1.45, x: -478, y: -540 },
+  { at: s(8.6), scale: 1.47, x: -486, y: -548 },
   // The steps chart and its bottleneck.
-  { at: s(8.2), scale: 1.45, x: -903, y: -520 },
-  { at: s(12), scale: 1.48, x: -930, y: -532 },
+  { at: s(9.5), scale: 1.45, x: -903, y: -520 },
+  { at: s(14), scale: 1.48, x: -930, y: -532 },
 ]
 
 function camera(frame: number) {
@@ -29,7 +29,7 @@ function camera(frame: number) {
   }
 }
 
-export const CASES_DATA_FRAMES = s(12)
+export const CASES_DATA_FRAMES = s(14)
 
 /** The cases are data too: county by county, step by step, as they are entered. */
 export function CasesDataScene() {
@@ -42,17 +42,17 @@ export function CasesDataScene() {
         path={[
           { at: s(0.6), x: 1700, y: 1000 },
           { at: s(2.6), x: 1300, y: 640 },
-          { at: s(5.2), x: 1053, y: 240 },
-          { at: s(9.2), x: 1579, y: 392 },
+          { at: s(5.6), x: 1053, y: 240 },
+          { at: s(10.6), x: 1579, y: 392 },
         ]}
       />
-      <Sequence durationInFrames={s(4)}>
-        <LowerThird title="The cases are data too" line="Read like any other source, as they are entered (synthetic data)" exitAt={s(3.6)} />
+      <Sequence durationInFrames={s(4.2)}>
+        <LowerThird title="The cases are data too" line="Read like any other source, as they are entered (synthetic data)" exitAt={s(3.8)} />
       </Sequence>
-      <Sequence from={s(4.2)} durationInFrames={s(3.8)}>
-        <LowerThird title="Who waits longest" line="Days behind the treatment-start target, county by county" accent="#f97316" exitAt={s(3.4)} />
+      <Sequence from={s(4.5)} durationInFrames={s(4.8)}>
+        <LowerThird title="Who waits longest" line="Days behind the treatment-start target, county by county" accent="#f97316" exitAt={s(4.4)} />
       </Sequence>
-      <Sequence from={s(8.2)}>
+      <Sequence from={s(9.5)}>
         <LowerThird title="The bottleneck step" line="Specialist to work-up takes longest: where to act first" accent="#dc2626" />
       </Sequence>
     </AbsoluteFill>
