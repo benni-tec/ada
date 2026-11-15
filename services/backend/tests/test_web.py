@@ -33,8 +33,10 @@ from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.errors import Invalid, Unavailable
 from ada.core.models.schema import Column, ColumnType, Schema
+from ada.core.models.sessions import SessionAgent
 from ada.core.models.sources import (
     AccessKind,
+    CheckEvery,
     DataFormat,
     DataSource,
     FreshnessKind,
@@ -377,8 +379,8 @@ async def test_failed_web_calls_count_against_the_research_cap(
             project = await (await request.get(ProjectService)).create("P")
             sessions = await request.get(SessionService)
             parent = await sessions.create(project.id, "S")
-            child = await sessions.create_research(
-                parent.id, "Survival", Actor(kind=ActorKind.USER, name="web")
+            child = await sessions.create_child(
+                parent.id, "Survival", SessionAgent.RESEARCH, Actor(kind=ActorKind.USER, name="web")
             )
         arguments = {
             "query": "survival",
@@ -501,6 +503,10 @@ async def test_crawls_answers_and_extractions_become_rows() -> None:
 
 
 async def test_a_web_source_fails_readably_and_stays_counted() -> None:
+    empty = FakeExplorer()
+    empty.page = empty.page.model_copy(update={"markdown": "| Name | Free |\n| --- | --- |\n| | |"})
+    with pytest.raises(Invalid, match="No table data rows.*not proof"):
+        await _reader(empty)[0].fetch(_web_source(options={"extract": "tables"}), TimeRange())
     explorer = FakeExplorer()
     reader, budget = _reader(explorer, limit=1)
     explorer.failure = Invalid("Context.dev could not read https://example.test/screening: 404")
@@ -656,7 +662,7 @@ async def test_context_dev_reads_extracts_and_watches_against_its_recorded_answe
     replay = WebReplay()
     tags = ["ada", "project:p"]
     async with _client(replay) as http:
-        web = ContextDevWeb(http, "test-key")
+        web = ContextDevWeb(http, "test-key", monitor_minutes=15)
         page = await web.read(SOTKANET, tags=tags, main_content_only=True)
         extraction = await web.extract(
             SOTKANET,
@@ -676,6 +682,7 @@ async def test_context_dev_reads_extracts_and_watches_against_its_recorded_answe
     assert monitor.secret.get_secret_value() == "test-secret"
     bodies = [json.loads(request.content) for request in replay.requests[:3]]
     assert [body.get("tags") for body in bodies] == [tags, tags, None]
+    assert bodies[2]["schedule"] == {"type": "interval", "frequency": 15, "unit": "minutes"}
     assert "secret" not in bodies[2]["webhook"]
     assert replay.requests[3].method == "DELETE"
 
@@ -810,6 +817,7 @@ async def test_context_dev_reads_pdf_pages_with_ocr_and_the_passages_on_a_questi
     assert sent[0] == {
         "url": LUNG_REPORT,
         "formats": {"highlights": True},
+        "maxAgeMs": 0,
         "highlightsParams": {"query": question, "maxCharacters": 8000},
         "sharedParams": {
             "mainContentOnly": True,
@@ -873,6 +881,7 @@ async def test_context_dev_gets_only_the_forwarded_parameters_and_its_refusals_r
     assert json.loads(sent[0].content) == {
         "url": "https://example.test",
         "formats": {"markdown": True},
+        "maxAgeMs": 0,
         "tags": ["ada", "project:p"],
     }
     assert sent[0].headers["authorization"] == "Bearer key"
@@ -935,3 +944,162 @@ async def test_the_web_budget_counts_in_its_own_transaction(migrated_database_ur
         await budget.adjust(project.id, day, -2)
         assert await budget.spend(project.id, day, 2, limit=4)
         assert not await budget.spend(project.id, day + timedelta(days=1), 5, limit=4)
+
+
+async def test_render_wait_reaches_fresh_scrapes_and_extractions() -> None:
+    sent = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "markdown": {"success": True, "data": "loaded"},
+                "html": {"success": True, "data": "<script>public endpoint</script>"},
+                "json": {"success": True, "data": {"rows": [{"name": "loaded"}]}},
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+        web = ContextDevWeb(client, "test-key")
+        await web.read("https://example.test", tags=[], wait_for=1200, main_content_only=True)
+        await web.extract("https://example.test", "rows", ["name"], tags=[], wait_for="tbody tr")
+    assert [body["sharedParams"]["waitFor"] for body in sent] == [1200, "tbody tr"]
+    assert all(body["maxAgeMs"] == 0 for body in sent)
+    assert sent[0]["markdownParams"]["includeLinks"] is True
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+        page = await ContextDevWeb(client, "test-key").read(
+            "https://example.test", tags=[], raw_html=True
+        )
+    assert page.markdown == "<script>public endpoint</script>"
+    assert sent[-1]["formats"] == {"html": True}
+    explorer = FakeExplorer()
+    await _reader(explorer)[0].fetch(_web_source(options={"wait_for": 1200}), TimeRange())
+    assert explorer.calls[0][1]["wait_for"] == 1200
+    from ada.core.models.web import render_wait
+
+    with pytest.raises(Invalid, match="wait_for"):
+        render_wait(30001)
+
+
+async def test_web_provenance_survives_typed_extraction_as_platform_values() -> None:
+    from ada.core.services.sources.web import web_schema
+
+    source = _web_source(
+        options={"operation": "extract", "instruction": "rows", "include_provenance": True},
+        declared_schema=Schema(columns=(Column(name="rate", type=ColumnType.NUMBER),)),
+    )
+    source = source.model_copy(
+        update={"declared_schema": web_schema(source.options, source.declared_schema)}
+    )
+    explorer = FakeExplorer(
+        rows=[{"rate": "4.2", "source_url": "invented", "fetched_at": "invented"}]
+    )
+    fetched = await _reader(explorer)[0].fetch(source, TimeRange())
+    assert _rows(fetched.content) == [
+        {"rate": 4.2, "source_url": source.address, "fetched_at": fetched.fetched_at}
+    ]
+    assert explorer.calls[0][1]["columns"] == ["rate"]
+
+
+async def test_original_html_tables_keep_rows_hidden_by_client_pagination() -> None:
+    import base64
+
+    markup = (
+        "<table><tr><th>Name</th><th>Free</th></tr>"
+        "<tr><td>A &amp; B</td><td>4</td></tr><tr><td>C</td><td>0</td></tr></table>"
+    )
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["formats"] == {"bytes": True}
+        return httpx.Response(
+            200,
+            json={
+                "bytes": {
+                    "success": True,
+                    "data": {
+                        "contentType": "text/html",
+                        "base64": base64.b64encode(markup.encode()).decode(),
+                    },
+                }
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+        reader = WebPageReader(
+            ContextDevWeb(client, "test-key"), MemoryWebBudget(), FixedClock(), 300
+        )
+        source = _web_source(options={"extract": "tables", "original_html": True})
+        data = await reader.fetch(source, TimeRange())
+    assert [row["cells"] for row in _rows(data.content)] == [
+        ["Name", "Free"],
+        ["A & B", "4"],
+        ["C", "0"],
+    ]
+
+
+async def test_literal_html_queries_show_later_application_code_in_large_bundles() -> None:
+    explorer = FakeExplorer()
+    explorer.page = explorer.page.model_copy(
+        update={
+            "markdown": "routes: library boilerplate"
+            + " " * 10000
+            + "routes: application public endpoint /data/events"
+        }
+    )
+    service = WebExploration(FakeWebSearch(), explorer, MemoryWebBudget(), FixedClock(), 300)
+    answer = await service.read(
+        factories.project().id,
+        factories.project().id,
+        "https://example.test/app.js",
+        raw_html=True,
+        query="routes:",
+        max_chars=1000,
+    )
+    assert "/data/events" in answer.markdown
+    assert "library boilerplate" in answer.markdown
+    assert len(answer.markdown) <= 1000 and answer.truncated
+
+
+@pytest.mark.parametrize(
+    "check_every, minutes",
+    [(None, 15), (CheckEvery.TEN_MINUTES, 10), (CheckEvery.HOURLY, 60), (CheckEvery.DAILY, 1440)],
+)
+async def test_monitor_interval_payload(check_every: CheckEvery | None, minutes: int) -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST" and request.url.path == "/v1/monitors"
+        assert json.loads(request.content)["schedule"] == {
+            "type": "interval",
+            "frequency": minutes,
+            "unit": "minutes",
+        }
+        return httpx.Response(201, json={"id": "mon_1", "webhook": {"secret": "test-secret"}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        await ContextDevWeb(http, "test-key", monitor_minutes=15).watch(
+            "https://example.com/", "https://example.com/api/hooks/context/probe", check_every
+        )
+
+
+async def test_watch_mcp_rejects_other_intervals(
+    web: tuple[Client, Seen, FakeWebSearch, FakeExplorer],
+) -> None:
+    client, _, _, explorer = web
+    project_id, session_id = await _project_and_session(client)
+    before = len(explorer.calls)
+    with pytest.raises(ToolError, match="check_every"):
+        await call(
+            client,
+            "watch_source",
+            session_id=session_id,
+            source_id=project_id,
+            check_every="weekly",
+        )
+    assert len(explorer.calls) == before
+
+
+def test_original_html_tables_close_omitted_cell_and_row_tags() -> None:
+    from ada.adapters.sources.context_dev import html_tables
+
+    rows = html_tables("<table><tr><th>Name<th>Free<tr><td>A<td>4<tr><td>B<td>0</table>")
+    assert [cells for *_, cells in rows] == [["Name", "Free"], ["A", "4"], ["B", "0"]]

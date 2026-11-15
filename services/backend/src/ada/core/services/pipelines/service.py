@@ -1,19 +1,21 @@
 from collections.abc import Sequence
 
 from ada.core.models.actors import Actor
-from ada.core.models.base import Id
+from ada.core.models.base import Id, JsonObject
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.operators import (
+    HistoryParams,
     InputParams,
     Operator,
     OperatorId,
     OperatorKind,
     SourceParams,
+    StatisticParams,
     TransformParams,
     operator_identity,
 )
 from ada.core.models.pipelines import Pipeline
-from ada.core.models.schema import Column, OutputKind, Roles, Schema
+from ada.core.models.schema import Column, ColumnType, OutputKind, Roles, Schema
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.repositories import (
     DataSourceRepository,
@@ -22,12 +24,14 @@ from ada.core.ports.repositories import (
 )
 from ada.core.ports.system import Clock
 from ada.core.services.pipelines import listing
-from ada.core.services.pipelines.fusion import QueryNode, compose
+from ada.core.services.pipelines.fusion import QueryNode, SnapshotNode, compose
 from ada.core.services.pipelines.schemas import (
+    SOURCE_KEY,
     Columns,
     check_fits,
     check_unique,
 )
+from ada.core.services.pipelines.statistics import compile_statistic
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.schema.intervals import check_bounds
@@ -74,6 +78,72 @@ class Pipelines(PipelineService):
         )
         return await self.operators.add(operator)
 
+    async def add_history(
+        self, project_id: Id, source_id: Id, actor: Actor, last: int = 10
+    ) -> Operator:
+        if isinstance(last, bool) or not isinstance(last, int) or last < 1:
+            raise Invalid("History last must be a positive integer")
+        source = await self.data_sources.get(source_id)
+        if source.project_id != project_id:
+            raise Invalid(f"Data source {source_id} belongs to another project")
+        if source.options.get("pushdown") is not None:
+            raise Invalid("Source history does not support period (pushdown) sources")
+        upstream = await self.add_source(project_id, source_id, actor)
+        if upstream.output.kind is not OutputKind.TABLE:
+            raise Invalid("Source history needs a source that produces a table")
+        params = HistoryParams(last=last).model_dump(mode="json")
+        id = operator_identity(project_id, OperatorKind.HISTORY, params, (upstream.id,))
+        if existing := await self._find(id):
+            return existing
+        anchor = await self.columns.snapshots.current(upstream.id, SOURCE_KEY)
+        if anchor is None and upstream.output.columns:
+            # Declared columns let projects build before their first scheduled refresh.
+            columns = upstream.output.columns
+        else:
+            anchor = await self.columns.source_snapshot(upstream)
+            snapshots = sorted(
+                (
+                    s
+                    for s in await self.columns.snapshots.list(upstream.id)
+                    if s.parameters_key == SOURCE_KEY
+                    and (s.fetched_at, s.id) <= (anchor.fetched_at, anchor.id)
+                ),
+                key=lambda s: (s.fetched_at, s.id),
+                reverse=True,
+            )[:last]
+            columns = await self.store.describe(
+                compose(
+                    QueryNode(
+                        id,
+                        " UNION ALL BY NAME ".join(
+                            f"SELECT * FROM input_{i}" for i in range(len(snapshots))
+                        ),
+                        tuple(SnapshotNode(s) for s in snapshots),
+                    )
+                )
+            )
+        if any(c.name.lower() in {"snapshot_at", "snapshot_rank"} for c in columns):
+            raise Invalid("Source history reserves the columns snapshot_at and snapshot_rank")
+        return await self.operators.add(
+            Operator(
+                id=id,
+                project_id=project_id,
+                kind=OperatorKind.HISTORY,
+                params=params,
+                inputs=(upstream.id,),
+                output=Schema(
+                    columns=columns
+                    + (
+                        Column(name="snapshot_at", type=ColumnType.TIMESTAMP),
+                        Column(name="snapshot_rank", type=ColumnType.INTEGER),
+                    )
+                ),
+                materializing=False,
+                created_by=actor,
+                created_at=self.clock.now(),
+            )
+        )
+
     async def describe(
         self, project_id: Id, sql: str, inputs: Sequence[OperatorId]
     ) -> tuple[Column, ...]:
@@ -116,6 +186,40 @@ class Pipelines(PipelineService):
             # The columns are certain; what they mean after arbitrary SQL is not, so roles
             # come only from the caller.
             output=Schema(columns=columns, roles=roles or Roles(), derived=not declared),
+            materializing=materialize,
+            created_by=actor,
+            created_at=self.clock.now(),
+        )
+        return await self.operators.add(operator)
+
+    async def add_statistic(
+        self,
+        project_id: Id,
+        tool: str,
+        arguments: JsonObject,
+        input: OperatorId,
+        actor: Actor,
+        materialize: bool = False,
+    ) -> Operator:
+        upstream = await self._upstream(project_id, input)
+        normalised, compiled = compile_statistic(
+            tool, arguments, await self.columns.of(upstream), upstream.output.roles
+        )
+        params = StatisticParams(tool=tool, arguments=normalised, sql=compiled.sql)
+        dumped = params.model_dump(mode="json")
+        id = operator_identity(project_id, OperatorKind.STATISTIC, dumped, (input,))
+        if existing := await self._find(id):
+            return existing
+        columns = await self.describe(project_id, compiled.sql, (input,))
+        check_roles(compiled.roles, columns)
+        operator = Operator(
+            id=id,
+            project_id=project_id,
+            kind=OperatorKind.STATISTIC,
+            params=dumped,
+            inputs=(input,),
+            # The statistic knows what its columns mean, its bounds included.
+            output=Schema(columns=columns, roles=compiled.roles),
             materializing=materialize,
             created_by=actor,
             created_at=self.clock.now(),

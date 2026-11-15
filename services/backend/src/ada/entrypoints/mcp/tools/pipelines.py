@@ -6,10 +6,11 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 from ada.core.models.analysis import Rows
-from ada.core.models.base import DomainModel, Id
+from ada.core.models.base import DomainModel, Id, JsonObject
 from ada.core.models.operators import Operator, OperatorId
 from ada.core.models.pipelines import Pipeline
 from ada.core.models.schema import Column, Roles
+from ada.core.models.statistics import described
 from ada.core.services.ports.batches import BatchService, Step
 from ada.core.services.ports.exploration import (
     MAX_EXPLORATION_ROWS,
@@ -21,6 +22,7 @@ from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.mcp.actor import calling_agent
+from ada.entrypoints.mcp.bounds import bound_rows
 from ada.entrypoints.mcp.injection import Inject
 from ada.entrypoints.mcp.links import widget_url
 from ada.entrypoints.mcp.sessions import SessionId
@@ -35,16 +37,33 @@ EXPLORATION_NOTE = (
 )
 
 
+ADD_STATISTIC = f"""Add a statistic over one earlier operator: a named analysis the \
+platform has vetted, so its formula is right and its result is traced like a transform's. \
+Prefer it to writing the same statistics in SQL. `input` is the operator, `arguments` \
+name its columns. The statistic is compiled to SQL, stored with the operator and shown in \
+its lineage; a trend's confidence interval is declared as the measure's bounds. The \
+statistics:
+{described()}
+
+Give a one-line `note` on why you add it: the session shows it. Returns the operator with \
+its id and output columns."""
+
+
+class PreviewRows(Rows):
+    dropped_rows: int = 0
+
+
 class Preview(DomainModel):
     operator_id: OperatorId
     run_id: Id
-    rows: Rows
+    rows: PreviewRows
 
 
 class QueryAnswer(DomainModel):
     columns: tuple[Column, ...]
     rows: tuple[tuple[object, ...], ...]
     truncated: bool
+    dropped_rows: int = 0
     # The run the rows were read in; null when they came from one snapshot.
     run_id: Id | None
     note: str = EXPLORATION_NOTE
@@ -83,6 +102,29 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         await projects.get(project_id)
         actor = calling_agent()
         operator = await pipelines.add_source(project_id, data_source_id, actor)
+        await sessions.record_operator(session_id, operator.id, note, actor)
+        return operator
+
+    @mcp.tool
+    @inject
+    async def add_history(
+        project_id: Id,
+        session_id: SessionId,
+        source_id: Id,
+        projects: FromDishka[ProjectService],
+        pipelines: FromDishka[PipelineService],
+        sessions: FromDishka[SessionService],
+        last: Annotated[int, Field(ge=1)] = 10,
+        note: str = "",
+    ) -> Operator:
+        """All stored snapshots of a source, newest first, with snapshot_at and
+        snapshot_rank, for comparing over time. `last` limits snapshots (default 10).
+        Missing columns are NULL; period (pushdown) sources are unsupported.
+        Use the returned operator id as an input of add_transform.
+        """
+        await projects.get(project_id)
+        actor = calling_agent()
+        operator = await pipelines.add_history(project_id, source_id, actor, last=last)
         await sessions.record_operator(session_id, operator.id, note, actor)
         return operator
 
@@ -128,6 +170,28 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         await sessions.record_operator(session_id, operator.id, note, actor)
         return operator
 
+    @mcp.tool(description=ADD_STATISTIC)
+    @inject
+    async def add_statistic(
+        project_id: Id,
+        session_id: SessionId,
+        tool: str,
+        input: OperatorId,
+        projects: FromDishka[ProjectService],
+        pipelines: FromDishka[PipelineService],
+        sessions: FromDishka[SessionService],
+        arguments: JsonObject | None = None,
+        materialize: bool = False,
+        note: str = "",
+    ) -> Operator:
+        await projects.get(project_id)
+        actor = calling_agent()
+        operator = await pipelines.add_statistic(
+            project_id, tool, arguments or {}, input, actor, materialize=materialize
+        )
+        await sessions.record_operator(session_id, operator.id, note, actor)
+        return operator
+
     @mcp.tool
     @inject
     async def list_pipelines(
@@ -167,11 +231,18 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         or a transform does what you meant. Runs the pipeline with no bindings and an open
         time range. Returns the column names and types and at most `limit` rows
         (`truncated` says whether there are more), never the whole dataset: use SQL in a
-        transform to aggregate."""
+        transform to aggregate. String cells are cut after 300 characters; the result is
+        capped at 20 KB. `dropped_rows` counts rows omitted by that budget."""
         operator = await pipelines.get(operator_id)
         run = await runs.start(operator.project_id, calling_agent())
-        return Preview(
-            operator_id=operator_id, run_id=run.id, rows=await runs.read(run.id, operator_id, limit)
+        rows = await runs.read(run.id, operator_id, limit)
+        return bound_rows(
+            Preview(
+                operator_id=operator_id,
+                run_id=run.id,
+                rows=PreviewRows(**rows.model_dump()),
+            ),
+            nested=True,
         )
 
     @mcp.tool
@@ -204,7 +275,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         Reads the output in `run_id`, or in `snapshot_id` (a stored snapshot of this
         operator, if it is a source or a materialized transform), or by default in a new
         run with no bindings and an open time range. Returns the columns, at most `limit`
-        rows (`truncated` says whether there are more) and the run it read."""
+        rows (`truncated` says whether there are more) and the run it read. String cells
+        are cut after 300 characters; the result is capped at 20 KB. `dropped_rows` counts
+        rows omitted by that budget. Use SQL to aggregate or select a smaller excerpt."""
         explored = await exploration.query(
             operator_id,
             Clauses(
@@ -219,11 +292,13 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             run_id=run_id,
             snapshot_id=snapshot_id,
         )
-        return QueryAnswer(
-            columns=explored.rows.columns,
-            rows=explored.rows.rows,
-            truncated=explored.rows.truncated,
-            run_id=explored.run_id,
+        return bound_rows(
+            QueryAnswer(
+                columns=explored.rows.columns,
+                rows=explored.rows.rows,
+                truncated=explored.rows.truncated,
+                run_id=explored.run_id,
+            )
         )
 
     @mcp.tool

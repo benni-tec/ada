@@ -37,11 +37,27 @@ RESEARCH_TOOLS = frozenset(
         "add_source_operator",
         "preview_operator",
         "watch_source",
+        "watch_sources",
         "report_back",
     }
 )
-# Only the research agent reports back.
-RESEARCH_ONLY = frozenset({"report_back"})
+# The analyst works on the project's data with these, and reports findings. It adds no
+# sources and builds no widgets: whoever delegated shows what it found.
+ANALYSIS_TOOLS = frozenset(
+    {
+        "list_pipelines",
+        "get_lineage",
+        "list_sources",
+        "add_source_operator",
+        "preview_operator",
+        "query_operator",
+        "add_transform",
+        "add_statistic",
+        "report_findings",
+    }
+)
+# Only a delegated session reports back.
+CHILD_ONLY = frozenset({"report_back", "report_findings"})
 
 # Only for the server's logs: the actor comes from acting_as, never from this name.
 CLIENT = Implementation(name="ada-in-platform-agent", version="1")
@@ -69,7 +85,7 @@ class InProcessToolbox(AgentToolbox):
                     for tool in listed
                     if _offered(tool.name, profile)
                 ]
-                yield _McpTools(client, specs, session_id, profile is SessionAgent.RESEARCH)
+                yield _McpTools(client, specs, session_id, profile is not SessionAgent.SESSION)
 
 
 def _session_optional(schema: JsonObject) -> JsonObject:
@@ -84,7 +100,9 @@ def _session_optional(schema: JsonObject) -> JsonObject:
 def _offered(name: str, profile: SessionAgent) -> bool:
     if profile is SessionAgent.RESEARCH:
         return name in RESEARCH_TOOLS
-    return name not in LEFT_OUT and name not in RESEARCH_ONLY
+    if profile is SessionAgent.ANALYSIS:
+        return name in ANALYSIS_TOOLS
+    return name not in LEFT_OUT and name not in CHILD_ONLY
 
 
 def application(container: AsyncContainer) -> AsyncContainer:

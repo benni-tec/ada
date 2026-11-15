@@ -7,7 +7,8 @@
           "request",
           "browser",
           "document",
-          "web"
+          "web",
+          "cases"
         ],
         "title": "AccessKind",
         "type": "string"
@@ -262,6 +263,84 @@
         "title": "Alert",
         "type": "object"
       },
+      "AlertDelivery": {
+        "properties": {
+          "alert_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "rule_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "test": {
+            "default": false,
+            "title": "Test",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "rule_id",
+          "channel",
+          "target",
+          "status",
+          "created_at"
+        ],
+        "title": "AlertDelivery",
+        "type": "object"
+      },
       "AlertRule": {
         "description": "A condition on the output of a measure pipeline, checked on its own interval.",
         "properties": {
@@ -496,6 +575,26 @@
         "title": "AlertView",
         "type": "object"
       },
+      "AnyCompiled": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Compiled"
+          },
+          {
+            "$ref": "#/components/schemas/TrialCompiled"
+          }
+        ]
+      },
+      "AnySpec": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ModelSpec"
+          },
+          {
+            "$ref": "#/components/schemas/TrialMatcherSpec"
+          }
+        ]
+      },
       "Attachment": {
         "description": "Something shown beside a session, as a tab, and listed to its agent. A session has\neach thing attached at most once. An attachment is added or removed, never changed.",
         "properties": {
@@ -552,6 +651,425 @@
         "title": "AttachmentKind",
         "type": "string"
       },
+      "Attention": {
+        "description": "What a result says about whether the case needs someone: still open, how many\ndays the most overdue thing is late, how many days until the next thing is due.\nEach model kind fills it from its own result; lists sort by it.",
+        "properties": {
+          "due_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due In"
+          },
+          "open": {
+            "default": false,
+            "title": "Open",
+            "type": "boolean"
+          },
+          "overdue_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overdue By"
+          }
+        },
+        "title": "Attention",
+        "type": "object"
+      },
+      "BaselineCell": {
+        "description": "5-year relative survival for a profile in the baseline population (the Nordic\nlevel). `age_band` or `stage` None: all of them.",
+        "properties": {
+          "age_band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Band"
+          },
+          "excess_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excess Share"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "sex": {
+            "title": "Sex",
+            "type": "string"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "survival": {
+            "title": "Survival",
+            "type": "number"
+          }
+        },
+        "required": [
+          "site",
+          "sex",
+          "survival",
+          "provenance"
+        ],
+        "title": "BaselineCell",
+        "type": "object"
+      },
+      "Case": {
+        "properties": {
+          "case_type_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "revision": {
+            "default": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "schema_revision": {
+            "title": "Schema Revision",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "values": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "required": [
+          "id",
+          "case_type_id",
+          "key",
+          "values",
+          "schema_revision",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Case",
+        "type": "object"
+      },
+      "CaseEvent": {
+        "description": "A field whose value changed at a save: the case's history. A day map changes per\nlevel, so `level` names the step and `old`/`new` are its days; for other fields\n`level` is None. `old` is None for a value set for the first time.",
+        "properties": {
+          "case_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "new": {
+            "title": "New"
+          },
+          "old": {
+            "title": "Old"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "field",
+          "recorded_at"
+        ],
+        "title": "CaseEvent",
+        "type": "object"
+      },
+      "CaseResult": {
+        "properties": {
+          "case_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "case_revision": {
+            "title": "Case Revision",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "section": {
+            "$ref": "#/components/schemas/Section"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/ResultTrigger"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "case_id",
+          "model_id",
+          "version",
+          "case_revision",
+          "section",
+          "trigger",
+          "created_by",
+          "created_at"
+        ],
+        "title": "CaseResult",
+        "type": "object"
+      },
+      "CaseState": {
+        "description": "A case with its step events and every result, newest first.",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/Case"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CaseEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CaseResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "case",
+          "events",
+          "results"
+        ],
+        "title": "CaseState",
+        "type": "object"
+      },
+      "CaseType": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "revision": {
+            "default": 1,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "description",
+          "fields",
+          "created_by",
+          "created_at"
+        ],
+        "title": "CaseType",
+        "type": "object"
+      },
+      "CaseTypeChange": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Field"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "CaseTypeChange",
+        "type": "object"
+      },
+      "CaseValues": {
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "title": "CaseValues",
+        "type": "object"
+      },
+      "CaseWithResult": {
+        "description": "A case with one model's latest result for it; None when the model has not run.",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/Case"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaseResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "case",
+          "latest"
+        ],
+        "title": "CaseWithResult",
+        "type": "object"
+      },
+      "CaseWithResults": {
+        "description": "A case with the latest result of each model on its type that has run on it.",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/Case"
+          },
+          "latest": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CaseResult"
+            },
+            "title": "Latest",
+            "type": "array"
+          }
+        },
+        "required": [
+          "case"
+        ],
+        "title": "CaseWithResults",
+        "type": "object"
+      },
+      "CheckEvery": {
+        "enum": [
+          "10min",
+          "hourly",
+          "daily"
+        ],
+        "title": "CheckEvery",
+        "type": "string"
+      },
       "CheckResult": {
         "properties": {
           "changed": {
@@ -578,6 +1096,84 @@
           "firing"
         ],
         "title": "CheckResult",
+        "type": "object"
+      },
+      "Citation": {
+        "description": "Where a figure comes from: the citation, the passage it was checked against, and\nthe evidence grade shown beside it.",
+        "properties": {
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "grade": {
+            "$ref": "#/components/schemas/EvidenceGrade"
+          },
+          "operator_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Id"
+          },
+          "passage": {
+            "title": "Passage",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "source",
+          "passage",
+          "grade"
+        ],
+        "title": "Citation",
         "type": "object"
       },
       "Column": {
@@ -615,6 +1211,125 @@
         "title": "ColumnType",
         "type": "string"
       },
+      "ComparisonPopulation": {
+        "description": "What the model is compared with: a country's observed survival per site and sex,\nand its typical days per step, for the residual and the population view.",
+        "properties": {
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "days": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "propertyNames": {
+                "$ref": "#/components/schemas/PathwayStep"
+              },
+              "type": "object"
+            },
+            "title": "Days",
+            "type": "object"
+          },
+          "education_provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Citation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "survival": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Survival",
+            "type": "object"
+          },
+          "survival_by_education": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "default": {},
+            "title": "Survival By Education",
+            "type": "object"
+          }
+        },
+        "required": [
+          "country",
+          "survival",
+          "days",
+          "provenance"
+        ],
+        "title": "ComparisonPopulation",
+        "type": "object"
+      },
+      "Compiled": {
+        "description": "What the build derived from the spec.",
+        "properties": {
+          "kind": {
+            "const": "patient_pathway",
+            "default": "patient_pathway",
+            "title": "Kind",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Parameter"
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "population": {
+            "items": {
+              "$ref": "#/components/schemas/PopulationFigure"
+            },
+            "title": "Population",
+            "type": "array"
+          },
+          "targets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              "type": "object"
+            },
+            "title": "Targets",
+            "type": "object"
+          },
+          "validation": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ValidationCheck"
+            },
+            "title": "Validation",
+            "type": "array"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "targets",
+          "parameters",
+          "population"
+        ],
+        "title": "Compiled",
+        "type": "object"
+      },
       "Context": {
         "discriminator": {
           "mapping": {
@@ -635,6 +1350,75 @@
             "$ref": "#/components/schemas/WidgetContext"
           }
         ]
+      },
+      "Contribution": {
+        "description": "A term's effect on the log cumulative excess hazard, for the analyst view.",
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "log_hazard": {
+            "title": "Log Hazard",
+            "type": "number"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "log_hazard",
+          "applied",
+          "note"
+        ],
+        "title": "Contribution",
+        "type": "object"
+      },
+      "Criterion": {
+        "description": "One entry of a national pathway's criteria; the countries whose standard lists it.",
+        "properties": {
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/TriggerStage"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "site",
+          "stage",
+          "text",
+          "countries",
+          "provenance"
+        ],
+        "title": "Criterion",
+        "type": "object"
       },
       "Dashboard": {
         "description": "A live view that follows the latest run. Its content lives in its versions; this\nrecord only points at the current one.",
@@ -857,6 +1641,16 @@
             "title": "Address",
             "type": "string"
           },
+          "check_every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckEvery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -968,6 +1762,64 @@
         "title": "DataSource",
         "type": "object"
       },
+      "Deadline": {
+        "properties": {
+          "by": {
+            "title": "By",
+            "type": "integer"
+          },
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "due_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Day"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeadlineStatus"
+          }
+        },
+        "required": [
+          "label",
+          "rule",
+          "countries",
+          "due_day",
+          "status",
+          "by"
+        ],
+        "title": "Deadline",
+        "type": "object"
+      },
+      "DeadlineStatus": {
+        "enum": [
+          "met",
+          "late",
+          "due",
+          "overdue",
+          "not_applicable"
+        ],
+        "title": "DeadlineStatus",
+        "type": "string"
+      },
       "EntryKind": {
         "enum": [
           "message",
@@ -981,6 +1833,305 @@
         ],
         "title": "EntryKind",
         "type": "string"
+      },
+      "Evaluate": {
+        "additionalProperties": false,
+        "properties": {
+          "inputs": {
+            "$ref": "#/components/schemas/EvaluationInputs"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "inputs"
+        ],
+        "title": "Evaluate",
+        "type": "object"
+      },
+      "EvaluateCase": {
+        "additionalProperties": false,
+        "properties": {
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "model_id"
+        ],
+        "title": "EvaluateCase",
+        "type": "object"
+      },
+      "Evaluation": {
+        "properties": {
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/Contribution"
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "days_behind": {
+            "title": "Days Behind",
+            "type": "integer"
+          },
+          "deadlines": {
+            "items": {
+              "$ref": "#/components/schemas/Deadline"
+            },
+            "title": "Deadlines",
+            "type": "array"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "levers": {
+            "items": {
+              "$ref": "#/components/schemas/Lever"
+            },
+            "title": "Levers",
+            "type": "array"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "pathway": {
+            "items": {
+              "$ref": "#/components/schemas/PathwayRow"
+            },
+            "title": "Pathway",
+            "type": "array"
+          },
+          "survival": {
+            "$ref": "#/components/schemas/Survival"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/Trigger"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "model_id",
+          "version",
+          "trigger",
+          "deadlines",
+          "pathway",
+          "days_behind",
+          "survival",
+          "levers",
+          "flags",
+          "warnings",
+          "contributions"
+        ],
+        "title": "Evaluation",
+        "type": "object"
+      },
+      "EvaluationInputs": {
+        "description": "One profile. Days are the days spent in each step so far; a step left out has not\nstarted. Synthetic profiles only: the platform is not for patient data.",
+        "properties": {
+          "age_band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Band"
+          },
+          "days": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "propertyNames": {
+              "$ref": "#/components/schemas/PathwayStep"
+            },
+            "title": "Days",
+            "type": "object"
+          },
+          "education": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Education"
+          },
+          "intent": {
+            "$ref": "#/components/schemas/Intent",
+            "default": "unknown"
+          },
+          "modality": {
+            "$ref": "#/components/schemas/Modality",
+            "default": "surgery"
+          },
+          "presentation": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Presentation",
+            "type": "array"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "sex": {
+            "title": "Sex",
+            "type": "string"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "toggles": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "default": {},
+            "title": "Toggles",
+            "type": "object"
+          },
+          "treatment_started": {
+            "default": false,
+            "title": "Treatment Started",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "site",
+          "sex"
+        ],
+        "title": "EvaluationInputs",
+        "type": "object"
+      },
+      "EvidenceGrade": {
+        "enum": [
+          "standard",
+          "meta_analysis",
+          "cohort",
+          "registry",
+          "assumption"
+        ],
+        "title": "EvidenceGrade",
+        "type": "string"
+      },
+      "Field": {
+        "properties": {
+          "help": {
+            "default": "",
+            "title": "Help",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "levels": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "required": {
+            "default": false,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FieldType"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "Field",
+        "type": "object"
+      },
+      "FieldType": {
+        "enum": [
+          "text",
+          "number",
+          "integer",
+          "date",
+          "boolean",
+          "enum",
+          "enum_list",
+          "day_map"
+        ],
+        "title": "FieldType",
+        "type": "string"
+      },
+      "Figure": {
+        "properties": {
+          "now": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "on_target": {
+            "$ref": "#/components/schemas/Per100"
+          }
+        },
+        "required": [
+          "now",
+          "on_target"
+        ],
+        "title": "Figure",
+        "type": "object"
       },
       "Finding": {
         "properties": {
@@ -1008,6 +2159,47 @@
         ],
         "title": "Finding",
         "type": "object"
+      },
+      "Flag": {
+        "description": "An offer of support shown when a term has a level, e.g. a navigator after basic\neducation. Never a risk label.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "level",
+          "action",
+          "provenance"
+        ],
+        "title": "Flag",
+        "type": "object"
+      },
+      "Form": {
+        "description": "How a parameter enters the model.",
+        "enum": [
+          "per_4_weeks",
+          "beyond_12_weeks",
+          "per_day",
+          "hazard_ratio",
+          "odds_ratio",
+          "value"
+        ],
+        "title": "Form",
+        "type": "string"
       },
       "FoundBy": {
         "description": "How an agent came upon a source: the web search and its scope.",
@@ -1250,6 +2442,15 @@
         "format": "uuid",
         "type": "string"
       },
+      "Intent": {
+        "enum": [
+          "curative",
+          "palliative",
+          "unknown"
+        ],
+        "title": "Intent",
+        "type": "string"
+      },
       "Interval": {
         "description": "A period of data: both ends inclusive. A year is 1 January to 31 December; a\nmulti-year window such as 2022-2024 is one interval, not three.",
         "properties": {
@@ -1467,6 +2668,36 @@
         "title": "JudgeSettings",
         "type": "object"
       },
+      "Lever": {
+        "properties": {
+          "gain": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "grade": {
+            "$ref": "#/components/schemas/EvidenceGrade"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "step": {
+            "$ref": "#/components/schemas/PathwayStep"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "label",
+          "gain",
+          "grade",
+          "text"
+        ],
+        "title": "Lever",
+        "type": "object"
+      },
       "Liveness": {
         "properties": {
           "status": {
@@ -1588,6 +2819,40 @@
         "title": "MeasureRole",
         "type": "object"
       },
+      "Modality": {
+        "enum": [
+          "surgery",
+          "radiotherapy",
+          "drugs"
+        ],
+        "title": "Modality",
+        "type": "string"
+      },
+      "ModelCaseType": {
+        "additionalProperties": false,
+        "properties": {
+          "auto_run": {
+            "default": false,
+            "title": "Auto Run",
+            "type": "boolean"
+          },
+          "case_type_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "case_type_id"
+        ],
+        "title": "ModelCaseType",
+        "type": "object"
+      },
       "ModelInfo": {
         "description": "A configured model, as the catalog shows it. Its key is never part of it.",
         "properties": {
@@ -1672,6 +2937,218 @@
         "title": "ModelList",
         "type": "object"
       },
+      "ModelOnCase": {
+        "description": "A model on the case's type, with its latest result for the case if it has one.",
+        "properties": {
+          "auto_run": {
+            "title": "Auto Run",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaseResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reads": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reads",
+            "type": "array"
+          },
+          "results": {
+            "title": "Results",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model_id",
+          "name",
+          "kind",
+          "version",
+          "auto_run",
+          "latest",
+          "results"
+        ],
+        "title": "ModelOnCase",
+        "type": "object"
+      },
+      "ModelSpec": {
+        "description": "Everything a version is built from. Validated when a version is created\n(StatisticalModelService.create).",
+        "properties": {
+          "arrows": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Arrows",
+            "type": "object"
+          },
+          "baseline": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineCell"
+            },
+            "title": "Baseline",
+            "type": "array"
+          },
+          "cautions": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Cautions",
+            "type": "array"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/ComparisonPopulation"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/Flag"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "intended_use": {
+            "title": "Intended Use",
+            "type": "string"
+          },
+          "kind": {
+            "const": "patient_pathway",
+            "default": "patient_pathway",
+            "title": "Kind",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Parameter"
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "sites": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sites",
+            "type": "array"
+          },
+          "structure": {
+            "const": "relative_survival_dag",
+            "default": "relative_survival_dag",
+            "title": "Structure",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetTime"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/Term"
+            },
+            "title": "Terms",
+            "type": "array"
+          },
+          "toggles": {
+            "items": {
+              "$ref": "#/components/schemas/Toggle"
+            },
+            "title": "Toggles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outcome",
+          "sites",
+          "terms",
+          "criteria",
+          "targets",
+          "baseline",
+          "parameters",
+          "arrows",
+          "comparison",
+          "toggles",
+          "flags",
+          "intended_use"
+        ],
+        "title": "ModelSpec",
+        "type": "object"
+      },
+      "ModelVersion": {
+        "description": "Immutable; a change makes a new version.",
+        "properties": {
+          "compiled": {
+            "$ref": "#/components/schemas/AnyCompiled"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/AnySpec"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "model_id",
+          "version",
+          "spec",
+          "compiled",
+          "created_by",
+          "created_at"
+        ],
+        "title": "ModelVersion",
+        "type": "object"
+      },
       "NewAlertRule": {
         "additionalProperties": false,
         "properties": {
@@ -1738,6 +3215,33 @@
         "title": "NewAlertRule",
         "type": "object"
       },
+      "NewAnalysis": {
+        "additionalProperties": false,
+        "properties": {
+          "brief": {
+            "title": "Brief",
+            "type": "string"
+          },
+          "operator_ids": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OperatorId"
+            },
+            "title": "Operator Ids",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "brief",
+          "title"
+        ],
+        "title": "NewAnalysis",
+        "type": "object"
+      },
       "NewAttachment": {
         "additionalProperties": false,
         "properties": {
@@ -1765,6 +3269,33 @@
           "ref"
         ],
         "title": "NewAttachment",
+        "type": "object"
+      },
+      "NewCaseType": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "fields"
+        ],
+        "title": "NewCaseType",
         "type": "object"
       },
       "NewDashboard": {
@@ -1796,6 +3327,46 @@
           }
         },
         "title": "NewDashboardRun",
+        "type": "object"
+      },
+      "NewHistory": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "history",
+            "title": "Kind",
+            "type": "string"
+          },
+          "last": {
+            "default": 10,
+            "minimum": 1.0,
+            "title": "Last",
+            "type": "integer"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "kind",
+          "source_id"
+        ],
+        "title": "NewHistory",
         "type": "object"
       },
       "NewInput": {
@@ -1874,22 +3445,21 @@
         "title": "NewMessage",
         "type": "object"
       },
-      "NewModel": {
+      "NewPathwayModel": {
         "additionalProperties": false,
         "properties": {
-          "model": {
-            "title": "Model",
-            "type": "string"
-          },
-          "provider_id": {
-            "$ref": "#/components/schemas/Id"
+          "parameters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatorId"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
-        "required": [
-          "provider_id",
-          "model"
-        ],
-        "title": "NewModel",
+        "title": "NewPathwayModel",
         "type": "object"
       },
       "NewProject": {
@@ -2339,6 +3909,47 @@
         "title": "NewTransform",
         "type": "object"
       },
+      "NewTrialMatcher": {
+        "additionalProperties": false,
+        "properties": {
+          "auto_run": {
+            "default": false,
+            "title": "Auto Run",
+            "type": "boolean"
+          },
+          "case_type_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operator_id": {
+            "$ref": "#/components/schemas/OperatorId"
+          }
+        },
+        "required": [
+          "operator_id"
+        ],
+        "title": "NewTrialMatcher",
+        "type": "object"
+      },
+      "NewVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "spec": {
+            "$ref": "#/components/schemas/ModelSpec"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "title": "NewVersion",
+        "type": "object"
+      },
       "NewWidget": {
         "additionalProperties": false,
         "properties": {
@@ -2459,6 +4070,7 @@
       "OperatorKind": {
         "enum": [
           "source",
+          "history",
           "extract",
           "input",
           "transform",
@@ -2505,6 +4117,139 @@
         "title": "OutputKind",
         "type": "string"
       },
+      "Parameter": {
+        "properties": {
+          "ci_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci High"
+          },
+          "ci_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Low"
+          },
+          "estimate": {
+            "title": "Estimate",
+            "type": "number"
+          },
+          "form": {
+            "$ref": "#/components/schemas/Form",
+            "default": "value"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "scale": {
+            "$ref": "#/components/schemas/Scale"
+          }
+        },
+        "required": [
+          "name",
+          "estimate",
+          "scale",
+          "provenance"
+        ],
+        "title": "Parameter",
+        "type": "object"
+      },
+      "PathwayRow": {
+        "properties": {
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "gap": {
+            "title": "Gap",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "patient_interval": {
+            "title": "Patient Interval",
+            "type": "boolean"
+          },
+          "step": {
+            "$ref": "#/components/schemas/PathwayStep"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "step",
+          "label",
+          "days",
+          "target",
+          "gap",
+          "countries",
+          "patient_interval",
+          "current"
+        ],
+        "title": "PathwayRow",
+        "type": "object"
+      },
+      "PathwayStep": {
+        "description": "The seven intervals of a pathway, in order, from the first symptoms to the start of\ntreatment. The first is the patient interval; the trigger (imaging done) ends the\nthird; the clock the deadlines count from starts there.",
+        "enum": [
+          "symptoms_to_contact",
+          "contact_to_physician",
+          "physician_to_imaging",
+          "imaging_to_referral",
+          "referral_to_specialist",
+          "specialist_to_workup",
+          "workup_to_treatment"
+        ],
+        "title": "PathwayStep",
+        "type": "string"
+      },
+      "Per100": {
+        "type": "integer"
+      },
       "Pin": {
         "additionalProperties": false,
         "properties": {
@@ -2536,6 +4281,107 @@
           "expected_revision"
         ],
         "title": "Pin",
+        "type": "object"
+      },
+      "PinnedTrial": {
+        "description": "A recruiting trial as the trial matcher's version read it from the trials data\n(`case_trials`, docs/trials.md): what it matches on, and its nearest recruiting sites.\nThe eligibility text is the registry's, as written.",
+        "properties": {
+          "cancer_groups": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Cancer Groups",
+            "type": "array"
+          },
+          "conditions": {
+            "default": "",
+            "title": "Conditions",
+            "type": "string"
+          },
+          "eligibility": {
+            "default": "",
+            "title": "Eligibility",
+            "type": "string"
+          },
+          "finnish_site": {
+            "default": false,
+            "title": "Finnish Site",
+            "type": "boolean"
+          },
+          "max_age_years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age Years"
+          },
+          "min_age_years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Age Years"
+          },
+          "nct_id": {
+            "title": "Nct Id",
+            "type": "string"
+          },
+          "nearest": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrialSite"
+            },
+            "default": {},
+            "title": "Nearest",
+            "type": "object"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "recruiting_countries": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Recruiting Countries",
+            "type": "array"
+          },
+          "sex": {
+            "default": "ALL",
+            "title": "Sex",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nct_id",
+          "title",
+          "url"
+        ],
+        "title": "PinnedTrial",
         "type": "object"
       },
       "Pipeline": {
@@ -2612,6 +4458,47 @@
           "name"
         ],
         "title": "PipelineSource",
+        "type": "object"
+      },
+      "PopulationFigure": {
+        "description": "Per site and sex: the baseline, the baseline with the comparison country's days,\nand that country's observed survival. The residual is what the days do not explain.",
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "observed": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "residual": {
+            "title": "Residual",
+            "type": "number"
+          },
+          "sex": {
+            "title": "Sex",
+            "type": "string"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "timing_adjusted": {
+            "$ref": "#/components/schemas/Per100"
+          }
+        },
+        "required": [
+          "site",
+          "sex",
+          "baseline",
+          "timing_adjusted",
+          "observed",
+          "residual",
+          "note"
+        ],
+        "title": "PopulationFigure",
         "type": "object"
       },
       "PostedMessage": {
@@ -2838,6 +4725,22 @@
         ],
         "title": "ProviderKind",
         "type": "string"
+      },
+      "Range": {
+        "properties": {
+          "high": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "low": {
+            "$ref": "#/components/schemas/Per100"
+          }
+        },
+        "required": [
+          "low",
+          "high"
+        ],
+        "title": "Range",
+        "type": "object"
       },
       "ReasoningPart": {
         "properties": {
@@ -3193,6 +5096,14 @@
         "title": "ReportVersion",
         "type": "object"
       },
+      "ResultTrigger": {
+        "enum": [
+          "auto",
+          "request"
+        ],
+        "title": "ResultTrigger",
+        "type": "string"
+      },
       "Roles": {
         "properties": {
           "geo": {
@@ -3308,6 +5219,56 @@
         "title": "Run",
         "type": "object"
       },
+      "SavedCase": {
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/Case"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CaseEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "ran": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "title": "Ran",
+            "type": "array"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CaseResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "case",
+          "events",
+          "results"
+        ],
+        "title": "SavedCase",
+        "type": "object"
+      },
+      "Scale": {
+        "description": "What a parameter is measured on. Hazard ratios on overall mortality are converted to\nthe excess scale at build (Compiled.parameters), the others are used as they are.",
+        "enum": [
+          "excess",
+          "cause_specific",
+          "overall",
+          "odds_ratio",
+          "per_day",
+          "days",
+          "survival"
+        ],
+        "title": "Scale",
+        "type": "string"
+      },
       "Schema": {
         "description": "What an operator produces. Every operator states it; `derived` says whether the\nplatform worked it out from the inputs or its creator declared it.",
         "properties": {
@@ -3336,6 +5297,75 @@
           }
         },
         "title": "Schema",
+        "type": "object"
+      },
+      "Section": {
+        "description": "What one model said about one case. `body` is the model's own result (for\n`patient_pathway`, an Evaluation); `summary`, `status` and `columns` are what lists\nand the cases data source show.",
+        "properties": {
+          "attention": {
+            "$ref": "#/components/schemas/Attention",
+            "default": {
+              "open": false
+            }
+          },
+          "body": {
+            "$ref": "#/components/schemas/JsonObject",
+            "default": {}
+          },
+          "columns": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "default": {},
+            "title": "Columns",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "default": "info",
+            "enum": [
+              "ok",
+              "info",
+              "warn",
+              "urgent"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "summary"
+        ],
+        "title": "Section",
         "type": "object"
       },
       "Session": {
@@ -3398,7 +5428,8 @@
       "SessionAgent": {
         "enum": [
           "session",
-          "research"
+          "research",
+          "analysis"
         ],
         "title": "SessionAgent",
         "type": "string"
@@ -3799,6 +5830,112 @@
         "title": "SourcePart",
         "type": "object"
       },
+      "StageResult": {
+        "properties": {
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "criteria": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "fired": {
+            "title": "Fired",
+            "type": "boolean"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/TriggerStage"
+          }
+        },
+        "required": [
+          "stage",
+          "fired",
+          "countries",
+          "criteria"
+        ],
+        "title": "StageResult",
+        "type": "object"
+      },
+      "StatisticalModel": {
+        "properties": {
+          "auto_run": {
+            "default": false,
+            "title": "Auto Run",
+            "type": "boolean"
+          },
+          "case_type_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "latest_version": {
+            "title": "Latest Version",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "description",
+          "kind",
+          "latest_version",
+          "created_by",
+          "created_at"
+        ],
+        "title": "StatisticalModel",
+        "type": "object"
+      },
       "StoredFile": {
         "description": "A file uploaded to ADA, to be read by a source at `address`.",
         "properties": {
@@ -3831,6 +5968,101 @@
         ],
         "title": "Strictness",
         "type": "string"
+      },
+      "Survival": {
+        "properties": {
+          "by_setting": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Figure"
+            },
+            "title": "By Setting",
+            "type": "object"
+          },
+          "now": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "on_target": {
+            "$ref": "#/components/schemas/Per100"
+          },
+          "range_now": {
+            "$ref": "#/components/schemas/Range"
+          },
+          "range_on_target": {
+            "$ref": "#/components/schemas/Range"
+          },
+          "setting": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Setting",
+            "type": "object"
+          }
+        },
+        "required": [
+          "now",
+          "on_target",
+          "by_setting",
+          "range_now",
+          "range_on_target",
+          "setting"
+        ],
+        "title": "Survival",
+        "type": "object"
+      },
+      "TargetTime": {
+        "description": "A step's standard time in each country that defines it. The target is their median\n(Compiled.targets). `step` None is the whole pathway, trigger to treatment start.",
+        "properties": {
+          "days_by_country": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Days By Country",
+            "type": "object"
+          },
+          "modality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Modality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "other_sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Other Sources",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "site": {
+            "title": "Site",
+            "type": "string"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PathwayStep"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "site",
+          "step",
+          "days_by_country",
+          "provenance"
+        ],
+        "title": "TargetTime",
+        "type": "object"
       },
       "Template": {
         "properties": {
@@ -3887,6 +6119,41 @@
         ],
         "title": "TemplateKind",
         "type": "string"
+      },
+      "Term": {
+        "properties": {
+          "display": {
+            "default": "patient",
+            "enum": [
+              "patient",
+              "analyst"
+            ],
+            "title": "Display",
+            "type": "string"
+          },
+          "levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reference": {
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "levels",
+          "reference"
+        ],
+        "title": "Term",
+        "type": "object"
       },
       "TextPart": {
         "properties": {
@@ -3965,6 +6232,34 @@
           "end"
         ],
         "title": "TimeRole",
+        "type": "object"
+      },
+      "Toggle": {
+        "properties": {
+          "about": {
+            "title": "About",
+            "type": "string"
+          },
+          "default": {
+            "title": "Default",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "default",
+          "about"
+        ],
+        "title": "Toggle",
         "type": "object"
       },
       "ToolCall": {
@@ -4068,6 +6363,194 @@
         "title": "ToolState",
         "type": "string"
       },
+      "TrialCompiled": {
+        "description": "What a trial matcher version read: the trials, as they were, from one run.",
+        "properties": {
+          "kind": {
+            "const": "trial_matcher",
+            "default": "trial_matcher",
+            "title": "Kind",
+            "type": "string"
+          },
+          "read_at": {
+            "format": "date-time",
+            "title": "Read At",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "trials": {
+            "items": {
+              "$ref": "#/components/schemas/PinnedTrial"
+            },
+            "title": "Trials",
+            "type": "array"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "trials",
+          "read_at"
+        ],
+        "title": "TrialCompiled",
+        "type": "object"
+      },
+      "TrialMatcherSpec": {
+        "description": "The trial matcher: which recruiting trials a case could be discussed for, matched\non structured fields only (cancer group, sex, age), never on the eligibility text.",
+        "properties": {
+          "cautions": {
+            "default": [
+              "Matched on cancer group, sex and age only; the eligibility text is not judged.",
+              "Recruiting means the registry's site status, which lags.",
+              "An age group that only partly fits a trial's age limits is marked uncertain."
+            ],
+            "items": {
+              "type": "string"
+            },
+            "title": "Cautions",
+            "type": "array"
+          },
+          "groups": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {
+              "colorectal": "colorectal",
+              "lung": "lung",
+              "pancreas": "pancreas"
+            },
+            "title": "Groups",
+            "type": "object"
+          },
+          "intended_use": {
+            "default": "Educational: lists recruiting Nordic trials a synthetic case could be discussed for with an oncologist. Not an eligibility decision; never patient data.",
+            "title": "Intended Use",
+            "type": "string"
+          },
+          "kind": {
+            "const": "trial_matcher",
+            "default": "trial_matcher",
+            "title": "Kind",
+            "type": "string"
+          },
+          "operator_id": {
+            "title": "Operator Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator_id"
+        ],
+        "title": "TrialMatcherSpec",
+        "type": "object"
+      },
+      "TrialSite": {
+        "description": "A trial's recruiting Nordic site nearest to one of the cities the trials data\nmeasures from, and the great-circle distance to it.",
+        "properties": {
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "facility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facility"
+          },
+          "km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Km"
+          }
+        },
+        "required": [
+          "facility",
+          "city",
+          "country",
+          "km"
+        ],
+        "title": "TrialSite",
+        "type": "object"
+      },
+      "Trigger": {
+        "properties": {
+          "clock_start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Start"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "suspicion": {
+            "$ref": "#/components/schemas/StageResult"
+          },
+          "well_founded": {
+            "$ref": "#/components/schemas/StageResult"
+          }
+        },
+        "required": [
+          "suspicion",
+          "well_founded",
+          "clock_start",
+          "note"
+        ],
+        "title": "Trigger",
+        "type": "object"
+      },
+      "TriggerStage": {
+        "enum": [
+          "suspicion",
+          "well_founded"
+        ],
+        "title": "TriggerStage",
+        "type": "string"
+      },
       "TurnPart": {
         "discriminator": {
           "mapping": {
@@ -4103,6 +6586,35 @@
         ],
         "title": "TurnStatus",
         "type": "string"
+      },
+      "ValidationCheck": {
+        "description": "One check of the build against a figure the model was not built from.",
+        "properties": {
+          "expected": {
+            "title": "Expected",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "predicted": {
+            "title": "Predicted",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "expected",
+          "predicted",
+          "note"
+        ],
+        "title": "ValidationCheck",
+        "type": "object"
       },
       "ValidationError": {
         "properties": {
@@ -4219,6 +6731,89 @@
         ],
         "title": "VersionBump",
         "type": "string"
+      },
+      "WatchPage": {
+        "additionalProperties": false,
+        "properties": {
+          "check_every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckEvery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Provenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "name"
+        ],
+        "title": "WatchPage",
+        "type": "object"
+      },
+      "WatchResult": {
+        "properties": {
+          "already_watched": {
+            "default": false,
+            "title": "Already Watched",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "ok"
+        ],
+        "title": "WatchResult",
+        "type": "object"
       },
       "WebSettings": {
         "description": "What the web tools may do, from the platform's configuration (read only).",
@@ -4512,6 +7107,47 @@
         ],
         "title": "WidgetData",
         "type": "object"
+      },
+      "ada__entrypoints__http__routers__settings__NewModel": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "provider_id",
+          "model"
+        ],
+        "title": "NewModel",
+        "type": "object"
+      },
+      "ada__entrypoints__http__routers__statistical_models__NewModel": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ModelSpec"
+          }
+        },
+        "required": [
+          "name",
+          "spec"
+        ],
+        "title": "NewModel",
+        "type": "object"
       }
     }
   },
@@ -4659,6 +7295,49 @@
         ]
       }
     },
+    "/api/alert-rules/{rule_id}/test": {
+      "post": {
+        "operationId": "test_alert_api_alert_rules__rule_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Alert",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
     "/api/alerts/{alert_id}/rows": {
       "get": {
         "description": "The rows that raised the alert, as its last run showed them.",
@@ -4710,6 +7389,427 @@
         "summary": "Alert Rows",
         "tags": [
           "alerts"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}": {
+      "get": {
+        "operationId": "get_case_type_api_case_types__case_type_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseType"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Case Type",
+        "tags": [
+          "cases"
+        ]
+      },
+      "patch": {
+        "operationId": "update_case_type_api_case_types__case_type_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseTypeChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseType"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Case Type",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/cases": {
+      "get": {
+        "description": "Every case of the type, oldest first, with each model's latest result for it.",
+        "operationId": "list_cases_api_case_types__case_type_id__cases_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseWithResults"
+                  },
+                  "title": "Response List Cases Api Case Types  Case Type Id  Cases Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Cases",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/cases/{key}": {
+      "get": {
+        "operationId": "get_case_api_case_types__case_type_id__cases__key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Case",
+        "tags": [
+          "cases"
+        ]
+      },
+      "put": {
+        "description": "Create or update the case under `key`; the automatic models run and their results\nare stored on it.",
+        "operationId": "put_case_api_case_types__case_type_id__cases__key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseValues"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedCase"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/cases/{key}/evaluate": {
+      "post": {
+        "operationId": "evaluate_case_api_case_types__case_type_id__cases__key__evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateCase"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/cases/{key}/models": {
+      "get": {
+        "operationId": "case_models_api_case_types__case_type_id__cases__key__models_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModelOnCase"
+                  },
+                  "title": "Response Case Models Api Case Types  Case Type Id  Cases  Key  Models Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Case Models",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/case-types/{case_type_id}/open-cases": {
+      "get": {
+        "description": "The cases needing attention, each with its most urgent open result: by status, the\nmost overdue, the soonest due. Never by survival.",
+        "operationId": "open_cases_api_case_types__case_type_id__open_cases_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_type_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Type Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseWithResult"
+                  },
+                  "title": "Response Open Cases Api Case Types  Case Type Id  Open Cases Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Cases",
+        "tags": [
+          "cases"
         ]
       }
     },
@@ -5464,6 +8564,443 @@
         ]
       }
     },
+    "/api/models/{model_id}": {
+      "get": {
+        "operationId": "get_model_api_models__model_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatisticalModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/case-type": {
+      "put": {
+        "operationId": "set_model_case_type_api_models__model_id__case_type_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCaseType"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatisticalModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Model Case Type",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/models/{model_id}/cases": {
+      "get": {
+        "description": "Every case of the model's case type, with the model's latest result or none.",
+        "operationId": "model_cases_api_models__model_id__cases_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseWithResult"
+                  },
+                  "title": "Response Model Cases Api Models  Model Id  Cases Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Model Cases",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/models/{model_id}/evaluate": {
+      "post": {
+        "description": "Evaluate one synthetic profile. Nothing is stored: no run, no snapshot, no\noperator.",
+        "operationId": "evaluate_model_api_models__model_id__evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Evaluate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evaluation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/population": {
+      "get": {
+        "operationId": "population_api_models__model_id__population_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PopulationFigure"
+                  },
+                  "title": "Response Population Api Models  Model Id  Population Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Population",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/refresh": {
+      "post": {
+        "description": "A new version of a trial matcher with the trials read again.",
+        "operationId": "refresh_trial_matcher_api_models__model_id__refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Trial Matcher",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/versions": {
+      "post": {
+        "operationId": "add_version_api_models__model_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Version",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/versions/latest": {
+      "get": {
+        "operationId": "latest_version_api_models__model_id__versions_latest_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Latest Version",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/models/{model_id}/versions/{number}": {
+      "get": {
+        "operationId": "get_version_api_models__model_id__versions__number__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Version",
+        "tags": [
+          "models"
+        ]
+      }
+    },
     "/api/operators/{operator_id}": {
       "get": {
         "operationId": "get_operator_api_operators__operator_id__get",
@@ -5712,6 +9249,53 @@
         ]
       }
     },
+    "/api/projects/{project_id}/alert-deliveries": {
+      "get": {
+        "operationId": "list_deliveries_api_projects__project_id__alert_deliveries_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlertDelivery"
+                  },
+                  "title": "Response List Deliveries Api Projects  Project Id  Alert Deliveries Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Deliveries",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
     "/api/projects/{project_id}/alert-rules": {
       "get": {
         "description": "Every dashboard of the project with its rules, dashboards oldest first.",
@@ -5821,6 +9405,104 @@
         "summary": "List Alerts",
         "tags": [
           "alerts"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/case-types": {
+      "get": {
+        "operationId": "list_case_types_api_projects__project_id__case_types_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseType"
+                  },
+                  "title": "Response List Case Types Api Projects  Project Id  Case Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Case Types",
+        "tags": [
+          "cases"
+        ]
+      },
+      "post": {
+        "operationId": "create_case_type_api_projects__project_id__case_types_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCaseType"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseType"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Case Type",
+        "tags": [
+          "cases"
         ]
       }
     },
@@ -6202,6 +9884,219 @@
         ]
       }
     },
+    "/api/projects/{project_id}/models": {
+      "get": {
+        "operationId": "list_models_api_projects__project_id__models_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StatisticalModel"
+                  },
+                  "title": "Response List Models Api Projects  Project Id  Models Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "models"
+        ]
+      },
+      "post": {
+        "operationId": "create_model_api_projects__project_id__models_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ada__entrypoints__http__routers__statistical_models__NewModel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/models/pathway": {
+      "post": {
+        "description": "The patient pathway model, built from the figures and provenance shipped with the\nplatform, or with its effect sizes read from the operator in `parameters`.",
+        "operationId": "create_pathway_model_api_projects__project_id__models_pathway_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/NewPathwayModel"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Pathway Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/models/trials": {
+      "post": {
+        "description": "A trial matcher whose first version pins the recruiting trials read from\n`operator_id`, on a case type that covers it.",
+        "operationId": "create_trial_matcher_api_projects__project_id__models_trials_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTrialMatcher"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Trial Matcher",
+        "tags": [
+          "models"
+        ]
+      }
+    },
     "/api/projects/{project_id}/operators": {
       "post": {
         "operationId": "add_operator_api_projects__project_id__operators_post",
@@ -6223,6 +10118,7 @@
               "schema": {
                 "discriminator": {
                   "mapping": {
+                    "history": "#/components/schemas/NewHistory",
                     "input": "#/components/schemas/NewInput",
                     "source": "#/components/schemas/NewSourceOperator",
                     "transform": "#/components/schemas/NewTransform"
@@ -6232,6 +10128,9 @@
                 "oneOf": [
                   {
                     "$ref": "#/components/schemas/NewSourceOperator"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NewHistory"
                   },
                   {
                     "$ref": "#/components/schemas/NewTransform"
@@ -6762,6 +10661,70 @@
           }
         },
         "summary": "Register Source",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/sources/watch": {
+      "post": {
+        "description": "Register and watch up to 50 pages; each page commits independently.",
+        "operationId": "watch_sources_api_projects__project_id__sources_watch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/WatchPage"
+                },
+                "maxItems": 50,
+                "minItems": 1,
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WatchResult"
+                  },
+                  "title": "Response Watch Sources Api Projects  Project Id  Sources Watch Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Watch Sources",
         "tags": [
           "sources"
         ]
@@ -7478,6 +11441,60 @@
         ]
       }
     },
+    "/api/sessions/{session_id}/analysis": {
+      "post": {
+        "description": "Delegate an analysis to the analyst, as the person: an analysis session under this\none, with the brief as its first message and its turn queued. Its findings are added\nto this session's record, each with the operator that shows it.",
+        "operationId": "delegate_analysis_api_sessions__session_id__analysis_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAnalysis"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delegate Analysis",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
     "/api/sessions/{session_id}/attachments": {
       "get": {
         "description": "What the session shows beside its conversation, oldest first.",
@@ -8024,7 +12041,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NewModel"
+                "$ref": "#/components/schemas/ada__entrypoints__http__routers__settings__NewModel"
               }
             }
           },
@@ -8600,6 +12617,22 @@
               "format": "uuid",
               "title": "Source Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "check_every",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CheckEvery"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Check Every"
             }
           }
         ],

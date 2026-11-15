@@ -5,6 +5,8 @@ import { useId, type ReactNode } from 'react'
 
 import { attachmentTitle } from '@/components/attachments/kinds'
 import { EditableTitle } from '@/components/editable-title'
+import { LiveTime } from '@/components/live-time'
+import { WatchInterval } from '@/components/watch-interval'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { PageHeader } from '@/components/page-header'
 import { Time } from '@/components/provenance'
@@ -206,9 +208,10 @@ function Sources({ projectId }: { projectId: Id }) {
               </p>
               <p className="text-xs text-muted-foreground">
                 Refresh: {describeFreshness(source.freshness)}
+                <WatchInterval source={source} />
                 {source.last_checked_at && (
                   <>
-                    {' · '}checked <Time value={source.last_checked_at} />
+                    {' · '}checked <LiveTime value={source.last_checked_at} />
                   </>
                 )}
               </p>

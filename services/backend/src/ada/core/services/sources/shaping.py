@@ -23,7 +23,8 @@ These keys of `DataSource.options` control it; the readers ignore them.
     "null_values": [...]}, all optional. `skip_rows` drops lines before the header,
     `columns` replaces the header's names, and cells equal to one of `null_values` (e.g.
     ".." in PxWeb tables) become empty. The output is UTF-8 with commas. Without `csv` (and
-    without `period`) the bytes are kept as they came.
+    without `period`) valid UTF-8 bytes are kept as they came; legacy encodings are
+    transcoded, trying Windows-1252 then Latin-1.
 `period` (JSON and CSV)
     {"column": "year", "start": "period_start", "end": "period_end", "grain": "year"}:
     adds the period each row describes as two date columns, the first and the last day,
@@ -86,6 +87,7 @@ class PeriodOption(DomainModel):
 
 
 class ShapeOptions(DomainModel):
+    include_provenance: bool = False
     rows: str | None = None
     fields: dict[str, str | FieldOption] | None = None
     csv: CsvOptions | None = None
@@ -109,8 +111,41 @@ def shape(data: FetchedData, options: JsonObject) -> FetchedData:
     match data.format:
         case DataFormat.JSON:
             content = _shape_json(data.content, parsed)
-        case DataFormat.CSV if parsed.csv is not None or parsed.period is not None:
+            if parsed.include_provenance:
+                provenance = {"source_url": data.origin, "fetched_at": data.fetched_at.isoformat()}
+                content = _json(
+                    [
+                        {
+                            key: value
+                            for key, value in record.items()
+                            if key.casefold() not in provenance
+                        }
+                        | provenance
+                        for record in json.loads(content)
+                    ]
+                )
+        case DataFormat.CSV if (
+            parsed.csv is not None or parsed.period is not None or parsed.include_provenance
+        ):
             content = _shape_csv(data.content, parsed.csv or CsvOptions(), parsed.period)
+            if parsed.include_provenance:
+                rows = list(csv.reader(io.StringIO(content.decode())))
+                if rows:
+                    if {"source_url", "fetched_at"} & {name.strip().casefold() for name in rows[0]}:
+                        raise Invalid(
+                            "CSV provenance columns source_url and fetched_at are reserved"
+                        )
+                    rows = [
+                        rows[0] + ["source_url", "fetched_at"],
+                        *[row + [data.origin, data.fetched_at.isoformat()] for row in rows[1:]],
+                    ]
+                    content = _csv(rows)
+        case DataFormat.CSV:
+            try:
+                data.content.decode("utf-8-sig")
+                return data
+            except UnicodeDecodeError:
+                content = _decode_csv(data.content, "utf-8-sig").encode()
         case _:
             return data
     return data.model_copy(update={"content": content})
@@ -290,11 +325,22 @@ def _convert(value: Any, kind: FieldType, column: str) -> Any:
         raise Invalid(f"Column {column}: cannot read {value!r} as {kind}: {error}") from None
 
 
-def _shape_csv(content: bytes, options: CsvOptions, period: PeriodOption | None) -> bytes:
+def _decode_csv(content: bytes, requested: str) -> str:
+    content = content.removeprefix(b"\xef\xbb\xbf")
     try:
-        text = content.removeprefix(b"\xef\xbb\xbf").decode(options.encoding)
+        # Preserve explicit encodings; legacy exports often mislabel Windows-1252 as UTF-8.
+        for encoding in dict.fromkeys((requested, "utf-8-sig", "cp1252", "latin-1")):
+            try:
+                return content.decode(encoding)
+            except UnicodeDecodeError:
+                continue
     except (LookupError, UnicodeDecodeError) as error:
-        raise Invalid(f"Cannot decode the CSV as {options.encoding}: {error}") from None
+        raise Invalid(f"Cannot decode the CSV as {requested}: {error}") from None
+    raise AssertionError("Latin-1 decodes every byte")
+
+
+def _shape_csv(content: bytes, options: CsvOptions, period: PeriodOption | None) -> bytes:
+    text = _decode_csv(content, options.encoding)
     lines = text.splitlines(keepends=True)[options.skip_rows :]
     rows = [row for row in csv.reader(lines, delimiter=options.delimiter) if row]
     if not rows:

@@ -29,6 +29,7 @@ from ada.adapters.memory.repositories import (
     MemoryStore,
 )
 from ada.composition import create_container
+from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.agents import (
     AgentTurn,
     ReasoningPart,
@@ -52,9 +53,12 @@ from ada.core.ports.repositories import (
     ProjectRepository,
     SessionRepository,
 )
+from ada.core.services.ports.cases import CaseService
+from ada.core.services.ports.statistical_models import StatisticalModelService
 from conftest import settings_in
 from db_helpers import Repos, engine_for, make_world, unit_of_work
 from memory import MemoryBackground
+from test_cases import EARLY, OVERDUE
 
 pytestmark = pytest.mark.anyio
 
@@ -63,7 +67,7 @@ pytestmark = pytest.mark.anyio
 
 
 def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> None:
-    assert migrate(database_url) == [f"{n:04}" for n in range(1, 15)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(1, 19)]
     engine = create_engine(database_url)
     try:
         assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
@@ -104,9 +108,11 @@ def test_migrations_build_every_table_and_can_be_undone(database_url: str) -> No
         assert "web_usage" not in inspector.get_table_names()
         assert "session_attachments" not in inspector.get_table_names()
         assert "judge_defaults" not in inspector.get_table_names()
+        assert "statistical_models" not in inspector.get_table_names()
+        assert "cases" not in inspector.get_table_names()
     finally:
         engine.dispose()
-    assert migrate(database_url) == [f"{n:04}" for n in range(2, 15)]
+    assert migrate(database_url) == [f"{n:04}" for n in range(2, 19)]
     assert migrate(database_url) == []
 
 
@@ -998,3 +1004,41 @@ async def test_a_running_turn_commits_its_progress_on_its_own(engine: AsyncEngin
     assert (seen.status, seen.parts) == (TurnStatus.RUNNING, (TextPart(text="Partly"),))
     assert finished.status is TurnStatus.CANCELLED
     assert await scalar(engine, "SELECT status FROM agent_turns") == "cancelled"
+
+
+async def test_cases_and_their_results_round_trip_through_the_database(
+    migrated_database_url: str, tmp_path: Path
+) -> None:
+    actor = Actor(kind=ActorKind.USER, name="test")
+    container = create_container(settings_in(tmp_path, migrated_database_url), MemoryBackground())
+    try:
+        project = factories.project()
+        async with container() as request:
+            await (await request.get(ProjectRepository)).add(project)
+            models = await request.get(StatisticalModelService)
+            version = await models.create_pathway_model(project.id, actor)
+            model = await models.get(version.model_id)
+        assert model.auto_run and model.case_type_id is not None
+        type_id = model.case_type_id
+        async with container() as request:
+            cases = await request.get(CaseService)
+            await cases.put_case(type_id, "SYN-1", EARLY, actor)
+            await cases.put_case(type_id, "SYN-2", OVERDUE, actor)
+        async with container() as request:
+            cases = await request.get(CaseService)
+            saved = await cases.put_case(type_id, "SYN-1", OVERDUE, actor)
+            await cases.evaluate(type_id, "SYN-1", model.id, actor)
+        async with container() as request:
+            cases = await request.get(CaseService)
+            state = await cases.get_case(type_id, "SYN-1")
+            assert state.case.revision == 2 and state.case.id == saved.case.id
+            assert [r.case_revision for r in state.results] == [2, 2, 1]
+            assert state.results[0].trigger.value == "request"
+            assert state.results[0].section.body["model_id"] == str(model.id)
+            assert {e.level for e in state.events if e.field == "days"} >= set(OVERDUE["days"])
+            assert [c.case.key for c in await cases.model_cases(model.id)] == ["SYN-1", "SYN-2"]
+            on_case = await cases.models(type_id, "SYN-1")
+            assert on_case[0].results == 3
+            assert len(await cases.open_cases(type_id)) == 2
+    finally:
+        await container.close()

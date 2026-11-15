@@ -5,6 +5,7 @@ from ada.core.models.actors import Actor
 from ada.core.models.agents import (
     AgentSettingsView,
     AgentTurn,
+    Finding,
     LlmProvider,
     ModelInfo,
     ModelList,
@@ -12,6 +13,7 @@ from ada.core.models.agents import (
     ProviderKind,
 )
 from ada.core.models.base import UNCHANGED, Change, Id
+from ada.core.models.operators import OperatorId
 from ada.core.models.sessions import Context, Session, SessionEntry
 from ada.core.models.sources import DataSource
 from ada.core.ports.agents import AgentToolbox
@@ -135,6 +137,41 @@ class AgentSettingsService(Protocol):
     ) -> AgentSettingsView:
         """None lets research sessions use the session agent. The model must be
         configured."""
+        ...
+
+
+# A cited operator is read up to this many rows; a finding rests on a small output.
+MAX_EVIDENCE_ROWS = 200
+
+
+class AnalysisService(Protocol):
+    """Analysis delegated to the analyst, which works in a child session on the project's
+    data and reports findings back, each checked against the operator that shows it."""
+
+    async def delegate(
+        self,
+        parent_session_id: Id,
+        brief: str,
+        title: str,
+        operator_ids: Sequence[OperatorId],
+        actor: Actor,
+    ) -> Session:
+        """Create the analysis session, note the delegation in the parent and queue the
+        analyst's turn on the brief, which lists the operators named. Returns at once."""
+        ...
+
+    async def report(
+        self,
+        child_session_id: Id,
+        summary: str,
+        findings: Sequence[Finding],
+        caveats: Sequence[str],
+        not_shown: Sequence[str],
+        actor: Actor,
+    ) -> SessionEntry:
+        """Post the analysis session's findings into its parent. Every cited operator is
+        read in one new run; a figure in a finding, the summary or a caveat that is not in
+        the cited outputs raises Invalid, and nothing is posted."""
         ...
 
 

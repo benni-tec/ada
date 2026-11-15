@@ -1,0 +1,121 @@
+"""Statistical models and their immutable versions."""
+
+from collections.abc import Sequence
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ada.adapters.db.support import add_row, dump, fetch, oldest_first, require, rows
+from ada.adapters.db.tables import ProjectRow, StatisticalModelRow, StatisticalModelVersionRow
+from ada.core.models.actors import Actor
+from ada.core.models.base import Id
+from ada.core.models.errors import Conflict, NotFound
+from ada.core.models.statistical_models import ModelVersion, StatisticalModel
+from ada.core.ports.repositories import StatisticalModelRepository
+
+
+class SqlStatisticalModelRepository(StatisticalModelRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get(self, id: Id) -> StatisticalModel:
+        return _model(await fetch(self.session, StatisticalModelRow, id, "statistical model"))
+
+    async def list(self, project_id: Id) -> Sequence[StatisticalModel]:
+        statement = oldest_first(StatisticalModelRow, StatisticalModelRow.project_id == project_id)
+        return [_model(row) for row in await rows(self.session, statement)]
+
+    async def add(self, model: StatisticalModel) -> None:
+        await require(self.session, ProjectRow, model.project_id, "project")
+        await add_row(
+            self.session,
+            StatisticalModelRow(
+                id=model.id,
+                project_id=model.project_id,
+                name=model.name,
+                description=model.description,
+                kind=model.kind,
+                latest_version=model.latest_version,
+                case_type_id=model.case_type_id,
+                auto_run=model.auto_run,
+                created_by=dump(model.created_by),
+                updated_at=model.updated_at,
+                created_at=model.created_at,
+            ),
+        )
+
+    async def update(self, model: StatisticalModel) -> None:
+        row = await fetch(self.session, StatisticalModelRow, model.id, "statistical model")
+        row.name = model.name
+        row.description = model.description
+        row.case_type_id = model.case_type_id
+        row.auto_run = model.auto_run
+        await self.session.flush()
+
+    async def add_version(self, version: ModelVersion) -> None:
+        # Locked, so two writers of the same next version cannot both pass the check.
+        statement = (
+            select(StatisticalModelRow)
+            .where(StatisticalModelRow.id == version.model_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        model = (await self.session.execute(statement)).scalar_one_or_none()
+        if model is None:
+            raise NotFound("statistical model", version.model_id)
+        if version.version <= model.latest_version:
+            raise Conflict(
+                "statistical model", version.model_id, version.version - 1, model.latest_version
+            )
+        await add_row(
+            self.session,
+            StatisticalModelVersionRow(
+                id=version.id,
+                model_id=version.model_id,
+                version=version.version,
+                spec=dump(version.spec),
+                compiled=dump(version.compiled),
+                created_by=dump(version.created_by),
+                created_at=version.created_at,
+            ),
+        )
+        model.latest_version = max(model.latest_version, version.version)
+        model.updated_at = version.created_at
+        await self.session.flush()
+
+    async def version(self, model_id: Id, number: int) -> ModelVersion:
+        statement = select(StatisticalModelVersionRow).where(
+            StatisticalModelVersionRow.model_id == model_id,
+            StatisticalModelVersionRow.version == number,
+        )
+        row = (await self.session.execute(statement)).scalar_one_or_none()
+        if row is None:
+            raise NotFound("model version", f"{model_id}/{number}")
+        # Validated as a whole, so the spec and the build take the model kind's shape.
+        return ModelVersion.model_validate(
+            {
+                "id": row.id,
+                "model_id": row.model_id,
+                "version": row.version,
+                "spec": row.spec,
+                "compiled": row.compiled,
+                "created_by": row.created_by,
+                "created_at": row.created_at,
+            }
+        )
+
+
+def _model(row: StatisticalModelRow) -> StatisticalModel:
+    return StatisticalModel(
+        id=row.id,
+        project_id=row.project_id,
+        name=row.name,
+        description=row.description,
+        kind=row.kind,
+        latest_version=row.latest_version,
+        case_type_id=row.case_type_id,
+        auto_run=row.auto_run,
+        created_by=Actor.model_validate(row.created_by),
+        updated_at=row.updated_at,
+        created_at=row.created_at,
+    )

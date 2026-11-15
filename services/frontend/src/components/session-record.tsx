@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Bell, CircleAlert, CircleCheck, Code, LoaderCircle, Microscope } from 'lucide-react'
+import { Bell, ChartLine, CircleAlert, CircleCheck, Code, LoaderCircle, Microscope } from 'lucide-react'
 
 import {
   alertFeedQuery,
   operatorQuery,
-  sessionTurnsQuery,
+  sessionQuery, sessionTurnsQuery,
   widgetQuery,
   type Id,
   type SessionEntry,
@@ -148,12 +148,17 @@ const operatorKinds: Record<string, string> = {
 
 function OperatorEntry({ entry }: { entry: SessionEntry }) {
   const { data: operator } = useQuery({ ...operatorQuery(entry.ref ?? ''), enabled: !!entry.ref })
-  const sql = operator?.kind === 'transform' && typeof operator.params.sql === 'string' ? operator.params.sql : null
+  const sql =
+    (operator?.kind === 'transform' || operator?.kind === 'statistic') && typeof operator.params.sql === 'string'
+      ? operator.params.sql
+      : null
+  const statistic = operator?.kind === 'statistic' && typeof operator.params.tool === 'string' ? operator.params.tool : null
   const external = entry.actor.kind === 'external_agent'
   return (
     <div className={`flex flex-col gap-1 border-l-2 py-1 pl-4 ${external ? 'border-violet-400 dark:border-violet-700' : 'border-border'}`}>
       <p className="text-sm font-medium">
         {operator ? (operatorKinds[operator.kind] ?? `Added a ${operator.kind} operator`) : 'Added an operator'}
+        {statistic && `: ${statistic}`}
         {operator && (
           <span className="ml-2 font-normal text-muted-foreground">
             {operator.output.columns.length} column{operator.output.columns.length === 1 ? '' : 's'}
@@ -180,15 +185,27 @@ const delegationStates: Record<DelegationState, { label: string; icon: typeof Ci
   failed: { label: 'Failed', icon: CircleAlert, className: 'text-destructive' },
 }
 
-/** Work handed to a research agent: a card to its session, with how it is going. */
+/** Who works in a delegated session, by its kind. */
+const delegates = {
+  research: { icon: Microscope, handed: 'Handed to the research agent', from: 'Research agent', open: 'Open the research session' },
+  analysis: { icon: ChartLine, handed: 'Handed to the analyst', from: 'Analyst', open: 'Open the analysis session' },
+}
+
+function useDelegate(childId: string | null | undefined) {
+  const { data: child } = useQuery({ ...sessionQuery(childId ?? ''), enabled: !!childId })
+  return child?.agent === 'analysis' ? delegates.analysis : delegates.research
+}
+
+/** Work handed to the research agent or the analyst: a card to its session, with how it is going. */
 function DelegationEntry({ entry, projectId }: { entry: SessionEntry; projectId: Id }) {
   const { data: turns, isError } = useQuery({ ...sessionTurnsQuery(entry.ref ?? ''), enabled: !!entry.ref })
   const state = turns ? delegationStates[delegationState(turns)] : null
+  const delegate = useDelegate(entry.ref)
   return (
     <div className="flex flex-col gap-1 rounded-lg border bg-card px-4 py-3 text-sm">
       <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Microscope aria-hidden="true" className="size-3.5" />
-        Handed to the research agent
+        <delegate.icon aria-hidden="true" className="size-3.5" />
+        {delegate.handed}
       </p>
       <div className="flex items-center justify-between gap-3">
         {entry.ref ? (
@@ -215,14 +232,17 @@ function DelegationEntry({ entry, projectId }: { entry: SessionEntry; projectId:
   )
 }
 
-/** What the research agent found, as a message from it, with the way to its session. */
+/** What a delegated session found, as a message from it, with the way to its session. */
 function ReportEntry({ entry, projectId }: { entry: SessionEntry; projectId: Id }) {
+  const delegate = useDelegate(entry.ref)
   return (
     <Message>
       <MessageContent className="gap-1.5">
         <MessageHeader className="gap-2 px-0">
-          <Microscope aria-hidden="true" className="size-3.5" />
-          <span>Research agent ({entry.actor.name})</span>
+          <delegate.icon aria-hidden="true" className="size-3.5" />
+          <span>
+            {delegate.from} ({entry.actor.name})
+          </span>
           <span className="font-normal">
             <Time value={entry.created_at} />
           </span>
@@ -238,7 +258,7 @@ function ReportEntry({ entry, projectId }: { entry: SessionEntry; projectId: Id 
             params={{ projectId, sessionId: entry.ref }}
             className="text-xs text-muted-foreground underline underline-offset-2"
           >
-            Open the research session
+            {delegate.open}
           </Link>
         )}
       </MessageContent>

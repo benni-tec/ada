@@ -19,6 +19,9 @@ class AccessKind(StrEnum):
     # A web page through Context.dev (format html): its Markdown, a table a model reads off
     # it, the pages of a site, or a researched answer (WebOperation).
     WEB = "web"
+    # A case type's cases, step events or results, read inside ADA (no network). The
+    # address is the case type's id; `options.table` says which table (CaseTable).
+    CASES = "cases"
 
 
 class DataFormat(StrEnum):
@@ -157,6 +160,10 @@ WEB_ANSWERS_CREDITS = 10
 WEB_EXTRACT_CREDITS = 5
 # The column of an answers source with the URLs the answer cites, added to its declared
 # columns.
+WEB_PROVENANCE_COLUMNS = (
+    Column(name="source_url", type=ColumnType.TEXT, nullable=False),
+    Column(name="fetched_at", type=ColumnType.TIMESTAMP, nullable=False),
+)
 WEB_SOURCES_COLUMN = Column(name="sources", type=ColumnType.JSON, nullable=True)
 
 
@@ -212,6 +219,16 @@ class Provenance(DomainModel):
     note: str | None = None
 
 
+class CheckEvery(StrEnum):
+    TEN_MINUTES = "10min"
+    HOURLY = "hourly"
+    DAILY = "daily"
+
+    @property
+    def minutes(self) -> int:
+        return {self.TEN_MINUTES: 10, self.HOURLY: 60, self.DAILY: 1440}[self]
+
+
 class DataSource(DomainModel):
     """Registered once per project and referenced by source operators."""
 
@@ -237,8 +254,9 @@ class DataSource(DomainModel):
     # Why the last refresh failed; None after a successful one. While it is set, widgets
     # on this source show their data as stale.
     last_error: str | None = None
-    # The monitor that watches a document source, written by watch. Its secret is never
-    # part of the model: only the repository holds it, encrypted.
+    # None keeps the configured global interval; written with the monitor by watch.
+    check_every: CheckEvery | None = None
+    # The monitor that watches the source. Its secret is held only by the repository, encrypted.
     monitor_id: str | None = None
     revision: int = 1
 

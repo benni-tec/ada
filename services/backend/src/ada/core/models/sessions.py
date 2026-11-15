@@ -14,6 +14,8 @@ class SessionAgent(StrEnum):
     SESSION = "session"
     # A child session in which the research agent runs.
     RESEARCH = "research"
+    # A child session in which the analyst works on the project's data.
+    ANALYSIS = "analysis"
 
 
 class Session(DomainModel):

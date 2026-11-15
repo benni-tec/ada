@@ -13,13 +13,23 @@ has its own keys (ada.core.services.sources.shaping).
     The HTTP method; POST when there is a body, otherwise GET.
 `body` (request sources)
     An object or array is sent as JSON, a string as it is.
+`paginate` (JSON)
+    {"token": "nextPageToken", "param": "pageToken"} follows a response token in
+    a query parameter; {"more": "pagination.nextPage", "page": "pagination.page"}
+    increments an integer in the request's JSON body while `more` is truthy. For URL
+    sources `page` names a query parameter, starting at its value or 1. Response paths
+    and body paths use dots, with digit segments indexing arrays. Pages keep the first
+    document's metadata and concatenate the arrays at `rows`, or the top-level arrays
+    without `rows`, before shaping. `max_pages` defaults to 20 (1–100); more pages are an
+    error. `delay_seconds` defaults to 1 (0 allowed). All pages share the byte limit.
 `probe`
-    {"url": ..., "field": ..., "headers": {...}}: how to ask cheaply whether the data
-    changed. The url is fetched with GET; `field` is a dot path into its JSON answer whose
-    value is the token, e.g. Sotkanet's "data-updated". Without `field` the token is a
-    hash of the whole answer, which suits a small metadata document. Without `probe`, the
-    ETag or Last-Modified of a HEAD request to the address is the token, when the server
-    sends one and the source is read with GET.
+    {"url": ..., "field": ..., "headers": {...}} asks cheaply whether data changed.
+    `field` is a dot path into the JSON answer; digit segments index arrays. Alternatively
+    `fields` is a list of paths whose values form a JSON array token, in order. Missing
+    or null values are errors. `method` defaults to GET; `body` sends JSON, e.g. with
+    `method: "POST"` for a search API. Source headers apply, with probe headers overriding
+    them. Without `field` or `fields` the token hashes the whole answer. Without `probe`,
+    ETag or Last-Modified from HEAD is the token for non-paginated GET sources.
 
 A URL source is always read with GET; `method` and `body` belong to request sources.
 
@@ -36,6 +46,7 @@ writes the requested periods into `params` or `body` before it calls the reader
 
 import asyncio
 import contextlib
+import copy
 import functools
 import hashlib
 import ipaddress
@@ -49,7 +60,7 @@ from typing import Any, Literal, cast
 import httpcore
 import httpx
 from httpx._utils import get_environment_proxies
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, model_validator
 
 from ada.adapters.sources.context_dev import ContextDevParser
 from ada.adapters.sources.document import DocumentReader
@@ -58,7 +69,7 @@ from ada.adapters.web.context_dev import ContextDevWeb
 from ada.core.models.analysis import FetchedData
 from ada.core.models.base import DomainModel, Id
 from ada.core.models.errors import Invalid, Unavailable
-from ada.core.models.sources import AccessKind, DataSource, StoredFile
+from ada.core.models.sources import UPLOAD_SCHEME, AccessKind, DataFormat, DataSource, StoredFile
 from ada.core.models.time import TimeRange
 from ada.core.ports.sources import FileStore, SourceReader, SourceReaders
 from ada.core.ports.system import Clock
@@ -83,6 +94,30 @@ class ProbeOptions(DomainModel):
     url: str = Field(min_length=1)
     field: str | None = None
     headers: dict[str, str] = {}
+    fields: list[str] | None = Field(default=None, min_length=1)
+    method: Method = "GET"
+    body: dict[str, Any] | list[Any] | None = None
+
+
+class PaginateOptions(DomainModel, extra="forbid"):
+    token: str | None = Field(default=None, min_length=1)
+    param: str | None = Field(default=None, min_length=1)
+    more: str | None = Field(default=None, min_length=1)
+    page: str | None = Field(default=None, min_length=1)
+    max_pages: int = Field(default=20, ge=1, le=100, strict=True)
+    delay_seconds: float = Field(default=1, ge=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _style(self) -> PaginateOptions:
+        if not (
+            (self.token and self.param and self.more is None and self.page is None)
+            or (self.more and self.page and self.token is None and self.param is None)
+        ):
+            raise ValueError(
+                'Use {"token": "nextPageToken", "param": "pageToken"} '
+                'or {"more": "pagination.nextPage", "page": "pagination.page"}'
+            )
+        return self
 
 
 class HttpOptions(DomainModel):
@@ -91,6 +126,7 @@ class HttpOptions(DomainModel):
     method: Method | None = None
     body: dict[str, Any] | list[Any] | str | None = None
     probe: ProbeOptions | None = None
+    paginate: PaginateOptions | None = None
 
 
 class SourceUnavailable(Unavailable):
@@ -127,41 +163,126 @@ class HttpReader(SourceReader):
         kind: AccessKind,
         allow_private: bool = False,
         max_bytes: int = MAX_BYTES,
+        files: FileStore | None = None,
     ) -> None:
         if kind not in (AccessKind.URL, AccessKind.REQUEST):
             raise ValueError(f"HTTP reads URL and request sources, not {kind.value}")
         self.client = client
         self.clock = clock
         self.kind = kind
+        self.files = files
         self.allow_private = allow_private
         self.max_bytes = max_bytes
 
     async def fetch(self, source: DataSource, time_range: TimeRange) -> FetchedData:
         # The time range is already in the options where the source can take it (see the
         # module's docstring); it is not sent a second time.
+        if source.address.startswith(UPLOAD_SCHEME):
+            if self.kind is not AccessKind.URL or self.files is None:
+                raise Invalid(
+                    "Uploaded CSV, JSON and Parquet files need a URL source and file store"
+                )
+            if not source.address.startswith(f"{UPLOAD_SCHEME}{source.project_id}/"):
+                raise Invalid("An uploaded file must belong to the source's project")
+            return FetchedData(
+                content=await self.files.get(source.address),
+                format=source.format,
+                fetched_at=self.clock.now(),
+                origin=source.address,
+            )
         options = _options(source)
         method = self._method(options)
         body = options.body if self.kind is AccessKind.REQUEST else None
-        response = await self._send(
-            method,
-            _url(source, options),
-            headers=options.headers,
-            json=body if isinstance(body, dict | list) else None,
-            content=body if isinstance(body, str) else None,
-        )
+        url = _url(source, options)
+        pagination = options.paginate
+        if pagination and source.format is not DataFormat.JSON:
+            raise Invalid("paginate requires JSON format")
+        body = copy.deepcopy(body)
+        page_number = None
+        if pagination and pagination.page:
+            if self.kind is AccessKind.REQUEST:
+                page_number = _at(body, pagination.page)
+                if type(page_number) is not int:
+                    raise Invalid("paginate.page must point to an integer in the JSON body")
+            else:
+                try:
+                    page_number = int(url.params.get(pagination.page, "1"))
+                except ValueError:
+                    raise Invalid("paginate.page query parameter must be an integer") from None
+                url = url.copy_set_param(pagination.page, page_number)
+        total = 0
+        origin = None
+        document: Any = None
+        combined: list[Any] = []
+        for number in range(1, (pagination.max_pages if pagination else 1) + 1):
+            response = await self._send(
+                method,
+                url,
+                headers=options.headers,
+                json=body if isinstance(body, dict | list) else None,
+                content=body if isinstance(body, str) else None,
+                byte_limit=self.max_bytes - total,
+            )
+            origin = origin or str(response.url)
+            total += len(response.content)
+            if not pagination:
+                content = response.content
+                break
+            try:
+                answer = response.json()
+            except ValueError:
+                raise Invalid("Paginated source did not answer with JSON") from None
+            rows_path = source.options.get("rows")
+            rows = _at(answer, rows_path) if rows_path else answer
+            if not isinstance(rows, list):
+                raise Invalid("paginate requires an array at rows (or a top-level array)")
+            if number == 1:
+                document = answer
+            combined.extend(rows)
+            missing = object()
+            next_value = _at(answer, pagination.token or pagination.more or "", missing)
+            if next_value is missing:
+                if pagination.more:
+                    raise Invalid(f"Paginated response has no field {pagination.more!r}")
+                next_value = None
+            if pagination.token and next_value is not None and not isinstance(next_value, str):
+                raise Invalid("paginate.token must point to a string or null")
+            if not next_value:
+                if rows_path:
+                    _replace(document, rows_path, combined)
+                else:
+                    document = combined
+                content = json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode()
+                if len(content) > self.max_bytes:
+                    raise SourceUnavailable("Paginated source exceeds max_bytes")
+                break
+            if number == pagination.max_pages:
+                raise SourceUnavailable(f"Pagination exceeded max_pages ({pagination.max_pages})")
+            if pagination.token:
+                url = url.copy_set_param(pagination.param or "", next_value)
+            else:
+                assert page_number is not None
+                page_number += 1
+                if self.kind is AccessKind.REQUEST:
+                    _replace(body, pagination.page or "", page_number)
+                else:
+                    url = url.copy_set_param(pagination.page or "", page_number)
+            await asyncio.sleep(pagination.delay_seconds)
         return FetchedData(
-            content=response.content,
+            content=content,
             format=source.format,
             fetched_at=self.clock.now(),
-            origin=str(response.url),
+            origin=origin,
         )
 
     async def probe(self, source: DataSource) -> str | None:
+        if source.address.startswith(UPLOAD_SCHEME):
+            return source.address
         options = _options(source)
         if options.probe is not None:
             return await self._declared_probe(options.probe, options.headers)
-        if self._method(options) != "GET":
-            # A validator of the address describes what GET returns, not what a POST does.
+        if options.paginate is not None or self._method(options) != "GET":
+            # A validator of the address covers neither later pages nor a POST response.
             return None
         response = await self._send(
             "HEAD", _url(source, options), headers=options.headers, ok=False
@@ -176,17 +297,21 @@ class HttpReader(SourceReader):
         return None
 
     async def _declared_probe(self, probe: ProbeOptions, headers: dict[str, str]) -> str:
-        response = await self._send("GET", probe.url, headers=headers | probe.headers)
-        if probe.field is None:
+        response = await self._send(
+            probe.method, probe.url, headers=headers | probe.headers, json=probe.body
+        )
+        if probe.field is None and probe.fields is None:
             return "sha256:" + hashlib.sha256(response.content).hexdigest()
         try:
             found: Any = response.json()
         except ValueError:
             raise Invalid(f"The probe {probe.url} did not answer with JSON") from None
-        for segment in probe.field.split("."):
-            found = found.get(segment) if isinstance(found, dict) else None
-        if found is None:
-            raise Invalid(f"The probe {probe.url} has no field {probe.field!r}")
+        paths = probe.fields if probe.fields is not None else [probe.field or ""]
+        values = [_at(found, path) for path in paths]
+        for path, value in zip(paths, values, strict=True):
+            if value is None:
+                raise Invalid(f"The probe {probe.url} has no field {path!r}")
+        found = values if probe.fields is not None else values[0]
         if isinstance(found, dict | list):
             return json.dumps(found, sort_keys=True, separators=(",", ":"))
         return str(found)
@@ -197,7 +322,12 @@ class HttpReader(SourceReader):
         return options.method or ("POST" if options.body is not None else "GET")
 
     async def _send(
-        self, method: str, url: str | httpx.URL, ok: bool = True, **kwargs: Any
+        self,
+        method: str,
+        url: str | httpx.URL,
+        ok: bool = True,
+        byte_limit: int | None = None,
+        **kwargs: Any,
     ) -> httpx.Response:
         """Send one request, following redirects here so each address is checked before it
         is asked. Raises SourceUnavailable when it fails, and when the answer is an error
@@ -217,7 +347,7 @@ class HttpReader(SourceReader):
                             f"{method} {url} answered {response.status_code}"
                             f" {response.reason_phrase}"
                         )
-                    return await self._read(response, f"{method} {url}")
+                    return await self._read(response, f"{method} {url}", byte_limit)
                 finally:
                     await response.aclose()
             except httpx.HTTPError as error:
@@ -225,21 +355,24 @@ class HttpReader(SourceReader):
                 raise SourceUnavailable(f"{method} {url} failed: {reason}") from error
         raise SourceUnavailable(f"{method} {url} redirected more than {MAX_REDIRECTS} times")
 
-    async def _read(self, response: httpx.Response, call: str) -> httpx.Response:
+    async def _read(
+        self, response: httpx.Response, call: str, byte_limit: int | None = None
+    ) -> httpx.Response:
         """The answer with its whole body, which may be at most max_bytes once decoded."""
+        limit = self.max_bytes if byte_limit is None else byte_limit
         too_large = SourceUnavailable(
-            f"{call} answered more than {self.max_bytes:,} bytes, the most a source may have"
+            f"{call} answered more than {limit:,} bytes, the most a source may have"
         )
         length = response.headers.get("content-length", "")
         # A HEAD answer has no body: its length is that of what GET would send.
         head = response.request.method == "HEAD"
-        if not head and length.isdigit() and int(length) > self.max_bytes:
+        if not head and length.isdigit() and int(length) > limit:
             raise too_large
         # Decoded here, since httpx's decoders take no limit and a few kilobytes of gzip
         # can hold gigabytes. Last applied, first undone.
         encodings = response.headers.get_list("content-encoding", split_commas=True)
         decoders = [
-            _Inflate(name, self.max_bytes, too_large)
+            _Inflate(name, limit, too_large)
             for name in reversed([encoding.strip().lower() for encoding in encodings])
             if name in ENCODINGS
         ]
@@ -250,7 +383,7 @@ class HttpReader(SourceReader):
             for decoder in decoders:
                 chunk = decoder.decode(chunk)
             content += chunk
-            if len(content) > self.max_bytes:
+            if len(content) > limit:
                 raise too_large
         # The body is decoded already: the headers must no longer say how it was encoded.
         headers = [
@@ -317,7 +450,8 @@ class HttpSourceReaders(SourceReaders):
         max_bytes: int = MAX_BYTES,
     ) -> None:
         self.readers: dict[AccessKind, SourceReader] = {
-            kind: HttpReader(client, clock, kind, allow_private, max_bytes) for kind in HTTP_KINDS
+            kind: HttpReader(client, clock, kind, allow_private, max_bytes, files)
+            for kind in HTTP_KINDS
         }
         self.readers[AccessKind.DOCUMENT] = DocumentReader(
             self.readers[AccessKind.URL],
@@ -364,7 +498,33 @@ def _options(source: DataSource) -> HttpOptions:
     try:
         return HttpOptions.model_validate({k: v for k, v in source.options.items() if k in keys})
     except ValidationError as error:
-        raise Invalid(f"Invalid options for source {source.name}: {error}") from None
+        raise Invalid(
+            f"Invalid options for source {source.name}: {error}. "
+            'Example paginate: {"token": "nextPageToken", "param": "pageToken"}'
+        ) from None
+
+
+def _at(document: Any, path: str, default: Any = None) -> Any:
+    found = document
+    for segment in path.split("."):
+        if isinstance(found, dict):
+            found = found.get(segment, default)
+        elif isinstance(found, list) and segment.isdigit() and int(segment) < len(found):
+            found = found[int(segment)]
+        else:
+            return default
+    return found
+
+
+def _replace(document: Any, path: str, value: Any) -> None:
+    parent_path, _, key = path.rpartition(".")
+    parent = _at(document, parent_path) if parent_path else document
+    if isinstance(parent, dict) and key in parent:
+        parent[key] = value
+    elif isinstance(parent, list) and key.isdigit() and int(key) < len(parent):
+        parent[int(key)] = value
+    else:
+        raise Invalid(f"Nothing at {path!r} to replace")
 
 
 def _url(source: DataSource, options: HttpOptions) -> httpx.URL:

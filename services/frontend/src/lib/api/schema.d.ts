@@ -43,6 +43,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/alert-rules/{rule_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Alert */
+        post: operations["test_alert_api_alert_rules__rule_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/alerts/{alert_id}/rows": {
         parameters: {
             query?: never;
@@ -55,6 +72,121 @@ export interface paths {
          * @description The rows that raised the alert, as its last run showed them.
          */
         get: operations["alert_rows_api_alerts__alert_id__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Case Type */
+        get: operations["get_case_type_api_case_types__case_type_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Case Type */
+        patch: operations["update_case_type_api_case_types__case_type_id__patch"];
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Cases
+         * @description Every case of the type, oldest first, with each model's latest result for it.
+         */
+        get: operations["list_cases_api_case_types__case_type_id__cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/cases/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Case */
+        get: operations["get_case_api_case_types__case_type_id__cases__key__get"];
+        /**
+         * Put Case
+         * @description Create or update the case under `key`; the automatic models run and their results
+         *     are stored on it.
+         */
+        put: operations["put_case_api_case_types__case_type_id__cases__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/cases/{key}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate Case */
+        post: operations["evaluate_case_api_case_types__case_type_id__cases__key__evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/cases/{key}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Case Models */
+        get: operations["case_models_api_case_types__case_type_id__cases__key__models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/case-types/{case_type_id}/open-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Cases
+         * @description The cases needing attention, each with its most urgent open result: by status, the
+         *     most overdue, the soonest due. Never by survival.
+         */
+        get: operations["open_cases_api_case_types__case_type_id__open_cases_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -349,6 +481,169 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{model_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Model */
+        get: operations["get_model_api_models__model_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/case-type": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Model Case Type */
+        put: operations["set_model_case_type_api_models__model_id__case_type_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Model Cases
+         * @description Every case of the model's case type, with the model's latest result or none.
+         */
+        get: operations["model_cases_api_models__model_id__cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evaluate Model
+         * @description Evaluate one synthetic profile. Nothing is stored: no run, no snapshot, no
+         *     operator.
+         */
+        post: operations["evaluate_model_api_models__model_id__evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/population": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Population */
+        get: operations["population_api_models__model_id__population_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Trial Matcher
+         * @description A new version of a trial matcher with the trials read again.
+         */
+        post: operations["refresh_trial_matcher_api_models__model_id__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Version */
+        post: operations["add_version_api_models__model_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/versions/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Latest Version */
+        get: operations["latest_version_api_models__model_id__versions_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Version */
+        get: operations["get_version_api_models__model_id__versions__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/operators/{operator_id}": {
         parameters: {
             query?: never;
@@ -425,6 +720,23 @@ export interface paths {
         patch: operations["update_project_api_projects__project_id__patch"];
         trace?: never;
     };
+    "/api/projects/{project_id}/alert-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Deliveries */
+        get: operations["list_deliveries_api_projects__project_id__alert_deliveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/alert-rules": {
         parameters: {
             query?: never;
@@ -459,6 +771,24 @@ export interface paths {
         get: operations["list_alerts_api_projects__project_id__alerts_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/case-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Case Types */
+        get: operations["list_case_types_api_projects__project_id__case_types_get"];
+        put?: never;
+        /** Create Case Type */
+        post: operations["create_case_type_api_projects__project_id__case_types_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -581,6 +911,66 @@ export interface paths {
         /** Override Project Judge */
         put: operations["override_project_judge_api_projects__project_id__judges__kind__put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Models */
+        get: operations["list_models_api_projects__project_id__models_get"];
+        put?: never;
+        /** Create Model */
+        post: operations["create_model_api_projects__project_id__models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/models/pathway": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Pathway Model
+         * @description The patient pathway model, built from the figures and provenance shipped with the
+         *     platform, or with its effect sizes read from the operator in `parameters`.
+         */
+        post: operations["create_pathway_model_api_projects__project_id__models_pathway_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/models/trials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Trial Matcher
+         * @description A trial matcher whose first version pins the recruiting trials read from
+         *     `operator_id`, on a case type that covers it.
+         */
+        post: operations["create_trial_matcher_api_projects__project_id__models_trials_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -714,6 +1104,26 @@ export interface paths {
         put?: never;
         /** Register Source */
         post: operations["register_source_api_projects__project_id__sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/sources/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Watch Sources
+         * @description Register and watch up to 50 pages; each page commits independently.
+         */
+        post: operations["watch_sources_api_projects__project_id__sources_watch_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -905,6 +1315,28 @@ export interface paths {
         head?: never;
         /** Change Session */
         patch: operations["change_session_api_sessions__session_id__patch"];
+        trace?: never;
+    };
+    "/api/sessions/{session_id}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delegate Analysis
+         * @description Delegate an analysis to the analyst, as the person: an analysis session under this
+         *     one, with the brief as its first message and its turn queued. Its findings are added
+         *     to this session's record, each with the operator that shows it.
+         */
+        post: operations["delegate_analysis_api_sessions__session_id__analysis_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/sessions/{session_id}/attachments": {
@@ -1513,7 +1945,7 @@ export interface components {
          * AccessKind
          * @enum {string}
          */
-        AccessKind: "url" | "request" | "browser" | "document" | "web";
+        AccessKind: "url" | "request" | "browser" | "document" | "web" | "cases";
         /**
          * Actor
          * @description Who did something. There are no users yet, so this is a label, not an identity.
@@ -1616,6 +2048,33 @@ export interface components {
             started_at: string;
             state: components["schemas"]["AlertState"];
         };
+        /** AlertDelivery */
+        AlertDelivery: {
+            alert_id?: components["schemas"]["Id"] | null;
+            /** Channel */
+            channel: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Detail */
+            detail?: string | null;
+            /** Http Status */
+            http_status?: number | null;
+            id: components["schemas"]["Id"];
+            project_id: components["schemas"]["Id"];
+            rule_id: components["schemas"]["Id"];
+            /** Status */
+            status: string;
+            /** Target */
+            target: string;
+            /**
+             * Test
+             * @default false
+             */
+            test: boolean;
+        };
         /**
          * AlertRule
          * @description A condition on the output of a measure pipeline, checked on its own interval.
@@ -1690,6 +2149,8 @@ export interface components {
             alert: components["schemas"]["Alert"];
             rule: components["schemas"]["AlertRule"];
         };
+        AnyCompiled: components["schemas"]["Compiled"] | components["schemas"]["TrialCompiled"];
+        AnySpec: components["schemas"]["ModelSpec"] | components["schemas"]["TrialMatcherSpec"];
         /**
          * Attachment
          * @description Something shown beside a session, as a tab, and listed to its agent. A session has
@@ -1716,6 +2177,179 @@ export interface components {
          * @enum {string}
          */
         AttachmentKind: "dashboard" | "report" | "alert_rule" | "source" | "operator" | "session" | "widget" | "web_page";
+        /**
+         * Attention
+         * @description What a result says about whether the case needs someone: still open, how many
+         *     days the most overdue thing is late, how many days until the next thing is due.
+         *     Each model kind fills it from its own result; lists sort by it.
+         */
+        Attention: {
+            /** Due In */
+            due_in?: number | null;
+            /**
+             * Open
+             * @default false
+             */
+            open: boolean;
+            /** Overdue By */
+            overdue_by?: number | null;
+        };
+        /**
+         * BaselineCell
+         * @description 5-year relative survival for a profile in the baseline population (the Nordic
+         *     level). `age_band` or `stage` None: all of them.
+         */
+        BaselineCell: {
+            /** Age Band */
+            age_band?: string | null;
+            /** Excess Share */
+            excess_share?: number | null;
+            provenance: components["schemas"]["Citation"];
+            /** Sex */
+            sex: string;
+            /** Site */
+            site: string;
+            /** Stage */
+            stage?: string | null;
+            /** Survival */
+            survival: number;
+        };
+        /** Case */
+        Case: {
+            case_type_id: components["schemas"]["Id"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            id: components["schemas"]["Id"];
+            /** Key */
+            key: string;
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+            /** Schema Revision */
+            schema_revision: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            values: components["schemas"]["JsonObject"];
+        };
+        /**
+         * CaseEvent
+         * @description A field whose value changed at a save: the case's history. A day map changes per
+         *     level, so `level` names the step and `old`/`new` are its days; for other fields
+         *     `level` is None. `old` is None for a value set for the first time.
+         */
+        CaseEvent: {
+            case_id: components["schemas"]["Id"];
+            /** Field */
+            field: string;
+            /** Level */
+            level?: string | null;
+            /** New */
+            new?: unknown;
+            /** Old */
+            old?: unknown;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+        };
+        /** CaseResult */
+        CaseResult: {
+            case_id: components["schemas"]["Id"];
+            /** Case Revision */
+            case_revision: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            id: components["schemas"]["Id"];
+            model_id: components["schemas"]["Id"];
+            section: components["schemas"]["Section"];
+            trigger: components["schemas"]["ResultTrigger"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * CaseState
+         * @description A case with its step events and every result, newest first.
+         */
+        CaseState: {
+            case: components["schemas"]["Case"];
+            /** Events */
+            events: components["schemas"]["CaseEvent"][];
+            /** Results */
+            results: components["schemas"]["CaseResult"][];
+        };
+        /** CaseType */
+        CaseType: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            /** Description */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["Field"][];
+            id: components["schemas"]["Id"];
+            /** Name */
+            name: string;
+            project_id: components["schemas"]["Id"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+        };
+        /** CaseTypeChange */
+        CaseTypeChange: {
+            /** Description */
+            description?: string | null;
+            /** Fields */
+            fields?: components["schemas"]["Field"][] | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** CaseValues */
+        CaseValues: {
+            values: components["schemas"]["JsonObject"];
+        };
+        /**
+         * CaseWithResult
+         * @description A case with one model's latest result for it; None when the model has not run.
+         */
+        CaseWithResult: {
+            case: components["schemas"]["Case"];
+            latest: components["schemas"]["CaseResult"] | null;
+        };
+        /**
+         * CaseWithResults
+         * @description A case with the latest result of each model on its type that has run on it.
+         */
+        CaseWithResults: {
+            case: components["schemas"]["Case"];
+            /**
+             * Latest
+             * @default []
+             */
+            latest: components["schemas"]["CaseResult"][];
+        };
+        /**
+         * CheckEvery
+         * @enum {string}
+         */
+        CheckEvery: "10min" | "hourly" | "daily";
         /** CheckResult */
         CheckResult: {
             /** Changed */
@@ -1723,6 +2357,28 @@ export interface components {
             /** Firing */
             firing: components["schemas"]["Alert"][];
             rule: components["schemas"]["AlertRule"];
+        };
+        /**
+         * Citation
+         * @description Where a figure comes from: the citation, the passage it was checked against, and
+         *     the evidence grade shown beside it.
+         */
+        Citation: {
+            /** Country */
+            country?: string | null;
+            grade: components["schemas"]["EvidenceGrade"];
+            /** Operator Id */
+            operator_id?: string | null;
+            /** Passage */
+            passage: string;
+            /** Run Id */
+            run_id?: string | null;
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id?: string | null;
+            /** Url */
+            url?: string | null;
         };
         /** Column */
         Column: {
@@ -1740,7 +2396,101 @@ export interface components {
          * @enum {string}
          */
         ColumnType: "text" | "integer" | "number" | "boolean" | "date" | "timestamp" | "json";
+        /**
+         * ComparisonPopulation
+         * @description What the model is compared with: a country's observed survival per site and sex,
+         *     and its typical days per step, for the residual and the population view.
+         */
+        ComparisonPopulation: {
+            /** Country */
+            country: string;
+            /** Days */
+            days: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            education_provenance?: components["schemas"]["Citation"] | null;
+            provenance: components["schemas"]["Citation"];
+            /** Survival */
+            survival: {
+                [key: string]: number;
+            };
+            /**
+             * Survival By Education
+             * @default {}
+             */
+            survival_by_education: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * Compiled
+         * @description What the build derived from the spec.
+         */
+        Compiled: {
+            /**
+             * Kind
+             * @default patient_pathway
+             * @constant
+             */
+            kind: "patient_pathway";
+            /** Parameters */
+            parameters: {
+                [key: string]: components["schemas"]["Parameter"];
+            };
+            /** Population */
+            population: components["schemas"]["PopulationFigure"][];
+            /** Targets */
+            targets: {
+                [key: string]: {
+                    [key: string]: {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /**
+             * Validation
+             * @default []
+             */
+            validation: components["schemas"]["ValidationCheck"][];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
         Context: components["schemas"]["PipelineContext"] | components["schemas"]["DashboardContext"] | components["schemas"]["WidgetContext"];
+        /**
+         * Contribution
+         * @description A term's effect on the log cumulative excess hazard, for the analyst view.
+         */
+        Contribution: {
+            /** Applied */
+            applied: boolean;
+            /** Log Hazard */
+            log_hazard: number;
+            /** Note */
+            note: string;
+            /** Term */
+            term: string;
+        };
+        /**
+         * Criterion
+         * @description One entry of a national pathway's criteria; the countries whose standard lists it.
+         */
+        Criterion: {
+            /** Countries */
+            countries: string[];
+            /** Id */
+            id: string;
+            provenance: components["schemas"]["Citation"];
+            /** Site */
+            site: string;
+            stage: components["schemas"]["TriggerStage"];
+            /** Text */
+            text: string;
+        };
         /**
          * Dashboard
          * @description A live view that follows the latest run. Its content lives in its versions; this
@@ -1837,6 +2587,7 @@ export interface components {
             access_kind: components["schemas"]["AccessKind"];
             /** Address */
             address: string;
+            check_every?: components["schemas"]["CheckEvery"] | null;
             /**
              * Created At
              * Format: date-time
@@ -1871,11 +2622,150 @@ export interface components {
              */
             revision: number;
         };
+        /** Deadline */
+        Deadline: {
+            /** By */
+            by: number;
+            /** Countries */
+            countries: string[];
+            /** Due Day */
+            due_day: number | null;
+            /** Label */
+            label: string;
+            /** Rule */
+            rule: string;
+            status: components["schemas"]["DeadlineStatus"];
+        };
+        /**
+         * DeadlineStatus
+         * @enum {string}
+         */
+        DeadlineStatus: "met" | "late" | "due" | "overdue" | "not_applicable";
         /**
          * EntryKind
          * @enum {string}
          */
         EntryKind: "message" | "operator" | "widget" | "agent_turn" | "tool_call" | "delegation" | "report" | "alert";
+        /** Evaluate */
+        Evaluate: {
+            inputs: components["schemas"]["EvaluationInputs"];
+            /** Version */
+            version?: number | null;
+        };
+        /** EvaluateCase */
+        EvaluateCase: {
+            model_id: components["schemas"]["Id"];
+        };
+        /** Evaluation */
+        Evaluation: {
+            /** Contributions */
+            contributions: components["schemas"]["Contribution"][];
+            /** Days Behind */
+            days_behind: number;
+            /** Deadlines */
+            deadlines: components["schemas"]["Deadline"][];
+            /** Flags */
+            flags: string[];
+            /** Levers */
+            levers: components["schemas"]["Lever"][];
+            model_id: components["schemas"]["Id"];
+            /** Pathway */
+            pathway: components["schemas"]["PathwayRow"][];
+            survival: components["schemas"]["Survival"];
+            trigger: components["schemas"]["Trigger"];
+            /** Version */
+            version: number;
+            /** Warnings */
+            warnings: string[];
+        };
+        /**
+         * EvaluationInputs
+         * @description One profile. Days are the days spent in each step so far; a step left out has not
+         *     started. Synthetic profiles only: the platform is not for patient data.
+         */
+        EvaluationInputs: {
+            /** Age Band */
+            age_band?: string | null;
+            /**
+             * Days
+             * @default {}
+             */
+            days: {
+                [key: string]: number;
+            };
+            /** Education */
+            education?: string | null;
+            /** @default unknown */
+            intent: components["schemas"]["Intent"];
+            /** @default surgery */
+            modality: components["schemas"]["Modality"];
+            /**
+             * Presentation
+             * @default []
+             */
+            presentation: string[];
+            /** Route */
+            route?: string | null;
+            /** Sex */
+            sex: string;
+            /** Site */
+            site: string;
+            /** Stage */
+            stage?: string | null;
+            /**
+             * Toggles
+             * @default {}
+             */
+            toggles: {
+                [key: string]: boolean;
+            };
+            /**
+             * Treatment Started
+             * @default false
+             */
+            treatment_started: boolean;
+        };
+        /**
+         * EvidenceGrade
+         * @enum {string}
+         */
+        EvidenceGrade: "standard" | "meta_analysis" | "cohort" | "registry" | "assumption";
+        /** Field */
+        Field: {
+            /**
+             * Help
+             * @default
+             */
+            help: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /**
+             * Levels
+             * @default []
+             */
+            levels: string[];
+            /** Name */
+            name: string;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+            type: components["schemas"]["FieldType"];
+        };
+        /**
+         * FieldType
+         * @enum {string}
+         */
+        FieldType: "text" | "number" | "integer" | "date" | "boolean" | "enum" | "enum_list" | "day_map";
+        /** Figure */
+        Figure: {
+            now: components["schemas"]["Per100"];
+            on_target: components["schemas"]["Per100"];
+        };
         /** Finding */
         Finding: {
             /** Excerpt */
@@ -1889,6 +2779,26 @@ export interface components {
              */
             severity: "error" | "warning";
         };
+        /**
+         * Flag
+         * @description An offer of support shown when a term has a level, e.g. a navigator after basic
+         *     education. Never a risk label.
+         */
+        Flag: {
+            /** Action */
+            action: string;
+            /** Level */
+            level: string;
+            provenance: components["schemas"]["Citation"];
+            /** Term */
+            term: string;
+        };
+        /**
+         * Form
+         * @description How a parameter enters the model.
+         * @enum {string}
+         */
+        Form: "per_4_weeks" | "beyond_12_weeks" | "per_day" | "hazard_ratio" | "odds_ratio" | "value";
         /**
          * FoundBy
          * @description How an agent came upon a source: the web search and its scope.
@@ -2016,6 +2926,11 @@ export interface components {
         /** Format: uuid */
         Id: string;
         /**
+         * Intent
+         * @enum {string}
+         */
+        Intent: "curative" | "palliative" | "unknown";
+        /**
          * Interval
          * @description A period of data: both ends inclusive. A year is 1 January to 31 December; a
          *     multi-year window such as 2022-2024 is one interval, not three.
@@ -2111,6 +3026,16 @@ export interface components {
             revision: number;
             strictness: components["schemas"]["Strictness"];
         };
+        /** Lever */
+        Lever: {
+            gain: components["schemas"]["Per100"];
+            grade: components["schemas"]["EvidenceGrade"];
+            /** Label */
+            label: string;
+            step: components["schemas"]["PathwayStep"];
+            /** Text */
+            text: string;
+        };
         /** Liveness */
         Liveness: {
             /**
@@ -2164,6 +3089,20 @@ export interface components {
             value: string;
         };
         /**
+         * Modality
+         * @enum {string}
+         */
+        Modality: "surgery" | "radiotherapy" | "drugs";
+        /** ModelCaseType */
+        ModelCaseType: {
+            /**
+             * Auto Run
+             * @default false
+             */
+            auto_run: boolean;
+            case_type_id: components["schemas"]["Id"] | null;
+        };
+        /**
          * ModelInfo
          * @description A configured model, as the catalog shows it. Its key is never part of it.
          */
@@ -2196,6 +3135,98 @@ export interface components {
             /** Session Agent */
             session_agent?: string | null;
         };
+        /**
+         * ModelOnCase
+         * @description A model on the case's type, with its latest result for the case if it has one.
+         */
+        ModelOnCase: {
+            /** Auto Run */
+            auto_run: boolean;
+            /** Kind */
+            kind: string;
+            latest: components["schemas"]["CaseResult"] | null;
+            model_id: components["schemas"]["Id"];
+            /** Name */
+            name: string;
+            /**
+             * Reads
+             * @default []
+             */
+            reads: string[];
+            /** Results */
+            results: number;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ModelSpec
+         * @description Everything a version is built from. Validated when a version is created
+         *     (StatisticalModelService.create).
+         */
+        ModelSpec: {
+            /** Arrows */
+            arrows: {
+                [key: string]: string;
+            };
+            /** Baseline */
+            baseline: components["schemas"]["BaselineCell"][];
+            /**
+             * Cautions
+             * @default []
+             */
+            cautions: string[];
+            comparison: components["schemas"]["ComparisonPopulation"];
+            /** Criteria */
+            criteria: components["schemas"]["Criterion"][];
+            /** Flags */
+            flags: components["schemas"]["Flag"][];
+            /** Intended Use */
+            intended_use: string;
+            /**
+             * Kind
+             * @default patient_pathway
+             * @constant
+             */
+            kind: "patient_pathway";
+            /** Outcome */
+            outcome: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: components["schemas"]["Parameter"];
+            };
+            /** Sites */
+            sites: string[];
+            /**
+             * Structure
+             * @default relative_survival_dag
+             * @constant
+             */
+            structure: "relative_survival_dag";
+            /** Targets */
+            targets: components["schemas"]["TargetTime"][];
+            /** Terms */
+            terms: components["schemas"]["Term"][];
+            /** Toggles */
+            toggles: components["schemas"]["Toggle"][];
+        };
+        /**
+         * ModelVersion
+         * @description Immutable; a change makes a new version.
+         */
+        ModelVersion: {
+            compiled: components["schemas"]["AnyCompiled"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            id: components["schemas"]["Id"];
+            model_id: components["schemas"]["Id"];
+            spec: components["schemas"]["AnySpec"];
+            /** Version */
+            version: number;
+        };
         /** NewAlertRule */
         NewAlertRule: {
             alert_pipeline_id?: components["schemas"]["OperatorId"] | null;
@@ -2212,6 +3243,18 @@ export interface components {
             /** @default warning */
             severity: components["schemas"]["Severity"];
         };
+        /** NewAnalysis */
+        NewAnalysis: {
+            /** Brief */
+            brief: string;
+            /**
+             * Operator Ids
+             * @default []
+             */
+            operator_ids: components["schemas"]["OperatorId"][];
+            /** Title */
+            title: string;
+        };
         /** NewAttachment */
         NewAttachment: {
             kind: components["schemas"]["AttachmentKind"];
@@ -2219,6 +3262,18 @@ export interface components {
             ref: string;
             /** Title */
             title?: string | null;
+        };
+        /** NewCaseType */
+        NewCaseType: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["Field"][];
+            /** Name */
+            name: string;
         };
         /** NewDashboard */
         NewDashboard: {
@@ -2228,6 +3283,26 @@ export interface components {
         /** NewDashboardRun */
         NewDashboardRun: {
             time_range?: components["schemas"]["TimeRange"] | null;
+        };
+        /** NewHistory */
+        NewHistory: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "history";
+            /**
+             * Last
+             * @default 10
+             */
+            last: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            session_id?: components["schemas"]["Id"] | null;
+            source_id: components["schemas"]["Id"];
         };
         /** NewInput */
         NewInput: {
@@ -2259,11 +3334,9 @@ export interface components {
             /** Text */
             text: string;
         };
-        /** NewModel */
-        NewModel: {
-            /** Model */
-            model: string;
-            provider_id: components["schemas"]["Id"];
+        /** NewPathwayModel */
+        NewPathwayModel: {
+            parameters?: components["schemas"]["OperatorId"] | null;
         };
         /** NewProject */
         NewProject: {
@@ -2393,6 +3466,20 @@ export interface components {
             /** Sql */
             sql: string;
         };
+        /** NewTrialMatcher */
+        NewTrialMatcher: {
+            /**
+             * Auto Run
+             * @default false
+             */
+            auto_run: boolean;
+            case_type_id?: components["schemas"]["Id"] | null;
+            operator_id: components["schemas"]["OperatorId"];
+        };
+        /** NewVersion */
+        NewVersion: {
+            spec: components["schemas"]["ModelSpec"];
+        };
         /** NewWidget */
         NewWidget: {
             /** Inputs */
@@ -2442,7 +3529,7 @@ export interface components {
          * OperatorKind
          * @enum {string}
          */
-        OperatorKind: "source" | "extract" | "input" | "transform" | "statistic" | "agent";
+        OperatorKind: "source" | "history" | "extract" | "input" | "transform" | "statistic" | "agent";
         /**
          * Order
          * @description A new order of a project's dashboards or reports: every id of them, once.
@@ -2461,6 +3548,48 @@ export interface components {
          * @enum {string}
          */
         OutputKind: "table" | "document" | "result";
+        /** Parameter */
+        Parameter: {
+            /** Ci High */
+            ci_high?: number | null;
+            /** Ci Low */
+            ci_low?: number | null;
+            /** Estimate */
+            estimate: number;
+            /** @default value */
+            form: components["schemas"]["Form"];
+            /** Name */
+            name: string;
+            provenance: components["schemas"]["Citation"];
+            scale: components["schemas"]["Scale"];
+        };
+        /** PathwayRow */
+        PathwayRow: {
+            /** Countries */
+            countries: string[];
+            /** Current */
+            current: boolean;
+            /** Days */
+            days: number | null;
+            /** Gap */
+            gap: number;
+            /** Label */
+            label: string;
+            /** Patient Interval */
+            patient_interval: boolean;
+            step: components["schemas"]["PathwayStep"];
+            /** Target */
+            target: number | null;
+        };
+        /**
+         * PathwayStep
+         * @description The seven intervals of a pathway, in order, from the first symptoms to the start of
+         *     treatment. The first is the patient interval; the trigger (imaging done) ends the
+         *     third; the clock the deadlines count from starts there.
+         * @enum {string}
+         */
+        PathwayStep: "symptoms_to_contact" | "contact_to_physician" | "physician_to_imaging" | "imaging_to_referral" | "referral_to_specialist" | "specialist_to_workup" | "workup_to_treatment";
+        Per100: number;
         /** Pin */
         Pin: {
             /** Expected Revision */
@@ -2469,6 +3598,63 @@ export interface components {
             /** Slot */
             slot: string;
             widget_id: components["schemas"]["Id"];
+        };
+        /**
+         * PinnedTrial
+         * @description A recruiting trial as the trial matcher's version read it from the trials data
+         *     (`case_trials`, docs/trials.md): what it matches on, and its nearest recruiting sites.
+         *     The eligibility text is the registry's, as written.
+         */
+        PinnedTrial: {
+            /**
+             * Cancer Groups
+             * @default []
+             */
+            cancer_groups: string[];
+            /**
+             * Conditions
+             * @default
+             */
+            conditions: string;
+            /**
+             * Eligibility
+             * @default
+             */
+            eligibility: string;
+            /**
+             * Finnish Site
+             * @default false
+             */
+            finnish_site: boolean;
+            /** Max Age Years */
+            max_age_years?: number | null;
+            /** Min Age Years */
+            min_age_years?: number | null;
+            /** Nct Id */
+            nct_id: string;
+            /**
+             * Nearest
+             * @default {}
+             */
+            nearest: {
+                [key: string]: components["schemas"]["TrialSite"];
+            };
+            /** Phase */
+            phase?: string | null;
+            /**
+             * Recruiting Countries
+             * @default []
+             */
+            recruiting_countries: string[];
+            /**
+             * Sex
+             * @default ALL
+             */
+            sex: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
         };
         /**
          * Pipeline
@@ -2509,6 +3695,24 @@ export interface components {
             data_source_id: components["schemas"]["Id"];
             /** Name */
             name: string;
+        };
+        /**
+         * PopulationFigure
+         * @description Per site and sex: the baseline, the baseline with the comparison country's days,
+         *     and that country's observed survival. The residual is what the days do not explain.
+         */
+        PopulationFigure: {
+            baseline: components["schemas"]["Per100"];
+            /** Note */
+            note: string;
+            observed: components["schemas"]["Per100"];
+            /** Residual */
+            residual: number;
+            /** Sex */
+            sex: string;
+            /** Site */
+            site: string;
+            timing_adjusted: components["schemas"]["Per100"];
         };
         /** PostedMessage */
         PostedMessage: {
@@ -2593,6 +3797,11 @@ export interface components {
          * @enum {string}
          */
         ProviderKind: "openai-compatible" | "gemini";
+        /** Range */
+        Range: {
+            high: components["schemas"]["Per100"];
+            low: components["schemas"]["Per100"];
+        };
         /** ReasoningPart */
         ReasoningPart: {
             /** Text */
@@ -2712,6 +3921,11 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * ResultTrigger
+         * @enum {string}
+         */
+        ResultTrigger: "auto" | "request";
         /** Roles */
         Roles: {
             geo?: components["schemas"]["GeoRole"] | null;
@@ -2769,6 +3983,26 @@ export interface components {
             /** @default {} */
             time_range: components["schemas"]["TimeRange"];
         };
+        /** SavedCase */
+        SavedCase: {
+            case: components["schemas"]["Case"];
+            /** Events */
+            events: components["schemas"]["CaseEvent"][];
+            /**
+             * Ran
+             * @default []
+             */
+            ran: components["schemas"]["Id"][];
+            /** Results */
+            results: components["schemas"]["CaseResult"][];
+        };
+        /**
+         * Scale
+         * @description What a parameter is measured on. Hazard ratios on overall mortality are converted to
+         *     the excess scale at build (Compiled.parameters), the others are used as they are.
+         * @enum {string}
+         */
+        Scale: "excess" | "cause_specific" | "overall" | "odds_ratio" | "per_day" | "days" | "survival";
         /**
          * Schema
          * @description What an operator produces. Every operator states it; `derived` says whether the
@@ -2793,6 +4027,41 @@ export interface components {
              *     }
              */
             roles: components["schemas"]["Roles"];
+        };
+        /**
+         * Section
+         * @description What one model said about one case. `body` is the model's own result (for
+         *     `patient_pathway`, an Evaluation); `summary`, `status` and `columns` are what lists
+         *     and the cases data source show.
+         */
+        Section: {
+            /**
+             * @default {
+             *       "open": false
+             *     }
+             */
+            attention: components["schemas"]["Attention"];
+            /** @default {} */
+            body: components["schemas"]["JsonObject"];
+            /**
+             * Columns
+             * @default {}
+             */
+            columns: {
+                [key: string]: string | number | boolean | null;
+            };
+            /** Kind */
+            kind: string;
+            /**
+             * Status
+             * @default info
+             * @enum {string}
+             */
+            status: "ok" | "info" | "warn" | "urgent";
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
         };
         /**
          * Session
@@ -2822,7 +4091,7 @@ export interface components {
          * SessionAgent
          * @enum {string}
          */
-        SessionAgent: "session" | "research";
+        SessionAgent: "session" | "research" | "analysis";
         /** SessionAgentChoice */
         SessionAgentChoice: {
             /** Expected Revision */
@@ -2970,6 +4239,43 @@ export interface components {
             /** Url */
             url?: string | null;
         };
+        /** StageResult */
+        StageResult: {
+            /** Countries */
+            countries: string[];
+            /** Criteria */
+            criteria: string[];
+            /** Fired */
+            fired: boolean;
+            stage: components["schemas"]["TriggerStage"];
+        };
+        /** StatisticalModel */
+        StatisticalModel: {
+            /**
+             * Auto Run
+             * @default false
+             */
+            auto_run: boolean;
+            case_type_id?: components["schemas"]["Id"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["Actor"];
+            /** Description */
+            description: string;
+            id: components["schemas"]["Id"];
+            /** Kind */
+            kind: string;
+            /** Latest Version */
+            latest_version: number;
+            /** Name */
+            name: string;
+            project_id: components["schemas"]["Id"];
+            /** Updated At */
+            updated_at?: string | null;
+        };
         /**
          * StoredFile
          * @description A file uploaded to ADA, to be read by a source at `address`.
@@ -2987,6 +4293,42 @@ export interface components {
          * @enum {string}
          */
         Strictness: "off" | "warn" | "block";
+        /** Survival */
+        Survival: {
+            /** By Setting */
+            by_setting: {
+                [key: string]: components["schemas"]["Figure"];
+            };
+            now: components["schemas"]["Per100"];
+            on_target: components["schemas"]["Per100"];
+            range_now: components["schemas"]["Range"];
+            range_on_target: components["schemas"]["Range"];
+            /** Setting */
+            setting: {
+                [key: string]: boolean;
+            };
+        };
+        /**
+         * TargetTime
+         * @description A step's standard time in each country that defines it. The target is their median
+         *     (Compiled.targets). `step` None is the whole pathway, trigger to treatment start.
+         */
+        TargetTime: {
+            /** Days By Country */
+            days_by_country: {
+                [key: string]: number;
+            };
+            modality?: components["schemas"]["Modality"] | null;
+            /**
+             * Other Sources
+             * @default []
+             */
+            other_sources: components["schemas"]["Citation"][];
+            provenance: components["schemas"]["Citation"];
+            /** Site */
+            site: string;
+            step: components["schemas"]["PathwayStep"] | null;
+        };
         /** Template */
         Template: {
             /** @default {} */
@@ -3017,6 +4359,21 @@ export interface components {
          * @enum {string}
          */
         TemplateKind: "report" | "dashboard";
+        /** Term */
+        Term: {
+            /**
+             * Display
+             * @default patient
+             * @enum {string}
+             */
+            display: "patient" | "analyst";
+            /** Levels */
+            levels: string[];
+            /** Name */
+            name: string;
+            /** Reference */
+            reference: string;
+        };
         /** TextPart */
         TextPart: {
             /** Text */
@@ -3048,6 +4405,17 @@ export interface components {
             grain?: components["schemas"]["Grain"] | null;
             /** Start */
             start: string;
+        };
+        /** Toggle */
+        Toggle: {
+            /** About */
+            about: string;
+            /** Default */
+            default: boolean;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
         };
         /**
          * ToolCall
@@ -3093,12 +4461,121 @@ export interface components {
          * @enum {string}
          */
         ToolState: "input-available" | "output-available" | "output-error";
+        /**
+         * TrialCompiled
+         * @description What a trial matcher version read: the trials, as they were, from one run.
+         */
+        TrialCompiled: {
+            /**
+             * Kind
+             * @default trial_matcher
+             * @constant
+             */
+            kind: "trial_matcher";
+            /**
+             * Read At
+             * Format: date-time
+             */
+            read_at: string;
+            /** Run Id */
+            run_id?: string | null;
+            /** Trials */
+            trials: components["schemas"]["PinnedTrial"][];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /**
+         * TrialMatcherSpec
+         * @description The trial matcher: which recruiting trials a case could be discussed for, matched
+         *     on structured fields only (cancer group, sex, age), never on the eligibility text.
+         */
+        TrialMatcherSpec: {
+            /**
+             * Cautions
+             * @default [
+             *       "Matched on cancer group, sex and age only; the eligibility text is not judged.",
+             *       "Recruiting means the registry's site status, which lags.",
+             *       "An age group that only partly fits a trial's age limits is marked uncertain."
+             *     ]
+             */
+            cautions: string[];
+            /**
+             * Groups
+             * @default {
+             *       "colorectal": "colorectal",
+             *       "lung": "lung",
+             *       "pancreas": "pancreas"
+             *     }
+             */
+            groups: {
+                [key: string]: string;
+            };
+            /**
+             * Intended Use
+             * @default Educational: lists recruiting Nordic trials a synthetic case could be discussed for with an oncologist. Not an eligibility decision; never patient data.
+             */
+            intended_use: string;
+            /**
+             * Kind
+             * @default trial_matcher
+             * @constant
+             */
+            kind: "trial_matcher";
+            /** Operator Id */
+            operator_id: string;
+        };
+        /**
+         * TrialSite
+         * @description A trial's recruiting Nordic site nearest to one of the cities the trials data
+         *     measures from, and the great-circle distance to it.
+         */
+        TrialSite: {
+            /** City */
+            city: string | null;
+            /** Country */
+            country: string;
+            /** Facility */
+            facility: string | null;
+            /** Km */
+            km: number | null;
+        };
+        /** Trigger */
+        Trigger: {
+            /** Clock Start */
+            clock_start: number | null;
+            /** Note */
+            note: string;
+            suspicion: components["schemas"]["StageResult"];
+            well_founded: components["schemas"]["StageResult"];
+        };
+        /**
+         * TriggerStage
+         * @enum {string}
+         */
+        TriggerStage: "suspicion" | "well_founded";
         TurnPart: components["schemas"]["ReasoningPart"] | components["schemas"]["ToolPart"] | components["schemas"]["TextPart"] | components["schemas"]["SourcePart"];
         /**
          * TurnStatus
          * @enum {string}
          */
         TurnStatus: "queued" | "running" | "done" | "failed" | "cancelled";
+        /**
+         * ValidationCheck
+         * @description One check of the build against a figure the model was not built from.
+         */
+        ValidationCheck: {
+            /** Expected */
+            expected: number;
+            /** Name */
+            name: string;
+            /** Note */
+            note: string;
+            /** Predicted */
+            predicted: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -3142,6 +4619,30 @@ export interface components {
          * @enum {string}
          */
         VersionBump: "major" | "minor" | "patch";
+        /** WatchPage */
+        WatchPage: {
+            check_every?: components["schemas"]["CheckEvery"] | null;
+            /** Name */
+            name: string;
+            provenance?: components["schemas"]["Provenance"] | null;
+            /** Url */
+            url: string;
+        };
+        /** WatchResult */
+        WatchResult: {
+            /**
+             * Already Watched
+             * @default false
+             */
+            already_watched: boolean;
+            /** Error */
+            error?: string | null;
+            /** Ok */
+            ok: boolean;
+            source_id?: components["schemas"]["Id"] | null;
+            /** Url */
+            url: string;
+        };
         /**
          * WebSettings
          * @description What the web tools may do, from the platform's configuration (read only).
@@ -3270,6 +4771,23 @@ export interface components {
             truncated: boolean;
             widget_id: components["schemas"]["Id"];
         };
+        /** NewModel */
+        ada__entrypoints__http__routers__settings__NewModel: {
+            /** Model */
+            model: string;
+            provider_id: components["schemas"]["Id"];
+        };
+        /** NewModel */
+        ada__entrypoints__http__routers__statistical_models__NewModel: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Name */
+            name: string;
+            spec: components["schemas"]["ModelSpec"];
+        };
     };
     responses: never;
     parameters: never;
@@ -3376,6 +4894,37 @@ export interface operations {
             };
         };
     };
+    test_alert_api_alert_rules__rule_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Alert"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     alert_rows_api_alerts__alert_id__rows_get: {
         parameters: {
             query?: {
@@ -3396,6 +4945,270 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Rows"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_case_type_api_case_types__case_type_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseType"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_case_type_api_case_types__case_type_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseTypeChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseType"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cases_api_case_types__case_type_id__cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWithResults"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_case_api_case_types__case_type_id__cases__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_case_api_case_types__case_type_id__cases__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseValues"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedCase"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_case_api_case_types__case_type_id__cases__key__evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluateCase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    case_models_api_case_types__case_type_id__cases__key__models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelOnCase"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_cases_api_case_types__case_type_id__open_cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWithResult"][];
                 };
             };
             /** @description Validation Error */
@@ -3909,6 +5722,298 @@ export interface operations {
             };
         };
     };
+    get_model_api_models__model_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatisticalModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_model_case_type_api_models__model_id__case_type_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCaseType"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatisticalModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    model_cases_api_models__model_id__cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWithResult"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_model_api_models__model_id__evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Evaluate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Evaluation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    population_api_models__model_id__population_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PopulationFigure"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_trial_matcher_api_models__model_id__refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_version_api_models__model_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    latest_version_api_models__model_id__versions_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_version_api_models__model_id__versions__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_operator_api_operators__operator_id__get: {
         parameters: {
             query?: never;
@@ -4090,6 +6195,37 @@ export interface operations {
             };
         };
     };
+    list_deliveries_api_projects__project_id__alert_deliveries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertDelivery"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_project_alert_rules_api_projects__project_id__alert_rules_get: {
         parameters: {
             query?: never;
@@ -4141,6 +6277,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_case_types_api_projects__project_id__case_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseType"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_case_type_api_projects__project_id__case_types_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewCaseType"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseType"];
                 };
             };
             /** @description Validation Error */
@@ -4386,6 +6588,142 @@ export interface operations {
             };
         };
     };
+    list_models_api_projects__project_id__models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatisticalModel"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_model_api_projects__project_id__models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ada__entrypoints__http__routers__statistical_models__NewModel"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_pathway_model_api_projects__project_id__models_pathway_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NewPathwayModel"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_trial_matcher_api_projects__project_id__models_trials_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTrialMatcher"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_operator_api_projects__project_id__operators_post: {
         parameters: {
             query?: never;
@@ -4397,7 +6735,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewSourceOperator"] | components["schemas"]["NewTransform"] | components["schemas"]["NewInput"];
+                "application/json": components["schemas"]["NewSourceOperator"] | components["schemas"]["NewHistory"] | components["schemas"]["NewTransform"] | components["schemas"]["NewInput"];
             };
         };
         responses: {
@@ -4710,6 +7048,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DataSource"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    watch_sources_api_projects__project_id__sources_watch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchPage"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchResult"][];
                 };
             };
             /** @description Validation Error */
@@ -5179,6 +7552,41 @@ export interface operations {
             };
         };
     };
+    delegate_analysis_api_sessions__session_id__analysis_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewAnalysis"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_attachments_api_sessions__session_id__attachments_get: {
         parameters: {
             query?: never;
@@ -5555,7 +7963,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewModel"];
+                "application/json": components["schemas"]["ada__entrypoints__http__routers__settings__NewModel"];
             };
         };
         responses: {
@@ -5934,7 +8342,9 @@ export interface operations {
     };
     watch_source_api_sources__source_id__watch_post: {
         parameters: {
-            query?: never;
+            query?: {
+                check_every?: components["schemas"]["CheckEvery"] | null;
+            };
             header?: never;
             path: {
                 source_id: string;

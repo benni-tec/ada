@@ -3,12 +3,13 @@ import { ChevronDown } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import { IconButton } from '@/components/icon-action'
+import { LiveTime } from '@/components/live-time'
 import { ErrorNotice, Loading } from '@/components/notices'
-import { Time } from '@/components/provenance'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { alertRowsQuery, type AlertView } from '@/lib/api'
 import { cell, cellText, isLong } from '@/lib/cells'
 
+import { Deliveries } from './deliveries'
 import { keyText, severityTextClasses } from './labels'
 
 /** What the people reading it call an alert's state: it is active, or it has ended. */
@@ -46,17 +47,20 @@ function AlertRow({ view }: { view: AlertView }) {
   return (
     <>
       <TableRow data-state={open ? 'selected' : undefined}>
-        <TableCell className="font-medium">{keyText(alert.key)}</TableCell>
+        <TableCell className="font-medium whitespace-normal">
+          {keyText(alert.key)}
+          <Deliveries projectId={alert.project_id} alertId={alert.id} />
+        </TableCell>
         <TableCell className={active ? severityTextClasses[view.rule.severity] : 'text-muted-foreground'}>
           {stateText(view)}
         </TableCell>
         <TableCell className="text-muted-foreground">
           {active ? 'Since ' : 'From '}
-          <Time value={alert.started_at} />
+          <LiveTime value={alert.started_at} relative={!alert.resolved_at} />
           {alert.resolved_at && (
             <>
               {' to '}
-              <Time value={alert.resolved_at} />
+              <LiveTime value={alert.resolved_at} />
             </>
           )}
         </TableCell>

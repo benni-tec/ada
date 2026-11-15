@@ -324,6 +324,34 @@ async def test_an_input_checks_its_default_against_its_schema(world: World) -> N
         await world.pipelines.add_input(world.project_id, "codes", wrong, source.id, AGENT)
 
 
+async def test_a_statistic_runs_the_sql_it_stored_and_declares_its_interval(
+    world: World,
+) -> None:
+    years = await world.transform(
+        "SELECT * FROM (VALUES ('FI', 2020, 10.0), ('FI', 2021, 12.0), ('FI', 2022, 13.5), "
+        "('FI', 2023, 15.0), ('SE', 2022, 20.0)) v(country, year, share)"
+    )
+    arguments = {"value": "share", "time": "year", "by": ["country"]}
+    trend = await world.pipelines.add_statistic(
+        world.project_id, "trend", arguments, years.id, AGENT
+    )
+
+    assert trend.kind is OperatorKind.STATISTIC
+    assert "regr_slope" in trend.params["sql"]
+    assert trend.output.roles.measures == (
+        MeasureRole(value="slope", lower="slope_lower", upper="slope_upper"),
+    )
+    fi, se = sorted(await world.read(trend))
+    # country, n, first, last, slope, lower, upper, confidence, r2, direction
+    assert (fi[0], fi[1], fi[4], fi[7], fi[9]) == ("FI", 4, 1.65, 95, "rising")
+    assert round(fi[5], 2) == 1.28 and round(fi[6], 2) == 2.02
+    assert (se[0], se[1], se[9]) == ("SE", 1, "too few points")
+    with pytest.raises(Invalid, match="'nope' is not a column"):
+        await world.pipelines.add_statistic(
+            world.project_id, "trend", {**arguments, "value": "nope"}, years.id, AGENT
+        )
+
+
 async def test_a_chain_of_pass_through_transforms_is_one_query(world: World) -> None:
     source = await world.source()
     big = await world.transform("SELECT * FROM input_0 WHERE value > 10", source)
@@ -1286,6 +1314,24 @@ async def test_a_batch_builds_everything_with_references_and_again_nothing_new(
         "CC BY 4.0",
     )
 
+    history = await call(
+        client,
+        "add_history",
+        project_id=project["id"],
+        session_id=session["id"],
+        source_id=refs["s"],
+        last=3,
+    )
+    assert history["kind"] == "history"
+    assert history["params"] == {"last": 3}
+    assert history["inputs"] == [refs["src"]]
+    assert [c["name"] for c in history["output"]["columns"]] == [
+        "region",
+        "value",
+        "snapshot_at",
+        "snapshot_rank",
+    ]
+
 
 async def test_a_batch_that_fails_midway_stores_nothing(
     builder: tuple[Client, AsyncContainer],
@@ -1308,3 +1354,94 @@ async def test_a_batch_that_fails_midway_stores_nothing(
     dispatcher = await container.get(TaskDispatcher)
     assert isinstance(dispatcher, RecordingTaskDispatcher)
     assert dispatcher.refreshes == []
+
+
+async def test_source_history_is_fixed_limited_and_cached(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    source, operator = await world.sources.add(world.project_id, b"region\nHelsinki\n")
+    await world.sources.refresh(source.id)
+    world.clock.advance(days=1)
+    world.sources.content[source.id] = b"region\nHelsinki\nTurku\n"
+    await world.sources.refresh(source.id)
+    old_run = await world.runs.start(world.project_id, AGENT)
+    await world.runs.read(old_run.id, operator.id)
+    history = await world.pipelines.add_history(world.project_id, source.id, AGENT)
+    delta = await world.transform(
+        "SELECT region FROM input_0 WHERE snapshot_rank = 1 "
+        "EXCEPT SELECT region FROM input_0 WHERE snapshot_rank = 2",
+        history,
+        materialize=True,
+    )
+    assert await world.read(delta, old_run.id) == [("Turku",)]
+    cached = len(world.store.materialized)
+    assert await world.read(delta) == [("Turku",)]
+    assert len(world.store.materialized) == cached
+
+    world.clock.advance(days=1)
+    world.sources.content[source.id] = b"region\nHelsinki\nTurku\nOulu\n"
+    await world.sources.refresh(source.id)
+    rows = await world.read(history)
+    assert [row[2] for row in rows] == [1, 1, 1, 2, 2, 3]
+    assert sorted((row[0], row[2]) for row in rows) == sorted(
+        [
+            ("Helsinki", 1),
+            ("Turku", 1),
+            ("Oulu", 1),
+            ("Helsinki", 2),
+            ("Turku", 2),
+            ("Helsinki", 3),
+        ]
+    )
+    assert rows[0][1] == world.clock.now().replace(tzinfo=None)
+    assert {row[2] for row in await world.read(history, old_run.id)} == {1, 2}
+    assert await world.read(delta) == [("Oulu",)]
+    assert len(world.store.materialized) == cached + 1
+    limited = await world.pipelines.add_history(world.project_id, source.id, AGENT, last=1)
+    assert {row[2] for row in await world.read(limited)} == {1}
+    assert not (await world.sources.refresh(source.id)).changed
+    assert len(await world.snapshots.list(operator.id)) == 3
+    assert await world.read(delta, old_run.id) == [("Turku",)]
+
+
+async def test_source_history_schema_changes_and_validation(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    source, _ = await world.sources.add(world.project_id, b"region,removed\nHelsinki,old\n")
+    await world.sources.refresh(source.id)
+    world.clock.advance(days=1)
+    world.sources.content[source.id] = b"region,value\nTurku,10\n"
+    await world.sources.refresh(source.id)
+    history = await world.pipelines.add_history(world.project_id, source.id, AGENT)
+    rows = await world.read(history)
+    assert rows[0][:2] == ("Turku", 10)
+    assert rows[1][:2] == ("Helsinki", None)
+    removed = await world.transform("SELECT removed FROM input_0", history)
+    assert await world.read(removed) == [(None,), ("old",)]
+    for last in (0, -1):
+        with pytest.raises(Invalid, match="positive integer"):
+            await world.pipelines.add_history(world.project_id, source.id, AGENT, last=last)
+    with pytest.raises(Invalid, match="another project"):
+        await world.pipelines.add_history(uuid7(), source.id, AGENT)
+    await world.data_sources.update(
+        source.model_copy(update={"options": {"pushdown": {"param": "years"}}}), source.revision
+    )
+    with pytest.raises(Invalid, match="pushdown"):
+        await world.pipelines.add_history(world.project_id, source.id, AGENT)
+
+    reserved, _ = await world.sources.add(world.project_id, b"snapshot_rank\n1\n")
+    with pytest.raises(Invalid, match="reserves"):
+        await world.pipelines.add_history(world.project_id, reserved.id, AGENT)
+
+
+async def test_source_history_refuses_a_source_changed_to_pushdown(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    source, operator = await world.sources.add(world.project_id, REGIONS)
+    history = await world.pipelines.add_history(world.project_id, source.id, AGENT)
+    run = await world.runs.start(world.project_id, AGENT)
+    await world.runs.read(run.id, operator.id)
+    await world.data_sources.update(
+        source.model_copy(update={"options": {"pushdown": {"param": "years"}}}), source.revision
+    )
+    with pytest.raises(
+        Invalid, match=r"Source history does not support period \(pushdown\) sources"
+    ):
+        await world.runs.execute(run.id, history.id)

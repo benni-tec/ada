@@ -69,6 +69,7 @@ export function customData({ data, inputs }: Pick<Loaded, 'data' | 'inputs'>): D
     main: all.main ?? dataset(data),
     inputs: all,
     run_id: data.run_id,
+    // Kept for code that reads it; see protocol.ts.
     is_scenario: data.is_scenario,
     is_stale: data.is_stale,
   }

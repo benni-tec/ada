@@ -14,7 +14,7 @@ from ada.core.models.agents import ResearchLimits
 from ada.core.models.analysis import FetchedData
 from ada.core.models.base import Id
 from ada.core.models.errors import Invalid
-from ada.core.models.sessions import Session, SessionEntry
+from ada.core.models.sessions import Session, SessionAgent, SessionEntry
 from ada.core.models.sources import AccessKind, DataSource, DocumentEngine, document_engine
 from ada.core.models.time import TimeRange
 from ada.core.ports.agents import LanguageModels, ResearchCalls
@@ -117,7 +117,9 @@ class Research(ResearchService):
             raise Invalid("No research agent model is configured")
         if not brief.strip():
             raise Invalid("A research brief needs text")
-        child = await self.session_records.create_research(parent_session_id, title, actor)
+        child = await self.session_records.create_child(
+            parent_session_id, title, SessionAgent.RESEARCH, actor
+        )
         await self.turns.post_message(child.id, brief, actor, model=model)
         return child
 
@@ -130,6 +132,8 @@ class Research(ResearchService):
         actor: Actor,
     ) -> SessionEntry:
         child = await self.sessions.get(child_session_id)
+        if child.agent is not SessionAgent.RESEARCH:
+            raise Invalid("Only a research session reports back; an analysis uses report_findings")
         if not summary.strip():
             raise Invalid("A report needs a summary")
         sections = [summary.strip()]

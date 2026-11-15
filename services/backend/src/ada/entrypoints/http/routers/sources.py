@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from pathlib import PurePath
 
-from dishka import FromDishka
+from dishka import AsyncContainer, FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, Response, status
 from fastapi import Request as HttpRequest
@@ -12,6 +12,7 @@ from ada.core.models.errors import Invalid
 from ada.core.models.schema import Schema
 from ada.core.models.sources import (
     AccessKind,
+    CheckEvery,
     DataFormat,
     DataSource,
     FreshnessPolicy,
@@ -25,6 +26,7 @@ from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.refreshes import MAX_WAIT_SECONDS, RefreshOutcome, RefreshService
 from ada.core.services.ports.sources import SourceService
 from ada.entrypoints.http.requests import Request
+from ada.entrypoints.watch_sources import WatchPages, WatchResult, watch_pages
 
 router = APIRouter(route_class=DishkaRoute, tags=["sources"])
 
@@ -186,12 +188,22 @@ async def refresh_source(
 
 
 @router.post("/sources/{source_id}/watch")
-async def watch_source(source_id: Id, service: FromDishka[SourceService]) -> DataSource:
+async def watch_source(
+    source_id: Id, service: FromDishka[SourceService], check_every: CheckEvery | None = None
+) -> DataSource:
     """Have Context.dev watch the source's page and refresh the source when it changes."""
-    return await service.watch(source_id)
+    return await service.watch(source_id, check_every)
 
 
 @router.delete("/sources/{source_id}/watch")
 async def unwatch_source(source_id: Id, service: FromDishka[SourceService]) -> DataSource:
     """Stop watching the source's page; it is refreshed by hand again."""
     return await service.unwatch(source_id)
+
+
+@router.post("/projects/{project_id}/sources/watch")
+async def watch_sources(
+    project_id: Id, body: WatchPages, container: FromDishka[AsyncContainer]
+) -> list[WatchResult]:
+    """Register and watch up to 50 pages; each page commits independently."""
+    return await watch_pages(container, project_id, body)

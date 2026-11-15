@@ -43,6 +43,14 @@ CI never writes these two in `/opt/ada`:
 - `.env.local`: `ADA_SECRET_KEY=...`, the master key of the stored agent API keys (see the README).
   Keep it: keys stored under a lost key cannot be read.
 
+Optional backend settings in `.env.local`:
+
+- `RESEARCH_WEB_CALLS`: paid web-call budget per research session, default 80.
+- `CONTEXT_MONITOR_MINUTES`: page monitor interval, default 1440; minimum 10 minutes. Applies to newly created monitors.
+- `ALERT_NTFY_URL`: full ntfy topic URL; unset disables push notifications.
+- `ALERT_EMAIL_TO`: optional comma-separated addresses. Records simulated emails (subject and body) in the delivery log; never sends email.
+- `ALERT_WEBHOOK_URL`: outbound JSON webhook URL; unset disables webhook notifications.
+
 ## Order of deploys
 
 Deploys run one at a time, and on the VM they also take a lock. GitHub keeps one deploy waiting

@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pathway model evaluation</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#fafafa}
+a{color:#1d4ed8}a:hover{color:#1e3a8a}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 100vh; box-sizing: border-box; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.45; color: #171717; background: #fafafa">
+
+<div role="note" style="background: #b91c1c; color: #ffffff; font-size: 13px; font-weight: 500; padding: 6px 16px; display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+<span>Educational use only. Do not enter patient data.</span>
+</div>
+
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 24px; border-bottom: 1px solid #e5e5e5; background: #ffffff">
+<button type="button" aria-label="Toggle sidebar" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid #e5e5e5; border-radius: 8px; background: #ffffff; color: #404040"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 3v18"></path></svg></button>
+<span style="font-weight: 600">Nordic cancer care</span>
+<span style="color: #737373">/ Models</span>
+</div>
+
+<div style="max-width: 1240px; margin: 0 auto; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 6px; color: #525252; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3v18h18"></path><path d="m7 15 4-4 3 3 5-6"></path></svg>
+<span>Model</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+<h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em">Patient pathway model</h1>
+<span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f4f4f5; color: #404040; border: 1px solid #e5e5e5">v2 · colorectal, lung</span>
+<span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa">Illustrative numbers: the model is not built yet</span>
+</div>
+</div>
+
+<nav aria-label="Model views" style="display: flex; flex-wrap: wrap; gap: 28px; border-bottom: 1px solid #e5e5e5">
+<a href="Model.dc.html" style="padding: 12px 2px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #737373; font-weight: 500; text-decoration: none">Model card</a>
+<a href="Main.dc.html" aria-current="page" style="padding: 12px 2px; margin-bottom: -1px; border-bottom: 2px solid #171717; color: #171717; font-weight: 600; text-decoration: none">Evaluation</a>
+<a href="Population.dc.html" style="padding: 12px 2px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #737373; font-weight: 500; text-decoration: none">Population</a>
+</nav>
+
+<p style="margin: 0; color: #525252; max-width: 860px">An educational and planning tool. For one example profile it shows whether the presentation would start a fast-track cancer pathway in Norway and Sweden, when each step would be due, and how far the pathway is behind. Not for decisions about the care of an individual patient.</p>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<form style="flex: 1 1 320px; min-width: 0; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Example profile</h2>
+<span style="color: #737373; font-size: 13px">Synthetic profiles only.</span>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500">Cancer site<select style="height: 36px; border: 1px solid #d4d4d4; border-radius: 8px; padding: 0 8px; font: inherit; font-weight: 400; background: #ffffff"><option>Lung</option><option>Colorectal</option><option>Pancreas</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500">Sex<select style="height: 36px; border: 1px solid #d4d4d4; border-radius: 8px; padding: 0 8px; font: inherit; font-weight: 400; background: #ffffff"><option>Female</option><option>Male</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500">Age band<select style="height: 36px; border: 1px solid #d4d4d4; border-radius: 8px; padding: 0 8px; font: inherit; font-weight: 400; background: #ffffff"><option>60–69</option><option>70–79</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500">Stage<select style="height: 36px; border: 1px solid #d4d4d4; border-radius: 8px; padding: 0 8px; font: inherit; font-weight: 400; background: #ffffff"><option>Not known yet</option><option>Localised</option><option>Regional</option><option>Distant</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500">Education<select style="height: 36px; border: 1px solid #d4d4d4; border-radius: 8px; padding: 0 8px; font: inherit; font-weight: 400; background: #ffffff"><option>Basic</option><option>Secondary</option><option>Tertiary</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500">First contact<select style="height: 36px; border: 1px solid #d4d4d4; border-radius: 8px; padding: 0 8px; font: inherit; font-weight: 400; background: #ffffff"><option>Public health centre</option><option>Occupational</option><option>Private</option><option>Emergency</option></select></label>
+</div>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="font-size: 13px; font-weight: 600; margin-bottom: 8px">Presentation at first contact</legend>
+<label style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px"><input type="checkbox" checked style="margin-top: 3px">Cough or breathlessness for 6 weeks or more, smoker or ex-smoker over 40</label>
+<label style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px"><input type="checkbox" style="margin-top: 3px">Chest or shoulder pain without another explanation</label>
+<label style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px"><input type="checkbox" style="margin-top: 3px">Coughing blood</label>
+</fieldset>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="font-size: 13px; font-weight: 600; margin-bottom: 8px">Findings so far</legend>
+<label style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px"><input type="checkbox" checked style="margin-top: 3px">Imaging finding suggesting lung cancer</label>
+<label style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px"><input type="checkbox" style="margin-top: 3px">Metastasis suggesting lung cancer</label>
+<label style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px"><input type="checkbox" style="margin-top: 3px">Repeated haemoptysis with a normal X-ray</label>
+</fieldset>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="font-size: 13px; font-weight: 600; margin-bottom: 8px">Days in each step so far</legend>
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="7">
+<label style="display: grid; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; gap: 8px; font-size: 13px; color: #404040">{{s.short}}<input type="number" min="0" value="{{s.input}}" placeholder="–" aria-label="Days in step {{s.n}}" style="height: 32px; border: 1px solid #d4d4d4; border-radius: 8px; padding: 0 8px; font: inherit; text-align: right"></label>
+</sc-for>
+</fieldset>
+
+<button type="button" style="height: 40px; border: 0; border-radius: 8px; background: #171717; color: #ffffff; font: inherit; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 8px">Evaluate</button>
+</form>
+
+<div style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+<section style="background: #ffffff; border: 1px solid #171717; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Fast-track pathway</h2>
+<p style="margin: 0; font-size: 15px">This presentation <strong>would start a lung-cancer pathway in Norway and Sweden</strong>. The clock started with the X-ray on day 27. Finland has no national trigger and no standard times.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px">
+<div style="padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><strong style="font-size: 13px">Suspicion, at first contact</strong><span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f4f4f5; border: 1px solid #e5e5e5">Sweden</span></div>
+<span style="font-size: 13px; color: #404040">Met on day 0: cough for 8 weeks, smoker, 64. Imaging due within 6 days; done on day 27.</span>
+</div>
+<div style="padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><strong style="font-size: 13px">Well-founded suspicion</strong><span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f4f4f5; border: 1px solid #e5e5e5">Norway · Sweden</span></div>
+<span style="font-size: 13px; color: #404040">Met on day 27: imaging finding suggesting lung cancer. Pathway starts; treatment due within 43 days.</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{deadlines}}" as="d" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: {{d.bg}}">
+<div style="display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 500">{{d.label}}</span><span style="font-size: 12px; color: #737373">{{d.rule}}</span></div>
+<span style="font-size: 12px; color: #525252; white-space: nowrap">due day {{d.due}}</span>
+<span style="font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; white-space: nowrap; color: {{d.fg}}; background: {{d.pill}}">{{d.status}}</span>
+</div>
+</sc-for>
+</div>
+<div style="padding: 12px; border-radius: 8px; background: #171717; color: #ffffff; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px">
+<span><strong>Next:</strong> treatment plan and start. Due today under the Nordic standard; no MDT slot booked yet.</span>
+<span style="font-size: 12px; opacity: 0.8">standard · exact</span>
+</div>
+</section>
+
+<section style="background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Where the days go</h2>
+<p style="margin: 0; font-size: 15px">This pathway is <strong style="color: #c2410c">20 days behind target</strong> so far, most of it before the X-ray. Before the first contact, 51 days passed with symptoms.</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #525252">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 2px; background: #404040"></span>Within target</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 2px; background: #c2410c"></span>Beyond target</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 2px; height: 14px; background: #1d4ed8"></span>Target</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 2px; background: #d4d4d4"></span>Before first contact</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="7">
+<div style="display: grid; grid-template-columns: minmax(150px, 230px) minmax(0, 1fr) 128px; align-items: center; gap: 12px">
+<div style="display: flex; flex-direction: column">
+<span style="font-size: 13px; font-weight: 500">{{s.label}}</span>
+<span style="font-size: 12px; color: #737373">{{s.note}}</span>
+</div>
+<div style="position: relative; height: 18px; background: #f4f4f5; border-radius: 4px">
+<div style="position: absolute; left: 0; top: 0; bottom: 0; width: {{s.withinW}}; background: {{s.withinColor}}; border-radius: 4px 0 0 4px"></div>
+<div style="position: absolute; top: 0; bottom: 0; left: {{s.benchL}}; width: {{s.gapW}}; background: #c2410c; border-radius: 0 4px 4px 0"></div>
+<sc-if value="{{s.pending}}" hint-placeholder-val="{{ false }}"><div style="position: absolute; top: 0; bottom: 0; left: 0; width: {{s.benchL}}; border: 1px dashed #a3a3a3; border-radius: 4px; box-sizing: border-box"></div></sc-if>
+<sc-if value="{{s.hasBench}}" hint-placeholder-val="{{ true }}"><div style="position: absolute; top: -4px; bottom: -4px; left: {{s.benchL}}; width: 2px; background: #1d4ed8"></div></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; font-size: 12px">
+<span style="font-weight: 600; font-size: 13px; color: {{s.daysColor}}">{{s.daysText}}</span>
+<span style="color: #737373">{{s.benchText}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<p style="margin: 0; font-size: 12px; color: #737373">Targets: Sweden's primary-care times to the pathway decision, then the median of the Norwegian and Swedish standard times. Denmark is added when its document is loaded. The first-contact wait has no national standard; 7 days is the Nordic reference from Khalife 2025.</p>
+</section>
+
+<section style="background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Alive at 5 years, out of 100 people with this profile</h2>
+<p style="margin: 0; color: #525252">Nordic survival for this profile, adjusted for the days beyond target. The evidence for these figures is weaker than for the deadlines above.</p>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px" role="group" aria-label="Assumptions">
+<sc-for list="{{toggles}}" as="t" hint-placeholder-count="2">
+<button type="button" onClick="{{t.flip}}" aria-pressed="{{t.pressed}}" style="min-height: 36px; padding: 6px 12px; border-radius: 999px; font: inherit; font-size: 13px; display: flex; align-items: center; gap: 8px; border: 1px solid {{t.border}}; background: {{t.bg}}; color: {{t.fg}}"><span style="width: 10px; height: 10px; border-radius: 999px; background: {{t.dot}}"></span>{{t.label}}</button>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline; gap: 8px"><span style="font-size: 30px; font-weight: 700">{{now}}</span><span style="color: #525252">as it stands</span></div>
+<div role="img" aria-label="{{nowAria}}" style="display: grid; grid-template-columns: repeat(10, 14px); gap: 4px">
+<sc-for list="{{nowDots}}" as="d" hint-placeholder-count="100"><span style="width: 14px; height: 14px; border-radius: 999px; background: {{d.c}}"></span></sc-for>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline; gap: 8px"><span style="font-size: 30px; font-weight: 700; color: #1d4ed8">{{target}}</span><span style="color: #525252">if the remaining steps are on target</span></div>
+<div role="img" aria-label="{{targetAria}}" style="display: grid; grid-template-columns: repeat(10, 14px); gap: 4px">
+<sc-for list="{{targetDots}}" as="d" hint-placeholder-count="100"><span style="width: 14px; height: 14px; border-radius: 999px; background: {{d.c}}"></span></sc-for>
+</div>
+</div>
+<div style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px">
+<div style="padding: 12px; border-radius: 8px; background: #f4f4f5"><strong>Range across the four settings</strong><br>As it stands: {{nowRange}}<br>On target: {{targetRange}}</div>
+<div style="color: #525252">{{note}}</div>
+</div>
+</div>
+
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<li style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px">
+<div style="display: flex; flex-direction: column; gap: 2px"><strong>Treatment start within the deadline</strong><span style="color: #525252">For stage I surgery, waits over 12 weeks from the diagnostic CT went with worse survival. About 1 more person of 100 alive at 5 years.</span></div>
+<span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; white-space: nowrap">one cohort</span>
+</li>
+<li style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px">
+<div style="display: flex; flex-direction: column; gap: 2px"><strong>The 14 days lost before the X-ray</strong><span style="color: #525252">Already spent for this patient. Their survival effect is the second setting above, and it is an assumption. Shortening them is a system change: appointment access, nurse-ordered imaging. See the Population tab.</span></div>
+<span style="font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; white-space: nowrap">assumption</span>
+</li>
+</ol>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px">
+<section style="flex: 1 1 300px; min-width: 0; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Support to offer</h2>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px">
+<li>A patient navigator to keep the next steps on time.</li>
+<li>Check that every treatment option was discussed. Less surgery is offered after basic education (Zai 2025).</li>
+</ul>
+<p style="margin: 0; font-size: 12px; color: #737373">Education is not used to lower the survival figures.</p>
+</section>
+<section style="flex: 1 1 300px; min-width: 0; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Read with care</h2>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: #404040">
+<li>Survival is counted from diagnosis, so an earlier diagnosis looks better even if death comes no later.</li>
+<li>Sicker patients are often treated faster, which hides part of the effect of waiting.</li>
+<li>Nordic baseline, Finnish education gradient, American and English delay effects. Not validated on Finnish patients.</li>
+</ul>
+</section>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":2120}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { residual: true, pre: false };
+  }
+  renderVals() {
+    var self = this;
+    var MAX = 60;
+    var pct = function (d) { return Math.min(d, MAX) / MAX * 100 + '%'; };
+    var raw = [
+      { n: 1, label: 'Symptoms → first contact', short: '1 · Symptoms → first contact', days: 51, bench: null, patient: true },
+      { n: 2, label: 'First contact → physician', short: '2 · First contact → physician', days: 14, bench: 7 },
+      { n: 3, label: 'Physician → imaging done', short: '3 · Physician → imaging done', days: 13, bench: 6 },
+      { n: 4, label: 'Imaging → pathway referral', short: '4 · Imaging → pathway referral', days: 1, bench: 4 },
+      { n: 5, label: 'Referral → first specialist visit', short: '5 · Referral → specialist visit', days: 8, bench: 7 },
+      { n: 6, label: 'First visit → work-up complete', short: '6 · Visit → work-up complete', days: 26, bench: 21 },
+      { n: 7, label: 'Work-up complete → treatment start', short: '7 · Work-up → treatment start', days: 9, bench: 14, current: true }
+    ];
+    var steps = raw.map(function (s) {
+      var pending = s.days === null;
+      var within = pending ? 0 : (s.bench === null ? s.days : Math.min(s.days, s.bench));
+      var gap = (pending || s.bench === null) ? 0 : Math.max(s.days - s.bench, 0);
+      var note = s.patient ? 'before first contact' : (s.current ? 'current step, so far' : (pending ? 'not started' : 'done'));
+      var daysText = pending ? '–' : (gap > 0 ? s.days + ' d (+' + gap + ')' : s.days + ' d');
+      return {
+        n: s.n, label: s.label, short: s.short, note: note,
+        input: pending ? '' : String(s.days),
+        withinW: pct(within),
+        withinColor: s.patient ? '#d4d4d4' : '#404040',
+        benchL: s.bench === null ? '0%' : pct(s.bench),
+        gapW: pct(gap),
+        hasBench: s.bench !== null,
+        pending: pending,
+        daysText: daysText,
+        daysColor: gap > 0 ? '#c2410c' : '#171717',
+        benchText: s.bench === null ? 'no target' : 'target ' + s.bench + ' d'
+      };
+    });
+    var dl = [
+      { label: 'Imaging after suspicion', rule: 'Sweden: within 6 days of first contact', due: 6, kind: 'late', status: 'late by 21 days' },
+      { label: 'First specialist visit', rule: 'Norway: 7 days after the referral', due: 35, kind: 'late', status: 'late by 1 day' },
+      { label: 'Work-up complete', rule: 'Norway: 28 days after the referral', due: 56, kind: 'late', status: 'late by 6 days' },
+      { label: 'Treatment start', rule: 'Median of Norway 42 and Sweden 44 days from the trigger', due: 71, kind: 'due', status: 'due today' }
+    ];
+    var deadlines = dl.map(function (d) {
+      var due = d.kind === 'due';
+      return { label: d.label, rule: d.rule, due: d.due, status: d.status,
+        bg: due ? '#fff7ed' : '#fafafa', pill: due ? '#c2410c' : '#f4f4f5', fg: due ? '#ffffff' : '#525252' };
+    });
+    var table = {
+      'true,false': { now: 30, target: 31, note: 'Default: the Finland residual is on, so the figures match Finnish survival; the days before the X-ray carry no survival effect of their own.' },
+      'true,true': { now: 29, target: 31, note: 'The days before the X-ray count, at a per-day rate from Sud 2020. An assumption: part of it is lead time.' },
+      'false,false': { now: 37, target: 38, note: 'Without the Finland residual: what this profile would get if only the waiting times and education differed from the Nordic level.' },
+      'false,true': { now: 36, target: 38, note: 'Without the residual, and with the days before the X-ray counting.' }
+    };
+    var key = String(this.state.residual) + ',' + String(this.state.pre);
+    var cur = table[key];
+    var mk = function (name, label, on) {
+      return { label: label, pressed: on ? 'true' : 'false',
+        bg: on ? '#171717' : '#ffffff', fg: on ? '#ffffff' : '#171717', border: on ? '#171717' : '#d4d4d4', dot: on ? '#4ade80' : '#d4d4d4',
+        flip: function () { var s = {}; s[name] = !self.state[name]; self.setState(s); } };
+    };
+    var dots = function (alive, extra) {
+      var out = [];
+      for (var i = 0; i < 100; i++) out.push({ c: i < alive ? '#404040' : (i < alive + extra ? '#1d4ed8' : '#e5e5e5') });
+      return out;
+    };
+    var nows = [], targets = [];
+    for (var k in table) { nows.push(table[k].now); targets.push(table[k].target); }
+    return {
+      steps: steps,
+      deadlines: deadlines,
+      toggles: [mk('residual', 'Finland residual', this.state.residual), mk('pre', 'Days before the trigger count', this.state.pre)],
+      now: cur.now, target: cur.target,
+      nowDots: dots(cur.now, 0),
+      targetDots: dots(cur.now, cur.target - cur.now),
+      nowAria: cur.now + ' of 100 people alive at 5 years as it stands',
+      targetAria: cur.target + ' of 100 people alive at 5 years on target; ' + (cur.target - cur.now) + ' more',
+      nowRange: Math.min.apply(null, nows) + '–' + Math.max.apply(null, nows) + ' of 100',
+      targetRange: Math.min.apply(null, targets) + '–' + Math.max.apply(null, targets) + ' of 100',
+      note: cur.note
+    };
+  }
+}
+</script>
+</body>
+</html>

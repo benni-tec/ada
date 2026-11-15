@@ -54,7 +54,6 @@ import { defaultSettingsSection, withSettings } from '@/lib/settings-sections'
 import { CreateDialog } from './create-dialog'
 import { Hint } from './icon-action'
 import { SortableList, type SortHandle, type SortItem } from './sortable-list'
-import { Vahti } from './vahti/vahti'
 
 /**
  * The project's navigation, after shadcn's sidebar that collapses to icons: the project
@@ -89,6 +88,11 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
               <Sessions projectId={projectId} />
               <Dashboards projectId={projectId} />
               <Reports projectId={projectId} />
+              {/* Cases and the models that run on them. */}
+              <Group type="pathway" label="Pathways">
+                <PageLink to="/projects/$projectId/cases" projectId={projectId} type="case" label="Cases" />
+                <PageLink to="/projects/$projectId/models" projectId={projectId} type="model" label="Models" />
+              </Group>
             </SidebarMenu>
           </SidebarGroup>
         </nav>
@@ -112,15 +116,15 @@ function ProjectSwitcher({ projectId }: { projectId: Id }) {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton size="lg" aria-label={`Project ${project?.name ?? ''}: switch project`} className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-              <span className="flex aspect-square size-8 items-end justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <Vahti pose="peek" size={24} label="" filter={false} className="-mb-px [--vahti-paper:var(--sidebar-primary)]" />
+            <SidebarMenuButton size="lg" tooltip={project?.name ?? 'Project'} aria-label={`Project ${project?.name ?? ''}: switch project`} className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+              <span aria-hidden="true" className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-accent font-semibold text-sidebar-accent-foreground">
+                {project?.name ? Array.from(project.name)[0].toUpperCase() : <Icon />}
               </span>
-              <span className="grid flex-1 text-left leading-tight">
+              <span className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="text-xs text-sidebar-foreground/70">Project</span>
                 <span className="truncate font-semibold">{project?.name ?? '…'}</span>
               </span>
-              <ChevronsUpDown aria-hidden="true" className="ml-auto" />
+              <ChevronsUpDown aria-hidden="true" className="ml-auto group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -259,7 +263,7 @@ function Sessions({ projectId }: { projectId: Id }) {
   const navigate = useNavigate()
   const { data } = useQuery(sessionsQuery(projectId))
   const sessions = [...(data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))
-  // Research sessions hang under the session that delegated them.
+  // Delegated sessions (research, analysis) hang under the session that delegated them.
   const known = new Set(sessions.map((session) => session.id))
   const byParent = new Map<string, Session[]>()
   for (const session of sessions) {
@@ -300,7 +304,7 @@ function Sessions({ projectId }: { projectId: Id }) {
   )
 }
 
-/** A session and, nested under it, the research sessions it delegated. */
+/** A session and, nested under it, the sessions it delegated. */
 function SessionNode({
   session,
   byParent,
@@ -318,8 +322,10 @@ function SessionNode({
       <SidebarMenuSubButton asChild isActive={session.id === activeId}>
         <Link to="/projects/$projectId/sessions/$sessionId" params={{ projectId, sessionId: session.id }}>
           <span>{session.title}</span>
-          {session.agent === 'research' && (
-            <span className="ml-auto rounded-full border px-1.5 text-[10px] font-medium text-sidebar-foreground/70">research</span>
+          {session.agent !== 'session' && (
+            <span className="ml-auto rounded-full border px-1.5 text-[10px] font-medium text-sidebar-foreground/70">
+              {session.agent}
+            </span>
           )}
         </Link>
       </SidebarMenuSubButton>
@@ -439,6 +445,31 @@ function Alerts({ projectId }: { projectId: Id }) {
         </SidebarMenuBadge>
       )}
     </SidebarMenuItem>
+  )
+}
+
+/** One page of the project, as a link that is marked while one is on it or below it. */
+function PageLink({
+  to,
+  projectId,
+  type,
+  label,
+}: {
+  to: '/projects/$projectId/cases' | '/projects/$projectId/models'
+  projectId: Id
+  type: PageTypeName
+  label: string
+}) {
+  const Icon = pageTypes[type].icon
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild>
+        <Link to={to} params={{ projectId }} activeProps={{ 'data-active': true }}>
+          <Icon aria-hidden="true" />
+          <span>{label}</span>
+        </Link>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
   )
 }
 

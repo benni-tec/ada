@@ -660,7 +660,7 @@ async def test_the_tools_are_verbs_documented_for_an_agent_without_injected_para
     verbs = {"list", "create", "register", "update", "refresh", "add", "get", "preview", "system"}
     verbs |= {"pin", "edit", "set", "show", "generate", "check", "build", "query", "search"}
     verbs |= {"read", "extract", "map", "watch", "unwatch", "delegate", "report", "review"}
-    verbs |= {"attach", "detach"}
+    verbs |= {"attach", "detach", "evaluate"}
     injected = {"service", "projects", "pipelines", "sessions", "widgets", "runs", "dispatcher"}
     injected |= {"exploration", "batches", "refreshes", "web", "research", "attachments"}
     injected |= {"reviews"}
@@ -998,3 +998,30 @@ async def test_the_container_binds_every_port_to_a_real_implementation(
     assert standing_in == []
     with pytest.raises(NotImplementedError, match="DashboardService"):
         Unbuilt(DashboardService).list(uuid7())
+
+
+async def test_rest_write_response_waits_for_request_commit() -> None:
+    from ada.entrypoints.http.errors import DomainErrorMiddleware
+
+    committed = False
+
+    async def app(scope, receive, send):
+        nonlocal committed
+        await send({"type": "http.response.start", "status": 201, "headers": []})
+        await send({"type": "http.response.body", "body": b"created"})
+        # This is where the request container exits and commits.
+        committed = True
+
+    seen = []
+
+    async def send(message):
+        assert committed
+        seen.append(message)
+
+    async def receive():
+        return {"type": "http.request", "body": b""}
+
+    await DomainErrorMiddleware(app)(
+        {"type": "http", "path": "/api/projects", "method": "POST"}, receive, send
+    )
+    assert [message["type"] for message in seen] == ["http.response.start", "http.response.body"]

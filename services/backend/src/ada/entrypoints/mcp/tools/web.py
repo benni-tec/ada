@@ -21,6 +21,7 @@ from ada.core.services.ports.web import (
     WebReadAnswer,
     WebSearchAnswer,
 )
+from ada.entrypoints.mcp.bounds import bound_rows
 from ada.entrypoints.mcp.injection import Inject
 from ada.entrypoints.mcp.sessions import SessionId
 
@@ -34,6 +35,10 @@ What it returns is for your own exploration only: never show or quote it to the 
 To present web data, register its URL as a source (register_source, access_kind "web" or
 "document") and build on it, so it can be traced. Each call spends the project's daily web
 credits; in a research session it also counts against the session's web calls."""
+
+
+class ExtractAnswer(WebExtractAnswer):
+    dropped_rows: int = 0
 
 
 def register(mcp: FastMCP, inject: Inject) -> None:
@@ -75,7 +80,18 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         of the whole page: use it to check a figure on a long page or PDF cheaply. For a
         PDF, `pdf_pages` ("25" or "25-26") reads only those pages, each starting with a
         `<!-- page N -->` line, and `ocr` reads them with OCR, for tables that are images
-        (empty or garbled without it). One credit, a page of a PDF with OCR one each."""
+        (empty or garbled without it). For JS-loaded data, wait_for is a delay in
+        milliseconds (0–30000) or a CSS
+        selector. With raw_html=true, the markdown field contains rendered HTML, including
+        scripts and hidden links, to discover a JS page's public data endpoint. Then query
+        is a literal substring to find in that HTML (bounded excerpts across up to six
+        occurrences, so repeated library boilerplate does not hide later application code).
+        For JavaScript/source-code URLs, use raw_html=true with a literal query: semantic
+        highlights are not exact code search. Reading HTML never clicks or submits anything.
+        original_html=true reads the original HTTP HTML before JS removes paginated rows
+        (same literal-query behavior).
+        Reads bypass the upstream cache. One credit, a page of a PDF with OCR
+        one each."""
         )
     )
     @inject
@@ -89,6 +105,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         query: Annotated[str | None, Field(max_length=MAX_FOCUS_CHARS)] = None,
         pdf_pages: str | None = None,
         ocr: bool = False,
+        wait_for: int | str | None = None,
+        raw_html: bool = False,
+        original_html: bool = False,
     ) -> WebReadAnswer:
         await research.use_web_call(session_id)
         return await web.read(
@@ -99,6 +118,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             query=query,
             pdf_pages=pdf_pages,
             ocr=ocr,
+            wait_for=wait_for,
+            raw_html=raw_html,
+            original_html=original_html,
         )
 
     @mcp.tool(
@@ -107,7 +129,10 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         (Context.dev): to see whether a page holds a table worth registering. The rows are
         model-extracted, not parsed: a value the page does not state comes back null, and
         every figure needs checking against the page. To keep such rows, register the page
-        as a web source with operation "extract". About five credits."""
+        as a web source with operation "extract". For JS-loaded data, wait_for is
+        milliseconds (0–30000) or a CSS selector.
+        String cells are cut after 300 characters, and results are capped at 20 KB;
+        `dropped_rows` counts omitted rows. About five credits."""
         )
     )
     @inject
@@ -119,9 +144,13 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         columns: Annotated[list[Column], Field(min_length=1, max_length=MAX_EXTRACT_COLUMNS)],
         web: FromDishka[WebExplorationService],
         research: FromDishka[ResearchService],
-    ) -> WebExtractAnswer:
+        wait_for: int | str | None = None,
+    ) -> ExtractAnswer:
         await research.use_web_call(session_id)
-        return await web.extract(project_id, session_id, url, instruction, columns)
+        answer = await web.extract(
+            project_id, session_id, url, instruction, columns, wait_for=wait_for
+        )
+        return bound_rows(ExtractAnswer(**answer.model_dump()))
 
     @mcp.tool(
         description=_described(

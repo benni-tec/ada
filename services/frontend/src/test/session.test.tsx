@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
 import type { AgentTurn, Attachment, Part, ToolCall } from '@/lib/api'
@@ -122,8 +122,10 @@ test('the record reads as a conversation, its widget cards all at the page’s o
   expect(within(card).getByRole('banner')).toHaveTextContent('The headline number for 2024')
   expect(card).toHaveAttribute('data-highlighted', 'true')
   expect(screen.getByRole('article', { name: 'Coverage by region' })).not.toHaveAttribute('data-highlighted')
-  // Nothing attached beside it.
-  expect(within(screen.getByRole('complementary', { name: 'Attachments' })).queryByRole('tablist')).not.toBeInTheDocument()
+  // Nothing attached beside it: the attachments are closed to a strip.
+  const attachmentsPane = screen.getByRole('complementary', { name: 'Attachments' })
+  expect(within(attachmentsPane).queryByRole('tablist')).not.toBeInTheDocument()
+  expect(await within(attachmentsPane).findByRole('button', { name: 'Open the attachments' })).toHaveAttribute('aria-expanded', 'false')
 
   // The live stream: a new entry is read, new data starts one new run for every card.
   const stream = FakeEventSource.latest()
@@ -564,11 +566,16 @@ test('attachments are tabs beside the conversation: attached from the chooser or
       attachments = [...attachments, made]
       return json(made, 201)
     },
-    'DELETE /api/sessions/s1/attachments/att2': () => {
-      calls.push('detach att2')
-      attachments = attachments.filter((item) => item.id !== 'att2')
-      return new Response(null, { status: 204 })
-    },
+    ...Object.fromEntries(
+      ['att2', 'att3', 'att4'].map((id) => [
+        `DELETE /api/sessions/s1/attachments/${id}`,
+        () => {
+          calls.push(`detach ${id}`)
+          attachments = attachments.filter((item) => item.id !== id)
+          return new Response(null, { status: 204 })
+        },
+      ]),
+    ),
     // What the chooser lists.
     'GET /api/projects/p1/dashboards': [dashboard()],
     'GET /api/projects/p1/reports': [],
@@ -583,9 +590,12 @@ test('attachments are tabs beside the conversation: attached from the chooser or
   })
   renderAt('/projects/p1/sessions/s1')
 
-  // Nothing attached: a short note and the way to attach.
+  // Nothing attached: the pane is closed, and opens empty to a short note and the way to attach.
   const panel = await screen.findByRole('complementary', { name: 'Attachments' })
+  expect(within(panel).queryByText(/Nothing is attached/)).not.toBeInTheDocument()
+  fireEvent.click(await within(panel).findByRole('button', { name: 'Open the attachments' }))
   expect(await within(panel).findByText(/Nothing is attached/)).toBeInTheDocument()
+  expect(within(panel).getByRole('button', { name: 'Close the attachments' })).toHaveFocus()
   fireEvent.click(within(panel).getByRole('button', { name: 'Attach' }))
 
   // A web page by its address, which must be one.
@@ -629,6 +639,70 @@ test('attachments are tabs beside the conversation: attached from the chooser or
   await waitFor(() => expect(within(bar).queryByRole('tab', { name: 'thl.fi' })).not.toBeInTheDocument())
   expect(within(bar).getByRole('tab', { name: 'Mortality' })).toHaveAttribute('aria-selected', 'true')
   expect(calls.at(-1)).toBe('detach att2')
+
+  // The person may close it with tabs, and open it again.
+  fireEvent.click(within(bar).getByRole('button', { name: 'Close the attachments' }))
+  expect(within(panel).queryByRole('tablist')).not.toBeInTheDocument()
+  expect(within(panel).getByText('2')).toHaveTextContent('Attached: 2')
+  fireEvent.click(within(panel).getByRole('button', { name: 'Open the attachments' }))
+  const tabs = within(panel).getByRole('tablist')
+
+  // Detaching the last one closes the pane; the focus goes to the button that opens it.
+  fireEvent.click(within(tabs).getByRole('button', { name: 'Detach Mortality' }))
+  await waitFor(() => expect(within(tabs).queryByRole('tab', { name: 'Mortality' })).not.toBeInTheDocument())
+  fireEvent.click(within(tabs).getByRole('button', { name: 'Detach Mortality by county' }))
+  const reopen = await within(panel).findByRole('button', { name: 'Open the attachments' })
+  expect(reopen).toHaveFocus()
+  expect(within(panel).queryByRole('tablist')).not.toBeInTheDocument()
+  expect(calls.slice(-2)).toEqual(['detach att3', 'detach att4'])
+  // Opened empty, it says so; an agent's attachment opens it again.
+  fireEvent.click(reopen)
+  expect(await within(panel).findByText(/Nothing is attached/)).toBeInTheDocument()
+  fireEvent.click(within(panel).getByRole('button', { name: 'Close the attachments' }))
+  attachments = [map]
+  act(() => emit('session.attachment_added', { session_id: 's1', attachment: map }))
+  expect(await within(panel).findByRole('tab', { name: 'Mortality by county' })).toHaveAttribute('aria-selected', 'true')
+})
+
+test('the attachments’ width is dragged at their edge or moved with the keys, and remembered', async () => {
+  serveSession({ 'GET /api/sessions/s1/attachments': [attachment({ id: 'att2', kind: 'web_page', ref: 'https://thl.fi/screening', title: 'thl.fi' })] })
+  renderAt('/projects/p1/sessions/s1')
+
+  // Something attached: the pane is open, half the width.
+  const panel = await screen.findByRole('complementary', { name: 'Attachments' })
+  const edge = await within(panel).findByRole('separator', { name: 'Resize the attachments' })
+  expect(edge).toHaveAttribute('aria-valuenow', '50')
+  expect(panel.style.getPropertyValue('--attachments-width')).toBe('50%')
+
+  // A drag across the row the pane shares with the conversation, 1000 px wide.
+  const row = panel.parentElement!
+  row.getBoundingClientRect = () => DOMRect.fromRect({ x: 0, y: 0, width: 1000, height: 800 })
+  fireEvent.pointerDown(edge, { button: 0, pointerId: 1, clientX: 500 })
+  fireEvent.pointerMove(edge, { pointerId: 1, clientX: 400 })
+  expect(edge).toHaveAttribute('aria-valuenow', '60')
+  expect(panel.style.getPropertyValue('--attachments-width')).toBe('60%')
+  expect(localStorage.getItem('ada-attachments-width')).toBeNull()
+  // Past the bounds it stops at them; remembered when it ends.
+  fireEvent.pointerMove(edge, { pointerId: 1, clientX: 50 })
+  fireEvent.pointerUp(edge, { pointerId: 1, clientX: 50 })
+  expect(edge).toHaveAttribute('aria-valuenow', '75')
+  expect(localStorage.getItem('ada-attachments-width')).toBe('75')
+
+  // The keys: right narrows it by a step, Home to the least, left widens it.
+  fireEvent.keyDown(edge, { key: 'ArrowRight' })
+  expect(edge).toHaveAttribute('aria-valuenow', '70')
+  fireEvent.keyDown(edge, { key: 'Home' })
+  expect(edge).toHaveAttribute('aria-valuenow', '25')
+  fireEvent.keyDown(edge, { key: 'ArrowLeft' })
+  expect(edge).toHaveAttribute('aria-valuenow', '30')
+  expect(localStorage.getItem('ada-attachments-width')).toBe('30')
+
+  // Another visit has it as it was left.
+  cleanup()
+  renderAt('/projects/p1/sessions/s1')
+  const again = await screen.findByRole('complementary', { name: 'Attachments' })
+  expect(await within(again).findByRole('separator', { name: 'Resize the attachments' })).toHaveAttribute('aria-valuenow', '30')
+  expect(again.style.getPropertyValue('--attachments-width')).toBe('30%')
 })
 
 test('an alert of an attached rule shows in the record, coloured by the rule’s severity', async () => {
@@ -651,4 +725,35 @@ test('an alert of an attached rule shows in the record, coloured by the rule’s
   expect(await within(alert).findByText('Critical')).toBeInTheDocument()
   expect(alert.querySelector('[data-severity]')).toHaveAttribute('data-severity', 'critical')
   expect(within(alert).getByRole('link', { name: 'See the alerts' })).toHaveAttribute('href', '/projects/p1/alerts')
+})
+
+test('the attachment chooser uploads a CSV and attaches its registered source', async () => {
+  const registered: unknown[] = []
+  const attached: unknown[] = []
+  const made = attachment({ id: 'csv-att', kind: 'source', ref: 'csv-source', title: 'inventory.csv' })
+  serveSession({
+    'POST /api/projects/p1/files': async (_body: unknown, request: Request) => {
+      expect(new URL(request.url).searchParams.get('filename')).toBe('inventory.csv')
+      expect(await request.text()).toBe('name,quantity\nExample,4\n')
+      return json({ address: 'upload://p1/file.csv', sha256: 'file', size: 24 }, 201)
+    },
+    'POST /api/projects/p1/sources': (body: unknown) => {
+      registered.push(body)
+      return json({ id: 'csv-source' }, 201)
+    },
+    'POST /api/sessions/s1/attachments': (body: unknown) => {
+      attached.push(body)
+      return json(made, 201)
+    },
+  })
+  renderAt('/projects/p1/sessions/s1')
+  // Nothing attached yet, so the pane starts closed; opened, it offers the way to attach.
+  const panel = await screen.findByRole('complementary', { name: 'Attachments' })
+  fireEvent.click(await within(panel).findByRole('button', { name: 'Open the attachments' }))
+  expect(await within(panel).findByText(/Nothing is attached/)).toBeInTheDocument()
+  fireEvent.click(within(panel).getByRole('button', { name: 'Attach' }))
+  const file = new File(['name,quantity\nExample,4\n'], 'inventory.csv', { type: 'text/csv' })
+  fireEvent.change(await screen.findByLabelText('Upload CSV'), { target: { files: [file] } })
+  await waitFor(() => expect(attached).toEqual([{ kind: 'source', ref: 'csv-source' }]))
+  expect(registered).toEqual([{ name: 'inventory.csv', address: 'upload://p1/file.csv', access_kind: 'url', format: 'csv' }])
 })

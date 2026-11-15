@@ -97,3 +97,11 @@ export const alertRowsQuery = (alertId: Id) =>
   })
 
 export const severities: readonly Severity[] = ['critical', 'warning', 'info']
+
+
+export const deliveriesQuery = (projectId: Id) => queryOptions({
+  queryKey: ['alerts', 'deliveries', projectId],
+  queryFn: () => unwrap(api.GET('/api/projects/{project_id}/alert-deliveries', { params: { path: { project_id: projectId } } })),
+})
+
+export const testAlertRule = (id: Id) => unwrap(api.POST('/api/alert-rules/{rule_id}/test', { params: { path: { rule_id: id } } }))
