@@ -17,6 +17,7 @@ type OperatorId = str
 class OperatorKind(StrEnum):
     # Reads a registered data source. Parameters: SourceParams.
     SOURCE = "source"
+    HISTORY = "history"
     # Model-based extraction of rows from a document. Parameters: ExtractParams.
     EXTRACT = "extract"
     # A named, typed slot bound to another pipeline at run time. Parameters: InputParams.
@@ -35,6 +36,10 @@ ALWAYS_MATERIALIZING = frozenset({OperatorKind.SOURCE, OperatorKind.EXTRACT, Ope
 
 class SourceParams(DomainModel):
     data_source_id: Id
+
+
+class HistoryParams(DomainModel):
+    last: int = 10
 
 
 class ExtractParams(DomainModel):
@@ -68,6 +73,7 @@ class AgentParams(DomainModel):
 
 PARAMS: dict[OperatorKind, type[DomainModel]] = {
     OperatorKind.SOURCE: SourceParams,
+    OperatorKind.HISTORY: HistoryParams,
     OperatorKind.EXTRACT: ExtractParams,
     OperatorKind.INPUT: InputParams,
     OperatorKind.TRANSFORM: TransformParams,

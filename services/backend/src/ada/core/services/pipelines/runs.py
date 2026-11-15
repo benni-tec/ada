@@ -7,6 +7,7 @@ from ada.core.models.base import Id
 from ada.core.models.errors import Invalid, NotFound
 from ada.core.models.events import Event, EventType
 from ada.core.models.operators import (
+    HistoryParams,
     InputParams,
     Operator,
     OperatorId,
@@ -27,6 +28,7 @@ from ada.core.services.pipelines.fusion import (
     QueryNode,
     SnapshotNode,
     compose,
+    history,
 )
 from ada.core.services.pipelines.fusion import parameters_key as key_of
 from ada.core.services.pipelines.schemas import (
@@ -249,6 +251,35 @@ class _Planner:
         match operator.kind:
             case OperatorKind.SOURCE:
                 return SnapshotNode(await self._fix(operator, await self._source(operator)))
+            case OperatorKind.HISTORY:
+                # Fix the whole source directly: history ignores the run's row time filter.
+                source = await self.runs._operator(self.run, operator.inputs[0])
+                data_source = await self.runs.sources.get(
+                    SourceParams.model_validate(source.params).data_source_id
+                )
+                if data_source.options.get("pushdown") is not None:
+                    raise Invalid("Source history does not support period (pushdown) sources")
+                anchor_node = await self._plan(source)
+                if not isinstance(anchor_node, SnapshotNode):
+                    raise Invalid("Source history needs a whole-source snapshot")
+                anchor = anchor_node.snapshot
+                snapshots = sorted(
+                    (
+                        s
+                        for s in await self.runs.snapshots.list(source.id)
+                        if s.parameters_key == SOURCE_KEY
+                        and (s.fetched_at, s.id) <= (anchor.fetched_at, anchor.id)
+                    ),
+                    key=lambda s: (s.fetched_at, s.id),
+                    reverse=True,
+                )[: HistoryParams.model_validate(operator.params).last]
+                for snapshot in snapshots:
+                    columns = await self.runs.store.describe(compose(SnapshotNode(snapshot)))
+                    if any(c.name.lower() in {"snapshot_at", "snapshot_rank"} for c in columns):
+                        raise Invalid(
+                            "Source history reserves the columns snapshot_at and snapshot_rank"
+                        )
+                return history(operator.id, snapshots)
             case OperatorKind.INPUT:
                 return await self.node(self._bound(operator))
             case OperatorKind.TRANSFORM | OperatorKind.STATISTIC:

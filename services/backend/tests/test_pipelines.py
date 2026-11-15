@@ -1314,6 +1314,24 @@ async def test_a_batch_builds_everything_with_references_and_again_nothing_new(
         "CC BY 4.0",
     )
 
+    history = await call(
+        client,
+        "add_history",
+        project_id=project["id"],
+        session_id=session["id"],
+        source_id=refs["s"],
+        last=3,
+    )
+    assert history["kind"] == "history"
+    assert history["params"] == {"last": 3}
+    assert history["inputs"] == [refs["src"]]
+    assert [c["name"] for c in history["output"]["columns"]] == [
+        "region",
+        "value",
+        "snapshot_at",
+        "snapshot_rank",
+    ]
+
 
 async def test_a_batch_that_fails_midway_stores_nothing(
     builder: tuple[Client, AsyncContainer],
@@ -1336,3 +1354,94 @@ async def test_a_batch_that_fails_midway_stores_nothing(
     dispatcher = await container.get(TaskDispatcher)
     assert isinstance(dispatcher, RecordingTaskDispatcher)
     assert dispatcher.refreshes == []
+
+
+async def test_source_history_is_fixed_limited_and_cached(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    source, operator = await world.sources.add(world.project_id, b"region\nHelsinki\n")
+    await world.sources.refresh(source.id)
+    world.clock.advance(days=1)
+    world.sources.content[source.id] = b"region\nHelsinki\nTurku\n"
+    await world.sources.refresh(source.id)
+    old_run = await world.runs.start(world.project_id, AGENT)
+    await world.runs.read(old_run.id, operator.id)
+    history = await world.pipelines.add_history(world.project_id, source.id, AGENT)
+    delta = await world.transform(
+        "SELECT region FROM input_0 WHERE snapshot_rank = 1 "
+        "EXCEPT SELECT region FROM input_0 WHERE snapshot_rank = 2",
+        history,
+        materialize=True,
+    )
+    assert await world.read(delta, old_run.id) == [("Turku",)]
+    cached = len(world.store.materialized)
+    assert await world.read(delta) == [("Turku",)]
+    assert len(world.store.materialized) == cached
+
+    world.clock.advance(days=1)
+    world.sources.content[source.id] = b"region\nHelsinki\nTurku\nOulu\n"
+    await world.sources.refresh(source.id)
+    rows = await world.read(history)
+    assert [row[2] for row in rows] == [1, 1, 1, 2, 2, 3]
+    assert sorted((row[0], row[2]) for row in rows) == sorted(
+        [
+            ("Helsinki", 1),
+            ("Turku", 1),
+            ("Oulu", 1),
+            ("Helsinki", 2),
+            ("Turku", 2),
+            ("Helsinki", 3),
+        ]
+    )
+    assert rows[0][1] == world.clock.now().replace(tzinfo=None)
+    assert {row[2] for row in await world.read(history, old_run.id)} == {1, 2}
+    assert await world.read(delta) == [("Oulu",)]
+    assert len(world.store.materialized) == cached + 1
+    limited = await world.pipelines.add_history(world.project_id, source.id, AGENT, last=1)
+    assert {row[2] for row in await world.read(limited)} == {1}
+    assert not (await world.sources.refresh(source.id)).changed
+    assert len(await world.snapshots.list(operator.id)) == 3
+    assert await world.read(delta, old_run.id) == [("Turku",)]
+
+
+async def test_source_history_schema_changes_and_validation(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    source, _ = await world.sources.add(world.project_id, b"region,removed\nHelsinki,old\n")
+    await world.sources.refresh(source.id)
+    world.clock.advance(days=1)
+    world.sources.content[source.id] = b"region,value\nTurku,10\n"
+    await world.sources.refresh(source.id)
+    history = await world.pipelines.add_history(world.project_id, source.id, AGENT)
+    rows = await world.read(history)
+    assert rows[0][:2] == ("Turku", 10)
+    assert rows[1][:2] == ("Helsinki", None)
+    removed = await world.transform("SELECT removed FROM input_0", history)
+    assert await world.read(removed) == [(None,), ("old",)]
+    for last in (0, -1):
+        with pytest.raises(Invalid, match="positive integer"):
+            await world.pipelines.add_history(world.project_id, source.id, AGENT, last=last)
+    with pytest.raises(Invalid, match="another project"):
+        await world.pipelines.add_history(uuid7(), source.id, AGENT)
+    await world.data_sources.update(
+        source.model_copy(update={"options": {"pushdown": {"param": "years"}}}), source.revision
+    )
+    with pytest.raises(Invalid, match="pushdown"):
+        await world.pipelines.add_history(world.project_id, source.id, AGENT)
+
+    reserved, _ = await world.sources.add(world.project_id, b"snapshot_rank\n1\n")
+    with pytest.raises(Invalid, match="reserves"):
+        await world.pipelines.add_history(world.project_id, reserved.id, AGENT)
+
+
+async def test_source_history_refuses_a_source_changed_to_pushdown(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    source, operator = await world.sources.add(world.project_id, REGIONS)
+    history = await world.pipelines.add_history(world.project_id, source.id, AGENT)
+    run = await world.runs.start(world.project_id, AGENT)
+    await world.runs.read(run.id, operator.id)
+    await world.data_sources.update(
+        source.model_copy(update={"options": {"pushdown": {"param": "years"}}}), source.revision
+    )
+    with pytest.raises(
+        Invalid, match=r"Source history does not support period \(pushdown\) sources"
+    ):
+        await world.runs.execute(run.id, history.id)

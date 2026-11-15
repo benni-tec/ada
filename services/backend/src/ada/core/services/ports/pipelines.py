@@ -18,6 +18,16 @@ class PipelineService(Protocol):
         declared one, or is read from the data on first use."""
         ...
 
+    async def add_history(
+        self, project_id: Id, source_id: Id, actor: Actor, last: int = 10
+    ) -> Operator:
+        """Stored whole-source snapshots, newest first, with snapshot_at and snapshot_rank.
+        The run's fixed source snapshot bounds history; row time ranges do not filter it.
+        Differing columns are unioned by name, with missing values filled with NULL.
+        Period sources and source columns named snapshot_at or snapshot_rank are refused.
+        """
+        ...
+
     async def add_transform(
         self,
         project_id: Id,
