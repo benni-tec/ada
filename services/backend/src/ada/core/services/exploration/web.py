@@ -1,3 +1,4 @@
+import re
 from collections.abc import Sequence
 from datetime import date
 
@@ -114,19 +115,13 @@ class WebExploration(WebExplorationService):
         )
         await self._correct(project_id, WEB_READ_CREDITS, page.credits)
         content = page.markdown
-        offset = 0
         if raw_html and focus:
-            found = content.casefold().find(focus.casefold())
-            if found < 0:
-                raise Invalid(
-                    "The query was not found in the rendered HTML; try a literal substring"
-                )
-            offset = max(0, found - min(1000, max_chars // 4))
+            content = _literal_passages(content, focus, max_chars)
         return WebReadAnswer(
             url=page.url,
             title=page.title,
-            markdown=content[offset : offset + max_chars],
-            truncated=offset > 0 or len(content) > offset + max_chars,
+            markdown=content[:max_chars],
+            truncated=content != page.markdown or len(content) > max_chars,
         )
 
     async def extract(
@@ -202,3 +197,23 @@ def _url(url: str, tool: str) -> str:
     if not url.startswith(("http://", "https://")):
         raise Invalid(f"{tool} reads an http(s) URL")
     return url
+
+
+def _literal_passages(content: str, query: str, max_chars: int) -> str:
+    """Show repeated code matches across a bundle, rather than only library boilerplate."""
+    matches = [match.start() for match in re.finditer(re.escape(query), content, re.IGNORECASE)]
+    if not matches:
+        raise Invalid("The query was not found in the HTML; try another literal substring")
+    if len(content) <= max_chars:
+        return content
+    count = min(6, len(matches))
+    positions = (
+        [matches[0]]
+        if count == 1
+        else [matches[index * (len(matches) - 1) // (count - 1)] for index in range(count)]
+    )
+    separator = "\n\n…\n\n"
+    width = max(1, (max_chars - len(separator) * (count - 1)) // count)
+    return separator.join(
+        content[max(0, position - min(300, width // 4)) :][:width] for position in positions
+    )[:max_chars]

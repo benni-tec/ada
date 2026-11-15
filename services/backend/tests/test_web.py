@@ -1034,3 +1034,25 @@ async def test_original_html_tables_keep_rows_hidden_by_client_pagination() -> N
         ["C", "0"],
     ]
 
+
+async def test_literal_html_queries_show_later_application_code_in_large_bundles() -> None:
+    explorer = FakeExplorer()
+    explorer.page = explorer.page.model_copy(
+        update={
+            "markdown": "routes: library boilerplate"
+            + " " * 10000
+            + "routes: application public endpoint /data/events"
+        }
+    )
+    service = WebExploration(FakeWebSearch(), explorer, MemoryWebBudget(), FixedClock(), 300)
+    answer = await service.read(
+        factories.project().id,
+        factories.project().id,
+        "https://example.test/app.js",
+        raw_html=True,
+        query="routes:",
+        max_chars=1000,
+    )
+    assert "/data/events" in answer.markdown
+    assert "library boilerplate" in answer.markdown
+    assert len(answer.markdown) <= 1000 and answer.truncated

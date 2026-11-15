@@ -79,9 +79,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         milliseconds (0–30000) or a CSS
         selector. With raw_html=true, the markdown field contains rendered HTML, including
         scripts and hidden links, to discover a JS page's public data endpoint. Then query
-        is a literal substring to find in that HTML (a bounded excerpt around its first
-        occurrence). For JavaScript/source-code URLs, use raw_html=true with a literal
-        query: semantic
+        is a literal substring to find in that HTML (bounded excerpts across up to six
+        occurrences, so repeated library boilerplate does not hide later application code).
+        For JavaScript/source-code URLs, use raw_html=true with a literal query: semantic
         highlights are not exact code search. Reading HTML never clicks or submits anything.
         original_html=true reads the original HTTP HTML before JS removes paginated rows
         (same literal-query behavior).
