@@ -17,6 +17,7 @@ from ada.core.models.sources import (
     DOCUMENT_COLUMNS,
     MODEL_EXTRACTED,
     AccessKind,
+    CheckEvery,
     DataFormat,
     DataSource,
     FreshnessKind,
@@ -352,7 +353,7 @@ class DataSources(SourceService):
             await self._publish(source, EventType.SOURCE_REFRESHED, changed=changed)
         return await self._union(source, operator_id, role, list(stored.values()))
 
-    async def watch(self, id: Id) -> DataSource:
+    async def watch(self, id: Id, check_every: CheckEvery | None = None) -> DataSource:
         if not self.public_url:
             raise watching_not_configured()
         if not self.secrets.available:
@@ -369,10 +370,10 @@ class DataSources(SourceService):
         # Restored by unwatch: the policy from before the first watch, never PUSH itself.
         before = source.freshness if old is None else await self.sources.freshness_before_watch(id)
         webhook = f"{self.public_url.rstrip('/')}/api/hooks/context/{id}"
-        monitor = await self.explorer.watch(source.address, webhook)
+        monitor = await self.explorer.watch(source.address, webhook, check_every)
         try:
             sealed = self.secrets.encrypt(monitor.secret.get_secret_value())
-            await self.sources.set_monitor(id, monitor.id, sealed, before)
+            await self.sources.set_monitor(id, monitor.id, sealed, before, check_every)
             watched = await self._set_freshness(source, FreshnessPolicy(kind=FreshnessKind.PUSH))
         except Exception:
             # Without this the monitor would keep firing at a source that does not know it.

@@ -7,6 +7,7 @@ from ada.core.models.runs import Snapshot
 from ada.core.models.schema import Schema
 from ada.core.models.sources import (
     AccessKind,
+    CheckEvery,
     DataFormat,
     DataSource,
     FreshnessPolicy,
@@ -75,7 +76,7 @@ class SourceService(Protocol):
         # filter, and the caller falls back to the whole source.
         return None
 
-    async def watch(self, id: Id) -> DataSource:
+    async def watch(self, id: Id, check_every: CheckEvery | None = None) -> DataSource:
         """Have the page monitor service call this platform when the source's page changes,
         and set the source's freshness to push. Needs ADA_PUBLIC_URL and the master key.
         A source that is watched already gets a new monitor in place of its old one."""

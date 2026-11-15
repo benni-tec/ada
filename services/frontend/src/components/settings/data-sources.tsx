@@ -4,8 +4,10 @@ import { CircleAlert, Eye, EyeOff, FileUp, Pencil, Plus, RefreshCw } from 'lucid
 import { useEffect, useState, type FormEvent } from 'react'
 
 import { IconButton } from '@/components/icon-action'
+import { LiveTime } from '@/components/live-time'
+import { WatchInterval } from '@/components/watch-interval'
 import { ConflictNotice, ErrorNotice, Loading } from '@/components/notices'
-import { SourceProvenance, Time } from '@/components/provenance'
+import { SourceProvenance } from '@/components/provenance'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -134,9 +136,10 @@ function SourceItem({ projectId, source, marked }: { projectId: Id; source: Data
           </p>
           <p className="text-xs text-muted-foreground">
             Refresh: {describeFreshness(source.freshness)}
+            <WatchInterval source={source} />
             {source.last_checked_at && (
               <>
-                {' · '}last checked <Time value={source.last_checked_at} />
+                {' · '}last checked <LiveTime value={source.last_checked_at} />
               </>
             )}
           </p>

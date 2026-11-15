@@ -67,6 +67,7 @@ from ada.core.models.operators import OperatorKind, operator_identity
 from ada.core.models.schema import Column, ColumnType, Schema
 from ada.core.models.sources import (
     AccessKind,
+    CheckEvery,
     DataFormat,
     DataSource,
     FoundBy,
@@ -1232,10 +1233,26 @@ async def test_watch_stores_encrypted_secret_and_sets_push(
     assert (watched.monitor_id, watched.freshness.kind) == ("mon_1", FreshnessKind.PUSH)
     assert "test-secret" not in watched.model_dump_json()
     webhook = f"{PUBLIC_URL}/api/hooks/context/{source.id}"
-    assert explorer.calls == [("watch", {"url": PAGE, "webhook_url": webhook})]
+    assert explorer.calls == [("watch", {"url": PAGE, "webhook_url": webhook, "check_every": None})]
     elsewhere = await pages.register(address="ftp://example.test/data.csv")
     with pytest.raises(Invalid, match="http"):
         await pages.service.watch(elsewhere.id)
+
+
+@pytest.mark.parametrize("check_every", list(CheckEvery))
+async def test_watch_interval_is_stored_and_rewatch_without_it_uses_default(
+    pages: World, explorer: FakeExplorer, check_every: CheckEvery
+) -> None:
+    source = await pages.register(**web_page())
+    watched = await pages.service.watch(source.id, check_every)
+    assert watched.check_every == check_every
+    assert (await pages.service.get(source.id)).check_every == check_every
+    assert explorer.calls[-1][1]["check_every"] == check_every
+    edited = await pages.service.update(source.id, watched.revision, name="Renamed")
+    assert edited.check_every == check_every
+    default = await pages.service.watch(source.id)
+    assert default.check_every is None
+    assert explorer.calls[-2][1]["check_every"] is None
 
 
 async def test_watching_again_replaces_the_monitor_and_unwatch_restores_the_policy(
@@ -1651,3 +1668,13 @@ async def test_page_pagination_requires_more_on_every_page(last_page: dict[str, 
         with pytest.raises(Invalid, match="no field 'pagination.more'"):
             await server.reader().fetch(declared, TimeRange())
     assert len(server.requests) == 2
+
+
+def test_watch_http_interval_validation_and_storage(watched: tuple[TestClient, str]) -> None:
+    client, source_id = watched
+    url = f"/api/sources/{source_id}/watch"
+    invalid = client.post(url, params={"check_every": "5min"})
+    assert invalid.status_code == 422
+    response = client.post(url, params={"check_every": "hourly"})
+    assert response.status_code == 200
+    assert response.json()["check_every"] == "hourly"

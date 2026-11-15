@@ -35,7 +35,7 @@ from ada.core.models.projects import Project
 from ada.core.models.reports import Report, ReportVersion, Template
 from ada.core.models.runs import Run, Snapshot
 from ada.core.models.sessions import Session, SessionEntry
-from ada.core.models.sources import DataSource, FreshnessPolicy
+from ada.core.models.sources import CheckEvery, DataSource, FreshnessPolicy
 from ada.core.models.widgets import Widget
 
 
@@ -69,6 +69,7 @@ class DataSourceRepository(Protocol):
         monitor_id: str | None,
         secret_encrypted: str | None,
         freshness_before: FreshnessPolicy | None,
+        check_every: CheckEvery | None = None,
     ) -> None:
         """Store (or with None clear) the monitor that watches the source, its secret,
         already sealed, and the freshness policy the source had before it was watched.

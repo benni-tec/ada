@@ -7,6 +7,8 @@ import { asFormula, describe } from '@/components/alerts/formula'
 import { intervalText, severityTextClasses } from '@/components/alerts/labels'
 import { SeverityBadge } from '@/components/alerts/severity'
 import { DashboardPanel } from '@/components/dashboards/dashboard-panel'
+import { LiveTime } from '@/components/live-time'
+import { WatchInterval } from '@/components/watch-interval'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { kindLabels, shortName, type SourceInfo } from '@/components/pipeline/labels'
 import { PipelineGraph } from '@/components/pipeline/pipeline-graph'
@@ -122,7 +124,7 @@ function AlertRuleView({ projectId, ruleId }: { projectId: Id; ruleId: Id }) {
           {rule.data.last_checked_at ? (
             <>
               {' · last '}
-              <Time value={rule.data.last_checked_at} />
+              <LiveTime value={rule.data.last_checked_at} />
             </>
           ) : (
             ' · not checked yet'
@@ -192,9 +194,10 @@ function SourceView({ projectId, sourceId }: { projectId: Id; sourceId: Id }) {
         </span>
         <span>
           Refresh {describeFreshness(source.freshness)}
+          <WatchInterval source={source} />
           {source.last_checked_at && (
             <>
-              {' · '}last checked <Time value={source.last_checked_at} />
+              {' · '}last checked <LiveTime value={source.last_checked_at} />
             </>
           )}
         </span>
