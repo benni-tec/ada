@@ -11,10 +11,10 @@ from ada.core.models.base import Id
 from ada.core.models.dashboards import Dashboard
 from ada.core.models.errors import Invalid
 from ada.core.models.operators import Operator
+from ada.core.models.runs import SOURCE_KEY
 from ada.core.models.schema import MeasureRole, Roles
 from ada.core.models.sources import DataSource, Provenance
 from ada.core.ports.repositories import SnapshotRepository
-from ada.core.services.pipelines.schemas import SOURCE_KEY
 from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService

@@ -16,7 +16,7 @@ from ada.core.models.operators import (
     StatisticParams,
     TransformParams,
 )
-from ada.core.models.runs import Run, Snapshot
+from ada.core.models.runs import SOURCE_KEY, Run, Snapshot
 from ada.core.models.time import TimeRange
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.events import EventPublisher
@@ -32,7 +32,6 @@ from ada.core.services.pipelines.fusion import (
 )
 from ada.core.services.pipelines.fusion import parameters_key as key_of
 from ada.core.services.pipelines.schemas import (
-    SOURCE_KEY,
     Columns,
     check_fits,
     check_still_matches,
