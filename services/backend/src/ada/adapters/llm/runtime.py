@@ -1,8 +1,10 @@
 """Runs a turn with pydantic-ai: the model the turn's request names, the turn's tools, and
 the run's events turned into the parts of the turn as they happen."""
 
+import logging
+import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -31,6 +33,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.messages import TextPart as AiTextPart
 from pydantic_ai.models import Model
+from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import UsageLimits
 from pydantic_core import to_jsonable_python
 
@@ -60,13 +63,28 @@ TOOL_RETRIES = 3
 
 type ModelFactory = Callable[[str], Model]
 
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ModelSpeed:
+    """Faster modes of the same models, from the deployment's settings. None: the
+    provider's default, as before. `service_tier` "fast" is OpenAI's fast tier and
+    Gemini's priority tier; `thinking` is the reasoning effort per step."""
+
+    service_tier: str | None = None
+    thinking: str | None = None
+
 
 class PydanticAiRuntime(AgentRuntime):
     """Calls the model of the request's target. `model_factory` replaces the providers,
     e.g. with pydantic-ai's FunctionModel in tests, so nothing calls a provider."""
 
-    def __init__(self, model_factory: ModelFactory | None = None) -> None:
+    def __init__(
+        self, model_factory: ModelFactory | None = None, speed: ModelSpeed | None = None
+    ) -> None:
         self.model_factory = model_factory
+        self.speed = speed or ModelSpeed()
 
     async def run(self, request: TurnRequest, tools: AgentTools, sink: TurnSink) -> TurnStatus:
         agent = Agent(
@@ -75,26 +93,34 @@ class PydanticAiRuntime(AgentRuntime):
             tools=[_tool(spec, tools) for spec in tools.specs()],
             retries={"tools": TOOL_RETRIES},
         )
-        parts = _Parts(sink)
+        timing = _Timing()
+        parts = _Parts(_TimedSink(sink, timing))
         try:
             async with agent.iter(
                 request.prompt,
                 message_history=_history(request.history),
                 instructions=request.instructions,
                 usage_limits=UsageLimits(request_limit=request.max_steps),
+                model_settings=model_settings(request.target, self.speed),
             ) as run:
                 async for node in run:
+                    started = time.monotonic()
                     if Agent.is_model_request_node(node):
                         parts.new_response()
                         async with node.stream(run.ctx) as stream:
                             async for event in stream:
                                 await parts.model_event(event)
+                        timing.model.append(time.monotonic() - started)
                     elif Agent.is_call_tools_node(node):
                         async with node.stream(run.ctx) as stream:
                             async for event in stream:
                                 await parts.tool_event(event)
+                        timing.tools += time.monotonic() - started
                     # Between two steps: the turn's parts are stored, and a cancel is seen.
-                    if await sink.checkpoint():
+                    stored = time.monotonic()
+                    cancelled = await sink.checkpoint()
+                    timing.checkpoints += time.monotonic() - stored
+                    if cancelled:
                         return TurnStatus.CANCELLED
         except UsageLimitExceeded as error:
             raise AgentFailed(
@@ -113,6 +139,8 @@ class PydanticAiRuntime(AgentRuntime):
             raise AgentFailed(f"The model did not answer as expected: {error}") from error
         except AgentRunError as error:
             raise AgentFailed(f"The agent run failed: {error}") from error
+        finally:
+            timing.log(request.model, self.speed)
         return TurnStatus.DONE
 
     def _model(self, request: TurnRequest) -> Model:
@@ -143,6 +171,74 @@ def provider_model(target: ModelTarget) -> Model:
             return GoogleModel(
                 target.model, provider=GoogleProvider(api_key=key, base_url=target.base_url)
             )
+
+
+def model_settings(target: ModelTarget, speed: ModelSpeed) -> ModelSettings:
+    """The speed settings the target's provider understands; empty when none are set."""
+    settings: dict[str, Any] = {}
+    if speed.thinking:
+        settings["thinking"] = speed.thinking
+    if speed.service_tier:
+        if target.kind is ProviderKind.GEMINI:
+            fast = speed.service_tier in ("fast", "priority")
+            settings["service_tier"] = "priority" if fast else speed.service_tier
+        elif _is_openai(target.base_url):
+            settings["openai_service_tier"] = speed.service_tier
+        # Other OpenAI-compatible servers may refuse the field: not sent.
+    return ModelSettings(**settings)
+
+
+@dataclass
+class _Timing:
+    """Where a turn's time went, logged when it ends: seconds per model request (streaming
+    included), in tool calls, publishing parts, and storing them between steps."""
+
+    started: float = field(default_factory=time.monotonic)
+    model: list[float] = field(default_factory=list)
+    tools: float = 0.0
+    publish: float = 0.0
+    checkpoints: float = 0.0
+
+    def log(self, model: str, speed: ModelSpeed) -> None:
+        logger.info(
+            "agent turn timing model=%s tier=%s thinking=%s steps=%d total=%.1fs "
+            "model=%.1fs (slowest %.1fs) tools=%.1fs publish=%.1fs checkpoints=%.1fs",
+            model,
+            speed.service_tier or "default",
+            speed.thinking or "default",
+            len(self.model),
+            time.monotonic() - self.started,
+            sum(self.model),
+            max(self.model, default=0.0),
+            self.tools,
+            self.publish,
+            self.checkpoints,
+        )
+
+
+class _TimedSink(TurnSink):
+    """The turn's sink, counting the time spent publishing parts."""
+
+    def __init__(self, sink: TurnSink, timing: _Timing) -> None:
+        self.sink = sink
+        self.timing = timing
+
+    async def add(self, part: Any) -> int:
+        started = time.monotonic()
+        try:
+            return await self.sink.add(part)
+        finally:
+            self.timing.publish += time.monotonic() - started
+
+    async def replace(self, index: int, part: Any) -> None:
+        started = time.monotonic()
+        try:
+            await self.sink.replace(index, part)
+        finally:
+            self.timing.publish += time.monotonic() - started
+
+    async def checkpoint(self) -> bool:
+        return await self.sink.checkpoint()
 
 
 def _is_openai(base_url: str | None) -> bool:

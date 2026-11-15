@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator
@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     alert_webhook_url: str | None = None
     # Paid web tool calls (Exa and Context.dev) a research session may make.
     research_web_calls: int = 80
+    # Faster modes of the same agent models. Unset: the provider's default. "fast" is
+    # OpenAI's fast tier (about 2x the price) and Gemini's priority tier.
+    agent_service_tier: Literal["fast", "priority", "default", "flex"] | None = None
+    # Reasoning effort per agent step. Unset: the model's default.
+    agent_thinking: Literal["minimal", "low", "medium", "high"] | None = None
 
     # URL, request and downloaded document sources read public addresses only; true lets
     # them read loopback and private ones too, for local development and tests. Never in

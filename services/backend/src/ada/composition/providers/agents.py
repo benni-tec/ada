@@ -1,6 +1,6 @@
 from dishka import AnyOf, Provider, Scope, provide
 
-from ada.adapters.llm.runtime import PydanticAiRuntime
+from ada.adapters.llm.runtime import ModelSpeed, PydanticAiRuntime
 from ada.adapters.secrets.fernet import FernetSecretBox
 from ada.config import Settings
 from ada.core.models.agents import ResearchLimits
@@ -29,8 +29,12 @@ class AgentProvider(Provider):
         return FernetSecretBox(settings.master_key())
 
     @provide(scope=Scope.APP)
-    def runtime(self) -> AgentRuntime:
-        return PydanticAiRuntime()
+    def runtime(self, settings: Settings) -> AgentRuntime:
+        return PydanticAiRuntime(
+            speed=ModelSpeed(
+                service_tier=settings.agent_service_tier, thinking=settings.agent_thinking
+            )
+        )
 
     # One service: the settings page's use cases, and the catalog the turns read.
     configuration = provide(

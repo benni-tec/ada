@@ -28,7 +28,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from taskiq import InMemoryBroker
 
 import factories
-from ada.adapters.llm.runtime import provider_model
+from ada.adapters.llm.runtime import ModelSpeed, model_settings, provider_model
 from ada.adapters.memory.events import MemoryEventBus
 from ada.adapters.memory.repositories import MemoryStore
 from ada.adapters.sources.web import WebPageReader
@@ -1574,6 +1574,24 @@ def test_openai_itself_is_called_through_the_responses_api() -> None:
     # gpt-6.1-sol refuses tools on Chat Completions; a local server knows only those.
     assert built(None) is built("https://api.openai.com/v1") is OpenAIResponsesModel
     assert built("http://localhost:8001/v1") is OpenAIChatModel
+
+
+def test_speed_settings_reach_each_provider_in_its_own_terms() -> None:
+    def sent(kind: ProviderKind, base_url: str | None, speed: ModelSpeed) -> dict[str, Any]:
+        target = ModelTarget(model_id="m", kind=kind, base_url=base_url, model="m")
+        return dict(model_settings(target, speed))
+
+    fast = ModelSpeed(service_tier="fast", thinking="low")
+    assert sent(ProviderKind.OPENAI_COMPATIBLE, None, ModelSpeed()) == {}
+    assert sent(ProviderKind.OPENAI_COMPATIBLE, None, fast) == {
+        "openai_service_tier": "fast",
+        "thinking": "low",
+    }
+    # Gemini calls its fast tier "priority"; a local server is not sent a tier it may refuse.
+    assert sent(ProviderKind.GEMINI, None, fast) == {"service_tier": "priority", "thinking": "low"}
+    assert sent(ProviderKind.OPENAI_COMPATIBLE, "http://localhost:8001/v1", fast) == {
+        "thinking": "low"
+    }
 
 
 # The analyst, in child sessions
