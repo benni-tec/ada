@@ -23,7 +23,8 @@ These keys of `DataSource.options` control it; the readers ignore them.
     "null_values": [...]}, all optional. `skip_rows` drops lines before the header,
     `columns` replaces the header's names, and cells equal to one of `null_values` (e.g.
     ".." in PxWeb tables) become empty. The output is UTF-8 with commas. Without `csv` (and
-    without `period`) the bytes are kept as they came.
+    without `period`) valid UTF-8 bytes are kept as they came; legacy encodings are
+    transcoded, trying Windows-1252 then Latin-1.
 `period` (JSON and CSV)
     {"column": "year", "start": "period_start", "end": "period_end", "grain": "year"}:
     adds the period each row describes as two date columns, the first and the last day,
@@ -139,6 +140,12 @@ def shape(data: FetchedData, options: JsonObject) -> FetchedData:
                         *[row + [data.origin, data.fetched_at.isoformat()] for row in rows[1:]],
                     ]
                     content = _csv(rows)
+        case DataFormat.CSV:
+            try:
+                data.content.decode("utf-8-sig")
+                return data
+            except UnicodeDecodeError:
+                content = _decode_csv(data.content, "utf-8-sig").encode()
         case _:
             return data
     return data.model_copy(update={"content": content})
@@ -318,11 +325,22 @@ def _convert(value: Any, kind: FieldType, column: str) -> Any:
         raise Invalid(f"Column {column}: cannot read {value!r} as {kind}: {error}") from None
 
 
-def _shape_csv(content: bytes, options: CsvOptions, period: PeriodOption | None) -> bytes:
+def _decode_csv(content: bytes, requested: str) -> str:
+    content = content.removeprefix(b"\xef\xbb\xbf")
     try:
-        text = content.removeprefix(b"\xef\xbb\xbf").decode(options.encoding)
+        # Preserve explicit encodings; legacy exports often mislabel Windows-1252 as UTF-8.
+        for encoding in dict.fromkeys((requested, "utf-8-sig", "cp1252", "latin-1")):
+            try:
+                return content.decode(encoding)
+            except UnicodeDecodeError:
+                continue
     except (LookupError, UnicodeDecodeError) as error:
-        raise Invalid(f"Cannot decode the CSV as {options.encoding}: {error}") from None
+        raise Invalid(f"Cannot decode the CSV as {requested}: {error}") from None
+    raise AssertionError("Latin-1 decodes every byte")
+
+
+def _shape_csv(content: bytes, options: CsvOptions, period: PeriodOption | None) -> bytes:
+    text = _decode_csv(content, options.encoding)
     lines = text.splitlines(keepends=True)[options.skip_rows :]
     rows = [row for row in csv.reader(lines, delimiter=options.delimiter) if row]
     if not rows:

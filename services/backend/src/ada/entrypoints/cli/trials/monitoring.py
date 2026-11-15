@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING
 
 from dishka import AsyncContainer
 
-from ada.adapters.sources.examples import DAY, ExampleSource
+from ada.adapters.sources.examples import DAY
 from ada.config import Settings
 from ada.core.models.actors import Actor
 from ada.core.models.alerts import Severity
 from ada.core.models.attachments import AttachmentKind
 from ada.core.models.base import Id, JsonObject
 from ada.core.models.dashboards import Dashboard, Slot
-from ada.core.models.sources import AccessKind, DataFormat, FreshnessKind, FreshnessPolicy
+from ada.core.models.sources import CheckEvery
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.attachments import AttachmentService
 from ada.core.services.ports.dashboards import DashboardService
@@ -19,6 +19,7 @@ from ada.core.services.ports.pipelines import PipelineService
 from ada.core.services.ports.sessions import SessionService
 from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
+from ada.entrypoints.cli.trials.pages import page_options
 
 if TYPE_CHECKING:
     from ada.entrypoints.cli.trials.seed import TrialSteps
@@ -26,31 +27,7 @@ if TYPE_CHECKING:
 DASHBOARD = "Trial site monitoring"
 MIN_SNAPSHOT_TRIAL_RATIO = 0.5
 FINNISH_RULE = "A Finnish site opened on a Nordic cancer trial"
-PAGES = tuple(
-    ExampleSource(
-        name=name,
-        access_kind=AccessKind.WEB,
-        address=url,
-        format=DataFormat.HTML,
-        options={"operation": "scrape", "extract": "pages"},
-        freshness=FreshnessPolicy(kind=FreshnessKind.TTL, ttl_seconds=DAY),
-    )
-    for name, url in (
-        (
-            "HUS: recruiting cancer trials",
-            "https://www.hus.fi/tutkimus-ja-opetus/tieteelliset-tutkimukset/syopatutkimukset",
-        ),
-        (
-            "Tays: recruiting cancer trials",
-            "https://pirha.fi/web/english/services/hospitals/cancer-researches",
-        ),
-    )
-)
-PAGE_TRIALS = r"""
-SELECT DISTINCT unnest(regexp_extract_all(text,
-    'NCT\d{8}|\d{4}-\d{6}-\d{2}-\d{2}')) AS trial_identifier
-FROM input_0
-"""
+HOSPITAL_RULE = "A Finnish hospital page listed a new cancer trial"
 
 
 def site_changes_sql(site_sql: str) -> str:
@@ -207,29 +184,33 @@ async def create_monitoring(
 
     await table(trial_site_changes.id, "trial_site_changes")
     registered = {s.name: s for s in await source_service.list(project_id)}
-    for page in PAGES:
-        source = registered.get(page.name)
-        if source is None:
-            source = await source_service.register(project_id, **page.registration())
+    await table(steps.hospital_trial_changes.id, "hospital_trial_changes")
+    await table(steps.hospital_trials.id, "hospital_trials")
+    await table(steps.hospital_trial_gaps.id, "hospital_trial_gaps")
+    await table(steps.sponsor_sites.id, "sponsor_sites [model-extracted]")
+    for source in registered.values():
+        metadata = page_options(source)
+        if not metadata:
+            continue
         if (await request.get(Settings)).ada_public_url:
-            if source.monitor_id is None:
+            interval = CheckEvery(metadata["interval"])
+            if source.monitor_id is None or source.check_every != interval:
                 try:
-                    await source_service.watch(source.id)
+                    await source_service.watch(source.id, check_every=interval)
                 except Exception as error:
-                    print(f"  {page.name}: watch failed ({type(error).__name__}); daily refresh")
+                    print(f"  {source.name}: watch failed ({type(error).__name__}); TTL refresh")
                 else:
-                    print(f"  watching {page.name}")
-            else:
-                print(f"  watching {page.name}")
+                    print(f"  watching {source.name}")
         else:
-            print(f"  {page.name}: daily refresh (ADA_PUBLIC_URL is not configured)")
-        operator = await pipelines.add_source(project_id, source.id, actor)
-        listed = await pipelines.add_transform(project_id, PAGE_TRIALS, [operator.id], actor)
-        await table(listed.id, page.name)
+            print(f"  {source.name}: TTL refresh (ADA_PUBLIC_URL is not configured)")
     dashboard = next((d for d in await dashboards.list(project_id) if d.name == DASHBOARD), None)
     if dashboard is None:
         dashboard = await dashboards.create(project_id, DASHBOARD, actor)
-    if await dashboards.current(dashboard.id) is None:
+    current = await dashboards.current(dashboard.id)
+    current_widgets = [await widgets.get(s.widget_id) for s in current.slots] if current else []
+    if current is None or [(w.operator_id, w.title) for w in current_widgets] != [
+        (w.operator_id, w.title) for w in tables
+    ]:
         await dashboards.edit(
             dashboard.id,
             [
@@ -244,6 +225,14 @@ async def create_monitoring(
         session_id, AttachmentKind.DASHBOARD, str(dashboard.id), actor
     )
     rules = (
+        (
+            HOSPITAL_RULE,
+            steps.hospital_trial_changes,
+            _compare("change_kind", "listed_by_hospital", "hospital_listed"),
+            ["page", "trial_id"],
+            Severity.INFO,
+            None,
+        ),
         (
             FINNISH_RULE,
             trial_site_changes,
@@ -298,16 +287,34 @@ async def create_monitoring(
             7 * DAY,
         ),
     )
-    names = {r.name for r in await alerts.list_rules(dashboard.id)}
+    existing_rules = {r.name: r for r in await alerts.list_rules(dashboard.id)}
+    # Rules cannot change their measure operator; retain the old rule as disabled history.
+    hospital_rule = existing_rules.get(HOSPITAL_RULE)
+    superseded = None
+    if hospital_rule is not None and hospital_rule.operator_id != steps.hospital_trial_changes.id:
+        superseded = await alerts.update_rule(
+            hospital_rule.id,
+            hospital_rule.revision,
+            name=f"{HOSPITAL_RULE} (superseded {hospital_rule.id})",
+            enabled=False,
+        )
+        del existing_rules[HOSPITAL_RULE]
     for name, operator, formula, keys, severity, interval in rules:
-        if name not in names:
-            await alerts.create_rule(
-                dashboard.id,
-                name,
-                operator.id,
-                formula,
-                keys,
-                severity=severity,
-                check_interval_seconds=interval,
-            )
+        if name in existing_rules:
+            continue
+        # The replacement keeps the settings people gave the superseded rule.
+        kept = superseded if name == HOSPITAL_RULE else None
+        created = await alerts.create_rule(
+            dashboard.id,
+            name,
+            operator.id,
+            formula,
+            keys,
+            severity=kept.severity if kept else severity,
+            check_interval_seconds=kept.check_interval_seconds if kept else interval,
+            max_data_age_seconds=kept.max_data_age_seconds if kept else None,
+            alert_pipeline_id=kept.alert_pipeline_id if kept else None,
+        )
+        if kept is not None and not hospital_rule.enabled:
+            await alerts.update_rule(created.id, created.revision, enabled=False)
     return dashboard

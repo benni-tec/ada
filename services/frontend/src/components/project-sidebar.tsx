@@ -54,7 +54,6 @@ import { defaultSettingsSection, withSettings } from '@/lib/settings-sections'
 import { CreateDialog } from './create-dialog'
 import { Hint } from './icon-action'
 import { SortableList, type SortHandle, type SortItem } from './sortable-list'
-import { Vahti } from './vahti/vahti'
 
 /**
  * The project's navigation, after shadcn's sidebar that collapses to icons: the project
@@ -117,15 +116,15 @@ function ProjectSwitcher({ projectId }: { projectId: Id }) {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton size="lg" aria-label={`Project ${project?.name ?? ''}: switch project`} className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-              <span className="flex aspect-square size-8 items-end justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <Vahti pose="peek" size={24} label="" filter={false} className="-mb-px [--vahti-paper:var(--sidebar-primary)]" />
+            <SidebarMenuButton size="lg" tooltip={project?.name ?? 'Project'} aria-label={`Project ${project?.name ?? ''}: switch project`} className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+              <span aria-hidden="true" className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-accent font-semibold text-sidebar-accent-foreground">
+                {project?.name ? Array.from(project.name)[0].toUpperCase() : <Icon />}
               </span>
-              <span className="grid flex-1 text-left leading-tight">
+              <span className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="text-xs text-sidebar-foreground/70">Project</span>
                 <span className="truncate font-semibold">{project?.name ?? '…'}</span>
               </span>
-              <ChevronsUpDown aria-hidden="true" className="ml-auto" />
+              <ChevronsUpDown aria-hidden="true" className="ml-auto group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent

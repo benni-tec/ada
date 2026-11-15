@@ -88,7 +88,10 @@ test('the overview counts the project’s items, and the sidebar lists them unde
   expect(screen.getByRole('status', { name: 'Live updates: Connecting' })).toBeInTheDocument()
 
   // The sidebar's header names the project and switches to another, or back to all of them.
-  fireEvent.keyDown(screen.getByRole('button', { name: /Project\s*Screening.*switch project/ }), { key: 'Enter' })
+  const switcher = screen.getByRole('button', { name: /Project\s*Screening.*switch project/ })
+  expect(within(switcher).getByText('S')).toBeInTheDocument()
+  expect(switcher.querySelector('.vahti')).toBeNull()
+  fireEvent.keyDown(switcher, { key: 'Enter' })
   const menu = await screen.findByRole('menu')
   expect(await within(menu).findByRole('menuitem', { name: 'Mortality study' })).toHaveAttribute('href', '/projects/p2')
   expect(within(menu).getByRole('menuitem', { name: 'All projects' })).toHaveAttribute('href', '/')

@@ -1,7 +1,9 @@
 from pathlib import Path
+from typing import Annotated
+from uuid import UUID
 
-from pydantic import AliasChoices, Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # services/widgets/dist of this checkout, for a backend running from source.
 SOURCE_WIDGETS_DIR = Path(__file__).resolve().parents[3] / "widgets" / "dist"
@@ -62,6 +64,17 @@ class Settings(BaseSettings):
     allow_private_sources: bool = False
     # The most a URL, request or document source may answer, in bytes once decoded.
     source_max_bytes: int = Field(50_000_000, gt=0)
+
+    # The team's demo projects, comma-separated ids: requests the gateway marks as a
+    # visitor's (X-Ada-Visitor: 1) may not change them. Empty: no project is protected.
+    demo_protected_projects: Annotated[frozenset[UUID], NoDecode] = frozenset()
+
+    @field_validator("demo_protected_projects", mode="before")
+    @classmethod
+    def _split_ids(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [part.strip() for part in value.split(",") if part.strip()]
+        return value
 
     def master_key(self) -> str | None:
         """ADA_SECRET_KEY, else the contents of ADA_SECRET_KEY_FILE; None when neither is

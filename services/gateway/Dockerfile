@@ -9,6 +9,7 @@ FROM nginx:1.30.6-alpine
 COPY services/gateway/nginx.conf.template /etc/nginx/templates/default.conf.template
 # Where to route; defaults match the dev servers (uvicorn on 8000, Vite on 5173).
 ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
+    DEMO_TOKEN="" \
     BACKEND_HOST=backend \
     BACKEND_PORT=8000 \
     FRONTEND_HOST=frontend \

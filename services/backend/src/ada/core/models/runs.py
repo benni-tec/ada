@@ -7,6 +7,10 @@ from ada.core.models.time import Interval, TimeRange
 
 # Run id plus operator id addresses any intermediate result.
 
+# The `parameters_key` of a source's whole-source snapshot. A source that fetches by period
+# also has one snapshot per period (ada.core.services.schema.time.period_key).
+SOURCE_KEY = ""
+
 
 class Snapshot(DomainModel):
     """The stored output of a materializing operator for one set of parameters. Written

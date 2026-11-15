@@ -15,6 +15,7 @@ from ada.core.models.operators import (
     operator_identity,
 )
 from ada.core.models.pipelines import Pipeline
+from ada.core.models.runs import SOURCE_KEY
 from ada.core.models.schema import Column, ColumnType, OutputKind, Roles, Schema
 from ada.core.ports.analysis import AnalysisStore
 from ada.core.ports.repositories import (
@@ -26,7 +27,6 @@ from ada.core.ports.system import Clock
 from ada.core.services.pipelines import listing
 from ada.core.services.pipelines.fusion import QueryNode, SnapshotNode, compose
 from ada.core.services.pipelines.schemas import (
-    SOURCE_KEY,
     Columns,
     check_fits,
     check_unique,

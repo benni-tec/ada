@@ -22,6 +22,7 @@ from ada.core.services.ports.projects import ProjectService
 from ada.core.services.ports.runs import RunService
 from ada.core.services.ports.sessions import SessionService
 from ada.entrypoints.mcp.actor import calling_agent
+from ada.entrypoints.mcp.bounds import bound_rows
 from ada.entrypoints.mcp.injection import Inject
 from ada.entrypoints.mcp.links import widget_url
 from ada.entrypoints.mcp.sessions import SessionId
@@ -48,16 +49,21 @@ Give a one-line `note` on why you add it: the session shows it. Returns the oper
 its id and output columns."""
 
 
+class PreviewRows(Rows):
+    dropped_rows: int = 0
+
+
 class Preview(DomainModel):
     operator_id: OperatorId
     run_id: Id
-    rows: Rows
+    rows: PreviewRows
 
 
 class QueryAnswer(DomainModel):
     columns: tuple[Column, ...]
     rows: tuple[tuple[object, ...], ...]
     truncated: bool
+    dropped_rows: int = 0
     # The run the rows were read in; null when they came from one snapshot.
     run_id: Id | None
     note: str = EXPLORATION_NOTE
@@ -225,11 +231,18 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         or a transform does what you meant. Runs the pipeline with no bindings and an open
         time range. Returns the column names and types and at most `limit` rows
         (`truncated` says whether there are more), never the whole dataset: use SQL in a
-        transform to aggregate."""
+        transform to aggregate. String cells are cut after 300 characters; the result is
+        capped at 20 KB. `dropped_rows` counts rows omitted by that budget."""
         operator = await pipelines.get(operator_id)
         run = await runs.start(operator.project_id, calling_agent())
-        return Preview(
-            operator_id=operator_id, run_id=run.id, rows=await runs.read(run.id, operator_id, limit)
+        rows = await runs.read(run.id, operator_id, limit)
+        return bound_rows(
+            Preview(
+                operator_id=operator_id,
+                run_id=run.id,
+                rows=PreviewRows(**rows.model_dump()),
+            ),
+            nested=True,
         )
 
     @mcp.tool
@@ -262,7 +275,9 @@ def register(mcp: FastMCP, inject: Inject) -> None:
         Reads the output in `run_id`, or in `snapshot_id` (a stored snapshot of this
         operator, if it is a source or a materialized transform), or by default in a new
         run with no bindings and an open time range. Returns the columns, at most `limit`
-        rows (`truncated` says whether there are more) and the run it read."""
+        rows (`truncated` says whether there are more) and the run it read. String cells
+        are cut after 300 characters; the result is capped at 20 KB. `dropped_rows` counts
+        rows omitted by that budget. Use SQL to aggregate or select a smaller excerpt."""
         explored = await exploration.query(
             operator_id,
             Clauses(
@@ -277,11 +292,13 @@ def register(mcp: FastMCP, inject: Inject) -> None:
             run_id=run_id,
             snapshot_id=snapshot_id,
         )
-        return QueryAnswer(
-            columns=explored.rows.columns,
-            rows=explored.rows.rows,
-            truncated=explored.rows.truncated,
-            run_id=explored.run_id,
+        return bound_rows(
+            QueryAnswer(
+                columns=explored.rows.columns,
+                rows=explored.rows.rows,
+                truncated=explored.rows.truncated,
+                run_id=explored.run_id,
+            )
         )
 
     @mcp.tool

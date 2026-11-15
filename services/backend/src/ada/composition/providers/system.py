@@ -1,10 +1,10 @@
 from dishka import Provider, Scope, provide
 
-from ada.adapters.db.database import EngineDatabase
+from ada.adapters.db.database import EngineDatabase, EngineProjectOwners
 from ada.adapters.valkey.task_queue import ValkeyTaskQueue
 from ada.config import Settings
 from ada.core.models.health import WebConfigured
-from ada.core.ports.system import Database, TaskQueue
+from ada.core.ports.system import Database, ProjectOwners, TaskQueue
 from ada.core.services.ports.system import SystemStatusService
 from ada.core.services.system import SystemStatus
 
@@ -17,6 +17,7 @@ class SystemProvider(Provider):
 
     database = provide(EngineDatabase, provides=Database)
     task_queue = provide(ValkeyTaskQueue, provides=TaskQueue)
+    project_owners = provide(EngineProjectOwners, provides=ProjectOwners)
 
     @provide
     def web_configured(self, settings: Settings) -> WebConfigured:
