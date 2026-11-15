@@ -6,6 +6,7 @@ import { LowerThird } from './LowerThird'
 import { CHAT_FRAMES, ChatScene } from './scenes/ChatScene'
 import { Credits } from './scenes/Credits'
 import { FeedbackLoop, LOOP_FRAMES } from './scenes/FeedbackLoop'
+import { SIDE_CHALLENGE_FRAMES, SideChallenges } from './scenes/SideChallenges'
 
 /** One line of big type, punched in. */
 function Punch({ children, sub }: { children: string; sub?: string }) {
@@ -95,7 +96,7 @@ const SECTIONS: Section[] = [
   // 2. What the registries cannot tell.
   {
     name: 'Gaps',
-    frames: s(29),
+    frames: s(25),
     scene: (
       <Planned
         title="Where the data runs out"
@@ -119,7 +120,7 @@ const SECTIONS: Section[] = [
   // 4. What a case gives back: the patient's timeline and the trials it fits.
   {
     name: 'Timeline and trials',
-    frames: s(35),
+    frames: s(31),
     scene: (
       <Planned
         title="A timeline for every patient, and the trials that fit"
@@ -130,6 +131,9 @@ const SECTIONS: Section[] = [
 
   // 5. Why it lasts: the loop.
   { name: 'Loop', frames: LOOP_FRAMES, scene: <FeedbackLoop /> },
+
+  // 6. What it is built with: the side challenges.
+  { name: 'Side challenges', frames: SIDE_CHALLENGE_FRAMES, scene: <SideChallenges /> },
 
   { name: 'Credits', frames: s(13.5), scene: <Credits /> },
 ]

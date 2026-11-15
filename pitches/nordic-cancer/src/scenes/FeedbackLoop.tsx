@@ -15,7 +15,7 @@ const CENTER = { x: 960, y: 440 }
 const RADIUS = 260
 const EACH = s(3.5)
 
-export const LOOP_FRAMES = s(20)
+export const LOOP_FRAMES = s(18)
 
 function position(index: number) {
   const angle = -Math.PI / 2 + (index * Math.PI) / 2
