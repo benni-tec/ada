@@ -45,6 +45,7 @@ export const EVENT_TYPES: readonly EventType[] = [
   'project.order_changed',
   'alert.firing',
   'alert.resolved',
+  'alert.delivered',
   'agent.turn_started',
   'agent.turn_part',
   'agent.turn_finished',
@@ -134,6 +135,7 @@ export function effectsOf(event: LiveEvent): Effects {
     // The payload names the alert and rule only, so every alert view refetches (feed,
     // badges); rules show when they were last checked.
     case 'alert.firing':
+    case 'alert.delivered':
     case 'alert.resolved':
       invalidate.push(alertKeys.all(), alertKeys.rules())
       break

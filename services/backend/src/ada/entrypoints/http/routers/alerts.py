@@ -4,11 +4,12 @@ from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, status
 
-from ada.core.models.alerts import Alert, AlertRule, AlertState, Severity
+from ada.core.models.alerts import Alert, AlertDelivery, AlertRule, AlertState, Severity
 from ada.core.models.analysis import Rows
 from ada.core.models.base import UNCHANGED, Change, DomainModel, Id, JsonObject
 from ada.core.models.dashboards import Dashboard
 from ada.core.models.operators import OperatorId
+from ada.core.ports.notify import DeliveryRepository
 from ada.core.services.ports.alerts import AlertService
 from ada.core.services.ports.dashboards import DashboardService
 from ada.core.services.ports.projects import ProjectService
@@ -194,3 +195,16 @@ async def _firing(service: AlertService, rule: AlertRule) -> list[Alert]:
         for alert in await service.alerts(rule.project_id, AlertState.FIRING)
         if alert.rule_id == rule.id
     ]
+
+
+@router.get("/projects/{project_id}/alert-deliveries")
+async def list_deliveries(
+    project_id: Id, projects: FromDishka[ProjectService], deliveries: FromDishka[DeliveryRepository]
+) -> list[AlertDelivery]:
+    await projects.get(project_id)
+    return await deliveries.list(project_id)
+
+
+@router.post("/alert-rules/{rule_id}/test")
+async def test_alert(rule_id: Id, service: FromDishka[AlertService]) -> Alert:
+    return await service.test(rule_id)

@@ -89,6 +89,9 @@ report freezes widgets at one run. Alert rules watch a measure on a dashboard.
 
 RULES = """\
 Rules:
+- When watching pages with watch_source, choose check_every by page type: "10min" only \
+for updates the user needs within minutes (e.g. shortage lists), "hourly" for news and \
+lists changing during the day, "daily" for slow pages.
 - Build on operators by their id. Prefer the project's existing pipelines \
 (list_pipelines, get_lineage) to building new ones; build new steps on top of them.
 - Never state a number you did not read from a tool result in this conversation. Prefer \
@@ -164,6 +167,9 @@ out). When a tool refuses a call, read its message and correct the call.
 
 RESEARCH_RULES = """\
 Rules:
+- When watching pages with watch_source, choose check_every by page type: "10min" only \
+for updates the user needs within minutes (e.g. shortage lists), "hourly" for news and \
+lists changing during the day, "daily" for slow pages.
 - Answer the brief with data: datasets that hold the numbers it asks for. Prefer official \
 statistics (statistics offices, public health institutes, Eurostat, OECD, WHO) to \
 articles that quote them.

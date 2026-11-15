@@ -8,6 +8,7 @@ import { intervalText, severityTextClasses } from '@/components/alerts/labels'
 import { SeverityBadge } from '@/components/alerts/severity'
 import { DashboardPanel } from '@/components/dashboards/dashboard-panel'
 import { LiveTime } from '@/components/live-time'
+import { WatchInterval } from '@/components/watch-interval'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { kindLabels, shortName, type SourceInfo } from '@/components/pipeline/labels'
 import { PipelineGraph } from '@/components/pipeline/pipeline-graph'
@@ -193,6 +194,7 @@ function SourceView({ projectId, sourceId }: { projectId: Id; sourceId: Id }) {
         </span>
         <span>
           Refresh {describeFreshness(source.freshness)}
+          <WatchInterval source={source} />
           {source.last_checked_at && (
             <>
               {' · '}last checked <LiveTime value={source.last_checked_at} />
