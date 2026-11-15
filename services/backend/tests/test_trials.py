@@ -74,6 +74,9 @@ async def container(
         if request.url.path == "/v1/web/scrape":
             body = json.loads(request.content)
             url = body["url"]
+            fixture = recorded_pages.get(url)
+            if fixture == "REQUEST_TIMEOUT":
+                raise Invalid("REQUEST_TIMEOUT")
             if "jsonParams" in body:
                 return httpx.Response(
                     200,
@@ -95,9 +98,6 @@ async def container(
                         }
                     },
                 )
-            fixture = recorded_pages.get(url)
-            if fixture == "REQUEST_TIMEOUT":
-                raise Invalid("REQUEST_TIMEOUT")
             markdown = (RECORDINGS / "pages" / fixture).read_text() if fixture else "No trial IDs"
             return httpx.Response(
                 200,
@@ -219,13 +219,28 @@ async def test_seed_is_idempotent_without_fetching(container: AsyncContainer) ->
 async def test_refresh_survives_failed_hospital_page(
     container: AsyncContainer,
     recorded_pages: dict[str, str],
+    finland_fixture: dict,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     page = PAGES[0]
     recorded_pages[page.address] = "REQUEST_TIMEOUT"
+    finland_fixture["studies"][0]["protocolSection"]["sponsorCollaboratorsModule"]["leadSponsor"][
+        "name"
+    ] = "Pfizer"
+    finland_fixture["studies"][0]["protocolSection"]["statusModule"]["lastUpdatePostDateStruct"] = {
+        "date": "2026-11-15"
+    }
+    study = study_page("NCT05634889", "Pfizer")
+    assert study is not None
+    recorded_pages[study.address] = "REQUEST_TIMEOUT"
     project_id = await seed_trials(container, refresh=True)
     async with container() as request:
         assert (await (await request.get(ProjectService)).get(project_id)).id == project_id
+        sources = await (await request.get(SourceService)).list(project_id)
+        built = await _build(request, project_id, {s.name: s.id for s in sources})
+        runs = await request.get(RunService)
+        [run] = await runs.list(project_id)
+        assert not (await runs.read(run.id, built.sponsor_sites.id)).rows
         dashboards = await (await request.get(DashboardService)).list(project_id)
         assert {DOORS, NEAR_YOU, DASHBOARD} <= {d.name for d in dashboards}
         assert len(await (await request.get(SessionService)).list(project_id)) == 1
@@ -237,7 +252,9 @@ async def test_refresh_survives_failed_hospital_page(
         assert source.last_error == "REQUEST_TIMEOUT"
     output = capsys.readouterr().out
     assert f"  {page.name}: refresh failed (REQUEST_TIMEOUT)" in output
-    assert f"  1 web pages failed; rerun the seed to retry them: {page.name}" in output
+    assert (
+        f"  2 web pages failed; rerun the seed to retry them: {page.name}, {study.name}" in output
+    )
 
 
 async def test_refresh_preserves_eligibility_sites_doors_and_ctis_pages(
