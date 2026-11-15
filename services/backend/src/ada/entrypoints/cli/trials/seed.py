@@ -171,11 +171,12 @@ async def seed_trials(container: AsyncContainer, refresh: bool = False) -> Id:
                         continue
                 try:
                     await sources.refresh(source.id, force=True)
-                except Invalid:
-                    # Extract pages keep a 7-day minimum between fetches; a recent
-                    # snapshot exists, so the next seed retries the failed check.
-                    if name not in study_names:
+                except Invalid as error:
+                    # Only the 7-day extract minimum is expected: a recent snapshot
+                    # exists, and the next seed retries the failed check.
+                    if name not in study_names or "is fetched at most every" not in str(error):
                         raise
+                    print(f"  {name}: kept the recent snapshot ({error})")
         async with container() as request:
             built = await _build(request, project_id, registered)
             for field in fields(built):

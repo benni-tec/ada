@@ -602,6 +602,9 @@ async def test_refresh_retries_failed_recent_sponsor_check(
     finland_fixture["studies"][0]["protocolSection"]["sponsorCollaboratorsModule"]["leadSponsor"][
         "name"
     ] = "Pfizer"
+    finland_fixture["studies"][0]["protocolSection"]["statusModule"]["lastUpdatePostDateStruct"] = {
+        "date": "2026-11-15"
+    }
     project_id = await seed_trials(container, refresh=True)
     async with container() as request:
         sources = await request.get(SourceService)
