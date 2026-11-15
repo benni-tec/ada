@@ -243,15 +243,20 @@ export function answerSnapshots(element: HTMLElement, capture: Capture = capture
   }
   // The page repeats a request until it is answered: one picture per request at a time.
   const working = new Set<string>()
+  // How many pictures are being taken: paper mode stays on until none is.
+  let painting = 0
   const onMessage = (event: MessageEvent) => {
     const { type, id } = (event.data ?? {}) as { type?: unknown; id?: unknown }
     if (event.source !== window.parent || type !== 'ada:snapshot' || typeof id !== 'string' || working.has(id)) return
     working.add(id)
     void (async () => {
+      let onPaper = false
       try {
         await drawn()
-        // Laid out for paper while the picture is taken (styles.css `data-snapshot`).
-        document.documentElement.dataset.snapshot = ''
+        // Laid out for paper while the picture is taken (styles.css `data-snapshot`), until
+        // the last picture being taken at once is done.
+        onPaper = true
+        if (painting++ === 0) document.documentElement.dataset.snapshot = ''
         await new Promise((resolve) => setTimeout(resolve, 100))
         const { width, height } = element.getBoundingClientRect()
         const image = await capture(element)
@@ -259,7 +264,7 @@ export function answerSnapshots(element: HTMLElement, capture: Capture = capture
       } catch (error) {
         tellPage({ type: 'ada:snapshot', id, error: error instanceof Error ? error.message : String(error) })
       } finally {
-        delete document.documentElement.dataset.snapshot
+        if (onPaper && --painting === 0) delete document.documentElement.dataset.snapshot
         working.delete(id)
       }
     })()

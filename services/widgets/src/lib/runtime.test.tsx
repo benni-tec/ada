@@ -341,3 +341,31 @@ test('a widget still loading when the wait is over sends no picture of “Loadin
   stop()
   vi.useRealTimers()
 })
+
+test('two pictures taken at once both see the widget laid out for paper', async () => {
+  const parent = { postMessage: vi.fn() }
+  Object.defineProperty(window, 'parent', { value: parent, configurable: true })
+  window.location.hash = '#widget=w1'
+  const element = document.createElement('div')
+  element.innerHTML = '<div class="ada-widget">drawn</div>'
+  element.getBoundingClientRect = () => ({ width: 100, height: 100 }) as DOMRect
+  const onPaper: boolean[] = []
+  let finishFirst = () => {}
+  const capture = vi.fn(async () => {
+    onPaper.push('snapshot' in document.documentElement.dataset)
+    // The first picture takes longer than the second.
+    if (capture.mock.calls.length === 1) await new Promise<void>((resolve) => (finishFirst = resolve))
+    onPaper.push('snapshot' in document.documentElement.dataset)
+    return 'data:image/png;base64,AAA'
+  })
+  const stop = answerSnapshots(element, capture)
+  const ask = (id: string) => window.dispatchEvent(new MessageEvent('message', { data: { type: 'ada:snapshot', id }, source: parent as unknown as Window }))
+  ask('a')
+  ask('b')
+  await vi.waitFor(() => expect(parent.postMessage).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }), '*'))
+  finishFirst()
+  await vi.waitFor(() => expect(parent.postMessage).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), '*'))
+  expect(onPaper).toEqual([true, true, true, true])
+  expect('snapshot' in document.documentElement.dataset).toBe(false)
+  stop()
+})
