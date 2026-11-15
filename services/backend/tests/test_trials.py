@@ -4,6 +4,7 @@ import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import duckdb
 import httpx
 import pytest
 from dishka import AsyncContainer, Provider, Scope
@@ -26,9 +27,10 @@ from ada.core.services.ports.sources import SourceService
 from ada.core.services.ports.widgets import WidgetService
 from ada.entrypoints.cli.trials import seed
 from ada.entrypoints.cli.trials.dashboards import DOORS, NEAR_YOU
-from ada.entrypoints.cli.trials.monitoring import DASHBOARD, FINNISH_RULE
+from ada.entrypoints.cli.trials.monitoring import DASHBOARD, FINNISH_RULE, site_changes_sql
 from ada.entrypoints.cli.trials.seed import SEED, _build, seed_trials
 from ada.entrypoints.cli.trials.sources import COUNTRIES
+from ada.entrypoints.cli.trials.steps import TRIAL_SITES
 from memory import MemoryBackground, memory_adapters
 
 pytestmark = pytest.mark.anyio
@@ -209,6 +211,19 @@ async def simulate_site_change(container: AsyncContainer, finland_fixture: dict)
         for t in finland_fixture["studies"]
     ):
         finland_fixture["studies"].append(json.loads(json.dumps(trial)))
+    previous = next(
+        t
+        for t in finland_fixture["studies"]
+        if t["protocolSection"]["identificationModule"]["nctId"] == "NCT07195695"
+    )
+    previous["protocolSection"]["contactsLocationsModule"]["locations"].append(
+        {
+            "facility": "HUS",
+            "city": "Helsinki",
+            "country": "Finland",
+            "status": "NOT_YET_RECRUITING",
+        }
+    )
     project_id = await seed_trials(container, refresh=True)
     section = trial["protocolSection"]
     locations = section["contactsLocationsModule"]["locations"]
@@ -258,7 +273,7 @@ async def test_monitoring_changes_and_finnish_alert(
         data = await runs.read(run.id, widget.operator_id)
         rows = [dict(zip([c.name for c in data.columns], row, strict=True)) for row in data.rows]
         assert {r["change_kind"] for r in rows if r["nct_id"] == "NCT07195695"} >= {
-            "finnish_site_added",
+            "finnish_site_recruiting",
             "nordic_site_closed",
         }
         dashboard = next(
@@ -268,6 +283,9 @@ async def test_monitoring_changes_and_finnish_alert(
         )
         alerts = await request.get(AlertService)
         rules = await alerts.list_rules(dashboard.id)
+        bulletin = next(r for r in rules if r.name == "Weekly trial-gap bulletin")
+        assert bulletin.key_columns == ("registry", "cancer_group", "week")
+        assert bulletin.check_interval_seconds == 7 * 86400
         rule = next(r for r in rules if r.name == FINNISH_RULE)
         await alerts.check(rule.id)
         firing = [
@@ -275,3 +293,59 @@ async def test_monitoring_changes_and_finnish_alert(
         ]
         assert len(firing) == 1
         assert "NCT07195695" in str((await alerts.rows(firing[0].id)).rows)
+
+
+def test_site_changes_reconcile_sources_and_unnamed_sites() -> None:
+    with duckdb.connect() as db:
+        for i in range(4):
+            db.execute(f"""
+                CREATE TABLE input_{i} (
+                    nct_id VARCHAR, title VARCHAR, last_update VARCHAR, locations JSON,
+                    snapshot_at TIMESTAMP, snapshot_rank INTEGER
+                )
+            """)
+
+        def observation(source: int, rank: int, statuses: list[str], trial: str = "NCT1") -> None:
+            sites = [
+                {"city": "Helsinki", "country": "Finland", "status": status} for status in statuses
+            ]
+            db.execute(
+                f"INSERT INTO input_{source} VALUES (?, 'Trial', '2026-01-01', ?, ?, ?)",
+                [trial, json.dumps(sites), f"2026-01-{4 - rank + source:02d}", rank],
+            )
+
+        observation(0, 2, ["recruiting", "COMPLETED"])
+        observation(1, 1, ["RECRUITING", "COMPLETED", "RECRUITING"])
+        sql = site_changes_sql(TRIAL_SITES)
+        # Moving between country pulls, duplicate unnamed sites and casing are not changes.
+        assert db.execute(sql).fetchall() == []
+
+        db.execute("DELETE FROM input_0")
+        observation(0, 2, ["not_yet_recruiting", "COMPLETED"])
+        result = db.execute(sql)
+        rows = [
+            dict(zip([c[0] for c in result.description], row, strict=True))
+            for row in result.fetchall()
+        ]
+        assert {r["change_kind"] for r in rows} == {"finnish_site_recruiting", "nordic_site_opened"}
+        assert len(rows) == 2
+
+        observation(2, 1, ["RECRUITING"], trial="NCT2")
+        observation(3, 1, ["recruiting"], trial="NCT2")
+        result = db.execute(sql)
+        rows = [
+            dict(zip([c[0] for c in result.description], row, strict=True))
+            for row in result.fetchall()
+        ]
+        assert sum(r["change_kind"] == "new_trial" for r in rows) == 1
+
+        observation(2, 1, ["not_yet_recruiting"], trial="NCT3")
+        result = db.execute(sql)
+        rows = [
+            dict(zip([c[0] for c in result.description], row, strict=True))
+            for row in result.fetchall()
+        ]
+        assert {r["change_kind"] for r in rows if r["nct_id"] == "NCT3"} == {
+            "new_trial",
+            "finnish_site_added",
+        }
