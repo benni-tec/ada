@@ -123,7 +123,7 @@ Every item becomes a registered source and an operator the model reads. The pass
 **Files:** `B/entrypoints/http/routers/models.py`, `B/entrypoints/mcp/tools/models.py`, `T/test_model_evaluation.py`.
 
 - [x] Failing tests first: evaluate through REST, MCP and the in-platform agent's toolbox; no `runs`, `run_snapshots` or `operators` rows appear and DuckDB is not opened (a fake that fails when touched); the MCP call is an ordinary `tool_call` entry; the agent's toolbox lists `evaluate_model`, `list_models`, `get_model`; an invalid input is refused with the term and its allowed values.
-- [x] REST: `POST /api/models/{id}/versions/{v}/evaluate` with `{inputs, today?, toggles?}`; `GET /api/models`, `GET /api/models/{id}`, `GET /api/models/{id}/versions/{v}`, and `GET …/population` for the per-site "Nordic → timing-adjusted → Finland" figures stored at build.
+- [x] REST: `POST /api/models/{id}/evaluate` with `{inputs, version?}` (toggles are part of `inputs`; the latest version when `version` is left out); `GET /api/models`, `GET /api/models/{id}`, `GET /api/models/{id}/versions/{v}`, and `GET …/population` for the per-site "Nordic → timing-adjusted → Finland" figures stored at build.
 - [x] MCP and agent: `evaluate_model(model_id, version?, inputs, session_id)`, `create_model`, `list_models`, `get_model`. The `evaluate_model` description states the intended use: "educational; synthetic example profiles only, never patient data".
 - [ ] Agent instructions: one line: use synthetic profiles; lead with the trigger and the deadlines; name each lever's evidence grade.
 

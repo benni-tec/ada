@@ -267,8 +267,8 @@ class Compiled(DomainModel):
 
     # site -> step (or "pathway") -> modality (or "any") -> median days.
     targets: dict[str, dict[str, dict[str, int]]]
-    # Parameters with overall-mortality HRs converted to the excess scale per site;
-    # key "<name>" holds the original and "<name>@<site>" the converted one.
+    # The parameters as built. Overall-mortality HRs are converted to the excess scale per
+    # profile, with the excess share of the profile's own baseline cell (evaluate.to_excess).
     parameters: dict[str, Parameter]
     population: tuple[PopulationFigure, ...]
     validation: tuple[ValidationCheck, ...] = ()

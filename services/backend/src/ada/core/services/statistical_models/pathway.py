@@ -27,7 +27,8 @@ from ada.core.models.statistical_models import (
 
 NAME = "Patient pathway model"
 DESCRIPTION = (
-    "Whether a presentation would start a Nordic fast-track lung-cancer pathway, when each "
+    "Whether a presentation would start a Nordic fast-track pathway for lung, colorectal or "
+    "pancreatic cancer, when each "
     "step is due, how many days the pathway is behind target, and, second and graded, the "
     "5-year survival associated with the difference. Nordic baseline, Finnish education "
     "gradient, international delay effects."
@@ -302,17 +303,31 @@ def _lung_criteria() -> tuple[Criterion, ...]:
         c(
             "lung_symptoms_smoker",
             S,
-            "New airway symptoms (cough, breathlessness) for 6 weeks (Denmark: 4-6) in a smoker or "
-            "ex-smoker over 40",
-            ("Denmark", "Sweden"),
+            "New airway symptoms (cough, breathlessness) for 6 weeks in a smoker or ex-smoker "
+            "over 40",
+            ("Sweden",),
             SWEDEN_SUSPICION,
+        ),
+        c(
+            "lung_cough_dk",
+            S,
+            "Cough for more than 4-6 weeks, or a changed cough, over 40 with a smoking history",
+            ("Denmark",),
+            DENMARK,
         ),
         c(
             "lung_chest_pain",
             S,
             "Chest or shoulder pain without another explanation",
-            ("Denmark", "Sweden"),
+            ("Sweden",),
             SWEDEN_SUSPICION,
+        ),
+        c(
+            "lung_chest_pain_dk",
+            S,
+            "Chest or shoulder pain, over 40 with a smoking history",
+            ("Denmark",),
+            DENMARK,
         ),
         c("lung_haemoptysis", S, "Coughing blood", ("Denmark", "Sweden"), SWEDEN_SUSPICION),
         c(
@@ -358,8 +373,22 @@ def _colorectal_criteria() -> tuple[Criterion, ...]:
     S, W = TriggerStage.SUSPICION, TriggerStage.WELL_FOUNDED
     c = lambda *a: _criterion(COLORECTAL, *a)  # noqa: E731
     return (
-        c("crc_blood", S, "Blood in the stool, over 40", ("Denmark", "Sweden"), SWEDEN_CRC),
-        c("crc_anaemia", S, "Anaemia, over 40", ("Denmark", "Sweden"), SWEDEN_CRC),
+        c("crc_blood", S, "Blood in the stool, over 40", ("Sweden",), SWEDEN_CRC),
+        c(
+            "crc_bleeding_dk",
+            S,
+            "Bleeding from the bowel without another obvious cause, especially over 40",
+            ("Denmark",),
+            DENMARK_CRC,
+        ),
+        c("crc_anaemia", S, "Anaemia, over 40", ("Sweden",), SWEDEN_CRC),
+        c(
+            "crc_anaemia_dk",
+            S,
+            "Unexplained bleeding anaemia or iron-deficiency anaemia, especially over 40",
+            ("Denmark",),
+            DENMARK_CRC,
+        ),
         c(
             "crc_habit_change",
             S,

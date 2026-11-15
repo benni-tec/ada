@@ -13,9 +13,7 @@ from ada.core.models.statistical_models import (
     Form,
     Modality,
     ModelSpec,
-    Parameter,
     PopulationFigure,
-    Scale,
     TriggerStage,
     ValidationCheck,
 )
@@ -29,6 +27,16 @@ from ada.core.services.statistical_models.evaluate import (
 )
 
 PARAMETER_COLUMNS = ("name", "estimate", "ci_low", "ci_high", "source_id", "passage", "found")
+
+
+def _found(value: object) -> bool:
+    """The `found` column as a truth value: a boolean, or the text true/false. Anything
+    else is refused rather than read as true."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in ("true", "false"):
+        return value.strip().lower() == "true"
+    raise Invalid(f"found must be true or false, not {value!r}")
 
 
 def _number(value: object) -> float | None:
@@ -51,8 +59,16 @@ def read_parameters(spec: ModelSpec, rows: Rows, operator_id: str, run_id: str) 
         name = str(row["name"])
         if name not in parameters:
             raise Invalid(f"operator {operator_id} has a row for an unknown parameter: {name}")
-        if not row["found"]:
+        if name in read:
+            raise Invalid(f"operator {operator_id} has two rows for {name}")
+        if not _found(row["found"]):
             raise Invalid(f"the passage for {name} is not in its source as fetched")
+        cited = parameters[name].provenance.source_id
+        if cited and str(row["source_id"]) != cited:
+            raise Invalid(
+                f"operator {operator_id} cites {row['source_id']} for {name}, "
+                f"whose citation is source {cited}"
+            )
         if row["estimate"] is None:
             raise Invalid(f"operator {operator_id} has no estimate for {name}")
         p = parameters[name]
@@ -80,6 +96,9 @@ def read_parameters(spec: ModelSpec, rows: Rows, operator_id: str, run_id: str) 
     return spec.model_copy(update={"parameters": parameters})
 
 
+MAX_TOGGLES = 4
+
+
 def validate(spec: ModelSpec) -> None:
     """Invalid when the spec does not hold together."""
     if not spec.intended_use.strip():
@@ -95,6 +114,14 @@ def validate(spec: ModelSpec) -> None:
             raise Invalid(f"baseline for an unknown site {cell.site!r}")
         if not 0 < cell.survival < 1:
             raise Invalid(f"baseline survival must be between 0 and 1, not {cell.survival}")
+        if cell.excess_share is not None and not 0 < cell.excess_share <= 1:
+            raise Invalid(f"an excess share must be in (0, 1], not {cell.excess_share}")
+    for p in spec.parameters.values():
+        if p.form is not Form.VALUE and p.estimate <= 0:
+            raise Invalid(f"{p.name}: a ratio must be positive, not {p.estimate}")
+        for bound in (p.ci_low, p.ci_high):
+            if bound is not None and p.form is not Form.VALUE and bound <= 0:
+                raise Invalid(f"{p.name}: an interval bound must be positive, not {bound}")
     ids = [c.id for c in spec.criteria]
     if len(set(ids)) != len(ids):
         raise Invalid("criteria ids must be unique")
@@ -114,6 +141,12 @@ def validate(spec: ModelSpec) -> None:
     names = {t.name for t in spec.toggles}
     if len(names) != len(spec.toggles):
         raise Invalid("toggle names must be unique")
+    # Every combination of toggles is evaluated: 2^n settings per evaluation.
+    if len(spec.toggles) > MAX_TOGGLES:
+        raise Invalid(f"a model has at most {MAX_TOGGLES} toggles, not {len(spec.toggles)}")
+    for key, figure in spec.comparison.survival.items():
+        if not 0 < figure < 1:
+            raise Invalid(f"comparison survival for {key} must be between 0 and 1, not {figure}")
     for flag in spec.flags:
         if flag.term not in {t.name for t in spec.terms}:
             raise Invalid(f"flag names an unknown term {flag.term!r}")
@@ -129,37 +162,16 @@ def _targets(spec: ModelSpec) -> dict[str, dict[str, dict[str, int]]]:
     return out
 
 
-def _converted(spec: ModelSpec) -> tuple[dict[str, Parameter], list[str]]:
-    parameters = dict(spec.parameters)
-    warnings: list[str] = []
-    for site in spec.sites:
-        shares = [
-            c.excess_share for c in spec.baseline if c.site == site and c.excess_share is not None
-        ]
-        if not shares:
-            warnings.append(
-                f"no excess share is loaded for {site}, so its overall-mortality HRs are used "
-                "unconverted"
-            )
-            continue
-        p = sum(shares) / len(shares)
-
-        def convert(x: float | None, p: float = p) -> float | None:
-            return None if x is None else 1 + (x - 1) / p
-
-        for name, parameter in spec.parameters.items():
-            if parameter.scale is not Scale.OVERALL:
-                continue
-            parameters[f"{name}@{site}"] = parameter.model_copy(
-                update={
-                    "name": f"{name}@{site}",
-                    "estimate": convert(parameter.estimate),
-                    "ci_low": convert(parameter.ci_low),
-                    "ci_high": convert(parameter.ci_high),
-                    "scale": Scale.EXCESS,
-                }
-            )
-    return parameters, warnings
+def _unconverted(spec: ModelSpec) -> list[str]:
+    """A warning per site with a baseline cell that has no excess share: its profiles use the
+    overall-mortality HRs as they are. The conversion itself is per profile, with the share
+    of the profile's own cell (evaluate.to_excess); there is one path, not two."""
+    return [
+        f"no excess share is loaded for some {site} baselines, so their overall-mortality HRs "
+        "are used unconverted"
+        for site in spec.sites
+        if any(c.excess_share is None for c in spec.baseline if c.site == site)
+    ]
 
 
 def _population(
@@ -269,7 +281,7 @@ def _validation(spec: ModelSpec) -> list[ValidationCheck]:
                     note=(
                         "Ratio of cumulative excess hazards, basic vs high education: "
                         f"observed in {source.source if source else 'the comparison'} "
-                        f"({basic:.3f} vs {high:.3f} alive at 5 years) against the direct HR "
+                        f"({basic:.3f} vs {high:.3f} 5-year cause-specific survival) against the direct HR "
                         f"of {direct.provenance.source}"
                     ),
                 )
@@ -280,13 +292,13 @@ def _validation(spec: ModelSpec) -> list[ValidationCheck]:
 def compile_spec(spec: ModelSpec) -> Compiled:
     validate(spec)
     targets = _targets(spec)
-    parameters, warnings = _converted(spec)
+    warnings = _unconverted(spec)
     population, more = _population(spec, targets)
     if not any(c.stage is TriggerStage.WELL_FOUNDED for c in spec.criteria):
         warnings.append("no well-founded-suspicion criteria: the trigger never fires")
     return Compiled(
         targets=targets,
-        parameters=parameters,
+        parameters=dict(spec.parameters),
         population=tuple(population),
         validation=tuple(_validation(spec)),
         warnings=tuple(dict.fromkeys(warnings + more)),

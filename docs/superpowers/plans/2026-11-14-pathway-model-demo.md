@@ -5,9 +5,12 @@
 
 ## Three synthetic profiles
 
-Each is an `EvaluationInputs` body for `POST /api/models/{id}/evaluate` or the
-`evaluate_model` tool. Days are days spent in each step so far; a step left out has not
-started.
+Each is an `EvaluationInputs` object. For REST, wrap it: `POST /api/models/{id}/evaluate`
+with `{"inputs": {…}, "version": 1}` (version optional, the latest when left out). For the
+`evaluate_model` tool, pass it as the `inputs` argument with `model_id` and `session_id`. As a
+case, the same values plus `county` are the body `{"values": {…}}` of
+`PUT /api/case-types/{id}/cases/{key}`. Days are days spent in each step so far; a step left
+out has not started.
 
 ### 1. Past the deadline, plan not booked
 
@@ -27,8 +30,8 @@ physician two weeks later, chest X-ray two weeks after that showing a suspicious
 
 What the page shows: the pathway would have started in Denmark, Norway and Sweden on day
 27; treatment start was due on day 71 and today is day 74 (overdue by three days); 20 days
-behind target so far, most of them before the X-ray. Survival second: 35 of 100 as it stands
-and on target (the remaining wait is under Heiden's twelve weeks), 32–39 across the
+behind target so far, most of them before the X-ray. Survival second: 5-year relative survival 35 per 100 as it
+stands and on target (the remaining wait is under Heiden's twelve weeks), 32–39 across the
 settings. Support: a navigator, and a
 check that every treatment option was discussed.
 
@@ -87,7 +90,8 @@ source is `2026-11-14-pathway-model-slides.html` beside this file. The outline:
    caveat the authors give themselves.
 5. **The tool at the point of care.** Live demo, profile 1: the trigger fires, the
    deadlines show, treatment start overdue by three days. The exact part: no hazard ratio needed.
-6. **Then survival, second and graded.** 35 of 100, 32–39 across two settings; every lever
+6. **Then survival, second and graded.** 5-year relative survival 35 per 100, 32–39 across
+   two settings; every lever
    names its evidence (national standard, meta-analysis, one cohort, assumption).
 7. **How it is built.** One parameter per arrow, so nothing counts twice (Westreich &
    Greenland 2013); Nordic baseline, Finnish education gradient (Zai 2025), international

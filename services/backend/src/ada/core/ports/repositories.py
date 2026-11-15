@@ -396,7 +396,9 @@ class StatisticalModelRepository(Protocol):
         ...
 
     async def add_version(self, version: ModelVersion) -> None:
-        """Store a version and point its model's `latest_version` at it."""
+        """Store a version and point its model's `latest_version` at it. Conflict when the
+        model already has a version with that number or a later one (a concurrent writer
+        got there first); versions are never replaced."""
         ...
 
     async def version(self, model_id: Id, number: int) -> ModelVersion:

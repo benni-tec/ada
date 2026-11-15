@@ -891,6 +891,10 @@ class MemoryStatisticalModelRepository(StatisticalModelRepository):
 
     async def add_version(self, version: ModelVersion) -> None:
         model = _get(self.store.statistical_models, "statistical model", version.model_id)
+        if version.version <= model.latest_version:
+            raise Conflict(
+                "statistical model", version.model_id, version.version - 1, model.latest_version
+            )
         self.store.model_versions[(version.model_id, version.version)] = version
         self.store.statistical_models[model.id] = model.model_copy(
             update={

@@ -9,7 +9,7 @@ from ada.adapters.db.support import add_row, dump, fetch, oldest_first, require,
 from ada.adapters.db.tables import ProjectRow, StatisticalModelRow, StatisticalModelVersionRow
 from ada.core.models.actors import Actor
 from ada.core.models.base import Id
-from ada.core.models.errors import NotFound
+from ada.core.models.errors import Conflict, NotFound
 from ada.core.models.statistical_models import Compiled, ModelSpec, ModelVersion, StatisticalModel
 from ada.core.ports.repositories import StatisticalModelRepository
 
@@ -53,9 +53,20 @@ class SqlStatisticalModelRepository(StatisticalModelRepository):
         await self.session.flush()
 
     async def add_version(self, version: ModelVersion) -> None:
-        model = await fetch(
-            self.session, StatisticalModelRow, version.model_id, "statistical model"
+        # Locked, so two writers of the same next version cannot both pass the check.
+        statement = (
+            select(StatisticalModelRow)
+            .where(StatisticalModelRow.id == version.model_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
+        model = (await self.session.execute(statement)).scalar_one_or_none()
+        if model is None:
+            raise NotFound("statistical model", version.model_id)
+        if version.version <= model.latest_version:
+            raise Conflict(
+                "statistical model", version.model_id, version.version - 1, model.latest_version
+            )
         await add_row(
             self.session,
             StatisticalModelVersionRow(

@@ -18,7 +18,7 @@ from ada.adapters.memory.repositories import (
 from ada.config import Settings
 from ada.core.models.actors import Actor, ActorKind
 from ada.core.models.analysis import Column, Rows
-from ada.core.models.errors import Invalid
+from ada.core.models.errors import Conflict, Invalid
 from ada.core.models.projects import Project
 from ada.core.models.statistical_models import (
     DeadlineStatus,
@@ -27,7 +27,6 @@ from ada.core.models.statistical_models import (
     Intent,
     ModelVersion,
     PathwayStep,
-    Scale,
 )
 from ada.core.services.ports.exploration import Clauses, Explored
 from ada.core.services.statistical_models.build import (
@@ -35,7 +34,7 @@ from ada.core.services.statistical_models.build import (
     compile_spec,
     read_parameters,
 )
-from ada.core.services.statistical_models.evaluate import evaluate
+from ada.core.services.statistical_models.evaluate import baseline_cell, evaluate, to_excess
 from ada.core.services.statistical_models.pathway import pathway_spec
 from ada.core.services.statistical_models.service import StatisticalModels
 from api_support import Overrides, call, mcp_client, new_project, resolve, send, serve
@@ -101,9 +100,11 @@ def test_build_takes_the_median_target_and_computes_the_residual(version: ModelV
     # Every baseline cell carries its excess share, so the overall-mortality HRs are
     # converted: other-cause deaths dilute an overall HR towards 1, the conversion undoes it.
     assert not any("unconverted" in w for w in version.compiled.warnings)
-    assert all(0 < c.excess_share < 1 for c in version.spec.baseline if c.excess_share)
-    colectomy = version.compiled.parameters["hanna_colectomy@colorectal"]
-    assert colectomy.scale is Scale.EXCESS and colectomy.estimate > 1.06
+    shares = [c.excess_share for c in version.spec.baseline]
+    assert all(share is not None and 0 < share <= 1 for share in shares)
+    cell = baseline_cell(version.spec, "colorectal", "male", "70-79", None)
+    converted, warning = to_excess(version.spec.parameters["hanna_colectomy"], cell)
+    assert converted > 1.06 and warning is None
 
 
 def test_the_build_checks_itself_against_figures_it_was_not_built_from(
@@ -186,7 +187,15 @@ def test_the_spec_must_hold_together() -> None:
 def test_the_trigger_fires_and_the_deadlines_count_from_it(version: ModelVersion) -> None:
     result = evaluate(version, EXAMPLE)
     assert result.trigger.suspicion.fired
-    assert result.trigger.suspicion.countries == ("Denmark", "Sweden")
+    # Sweden's six weeks of cough in a smoker; Denmark's 4-6 weeks is a criterion of its own.
+    assert result.trigger.suspicion.countries == ("Sweden",)
+    both = evaluate(
+        version,
+        EXAMPLE.model_copy(update={"presentation": (*EXAMPLE.presentation, "lung_cough_dk")}),
+    )
+    assert both.trigger.suspicion.countries == ("Denmark", "Sweden")
+    with pytest.raises(Invalid, match="names no lung criterion"):
+        evaluate(version, EXAMPLE.model_copy(update={"presentation": ("crc_blood",)}))
     assert result.trigger.well_founded.fired
     assert result.trigger.well_founded.countries == ("Denmark", "Norway", "Sweden")
     assert "Denmark, Norway and Sweden" in result.trigger.note
@@ -309,8 +318,9 @@ def _parameter_rows(**changes: tuple[object, ...]) -> Rows:
 
 def test_parameters_are_read_from_an_operator_and_cited_by_it() -> None:
     spec = pathway_spec()
+    source = spec.parameters["hanna_colectomy"].provenance.source_id
     rows = _parameter_rows(
-        hanna_colectomy=("hanna_colectomy", 1.07, 1.02, 1.13, "src", "colectomy 1.07", True)
+        hanna_colectomy=("hanna_colectomy", 1.07, 1.02, 1.13, source, "colectomy 1.07", True)
     )
     read = read_parameters(spec, rows, "op_parameters", "run-1")
     colectomy = read.parameters["hanna_colectomy"]
@@ -341,6 +351,22 @@ def test_a_parameter_operator_must_cover_every_sourced_figure_with_its_passage()
     partial = complete.model_copy(update={"rows": complete.rows[1:]})
     with pytest.raises(Invalid, match="no row for"):
         read_parameters(spec, partial, "op", "run")
+    # The text "false" is not a found passage, and nor is anything that is not a truth value.
+    for found in ("false", "0"):
+        rows = _parameter_rows(sud_per_day=("sud_per_day", 0.0056, None, None, "s", "x", found))
+        with pytest.raises(Invalid, match="not in its source|true or false"):
+            read_parameters(spec, rows, "op", "run")
+    # Two rows for one parameter are ambiguous.
+    twice = complete.model_copy(update={"rows": (*complete.rows, complete.rows[0])})
+    with pytest.raises(Invalid, match="two rows"):
+        read_parameters(spec, twice, "op", "run")
+    # A row cannot move a figure to another source while keeping the old citation.
+    hanna = spec.parameters["hanna_colectomy"]
+    moved = _parameter_rows(
+        hanna_colectomy=("hanna_colectomy", 1.06, 1.01, 1.12, "elsewhere", "colectomy", True)
+    )
+    with pytest.raises(Invalid, match=f"whose citation is source {hanna.provenance.source_id}"):
+        read_parameters(spec, moved, "op", "run")
 
 
 class RowsExploration:
@@ -448,3 +474,19 @@ async def test_mcp_lists_evaluates_and_records_an_ordinary_tool_call(
         assert result["survival"]["now"] <= result["survival"]["on_target"]
         entries = await seen.entries(UUID(session["id"]))
         assert [e.tool_call.tool for e in entries if e.tool_call][-1] == "evaluate_model"
+
+
+async def test_a_version_number_is_never_written_twice() -> None:
+    store = MemoryStore()
+    project = Project(id=uuid7(), name="Nordic cancer care", created_at=FixedClock().now())
+    store.projects[project.id] = project
+    service = StatisticalModels(
+        MemoryStatisticalModelRepository(store),
+        MemoryProjectRepository(store),
+        MemoryCaseRepository(store),
+        RowsExploration(_parameter_rows()),
+        FixedClock(),
+    )
+    version = await service.create_pathway_model(project.id, ACTOR)
+    with pytest.raises(Conflict, match="revision 1"):
+        await MemoryStatisticalModelRepository(store).add_version(version)

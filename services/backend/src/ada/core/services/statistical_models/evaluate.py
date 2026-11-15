@@ -156,6 +156,10 @@ def _validate(spec: ModelSpec, inputs: EvaluationInputs) -> None:
     for name in inputs.toggles:
         if name not in {t.name for t in spec.toggles}:
             raise Invalid(f"unknown toggle {name!r}")
+    criteria = {c.id for c in spec.criteria if c.site == inputs.site}
+    unknown = [c for c in inputs.presentation if c not in criteria]
+    if unknown:
+        raise Invalid(f"presentation names no {inputs.site} criterion: {', '.join(unknown)}")
     if baseline_cell(spec, inputs.site, inputs.sex, None, None) is None:
         raise Invalid(f"the version has no baseline for {inputs.site} ({inputs.sex})")
 
@@ -405,7 +409,7 @@ def evaluate(version: ModelVersion, inputs: EvaluationInputs) -> Evaluation:
     def survival(setting: dict[str, bool], on_target: set[PathwayStep]) -> tuple[float, list[str]]:
         total = _projected(pathway, typical, step_targets, on_target)
         log_hr, notes = delay_log_hazard(delay, cell, total, whole)
-        if setting.get(PRE_TRIGGER):
+        if curative and setting.get(PRE_TRIGGER):
             log_hr += pre_trigger_log_hazard(pre, pre_days_behind)
         hazard = base_hazard * math.exp(log_hr)
         if setting.get(RESIDUAL):
@@ -496,8 +500,8 @@ def evaluate(version: ModelVersion, inputs: EvaluationInputs) -> Evaluation:
         Contribution(
             term="delay_pre",
             log_hazard=pre_trigger_log_hazard(pre, pre_days_behind),
-            applied=bool(headline.get(PRE_TRIGGER)),
-            note="days before the trigger beyond target; a toggle",
+            applied=curative and bool(headline.get(PRE_TRIGGER)),
+            note="days before the trigger beyond target; a toggle; not for a palliative pathway",
         ),
         Contribution(
             term="finland_residual",
