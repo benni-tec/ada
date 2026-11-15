@@ -59,15 +59,19 @@ async def watch_pages(
                             uuid5(project_id, page.url.strip())
                         )
                         service = await scope.get(SourceService)
-                        existing = await service.list(project_id)
-                        source = next((s for s in existing if s.address == page.url.strip()), None)
+                        url = page.url.strip()
+                        matches = [s for s in await service.list(project_id) if s.address == url]
+                        # Prefer a watched duplicate: addresses are not unique.
+                        source = next((s for s in matches if s.monitor_id), None) or next(
+                            iter(matches), None
+                        )
                         already = source is not None and source.monitor_id is not None
                         if source is None:
                             source = await service.register(
                                 project_id,
                                 page.name,
                                 AccessKind.WEB,
-                                page.url,
+                                url,
                                 DataFormat.HTML,
                                 provenance=page.provenance,
                             )
