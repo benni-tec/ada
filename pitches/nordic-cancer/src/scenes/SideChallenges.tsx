@@ -31,7 +31,7 @@ export function SideChallenges() {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
   return (
-    <AbsoluteFill className="dark bg-background text-foreground" style={{ fontFamily: "'Geist Variable', sans-serif", padding: '140px 120px 0' }}>
+    <AbsoluteFill className="bg-background text-foreground" style={{ fontFamily: "'Geist Variable', sans-serif", padding: '140px 120px 0' }}>
       <div style={{ display: 'flex', gap: 40 }}>
         {CHALLENGES.map((item, index) => {
           const pop = spring({ frame: frame - s(0.3) - index * s(0.6), fps, config: { damping: 16, stiffness: 200 }, durationInFrames: 12 })
@@ -46,10 +46,10 @@ export function SideChallenges() {
               }}
             >
               <div style={{ width: 10, background: item.accent }} />
-              <div style={{ background: '#18181b', padding: '36px 36px 40px', flex: 1 }}>
+              <div style={{ background: 'var(--muted)', padding: '36px 36px 40px', flex: 1 }}>
                 <div style={{ fontSize: 60, fontWeight: 800, letterSpacing: -1.5 }}>{item.name}</div>
                 <div style={{ fontSize: 26, color: item.accent, marginTop: 8, fontWeight: 600 }}>{item.challenge}</div>
-                <div style={{ fontSize: 30, lineHeight: 1.45, color: 'rgba(255,255,255,0.75)', marginTop: 28 }}>{item.use}</div>
+                <div style={{ fontSize: 30, lineHeight: 1.45, color: 'var(--muted-foreground)', marginTop: 28 }}>{item.use}</div>
               </div>
             </div>
           )

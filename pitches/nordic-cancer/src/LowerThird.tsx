@@ -33,14 +33,14 @@ export function LowerThird({
       }}
     >
       <div style={{ width: 12, background: accent }} />
-      <div style={{ background: 'white', color: '#0a0a0e', padding: '18px 34px 20px 26px', boxShadow: '0 12px 40px rgba(0,0,0,0.35)' }}>
+      <div style={{ background: '#0a0a0e', color: 'white', padding: '18px 34px 20px 26px', boxShadow: '0 12px 40px rgba(0,0,0,0.25)' }}>
         <div style={{ fontSize: 44, fontWeight: 700, letterSpacing: -0.5, lineHeight: 1.1 }}>{title}</div>
         {line && (
           <div
             style={{
               fontSize: 28,
               marginTop: 6,
-              color: 'rgba(10,10,14,0.65)',
+              color: 'rgba(255,255,255,0.72)',
               opacity: interpolate(frame, [4, 10], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
             }}
           >

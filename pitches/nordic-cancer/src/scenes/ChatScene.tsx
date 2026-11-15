@@ -5,6 +5,7 @@ import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent } from '@/components/ui/message'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
+import { Cursor } from '../Cursor'
 import { s } from '../frame'
 import { LowerThird } from '../LowerThird'
 import { turnAt, type Step } from '../stream'
@@ -64,7 +65,7 @@ export function ChatScene() {
   const frame = useCurrentFrame()
   const typed = QUESTION.slice(0, Math.floor(frame * 3.2))
   return (
-    <AbsoluteFill className="dark bg-background text-foreground">
+    <AbsoluteFill className="bg-background text-foreground">
       <TooltipProvider>
         <div className="flex h-full flex-col justify-end px-[13%] pb-[150px]" style={{ zoom: 2.3 }}>
           <div className="flex flex-col gap-5">
@@ -79,6 +80,15 @@ export function ChatScene() {
           </div>
         </div>
       </TooltipProvider>
+      {/* The newest tool row stays at one height, since the chat grows upwards. */}
+      <Cursor
+        path={[
+          { at: s(0.2), x: 1650, y: 980 },
+          { at: s(1.4), x: 560, y: 712 },
+          { at: s(3.7), x: 560, y: 712 },
+          { at: s(4.4), x: 1560, y: 860 },
+        ]}
+      />
       <Sequence durationInFrames={s(1.4)}>
         <LowerThird title="Ask in plain language" line="ADA works on Finland's open health data" exitAt={s(1.1)} />
       </Sequence>

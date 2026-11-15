@@ -30,9 +30,9 @@ export function FeedbackLoop() {
   const drawn = interpolate(frame, [s(0.3), s(0.3) + EACH * STEPS.length], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
   const circumference = 2 * Math.PI * RADIUS
   return (
-    <AbsoluteFill className="dark bg-background text-foreground" style={{ fontFamily: "'Geist Variable', sans-serif" }}>
+    <AbsoluteFill className="bg-background text-foreground" style={{ fontFamily: "'Geist Variable', sans-serif" }}>
       <svg width={1920} height={1080} style={{ position: 'absolute' }}>
-        <circle cx={CENTER.x} cy={CENTER.y} r={RADIUS} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={6} />
+        <circle cx={CENTER.x} cy={CENTER.y} r={RADIUS} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={6} />
         <circle
           cx={CENTER.x}
           cy={CENTER.y}
@@ -47,7 +47,7 @@ export function FeedbackLoop() {
       </svg>
       <div style={{ position: 'absolute', left: CENTER.x - 200, top: CENTER.y - 60, width: 400, textAlign: 'center' }}>
         <div style={{ fontSize: 84, fontWeight: 800, letterSpacing: -2 }}>ada</div>
-        <div style={{ fontSize: 26, color: 'rgba(255,255,255,0.6)' }}>win-win</div>
+        <div style={{ fontSize: 26, color: 'var(--muted-foreground)' }}>win-win</div>
       </div>
       {STEPS.map((step, index) => {
         const at = s(0.3) + index * EACH
@@ -69,7 +69,7 @@ export function FeedbackLoop() {
             }}
           >
             <div style={{ fontSize: 44, fontWeight: 700 }}>{step.title}</div>
-            <div style={{ fontSize: 28, color: 'rgba(255,255,255,0.65)', marginTop: 4 }}>{step.line}</div>
+            <div style={{ fontSize: 28, color: 'var(--muted-foreground)', marginTop: 4 }}>{step.line}</div>
           </div>
         )
       })}
@@ -86,8 +86,8 @@ export function FeedbackLoop() {
               width: 32,
               height: 32,
               borderRadius: 16,
-              background: lit ? '#7c3aed' : '#27272a',
-              boxShadow: lit ? '0 0 24px #7c3aed' : 'none',
+              background: lit ? '#7c3aed' : '#e4e4e7',
+              boxShadow: lit ? '0 0 18px rgba(124,58,237,0.6)' : 'none',
             }}
           />
         )

@@ -3,3 +3,12 @@
 
 @source '../../../services/frontend/src/components';
 @source './';
+
+/* CSS animations run on the wall clock, not on Remotion's frames: everything that moves in
+   the video moves by frame (useCurrentFrame), so the app's own animations stand still. */
+*,
+*::before,
+*::after {
+  animation: none !important;
+  transition: none !important;
+}

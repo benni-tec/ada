@@ -8,6 +8,7 @@ import { CHAT_FRAMES, ChatScene } from './scenes/ChatScene'
 import { Credits } from './scenes/Credits'
 import { FeedbackLoop, LOOP_FRAMES } from './scenes/FeedbackLoop'
 import { SIDE_CHALLENGE_FRAMES, SideChallenges } from './scenes/SideChallenges'
+import { TitleCard } from './scenes/TitleCard'
 
 /** One line of big type, punched in. */
 function Punch({ children, sub }: { children: string; sub?: string }) {
@@ -15,7 +16,7 @@ function Punch({ children, sub }: { children: string; sub?: string }) {
   const { fps } = useVideoConfig()
   const pop = spring({ frame, fps, config: { damping: 14, stiffness: 180 }, durationInFrames: 12 })
   return (
-    <AbsoluteFill className="dark items-center justify-center bg-background text-foreground" style={{ fontFamily: "'Geist Variable', sans-serif" }}>
+    <AbsoluteFill className="items-center justify-center bg-background text-foreground" style={{ fontFamily: "'Geist Variable', sans-serif" }}>
       <div style={{ fontSize: 150, fontWeight: 800, letterSpacing: -4, transform: `scale(${0.85 + pop * 0.15})`, opacity: pop }}>{children}</div>
       {sub && (
         <div style={{ fontSize: 46, marginTop: 12, opacity: interpolate(frame, [8, 14], [0, 0.75], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) }}>
@@ -31,7 +32,7 @@ function Screen({ src, title, line }: { src: string; title: string; line: string
   const frame = useCurrentFrame()
   const scale = interpolate(frame, [0, s(6)], [1.02, 1.2])
   return (
-    <AbsoluteFill className="bg-black">
+    <AbsoluteFill className="bg-background">
       <Img src={staticFile(src)} style={{ width: '100%', transform: `scale(${scale})`, transformOrigin: '70% 45%' }} />
       <LowerThird title={title} line={line} />
     </AbsoluteFill>
@@ -41,9 +42,9 @@ function Screen({ src, title, line }: { src: string; title: string; line: string
 /** A scene that is planned but not built yet: what it will show, at its length. */
 function Planned({ title, shows }: { title: string; shows: string }) {
   return (
-    <AbsoluteFill className="dark bg-background text-foreground">
-      <div style={{ position: 'absolute', top: 96, left: 96, fontFamily: 'monospace', fontSize: 26, color: '#a78bfa' }}>PLANNED SCENE</div>
-      <div style={{ position: 'absolute', top: 150, left: 96, right: 96, fontSize: 40, lineHeight: 1.4, color: 'rgba(255,255,255,0.6)' }}>{shows}</div>
+    <AbsoluteFill className="bg-background text-foreground">
+      <div style={{ position: 'absolute', top: 96, left: 96, fontFamily: 'monospace', fontSize: 26, color: '#7c3aed' }}>PLANNED SCENE</div>
+      <div style={{ position: 'absolute', top: 150, left: 96, right: 96, fontSize: 40, lineHeight: 1.4, color: 'var(--muted-foreground)' }}>{shows}</div>
       <LowerThird title={title} />
     </AbsoluteFill>
   )
@@ -54,7 +55,7 @@ type Section = { name: string; frames: number; scene: ReactNode }
 /** The pitch, three minutes, in the order of the story: the case and its models first,
  * then where their data comes from, then the cases as data, which closes the loop. */
 const SECTIONS: Section[] = [
-  { name: 'Title', frames: s(4), scene: <Punch sub="Promoting better and equal cancer care">ada</Punch> },
+  { name: 'Title', frames: s(4), scene: <TitleCard subtitle="Promoting better and equal cancer care" /> },
   { name: 'No clock', frames: s(5), scene: <Punch sub="Finland has no trigger, no clock and no measurement">No clock</Punch> },
 
   // 1. The central tool: cases with models.
@@ -96,7 +97,7 @@ const SECTIONS: Section[] = [
   {
     name: 'Dashboard',
     frames: s(6),
-    scene: <Screen src="session.png" title="Goal 3 on one dashboard" line="Survival gap, mortality against target, screening by county" />,
+    scene: <Screen src="dashboard-light.png" title="Goal 3 on one dashboard" line="Survival gap, mortality against target, screening by county" />,
   },
   {
     name: 'Evidence',
@@ -145,7 +146,7 @@ export const PITCH_FRAMES = SECTIONS.reduce((total, section) => total + section.
 export function Pitch() {
   let at = 0
   return (
-    <AbsoluteFill className="bg-black">
+    <AbsoluteFill className="bg-background">
       {SECTIONS.map((section) => {
         const from = at
         at += section.frames

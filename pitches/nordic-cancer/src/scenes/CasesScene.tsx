@@ -3,6 +3,7 @@ import { AbsoluteFill, Sequence, spring, useCurrentFrame, useVideoConfig } from 
 import { CaseData } from '@/components/cases/case-data'
 import { ResultBadge, RunsBadge } from '@/components/cases/labels'
 import { SectionView } from '@/components/cases/result-sheet'
+import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ownFields, type CaseState, type CaseType, type ModelOnCase } from '@/lib/api'
@@ -10,6 +11,7 @@ import { ownFields, type CaseState, type CaseType, type ModelOnCase } from '@/li
 import caseTypeJson from '../data/case-type.json'
 import stateJson from '../data/case.json'
 import modelsJson from '../data/case-models.json'
+import { Cursor, type Point } from '../Cursor'
 import { s } from '../frame'
 import { LowerThird } from '../LowerThird'
 
@@ -31,6 +33,21 @@ function caseAt(frame: number): CaseState {
 const SAVED = s(0.5) * DAYS.length + s(0.4)
 const SHEET = s(7)
 
+/** The pointer: along the steps as they are entered, to the result, a click on View result,
+ * then the overdue deadline, the late step and the survival in the sheet. */
+const POINTER: Point[] = [
+  { at: 0, x: 1500, y: 980 },
+  { at: 12, x: 1110, y: 330 },
+  { at: 27, x: 1110, y: 372 },
+  { at: 42, x: 1110, y: 414 },
+  { at: SAVED + 20, x: 1120, y: 892 },
+  { at: SHEET - 12, x: 1560, y: 892 },
+  { at: SHEET - 6, x: 1560, y: 892, click: true },
+  { at: s(9.5), x: 1800, y: 300 },
+  { at: s(15), x: 1222, y: 682 },
+  { at: s(24), x: 1150, y: 952 },
+]
+
 export const CASES_FRAMES = s(34)
 
 const FOCUS_CSS = `
@@ -51,7 +68,7 @@ export function CasesScene() {
   // The part of the result the banner talks about; the rest dims.
   const focus = frame < s(8.5) ? null : frame < s(14) ? 'deadlines' : frame < s(23) ? 'days' : 'survival'
   return (
-    <AbsoluteFill className="dark bg-background text-foreground">
+    <AbsoluteFill className="bg-background text-foreground">
       <style>{FOCUS_CSS}</style>
       <TooltipProvider>
         <div style={{ zoom: 1.45, padding: '28px 40px' }} className="flex max-w-[1180px] flex-col gap-4">
@@ -80,6 +97,7 @@ export function CasesScene() {
                   <TableHead className="px-4 text-xs text-muted-foreground">Model</TableHead>
                   <TableHead className="px-4 text-xs text-muted-foreground">Runs</TableHead>
                   <TableHead className="px-4 text-xs text-muted-foreground">Latest result</TableHead>
+                  <TableHead className="px-4" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -95,6 +113,11 @@ export function CasesScene() {
                       <span className="text-xs text-muted-foreground">Running…</span>
                     )}
                   </TableCell>
+                  <TableCell className="px-4 py-3 text-right">
+                    <Button variant="outline" disabled={!ran}>
+                      View result
+                    </Button>
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -103,7 +126,7 @@ export function CasesScene() {
         {frame >= SHEET && pathway.latest && (
           <div
             className="absolute inset-y-0 right-0 overflow-hidden border-l bg-background"
-            style={{ width: 1040, transform: `translateX(${(1 - sheet) * 1040}px)`, boxShadow: '-24px 0 60px rgba(0,0,0,0.5)' }}
+            style={{ width: 1040, transform: `translateX(${(1 - sheet) * 1040}px)`, boxShadow: '-24px 0 60px rgba(0,0,0,0.15)' }}
           >
             <div style={{ zoom: 1.35, padding: '24px 28px' }}>
               <div className="text-sm text-muted-foreground">{full.case.key} · {caseType.name}</div>
@@ -115,6 +138,7 @@ export function CasesScene() {
           </div>
         )}
       </TooltipProvider>
+      <Cursor path={POINTER} />
       <Sequence durationInFrames={s(4)}>
         <LowerThird title="A case: one patient's pathway" line="Entered step by step by the clinician (synthetic data)" exitAt={s(3.6)} />
       </Sequence>
