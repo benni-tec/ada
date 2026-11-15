@@ -5,6 +5,7 @@ import { useId, type ReactNode } from 'react'
 
 import { attachmentTitle } from '@/components/attachments/kinds'
 import { EditableTitle } from '@/components/editable-title'
+import { LiveTime } from '@/components/live-time'
 import { ErrorNotice, Loading } from '@/components/notices'
 import { PageHeader } from '@/components/page-header'
 import { Time } from '@/components/provenance'
@@ -208,7 +209,7 @@ function Sources({ projectId }: { projectId: Id }) {
                 Refresh: {describeFreshness(source.freshness)}
                 {source.last_checked_at && (
                   <>
-                    {' · '}checked <Time value={source.last_checked_at} />
+                    {' · '}checked <LiveTime value={source.last_checked_at} />
                   </>
                 )}
               </p>

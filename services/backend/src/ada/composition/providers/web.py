@@ -43,7 +43,11 @@ class WebProvider(Provider):
 
     @provide(scope=Scope.APP)
     def explorer(self, client: WebClient, settings: Settings) -> WebExplorer:
-        return ContextDevWeb(client, _set(settings.context_dev_api_key))
+        return ContextDevWeb(
+            client,
+            _set(settings.context_dev_api_key),
+            monitor_minutes=settings.context_monitor_minutes,
+        )
 
     # Its own connection per write, from the engine, not the request's session.
     @provide(scope=Scope.APP)

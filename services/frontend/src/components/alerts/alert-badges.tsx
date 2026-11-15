@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { Bell } from 'lucide-react'
 
 import { Hint } from '@/components/icon-action'
-import { Time } from '@/components/provenance'
+import { LiveTime } from '@/components/live-time'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { dashboardAlertsQuery, type Id } from '@/lib/api'
@@ -54,7 +54,7 @@ export function AlertBadges({ projectId, dashboardId }: { projectId: Id; dashboa
                   <span className="min-w-0 truncate font-medium">{keyText(alert.key)}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {rule.name} · since <Time value={alert.started_at} />
+                  {rule.name} · since <LiveTime value={alert.started_at} />
                 </div>
               </li>
             ))}

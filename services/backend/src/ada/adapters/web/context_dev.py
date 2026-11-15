@@ -43,8 +43,6 @@ BASE_URL = "https://api.context.dev/v1"
 TIMEOUT = httpx.Timeout(180.0, connect=10.0)
 # What an extraction costs when Context.dev does not say (the recorded one cost 5).
 EXTRACT_CREDITS = 5
-# Watched pages are checked once a day.
-SCHEDULE = {"type": "interval", "frequency": 1, "unit": "days"}
 # The passages a focused read returns at most (Context.dev allows 100 to 20,000).
 FOCUS_CHARACTERS = 8000
 # A search hit's snippet: its passages relevant to the query, at most this long.
@@ -119,6 +117,16 @@ class _ContextDev:
 
 
 class ContextDevWeb(_ContextDev, WebExplorer):
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        api_key: str | None,
+        base_url: str = BASE_URL,
+        monitor_minutes: int = 1440,
+    ) -> None:
+        super().__init__(client, api_key, base_url)
+        self.monitor_minutes = monitor_minutes
+
     async def read(
         self,
         url: str,
@@ -258,7 +266,7 @@ class ContextDevWeb(_ContextDev, WebExplorer):
             "name": f"ada {url}"[:120],
             "target": {"type": "page", "url": url},
             "webhook": {"url": webhook_url, "events": ["change.detected"]},
-            "schedule": SCHEDULE,
+            "schedule": {"type": "interval", "frequency": self.monitor_minutes, "unit": "minutes"},
         }
         answer = await self._send("POST", "/monitors", f"watch {url}", None, json=body)
         webhook = answer.get("webhook") or {}
