@@ -292,11 +292,12 @@ class JudgeSettingsRepository(Protocol):
 class DashboardRepository(Protocol):
     async def get(self, id: Id) -> Dashboard: ...
     async def list(self, project_id: Id) -> Sequence[Dashboard]:
-        """In the order people gave them, then the unplaced ones oldest first."""
+        """The pinned ones in their order, then the others oldest first."""
         ...
 
     async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
-        """Place the given dashboards in this order, leaving their revisions as they are."""
+        """Pin the given dashboards in this order and unpin the others, leaving revisions as
+        they are."""
         ...
 
     async def add(self, dashboard: Dashboard) -> None: ...
@@ -316,11 +317,12 @@ class TemplateRepository(Protocol):
 class ReportRepository(Protocol):
     async def get(self, id: Id) -> Report: ...
     async def list(self, project_id: Id) -> Sequence[Report]:
-        """In the order people gave them, then the unplaced ones oldest first."""
+        """The pinned ones in their order, then the others oldest first."""
         ...
 
     async def reorder(self, project_id: Id, ids: Sequence[Id]) -> None:
-        """Place the given reports in this order, leaving their revisions as they are."""
+        """Pin the given reports in this order and unpin the others, leaving revisions as
+        they are."""
         ...
 
     async def add(self, report: Report) -> None: ...

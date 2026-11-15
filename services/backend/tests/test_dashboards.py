@@ -357,26 +357,34 @@ def test_pinning_answers_with_the_new_state_or_a_conflict_naming_both_revisions(
     assert [e.payload["version_id"] for e in changes] == [None, pinned["version"]["id"]]
 
 
-def test_dashboards_are_listed_in_the_order_people_gave_them(client: TestClient) -> None:
+def test_pinned_dashboards_come_first_in_their_order_and_a_dashboard_is_renamed(
+    client: TestClient,
+) -> None:
     project = new_project(client)
     first, second, third = (create_dashboard(client, project) for _ in range(3))
     path = f"/projects/{project['id']}/dashboards"
 
-    reordered = send(
-        client, "PUT", f"{path}/order", {"ids": [third["id"], first["id"], second["id"]]}
-    )
+    pinned = send(client, "PUT", f"{path}/order", {"ids": [third["id"], first["id"]]})
     added = create_dashboard(client, project)
-    partial = client.put(f"/api{path}/order", json={"ids": [first["id"]]})
-    twice = client.put(f"/api{path}/order", json={"ids": [first["id"]] * 4})
+    twice = client.put(f"/api{path}/order", json={"ids": [first["id"]] * 2})
+    foreign = client.put(f"/api{path}/order", json={"ids": [str(uuid7())]})
+    renamed = send(
+        client, "PATCH", f"/dashboards/{second['id']}", {"name": "Goals", "expected_revision": 1}
+    )
 
-    assert [d["id"] for d in reordered] == [third["id"], first["id"], second["id"]]
-    assert [d["revision"] for d in reordered] == [1, 1, 1]
-    # A new one comes last until it is moved.
+    # Pinned first in their order, then the others in creation order; no revision moved.
+    order = [third["id"], first["id"], second["id"]]
+    assert [d["id"] for d in pinned] == order
+    assert [(d["position"], d["revision"]) for d in pinned] == [(0, 1), (1, 1), (None, 1)]
     listed = send(client, "GET", path)
-    assert [d["id"] for d in listed] == [third["id"], first["id"], second["id"], added["id"]]
-    assert (partial.status_code, twice.status_code) == (422, 422)
+    assert [d["id"] for d in listed] == [*order, added["id"]]
+    assert (twice.status_code, foreign.status_code) == (422, 422)
+    assert (renamed["dashboard"]["name"], renamed["dashboard"]["revision"]) == ("Goals", 2)
+    # Unpinning all of them: creation order again.
+    unpinned = send(client, "PUT", f"{path}/order", {"ids": []})
+    assert [d["id"] for d in unpinned] == [first["id"], second["id"], third["id"], added["id"]]
     changed = [e for e in events(client, project["id"]) if e.type is EventType.ORDER_CHANGED]
-    assert [e.payload for e in changed] == [{"list": "dashboards"}]
+    assert [e.payload for e in changed] == [{"list": "dashboards"}] * 2
 
 
 def test_a_run_for_a_dashboard_uses_its_range_unless_one_is_given(client: TestClient) -> None:

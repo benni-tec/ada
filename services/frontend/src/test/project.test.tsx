@@ -165,13 +165,19 @@ test('the sidebar collapses to icons and opens again, and creates sessions and d
   expect(created).toEqual([{ title: 'Waiting times' }, { name: 'Mortality' }])
 })
 
-test('dashboards are put in another order with the keyboard, and the new order is saved', async () => {
-  const orders: unknown[] = []
-  const first = dashboard({ id: 'd1', name: 'Screening overview', current_version_id: null })
-  const second = dashboard({ id: 'd2', name: 'Mortality', current_version_id: null })
+test('pinned dashboards come first and move with the keyboard; another one is pinned to the end', async () => {
+  const orders: { ids: string[] }[] = []
+  const first = dashboard({ id: 'd1', name: 'Screening overview', current_version_id: null, position: 0 })
+  const second = dashboard({ id: 'd2', name: 'Mortality', current_version_id: null, position: 1 })
+  const third = dashboard({ id: 'd3', name: 'Data quality', current_version_id: null, position: null })
+  const listed = () => {
+    const ids = orders.at(-1)?.ids ?? ['d1', 'd2']
+    const all = [first, second, third]
+    return [...ids.map((id, position) => ({ ...all.find((d) => d.id === id)!, position })), ...all.filter((d) => !ids.includes(d.id)).map((d) => ({ ...d, position: null }))]
+  }
   serveProject({
-    'GET /api/projects/p1/dashboards': () => (orders.length ? [second, first] : [first, second]),
-    'PUT /api/projects/p1/dashboards/order': (body: unknown) => (orders.push(body), [second, first]),
+    'GET /api/projects/p1/dashboards': listed,
+    'PUT /api/projects/p1/dashboards/order': (body: unknown) => (orders.push(body as { ids: string[] }), listed()),
   })
   // jsdom lays nothing out: give the items rows of their own so arrow keys find a neighbour.
   const rect = Element.prototype.getBoundingClientRect
@@ -184,6 +190,9 @@ test('dashboards are put in another order with the keyboard, and the new order i
   try {
     renderAt('/projects/p1')
     const link = await within(await screen.findByRole('group', { name: 'Dashboards' })).findByRole('link', { name: 'Screening overview' })
+    const names = () => within(group('Dashboards')).getAllByRole('link').map((item) => item.textContent)
+    expect(names()).toEqual(['Screening overview', 'Mortality', 'Data quality'])
+    expect(within(group('Dashboards')).getByRole('button', { name: 'Unpin Mortality' })).toHaveAttribute('aria-pressed', 'true')
 
     // The sensor listens for the next keys from the next tick on.
     const tick = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)))
@@ -193,11 +202,12 @@ test('dashboards are put in another order with the keyboard, and the new order i
     fireEvent.keyDown(link, { code: 'ArrowDown', key: 'ArrowDown' })
     await tick()
     fireEvent.keyDown(link, { code: 'Space', key: ' ' })
-
     await waitFor(() => expect(orders).toEqual([{ ids: ['d2', 'd1'] }]))
-    await waitFor(() =>
-      expect(within(group('Dashboards')).getAllByRole('link').map((item) => item.textContent)).toEqual(['Mortality', 'Screening overview']),
-    )
+    await waitFor(() => expect(names()).toEqual(['Mortality', 'Screening overview', 'Data quality']))
+
+    // Pinning the unpinned one puts it after the pinned ones.
+    fireEvent.click(within(group('Dashboards')).getByRole('button', { name: 'Pin Data quality' }))
+    await waitFor(() => expect(orders.at(-1)).toEqual({ ids: ['d2', 'd1', 'd3'] }))
   } finally {
     Element.prototype.getBoundingClientRect = rect
   }

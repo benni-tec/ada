@@ -18,12 +18,12 @@ from ada.core.models.time import TimeRange
 class ReportService(Protocol):
     async def get(self, id: Id) -> Report: ...
     async def list(self, project_id: Id) -> Sequence[Report]:
-        """In the order people gave them; new ones last."""
+        """The pinned ones in the order people gave them, then the others oldest first."""
         ...
 
     async def reorder(self, project_id: Id, ids: Sequence[Id]) -> Sequence[Report]:
-        """Put the project's reports in this order: every one of them, once. Changes no
-        revision."""
+        """Pin these reports in this order and unpin the rest. Changes no revision. Only
+        people pin; no agent tool calls it."""
         ...
 
     async def version(self, version_id: Id) -> ReportVersion: ...

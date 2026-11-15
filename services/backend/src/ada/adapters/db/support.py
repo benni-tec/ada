@@ -54,8 +54,14 @@ def in_position_order(row_type: Any, *conditions: Any) -> Select[Any]:
 async def set_positions(
     session: AsyncSession, row_type: Any, project_id: object, ids: Sequence[object]
 ) -> None:
-    """Number the project's rows in the given order. A bulk update, so the revision stays:
-    reordering conflicts with no edit."""
+    """Pin the given rows in this order and unpin the project's others. A bulk update, so the
+    revision stays: pinning conflicts with no edit."""
+    await session.execute(
+        update(row_type)
+        .where(row_type.project_id == project_id, row_type.id.not_in(list(ids)))
+        .values(position=None)
+        .execution_options(synchronize_session=False)
+    )
     for position, id in enumerate(ids):
         await session.execute(
             update(row_type)

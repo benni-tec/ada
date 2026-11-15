@@ -28,8 +28,8 @@ class Dashboard(DomainModel):
     default_time_range: TimeRange = TimeRange()
     created_at: datetime
     revision: int = 1
-    # Where people put it among the project's dashboards; None (new) comes after them, in
-    # creation order. Set by reordering, outside the revision.
+    # Its place among the pinned dashboards; None when not pinned (listed after them, in
+    # creation order). Only people pin, outside the revision.
     position: int | None = None
 
 
