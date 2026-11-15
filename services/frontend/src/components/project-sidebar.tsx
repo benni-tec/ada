@@ -17,7 +17,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
@@ -64,7 +63,6 @@ import { Vahti } from './vahti/vahti'
  * (`aria-current`), so the sidebar also says where one is, in place of breadcrumbs.
  */
 export function ProjectSidebar({ projectId }: { projectId: Id }) {
-  const pathwaysId = useId()
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -91,14 +89,11 @@ export function ProjectSidebar({ projectId }: { projectId: Id }) {
               <Sessions projectId={projectId} />
               <Dashboards projectId={projectId} />
               <Reports projectId={projectId} />
-            </SidebarMenu>
-          </SidebarGroup>
-          {/* Cases and the models that run on them. */}
-          <SidebarGroup role="group" aria-labelledby={pathwaysId}>
-            <SidebarGroupLabel id={pathwaysId}>Pathways</SidebarGroupLabel>
-            <SidebarMenu>
-              <PageLink to="/projects/$projectId/cases" projectId={projectId} type="case" label="Cases" />
-              <PageLink to="/projects/$projectId/models" projectId={projectId} type="model" label="Models" />
+              {/* Cases and the models that run on them. */}
+              <Group type="pathway" label="Pathways">
+                <PageLink to="/projects/$projectId/cases" projectId={projectId} type="case" label="Cases" />
+                <PageLink to="/projects/$projectId/models" projectId={projectId} type="model" label="Models" />
+              </Group>
             </SidebarMenu>
           </SidebarGroup>
         </nav>
@@ -466,14 +461,14 @@ function PageLink({
 }) {
   const Icon = pageTypes[type].icon
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton asChild tooltip={label}>
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild>
         <Link to={to} params={{ projectId }} activeProps={{ 'data-active': true }}>
           <Icon aria-hidden="true" />
           <span>{label}</span>
         </Link>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
   )
 }
 
