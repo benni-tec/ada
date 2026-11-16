@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 COPY services/frontend services/frontend
 RUN pnpm --filter frontend build
 
-FROM nginx:1.30.6-alpine
+FROM nginx:1.31.7-alpine
 # nginx renders /etc/nginx/templates/*.template into conf.d/ at startup.
 COPY services/frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 # Same port as the Vite dev server.

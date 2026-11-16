@@ -5,7 +5,7 @@
 # Base images are pinned to exact versions in the FROM lines, where Dependabot updates them.
 # Keep Python, uv, Node and pnpm in line with mise.toml.
 
-FROM ghcr.io/astral-sh/uv:0.13.1 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.8 AS uv
 
 # The widgets, one self-contained HTML file each: the backend serves them to the frontend
 # and as MCP App resources.
@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 COPY services/widgets services/widgets
 RUN pnpm --filter widgets build
 
-FROM python:3.14.10-slim AS build
+FROM python:3.15.0-slim AS build
 COPY --from=uv /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -34,7 +34,7 @@ COPY services/backend services/backend
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable --package ada
 
-FROM python:3.14.10-slim
+FROM python:3.15.0-slim
 RUN useradd --system --uid 1000 --no-create-home ada \
     # Snapshots; compose mounts a volume here that the API and the workers share.
     && mkdir /data && chown ada /data
