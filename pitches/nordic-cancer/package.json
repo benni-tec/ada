@@ -8,12 +8,12 @@
     "still": "remotion still"
   },
   "dependencies": {
-    "@remotion/cli": "4.0.543",
-    "@remotion/tailwind-v4": "4.0.543",
-    "remotion": "4.0.543",
+    "@remotion/cli": "4.0.544",
+    "@remotion/tailwind-v4": "4.0.544",
+    "remotion": "4.0.544",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "@remotion/bundler": "4.0.543"
+    "@remotion/bundler": "4.0.544"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
